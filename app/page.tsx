@@ -1534,9 +1534,9 @@ export default function Home() {
   const simulationResults = calculateEstimate();
 
   const saveSupabaseRow = async (tableName: string, values: Record<string, unknown>) => {
-    const { error } = await getSupabaseClient()
+    const { error } = await (getSupabaseClient() as any)
       .from(tableName)
-      .insert([values]);
+      .insert(values);
 
     if (error) {
       throw new Error(error.message);
