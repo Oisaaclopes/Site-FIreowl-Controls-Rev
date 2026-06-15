@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
 import { motion, AnimatePresence } from 'motion/react';
 import { getSupabaseClient } from '../lib/supabaseClient';
 import {
@@ -1144,109 +1143,6 @@ export default function Home() {
   }, []);
 
   React.useEffect(() => {
-    // Inject tsParticles CDN script safely on client side
-    const scriptId = 'tsparticles-cdn';
-    let script = document.getElementById(scriptId) as HTMLScriptElement;
-
-    const initParticles = () => {
-      const tsP = (window as any).tsParticles;
-      if (tsP && document.getElementById('tsparticles')) {
-        tsP.load("tsparticles", {
-          fullScreen: {
-            enable: false
-          },
-          fpsLimit: 60,
-          particles: {
-            number: {
-              value: 60,
-              density: {
-                enable: true,
-                value_area: 800
-              }
-            },
-            color: {
-              value: "#1A1A72"
-            },
-            shape: {
-              type: "circle"
-            },
-            opacity: {
-              value: 0.3,
-              random: false
-            },
-            size: {
-              value: 3,
-              random: true
-            },
-            links: {
-              enable: true,
-              distance: 150,
-              color: "#1A1A72",
-              opacity: 0.15,
-              width: 1
-            },
-            move: {
-              enable: true,
-              speed: 1.5,
-              direction: "none",
-              random: false,
-              straight: false,
-              outModes: {
-                default: "bounce"
-              }
-            }
-          },
-          interactivity: {
-            focus: {
-              enable: false
-            },
-            detectsOn: "canvas",
-            events: {
-              onHover: {
-                enable: true,
-                mode: "grab"
-              },
-              resize: true
-            },
-            modes: {
-              grab: {
-                distance: 200,
-                links: {
-                  opacity: 0.5
-                }
-              }
-            }
-          },
-          detectRetina: true
-        });
-      }
-    };
-
-    if (!script) {
-      script = document.createElement('script');
-      script.id = scriptId;
-      script.src = 'https://cdn.jsdelivr.net/npm/tsparticles@2.12.0/tsparticles.bundle.min.js';
-      script.async = true;
-      script.onload = () => {
-        initParticles();
-      };
-      document.body.appendChild(script);
-    } else {
-      if ((window as any).tsParticles) {
-        initParticles();
-      } else {
-        script.addEventListener('load', initParticles);
-      }
-    }
-
-    return () => {
-      if (script) {
-        script.removeEventListener('load', initParticles);
-      }
-    };
-  }, []);
-
-  React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setSelectedCase(null);
@@ -1752,8 +1648,13 @@ export default function Home() {
 
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-white py-16 lg:py-24" id="hero-section">
-        {/* tsParticles background canvas */}
-        <div id="tsparticles" className="absolute inset-0 z-0 pointer-events-auto" />
+        <div
+          className="absolute inset-0 z-0 pointer-events-none opacity-70"
+          style={{
+            backgroundImage: 'radial-gradient(circle at 18% 22%, rgba(26,26,114,0.08) 0 2px, transparent 2px), radial-gradient(circle at 72% 35%, rgba(230,57,70,0.07) 0 2px, transparent 2px), radial-gradient(circle at 44% 74%, rgba(255,215,0,0.11) 0 1.5px, transparent 1.5px)',
+            backgroundSize: '96px 96px, 132px 132px, 84px 84px',
+          }}
+        />
 
         {/* Background Decorative Grid and Gradients */}
         <div className="absolute inset-x-0 top-0 h-[600px] bg-gradient-to-b from-[#F2F4FA] to-transparent -z-10" />
@@ -1880,18 +1781,14 @@ export default function Home() {
                     <span className="text-[10px] font-mono bg-blue-950/80 text-blue-300 px-2 py-0.5 rounded border border-blue-900/30 font-bold">STREAMING 4K</span>
                   </div>
                   
-                  {/* Camera Feed Screen with REAL Warehouse image behind standard CAD Grid */}
+                  {/* Camera Feed Screen */}
                   <div className="relative bg-slate-950 h-32 rounded-lg overflow-hidden flex items-center justify-center group border border-slate-800/80">
                     
-                    {/* Real Warehouse background image via picsum.photos with custom CSS filters */}
+                    {/* Local industrial signal background */}
                     <div className="absolute inset-0 w-full h-full select-none pointer-events-none">
-                      <Image
-                        src="https://picsum.photos/seed/industrial_warehouse/600/400"
-                        alt="Galpão Industrial Inteligente"
-                        fill
-                        className="object-cover absolute inset-0 select-none pointer-events-none transition-transform duration-700 group-hover:scale-105"
-                        style={{ filter: 'grayscale(100%) brightness(0.25) blur(1.5px)' }}
-                        referrerPolicy="no-referrer"
+                      <div
+                        aria-hidden="true"
+                        className="absolute inset-0 select-none pointer-events-none bg-[radial-gradient(circle_at_35%_30%,rgba(148,163,184,0.18),transparent_22%),linear-gradient(135deg,#020617_0%,#0f172a_48%,#111827_100%)] transition-transform duration-700 group-hover:scale-105"
                       />
                     </div>
 
