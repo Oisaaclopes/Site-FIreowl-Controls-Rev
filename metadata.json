@@ -1,0 +1,6 @@
+{
+  "name": "Fireowl Controls",
+  "description": "Landing page de alta fidelidade para Fireowl Controls, especialista B2B em automação, alarmes de incêndio, CFTV e controle de acesso.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

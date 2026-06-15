@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary-blue: #1A1A72;
+  --color-action-red: #E63946;
+  --color-warning-yellow: #FFD700;
+  --color-text-dark: #4D4D4D;
+  --color-bg-white: #FFFFFF;
+  --color-bg-light-gray: #F8F9FA;
+  --font-sans: var(--font-roboto), sans-serif;
+  --font-display: var(--font-oswald), sans-serif;
+  --font-montserrat: var(--font-montserrat), sans-serif;
+}
+
+:root {
+  --primary-blue: #1A1A72;
+  --action-red: #E63946;
+  --warning-yellow: #FFD700;
+  --text-dark: #4D4D4D;
+  --bg-white: #FFFFFF;
+  --bg-light-gray: #F8F9FA;
+}
+
+body {
+  font-family: var(--font-roboto), sans-serif;
+  color: var(--text-dark);
+  background-color: var(--bg-white);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-oswald), sans-serif;
+}
+
+@keyframes floatUp {
+  0% {
+    transform: translateY(0) scale(0.8);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-520px) scale(1.1);
+    opacity: 0;
+  }
+}
+
+.float-bubble {
+  position: absolute;
+  bottom: -60px;
+  background: rgba(230, 57, 70, 0.15); /* Fundo vermelho translúcido (#E63946) */
+  border: 1px solid rgba(230, 57, 70, 0.35); /* Borda vermelha um pouco mais forte */
+  color: rgba(255, 255, 255, 0.55); /* Texto branco com opacidade para leitura sutil */
+  font-family: var(--font-roboto), sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  border-radius: 50px;
+  white-space: nowrap;
+  animation: floatUp linear infinite;
+  box-shadow: 0 4px 15px rgba(230, 57, 70, 0.1); /* Leve brilho avermelhado ao redor */
+  pointer-events: none;
+}
+
+@keyframes scanLine {
+  0% {
+    top: 5%;
+  }
+  100% {
+    top: 95%;
+  }
+}
+
+.cctv-scanner-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background-color: #E63946;
+  box-shadow: 0 0 12px 2px #E63946, 0 0 6px #E63946;
+  animation: scanLine 3s ease-in-out infinite alternate;
+  pointer-events: none;
+  z-index: 10;
+}
+
+@keyframes ledPulse {
+  0% {
+    opacity: 0.25;
+    transform: scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+.led-indicator {
+  border-radius: 50%;
+  animation: ledPulse 1s ease-in-out infinite alternate;
+}
+
