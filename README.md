@@ -19,6 +19,21 @@ View your app in AI Studio: https://ai.studio/apps/dd54e446-d922-4ca5-9502-4e69c
 3. Run the app:
    `npm run dev`
 
+## Deploy on Hostinger
+
+This project is configured as a static Next.js export for Hostinger.
+
+Use these settings in the Hostinger deployment panel:
+
+```text
+Framework: Other / Static site
+Install command: npm install
+Build command: npm run build
+Publish directory: out
+```
+
+Add the Supabase variables below in the Hostinger environment variables before building.
+
 ## Supabase contact sync
 
 The contact, simulator, and diagnostic forms are saved directly from the browser with the Supabase SDK. This keeps the forms working without GitHub and without depending on the Next.js API routes.
