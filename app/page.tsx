@@ -1536,7 +1536,7 @@ export default function Home() {
   const saveSupabaseRow = async (tableName: string, values: Record<string, unknown>) => {
     const { error } = await getSupabaseClient()
       .from(tableName)
-      .insert(values);
+      .insert([values]);
 
     if (error) {
       throw new Error(error.message);
