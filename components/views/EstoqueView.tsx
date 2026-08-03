@@ -90,6 +90,18 @@ const BASE_CATEGORIES = [
 const round2 = (n: number) => Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
 const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
+// Máscara de moeda (BRL): dígitos preenchem os centavos da direita p/ esquerda
+const parseMoney = (s: string): number => {
+  const digits = s.replace(/\D/g, '');
+  if (!digits) return 0;
+  return parseInt(digits, 10) / 100;
+};
+const formatMoney = (n: number): string =>
+  (Number.isFinite(n) ? n : 0).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
 // Ponto de informação (tooltip no hover)
 const InfoDot: React.FC<{ text: string }> = ({ text }) => (
   <span className="relative inline-flex group/info align-middle ml-1">
@@ -222,6 +234,25 @@ const NumberStepper: React.FC<{
     >
       <span className="material-symbols-outlined text-base">add</span>
     </button>
+  </div>
+);
+
+// Input com máscara de moeda (R$). Mantém o valor numérico no estado.
+const MoneyInput: React.FC<{ value: number; onChange: (n: number) => void; icon: string }> = ({
+  value,
+  onChange,
+  icon,
+}) => (
+  <div className="relative">
+    <span className="material-symbols-outlined absolute left-2.5 top-2.5 text-slate-400 text-base">{icon}</span>
+    <span className="absolute left-9 top-2.5 text-slate-500 font-data-mono text-xs pointer-events-none">R$</span>
+    <input
+      type="text"
+      inputMode="numeric"
+      value={formatMoney(value)}
+      onChange={(e) => onChange(parseMoney(e.target.value))}
+      className={`${inputCls} pl-16 font-data-mono text-right`}
+    />
   </div>
 );
 
@@ -891,31 +922,11 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                     <label className={labelCls}>Preço de venda</label>
-                    <div className="relative">
-                      <span className="material-symbols-outlined absolute left-2.5 top-2.5 text-slate-400 text-base">sell</span>
-                      <input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={salePrice}
-                        onChange={(e) => onSaleChange(Number(e.target.value))}
-                        className={`${inputCls} pl-9 font-data-mono`}
-                      />
-                    </div>
+                    <MoneyInput value={salePrice} onChange={onSaleChange} icon="sell" />
                   </div>
                   <div>
                     <label className={labelCls}>Preço de custo</label>
-                    <div className="relative">
-                      <span className="material-symbols-outlined absolute left-2.5 top-2.5 text-slate-400 text-base">point_of_sale</span>
-                      <input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={costPrice}
-                        onChange={(e) => onCostChange(Number(e.target.value))}
-                        className={`${inputCls} pl-9 font-data-mono`}
-                      />
-                    </div>
+                    <MoneyInput value={costPrice} onChange={onCostChange} icon="point_of_sale" />
                   </div>
                   <div>
                     <label className={labelCls}>
