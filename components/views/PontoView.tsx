@@ -7,6 +7,7 @@ import { DataListRow, Badge } from '@/components/DataListRow';
 interface PontoViewProps {
   punches: TimePunch[];
   onAddPunch: (punch: TimePunch) => void;
+  currentUser?: string;
 }
 
 const typeBadge = (type: TimePunch['type']) =>
@@ -14,21 +15,24 @@ const typeBadge = (type: TimePunch['type']) =>
 const statusBadgeColor = (status: TimePunch['status']) =>
   status === 'APROVADO' ? 'emerald' : status === 'PENDENTE' ? 'amber' : 'blue';
 
-export const PontoView: React.FC<PontoViewProps> = ({ punches, onAddPunch }) => {
-  const [punchType, setPunchType] = useState<'ENTRADA' | 'PAUSA' | 'RETORNO' | 'SAIDA'>('ENTRADA');
-  const [techName, setTechName] = useState('Eng. Ricardo M.');
+export const PontoView: React.FC<PontoViewProps> = ({ punches, onAddPunch, currentUser = 'Operador Fireowl' }) => {
   const [showFolhaModal, setShowFolhaModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [punching, setPunching] = useState(false);
+
+  // Próxima batida do usuário logado: se a última foi ENTRADA/RETORNO → SAÍDA; senão → ENTRADA
+  const lastPunch = punches.find((p) => p.employeeName === currentUser);
+  const nextType: TimePunch['type'] =
+    lastPunch && (lastPunch.type === 'ENTRADA' || lastPunch.type === 'RETORNO') ? 'SAIDA' : 'ENTRADA';
+  const isEntrada = nextType === 'ENTRADA';
 
   const handleBaterPonto = () => {
+    if (punching) return;
+    setPunching(true);
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          registerPunch(pos.coords.latitude, pos.coords.longitude);
-        },
-        () => {
-          registerPunch(-23.5505, -46.6333);
-        },
+        (pos) => registerPunch(pos.coords.latitude, pos.coords.longitude),
+        () => registerPunch(-23.5505, -46.6333),
         { timeout: 3000 }
       );
     } else {
@@ -48,9 +52,9 @@ export const PontoView: React.FC<PontoViewProps> = ({ punches, onAddPunch }) => 
 
     const newPunch: TimePunch = {
       id: `p_${Date.now()}`,
-      employeeName: techName,
+      employeeName: currentUser,
       timestamp: formattedDate,
-      type: punchType,
+      type: nextType,
       locationStr: `Catuaí Londrina (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
       lat,
       lng,
@@ -58,7 +62,8 @@ export const PontoView: React.FC<PontoViewProps> = ({ punches, onAddPunch }) => 
     };
 
     onAddPunch(newPunch);
-    setToastMessage(`Ponto de ${punchType} registrado com sucesso para ${techName}!`);
+    setToastMessage(`Ponto de ${nextType} registrado com sucesso para ${currentUser}!`);
+    setPunching(false);
     setTimeout(() => setToastMessage(null), 4000);
   };
 
@@ -94,56 +99,38 @@ export const PontoView: React.FC<PontoViewProps> = ({ punches, onAddPunch }) => 
         </button>
       </div>
 
-      {/* Clock-in Terminal Card (dashboard claro) */}
-      <div className="bg-white p-6 rounded-xl shadow-sm">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
-          <div>
-            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full uppercase tracking-wider">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Terminal de Batida com GPS Verificado
-            </span>
-            <h2 className="text-lg font-bold text-slate-900 uppercase mt-3">Registrar Ponto do Técnico Operacional</h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Registro instantâneo de entrada, pausas de refeição e saída das equipes externas.
-            </p>
-          </div>
+      {/* Clock-in Card — one-click (foco no técnico / celular) */}
+      <div className="bg-white p-6 rounded-xl shadow-sm max-w-md mx-auto w-full text-center">
+        <p className="text-lg font-bold text-slate-900">
+          Olá, <span className="text-[#1A1A72]">{currentUser}</span> 👋
+        </p>
+        <p className="text-xs text-slate-500 mt-1">
+          {isEntrada ? 'Pronto para iniciar o expediente?' : 'Bom trabalho! Encerrando o expediente?'}
+        </p>
 
-          <div className="flex flex-col sm:flex-row items-stretch gap-3 w-full lg:w-auto">
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-semibold uppercase text-slate-400">Técnico</label>
-              <select
-                value={techName}
-                onChange={(e) => setTechName(e.target.value)}
-                className="bg-white border border-slate-200 p-2.5 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20 w-full sm:w-56"
-              >
-                <option value="Eng. Ricardo M.">Eng. Ricardo M. (CREA 4289)</option>
-                <option value="Carlos Silva">Carlos Silva (Técnico Senior)</option>
-                <option value="Amanda Souza">Amanda Souza (Técnica Operacional)</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-semibold uppercase text-slate-400">Tipo de batida</label>
-              <select
-                value={punchType}
-                onChange={(e) => setPunchType(e.target.value as any)}
-                className="bg-white border border-slate-200 p-2.5 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20 w-full sm:w-44"
-              >
-                <option value="ENTRADA">ENTRADA</option>
-                <option value="PAUSA">PAUSA REFEIÇÃO</option>
-                <option value="RETORNO">RETORNO PAUSA</option>
-                <option value="SAIDA">SAÍDA</option>
-              </select>
-            </div>
-
-            <button
-              onClick={handleBaterPonto}
-              className="w-full sm:w-auto bg-[#1A1A72] hover:bg-[#12124f] text-white font-semibold text-xs px-6 py-2.5 rounded-lg uppercase tracking-wider transition-colors shadow-sm flex items-center justify-center gap-2 self-end"
-            >
-              <span className="material-symbols-outlined text-lg">touch_app</span>
-              Bater Ponto Agora
-            </button>
-          </div>
+        {/* Indicativo de GPS / MTP 671 */}
+        <div className="mt-5 inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-full">
+          <span className="material-symbols-outlined text-sm">location_on</span>
+          Localização e coordenadas GPS sincronizadas
         </div>
+
+        {/* Botão grande one-click */}
+        <button
+          onClick={handleBaterPonto}
+          disabled={punching}
+          className={`mt-5 w-full rounded-2xl py-6 text-white font-bold uppercase tracking-wider text-sm transition-all shadow-md flex flex-col items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-70 ${
+            isEntrada ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#1A1A72] hover:bg-[#12124f]'
+          }`}
+        >
+          <span className={`material-symbols-outlined text-4xl ${punching ? 'animate-spin' : ''}`}>
+            {punching ? 'progress_activity' : isEntrada ? 'check_circle' : 'logout'}
+          </span>
+          {punching ? 'Registrando...' : isEntrada ? 'Registrar Entrada' : 'Registrar Saída'}
+        </button>
+
+        <p className="text-[10px] text-slate-400 mt-3 uppercase tracking-wider">
+          Conformidade Portaria MTP 671/2021 · Registro com GPS
+        </p>
       </div>
 
       {/* Lista de Frequência (DataListRow) */}

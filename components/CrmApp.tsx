@@ -66,6 +66,7 @@ import { EstoqueView } from '@/components/views/EstoqueView';
 import { ServicosView } from '@/components/views/ServicosView';
 import { PontoView } from '@/components/views/PontoView';
 import { ContaView } from '@/components/views/ContaView';
+import { allowedTabs, isTabAllowed } from '@/lib/rbac';
 
 let idSeq = 1000;
 function getNextSeq() {
@@ -74,13 +75,22 @@ function getNextSeq() {
 
 interface CrmAppProps {
   initialRole?: UserRole;
+  userName?: string;
   onLogout?: () => void;
 }
 
-export function CrmApp({ initialRole = 'ADMINISTRATIVO', onLogout }: CrmAppProps) {
-  const [currentTab, setCurrentTab] = useState<TabPath>('painel');
+export function CrmApp({ initialRole = 'ADMINISTRATIVO', userName = 'Operador Fireowl', onLogout }: CrmAppProps) {
+  const [currentTab, setCurrentTab] = useState<TabPath>(allowedTabs(initialRole)[0]);
   const [userRole, setUserRole] = useState<UserRole>(initialRole);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  // RBAC: se a aba atual não é permitida ao perfil, volta para a primeira permitida
+  useEffect(() => {
+    if (!isTabAllowed(userRole, currentTab)) {
+      setCurrentTab(allowedTabs(userRole)[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userRole]);
 
   // System State Data
   const [clients, setClients] = useState<Client[]>(INITIAL_CLIENTS);
@@ -493,7 +503,9 @@ export function CrmApp({ initialRole = 'ADMINISTRATIVO', onLogout }: CrmAppProps
             />
           )}
 
-          {currentTab === 'ponto' && <PontoView punches={punches} onAddPunch={handleAddPunch} />}
+          {currentTab === 'ponto' && (
+            <PontoView punches={punches} onAddPunch={handleAddPunch} currentUser={userName} />
+          )}
 
           {currentTab === 'conta' && (
             <ContaView

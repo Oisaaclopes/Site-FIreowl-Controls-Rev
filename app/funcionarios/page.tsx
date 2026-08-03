@@ -30,9 +30,11 @@ const FUNCIONARIOS: Record<string, Funcionario> = {
 };
 
 const STORAGE_KEY = 'fireowl_func_auth';
+const NAME_KEY = 'fireowl_func_name';
 
 export default function FuncionariosPage() {
   const [authRole, setAuthRole] = useState<UserRole | null>(null);
+  const [authName, setAuthName] = useState<string>('Operador Fireowl');
   const [ready, setReady] = useState(false);
 
   const [usuario, setUsuario] = useState('');
@@ -45,6 +47,8 @@ export default function FuncionariosPage() {
     try {
       const saved = sessionStorage.getItem(STORAGE_KEY);
       if (saved) setAuthRole(saved as UserRole);
+      const savedName = sessionStorage.getItem(NAME_KEY);
+      if (savedName) setAuthName(savedName);
     } catch {
       /* sessionStorage indisponível */
     }
@@ -67,10 +71,12 @@ export default function FuncionariosPage() {
       setErro('');
       try {
         sessionStorage.setItem(STORAGE_KEY, user.role);
+        sessionStorage.setItem(NAME_KEY, user.nome);
       } catch {
         /* ignore */
       }
       setAuthRole(user.role);
+      setAuthName(user.nome);
     } else {
       setErro('Usuário ou chave de acesso inválidos.');
     }
@@ -79,6 +85,7 @@ export default function FuncionariosPage() {
   const handleLogout = () => {
     try {
       sessionStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem(NAME_KEY);
     } catch {
       /* ignore */
     }
@@ -92,7 +99,7 @@ export default function FuncionariosPage() {
 
   // Autenticado → abre o sistema de gestão
   if (authRole) {
-    return <CrmApp initialRole={authRole} onLogout={handleLogout} />;
+    return <CrmApp initialRole={authRole} userName={authName} onLogout={handleLogout} />;
   }
 
   // Tela de login do operador

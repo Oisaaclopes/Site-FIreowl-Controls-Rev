@@ -3,6 +3,7 @@
 import React from 'react';
 import { TabPath, UserRole } from '@/lib/types';
 import { OfficialLogo } from '@/components/OfficialLogo';
+import { allowedTabs } from '@/lib/rbac';
 
 interface SidebarProps {
   currentTab: TabPath;
@@ -19,7 +20,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenAuthModal,
   onLogout
 }) => {
-  const navItems: { path: TabPath; label: string; icon: string; count?: number }[] = [
+  const allNavItems: { path: TabPath; label: string; icon: string; count?: number }[] = [
     { path: 'painel', label: 'Painel', icon: 'dashboard' },
     { path: 'pedidos', label: 'Pedidos', icon: 'receipt_long', count: 4 },
     { path: 'contratos', label: 'Contratos', icon: 'description', count: 4 },
@@ -34,6 +35,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { path: 'ponto', label: 'Ponto', icon: 'schedule' },
     { path: 'conta', label: 'Conta & Log', icon: 'settings' },
   ];
+
+  // RBAC: mostra apenas as abas permitidas ao perfil logado
+  const permitted = allowedTabs(userRole);
+  const navItems = allNavItems.filter((item) => permitted.includes(item.path));
 
   return (
     <aside className="fixed left-0 top-0 h-full w-64 bg-[#1A1A72] z-50 flex flex-col border-r border-white/10 shadow-xl">
