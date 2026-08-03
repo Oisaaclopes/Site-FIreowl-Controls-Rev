@@ -1,0 +1,20 @@
+# Fireowl Controls — regras de cache para o site estático (Next export)
+# O Next copia o conteúdo de /public para a raiz do build (out/), então
+# este arquivo vai para a pasta publicada.
+
+# Não cachear HTML: garante que o navegador/servidor sempre pegue a versão
+# mais nova após cada deploy. Os assets do Next têm hash no nome e podem
+# ser cacheados normalmente.
+<IfModule mod_headers.c>
+  <FilesMatch "\.(html)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </FilesMatch>
+</IfModule>
+
+# Hostinger usa LiteSpeed: desativa o cache de página inteira para evitar
+# servir HTML antigo depois de um novo deploy.
+<IfModule LiteSpeed>
+  CacheDisable public /
+</IfModule>

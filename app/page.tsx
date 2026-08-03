@@ -3715,7 +3715,7 @@ export default function Home() {
 
         {/* Corporate bottom legal credits block */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 mt-12 border-t border-white/10 flex flex-col md:flex-row justify-between items-center text-xs text-gray-400 gap-4" id="footer-bottom-bar">
-          <p>© 2026 Fireowl Controls. Todos os direitos reservados. CNPJ: 57.372.721/0001-40</p>
+          <p>© 2026 Fireowl Controls. Todos os direitos reservados. CNPJ: 57.372.721/0001-40 <span className="text-gray-600" title="Identificador do build publicado">· build 2026-08-03-r7 (BUILDCHECK-A1)</span></p>
           <div className="flex gap-4">
             <a href="#" className="hover:text-white transition-colors">Políticas de Segurança e LGPD</a>
             <span>•</span>
