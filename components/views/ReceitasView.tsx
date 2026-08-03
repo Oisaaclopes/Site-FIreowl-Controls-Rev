@@ -2,55 +2,103 @@
 
 import React, { useState } from 'react';
 import { FinancialTransaction, Client } from '@/lib/types';
+import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
 
 interface ReceitasViewProps {
   transactions: FinancialTransaction[];
   clients: Client[];
   onAddTransaction: (t: FinancialTransaction) => void;
+  onUpdateTransaction?: (t: FinancialTransaction) => void;
+  onDeleteTransaction?: (id: string) => void;
 }
 
 let recSeq = 300;
+
+const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+const inputCls =
+  'w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/40';
+const labelCls = 'block text-slate-600 mb-1 font-semibold uppercase text-[11px]';
+
+const statusBadge = (status: FinancialTransaction['status']) =>
+  status === 'CONFIRMADO' ? 'emerald' : status === 'PENDENTE' ? 'amber' : 'red';
 
 export const ReceitasView: React.FC<ReceitasViewProps> = ({
   transactions,
   clients,
   onAddTransaction,
+  onUpdateTransaction,
+  onDeleteTransaction,
 }) => {
   const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
 
   // Form
-  const [clientOrVendor, setClientOrVendor] = useState(clients[0]?.name || 'Catuaí Shopping Londrina');
-  const [description, setDescription] = useState('Mensalidade de Contrato SDAI');
-  const [amount, setAmount] = useState(18500);
+  const [clientOrVendor, setClientOrVendor] = useState(clients[0]?.name || '');
+  const [description, setDescription] = useState('');
+  const [amount, setAmount] = useState(0);
+  const [status, setStatus] = useState<FinancialTransaction['status']>('CONFIRMADO');
 
   const receitas = transactions.filter((t) => t.type === 'RECEITA');
-  const filteredReceitas = receitas.filter((t) => {
-    if (filterStatus === 'ALL') return true;
-    return t.status === filterStatus;
-  });
+  const filteredReceitas = receitas.filter((t) => (filterStatus === 'ALL' ? true : t.status === filterStatus));
 
   const totalConfirmed = receitas
     .filter((t) => t.status === 'CONFIRMADO')
     .reduce((acc, t) => acc + t.amount, 0);
-
   const totalPending = receitas
-    .filter((t) => t.status === 'PENDENTE')
+    .filter((t) => t.status !== 'CONFIRMADO')
     .reduce((acc, t) => acc + t.amount, 0);
 
-  const handleCreateReceita = (e: React.FormEvent) => {
+  const openCreate = () => {
+    setEditingId(null);
+    setClientOrVendor(clients[0]?.name || '');
+    setDescription('');
+    setAmount(0);
+    setStatus('CONFIRMADO');
+    setShowModal(true);
+  };
+
+  const openEdit = (t: FinancialTransaction) => {
+    setEditingId(t.id);
+    setClientOrVendor(t.clientOrVendor);
+    setDescription(t.description);
+    setAmount(t.amount);
+    setStatus(t.status);
+    setShowModal(true);
+  };
+
+  const handleDelete = (t: FinancialTransaction) => {
+    if (!onDeleteTransaction) return;
+    if (!window.confirm(`Excluir o lançamento "${t.description}" (${brl(t.amount)})?\n\nEsta ação não pode ser desfeita.`))
+      return;
+    onDeleteTransaction(t.id);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const seq = (recSeq++).toString();
-    const newTx: FinancialTransaction = {
-      id: `#FOWL-REC-${seq}`,
-      type: 'RECEITA',
-      clientOrVendor,
-      description,
-      date: new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase(),
-      status: 'CONFIRMADO',
-      amount: Number(amount),
-    };
-    onAddTransaction(newTx);
+    if (editingId) {
+      const existing = receitas.find((r) => r.id === editingId);
+      if (existing) {
+        onUpdateTransaction?.({
+          ...existing,
+          clientOrVendor,
+          description,
+          amount: Number(amount),
+          status,
+        });
+      }
+    } else {
+      const seq = (recSeq++).toString();
+      onAddTransaction({
+        id: `#FOWL-REC-${seq}`,
+        type: 'RECEITA',
+        clientOrVendor,
+        description,
+        date: new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase(),
+        status,
+        amount: Number(amount),
+      });
+    }
     setShowModal(false);
   };
 
@@ -68,7 +116,7 @@ export const ReceitasView: React.FC<ReceitasViewProps> = ({
         </div>
 
         <button
-          onClick={() => setShowModal(true)}
+          onClick={openCreate}
           className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase"
         >
           <span className="material-symbols-outlined text-base">add</span> Nova Receita
@@ -77,88 +125,90 @@ export const ReceitasView: React.FC<ReceitasViewProps> = ({
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+        <div className="bg-white p-6 rounded-xl shadow-sm">
           <p className="text-xs font-semibold text-slate-500 uppercase">Receitas Confirmadas (Pagas)</p>
-          <h2 className="font-data-mono text-3xl font-bold text-emerald-600 mt-2">
-            R$ {totalConfirmed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-          </h2>
+          <h2 className="font-data-mono text-3xl font-bold text-emerald-600 mt-2">{brl(totalConfirmed)}</h2>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+        <div className="bg-white p-6 rounded-xl shadow-sm">
           <p className="text-xs font-semibold text-slate-500 uppercase">A Receber / Pendente</p>
-          <h2 className="font-data-mono text-3xl font-bold text-amber-600 mt-2">
-            R$ {totalPending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-          </h2>
+          <h2 className="font-data-mono text-3xl font-bold text-amber-600 mt-2">{brl(totalPending)}</h2>
         </div>
 
-        <div className="bg-[#0f172a] text-white p-5 rounded-xl border border-slate-800 shadow-md">
-          <p className="text-xs font-semibold text-slate-400 uppercase">Faturamento Bruto Total</p>
-          <h2 className="font-data-mono text-3xl font-bold text-emerald-400 mt-2">
-            R$ {(totalConfirmed + totalPending).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+        <div className="bg-white p-6 rounded-xl shadow-sm">
+          <p className="text-xs font-semibold text-slate-500 uppercase">Faturamento Bruto Total</p>
+          <h2 className="font-data-mono text-3xl font-bold text-emerald-600 mt-2">
+            {brl(totalConfirmed + totalPending)}
           </h2>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-slate-900 px-6 py-4 text-white text-xs font-bold uppercase tracking-wider flex justify-between items-center">
-          <span>Lançamentos de Receita</span>
-          <div className="flex gap-2">
-            {['ALL', 'CONFIRMADO', 'PENDENTE'].map((st) => (
-              <button
-                key={st}
-                onClick={() => setFilterStatus(st)}
-                className={`px-2.5 py-1 rounded text-[11px] ${
-                  filterStatus === st ? 'bg-white text-slate-900 font-bold' : 'text-slate-300'
-                }`}
-              >
-                {st === 'ALL' ? 'Todas' : st}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-200">
-                <th className="p-4">Cód. Transação</th>
-                <th className="p-4">Cliente / Origem</th>
-                <th className="p-4">Descrição do Lançamento</th>
-                <th className="p-4">Data Emissão</th>
-                <th className="p-4 text-center">Status</th>
-                <th className="p-4 text-right">Valor Bruto</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-              {filteredReceitas.map((t) => (
-                <tr key={t.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="p-4 font-data-mono font-bold text-emerald-700">{t.id}</td>
-                  <td className="p-4 font-bold uppercase text-slate-900">{t.clientOrVendor}</td>
-                  <td className="p-4 text-slate-600">{t.description}</td>
-                  <td className="p-4 font-data-mono text-slate-500">{t.date}</td>
-                  <td className="p-4 text-center">
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                        t.status === 'CONFIRMADO'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}
-                    >
-                      {t.status}
-                    </span>
-                  </td>
-                  <td className="p-4 text-right font-data-mono font-bold text-emerald-600">
-                    R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* Filtros */}
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] font-semibold uppercase text-slate-400">Filtrar:</span>
+        {['ALL', 'CONFIRMADO', 'PENDENTE', 'ATRASADO'].map((st) => (
+          <button
+            key={st}
+            onClick={() => setFilterStatus(st)}
+            className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold uppercase tracking-wide transition-colors ${
+              filterStatus === st
+                ? 'bg-slate-900 text-white shadow-sm'
+                : 'bg-white text-slate-500 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            {st === 'ALL' ? 'Todas' : st}
+          </button>
+        ))}
       </div>
 
-      {/* Modal Add Receita */}
+      {/* Lista de lançamentos (DataListRow) */}
+      {filteredReceitas.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-sm py-16 text-center text-slate-400">
+          <span className="material-symbols-outlined text-4xl text-slate-300">trending_up</span>
+          <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">Nenhuma receita encontrada</p>
+          <p className="text-xs text-slate-400 mt-1">Clique em &quot;Nova Receita&quot; para lançar a primeira.</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {filteredReceitas.map((t) => (
+            <DataListRow
+              key={t.id}
+              leading={
+                <span className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-lg">south</span>
+                </span>
+              }
+              title={<span className="uppercase">{t.clientOrVendor}</span>}
+              meta={
+                <>
+                  <span className="text-slate-500">{t.description}</span>
+                  <RowMeta label="Cód" value={<span className="font-data-mono">{t.id}</span>} />
+                </>
+              }
+              center={
+                <div className="text-left md:text-center">
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wider">Emissão</p>
+                  <p className="font-data-mono text-slate-700 font-semibold">{t.date}</p>
+                </div>
+              }
+              right={
+                <>
+                  <span className="font-data-mono font-bold text-emerald-600 text-base md:text-lg text-right">
+                    {brl(t.amount)}
+                  </span>
+                  <Badge color={statusBadge(t.status)}>{t.status}</Badge>
+                  <div className="flex items-center gap-1">
+                    <RowAction icon="edit" label="Editar lançamento" onClick={() => openEdit(t)} />
+                    <RowAction icon="delete" label="Excluir lançamento" danger onClick={() => handleDelete(t)} />
+                  </div>
+                </>
+              }
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Modal Nova/Editar Receita */}
       {showModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white max-w-md w-full rounded-xl border border-slate-200 p-6 shadow-2xl relative">
@@ -168,50 +218,71 @@ export const ReceitasView: React.FC<ReceitasViewProps> = ({
             >
               ✕
             </button>
-            <h3 className="text-lg font-bold text-slate-900 uppercase mb-4">Lançar Nova Receita</h3>
-            <form onSubmit={handleCreateReceita} className="space-y-4 text-xs font-medium">
+            <h3 className="text-lg font-bold text-slate-900 uppercase mb-4">
+              {editingId ? 'Editar Receita' : 'Lançar Nova Receita'}
+            </h3>
+            <form onSubmit={handleSubmit} className="space-y-4 text-xs font-medium">
               <div>
-                <label className="block text-slate-600 mb-1 font-semibold uppercase">Cliente / Origem</label>
+                <label className={labelCls}>Cliente / Origem</label>
                 <select
                   value={clientOrVendor}
                   onChange={(e) => setClientOrVendor(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  className={inputCls}
                 >
                   {clients.map((c) => (
                     <option key={c.id} value={c.name}>
                       {c.name}
                     </option>
                   ))}
+                  {clientOrVendor && !clients.some((c) => c.name === clientOrVendor) && (
+                    <option value={clientOrVendor}>{clientOrVendor}</option>
+                  )}
                 </select>
               </div>
 
               <div>
-                <label className="block text-slate-600 mb-1 font-semibold uppercase">Descrição</label>
+                <label className={labelCls}>Descrição</label>
                 <input
                   type="text"
                   required
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  className={inputCls}
                 />
               </div>
 
-              <div>
-                <label className="block text-slate-600 mb-1 font-semibold uppercase">Valor da Receita (R$)</label>
-                <input
-                  type="number"
-                  required
-                  value={amount}
-                  onChange={(e) => setAmount(Number(e.target.value))}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Valor (R$)</label>
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    step="0.01"
+                    value={amount}
+                    onChange={(e) => setAmount(Number(e.target.value))}
+                    className={`${inputCls} font-data-mono`}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Status</label>
+                  <select
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value as FinancialTransaction['status'])}
+                    className={inputCls}
+                  >
+                    <option value="CONFIRMADO">CONFIRMADO</option>
+                    <option value="PENDENTE">PENDENTE</option>
+                    <option value="ATRASADO">ATRASADO</option>
+                  </select>
+                </div>
               </div>
 
               <button
                 type="submit"
                 className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
               >
-                Confirmar Lançamento de Receita
+                {editingId ? 'Salvar Alterações' : 'Confirmar Lançamento de Receita'}
               </button>
             </form>
           </div>

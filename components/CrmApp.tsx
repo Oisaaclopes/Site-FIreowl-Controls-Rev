@@ -204,6 +204,17 @@ export function CrmApp({ initialRole = 'ADMINISTRATIVO', onLogout }: CrmAppProps
     logAction(`Lançamento de ${newTx.type}`, 'Finanças', `Lançado ${newTx.id} - ${newTx.clientOrVendor} (R$ ${newTx.amount})`);
   };
 
+  const handleUpdateTransaction = (tx: FinancialTransaction) => {
+    setTransactions((prev) => prev.map((t) => (t.id === tx.id ? tx : t)));
+    logAction(`Edição de ${tx.type}`, 'Finanças', `Atualizado ${tx.id} - ${tx.clientOrVendor} (R$ ${tx.amount})`);
+  };
+
+  const handleDeleteTransaction = (id: string) => {
+    const tx = transactions.find((t) => t.id === id);
+    setTransactions((prev) => prev.filter((t) => t.id !== id));
+    logAction(`Exclusão de ${tx?.type || 'Lançamento'}`, 'Finanças', `Removido ${tx?.id || id}`);
+  };
+
   const handleAddSupplier = (newSupplier: Supplier) => {
     setSuppliers([newSupplier, ...suppliers]);
     logAction('Homologação de Fornecedor', 'Fornecedores', `Homologado ${newSupplier.name}`);
@@ -391,6 +402,8 @@ export function CrmApp({ initialRole = 'ADMINISTRATIVO', onLogout }: CrmAppProps
               transactions={transactions}
               clients={clients}
               onAddTransaction={handleAddTransaction}
+              onUpdateTransaction={handleUpdateTransaction}
+              onDeleteTransaction={handleDeleteTransaction}
             />
           )}
 
