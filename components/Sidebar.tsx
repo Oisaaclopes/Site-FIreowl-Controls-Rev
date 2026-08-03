@@ -11,6 +11,7 @@ interface SidebarProps {
   userRole: UserRole;
   onOpenAuthModal: () => void;
   onLogout?: () => void;
+  canSwitchRole?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -18,7 +19,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectTab,
   userRole,
   onOpenAuthModal,
-  onLogout
+  onLogout,
+  canSwitchRole = false
 }) => {
   const allNavItems: { path: TabPath; label: string; icon: string; count?: number }[] = [
     { path: 'painel', label: 'Painel', icon: 'dashboard' },
@@ -96,12 +98,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
             <span className="font-data-mono text-[10px] text-emerald-300 uppercase font-semibold">SISTEMA ONLINE</span>
           </div>
-          <button
-            onClick={onOpenAuthModal}
-            className="font-label-caps text-[10px] text-white/60 hover:text-white underline uppercase transition-colors"
-          >
-            Trocar Perfil
-          </button>
+          {canSwitchRole && (
+            <button
+              onClick={onOpenAuthModal}
+              className="font-label-caps text-[10px] text-white/60 hover:text-white underline uppercase transition-colors"
+            >
+              Simular perfil
+            </button>
+          )}
         </div>
         <div className="flex items-center justify-between bg-white/10 p-2.5 rounded-lg border border-white/10">
           <div className="flex flex-col">

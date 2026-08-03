@@ -8,13 +8,15 @@ interface HeaderProps {
   onOpenAuthModal: () => void;
   onQuickSearchClick?: () => void;
   onNewOSClick?: () => void;
+  canSwitchRole?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   userRole,
   onOpenAuthModal,
   onQuickSearchClick,
-  onNewOSClick
+  onNewOSClick,
+  canSwitchRole = false
 }) => {
   const [currentDateTime, setCurrentDateTime] = useState('24 Mai 2024 | 14:30');
   const [showNotifications, setShowNotifications] = useState(false);
@@ -108,13 +110,22 @@ export const Header: React.FC<HeaderProps> = ({
             <p className="font-bold text-slate-800 text-xs">Admin Fireowl</p>
             <p className="font-label-caps text-slate-500 text-[10px]">{userRole}</p>
           </div>
-          <button
-            onClick={onOpenAuthModal}
-            className="w-9 h-9 rounded-full bg-[#1A1A72] flex items-center justify-center text-white hover:ring-2 hover:ring-[#E63946] transition-all shadow-sm"
-            title="Painel de Acesso do Operador"
-          >
-            <span className="material-symbols-outlined text-[20px]">person</span>
-          </button>
+          {canSwitchRole ? (
+            <button
+              onClick={onOpenAuthModal}
+              className="w-9 h-9 rounded-full bg-[#1A1A72] flex items-center justify-center text-white hover:ring-2 hover:ring-[#E63946] transition-all shadow-sm"
+              title="Simular perfil de acesso"
+            >
+              <span className="material-symbols-outlined text-[20px]">person</span>
+            </button>
+          ) : (
+            <div
+              className="w-9 h-9 rounded-full bg-[#1A1A72] flex items-center justify-center text-white shadow-sm"
+              title="Perfil de acesso"
+            >
+              <span className="material-symbols-outlined text-[20px]">person</span>
+            </div>
+          )}
         </div>
       </div>
     </header>

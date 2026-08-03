@@ -16,6 +16,7 @@ interface ContaViewProps {
   onDeletePartnerBrand: (id: string) => void;
   pdfPrefs: PdfPrefs;
   onUpdatePdfPrefs: (p: PdfPrefs) => void;
+  canSwitchRole?: boolean;
 }
 
 const inputCls =
@@ -39,6 +40,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
   onDeletePartnerBrand,
   pdfPrefs,
   onUpdatePdfPrefs,
+  canSwitchRole = false,
 }) => {
   const [tab, setTab] = useState<'conta' | 'preferencias' | 'pdf'>('conta');
 
@@ -212,19 +214,33 @@ export const ContaView: React.FC<ContaViewProps> = ({
                 <h3 className="font-display text-sm font-bold uppercase tracking-wide text-[#1A1A72]">
                   Matriz de permissões (RBAC)
                 </h3>
-                <p className="text-[11px] text-slate-400">Perfil ativo que define o nível de acesso da interface.</p>
+                <p className="text-[11px] text-slate-400">
+                  {canSwitchRole
+                    ? 'Simule um perfil para pré-visualizar o acesso (não altera o perfil real).'
+                    : 'Seu perfil é definido pela autenticação e não pode ser alterado aqui.'}
+                </p>
               </div>
             </div>
-            <select
-              value={userRole}
-              onChange={(e) => onSelectRole(e.target.value as UserRole)}
-              className={`${inputCls} font-semibold`}
-            >
-              <option value="ADMINISTRATIVO">ADMINISTRATIVO — Acesso irrestrito aos módulos</option>
-              <option value="TECNICO">TÉCNICO DE CAMPO — Execução de OS, ponto &amp; relatórios</option>
-              <option value="GESTOR">GESTOR DE CONTRATO — Aprovação &amp; escala da equipe</option>
-              <option value="FINANCEIRO">FINANCEIRO — Receitas, despesas &amp; DRE</option>
-            </select>
+            {canSwitchRole ? (
+              <select
+                value={userRole}
+                onChange={(e) => onSelectRole(e.target.value as UserRole)}
+                className={`${inputCls} font-semibold`}
+              >
+                <option value="ADMINISTRATIVO">ADMINISTRATIVO — Acesso irrestrito aos módulos</option>
+                <option value="TECNICO">TÉCNICO DE CAMPO — Execução de OS, ponto &amp; relatórios</option>
+                <option value="GESTOR">GESTOR DE CONTRATO — Aprovação &amp; escala da equipe</option>
+                <option value="FINANCEIRO">FINANCEIRO — Receitas, despesas &amp; DRE</option>
+              </select>
+            ) : (
+              <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
+                <span className="text-xs font-semibold text-slate-700">Perfil atual</span>
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[#1A1A72] bg-[#1A1A72]/5 px-2.5 py-1 rounded-full">
+                  <span className="material-symbols-outlined text-sm">verified_user</span>
+                  {userRole}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Log de auditoria */}

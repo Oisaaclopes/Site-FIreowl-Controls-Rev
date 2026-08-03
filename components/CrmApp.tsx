@@ -384,6 +384,10 @@ export function CrmApp({ initialRole = 'ADMINISTRATIVO', userName = 'Operador Fi
     setAuditLogs((prev) => [newLog, ...prev]);
   };
 
+  // Papel REAL (autenticado). Só o admin pode simular outros perfis na UI,
+  // e mesmo simulando continua sendo admin de verdade (não trava).
+  const canSwitchRole = initialRole === 'ADMINISTRATIVO';
+
   return (
     <div className="min-h-screen bg-slate-50 font-body-md text-[#131c28]">
       {/* Sidebar Navigation */}
@@ -393,6 +397,7 @@ export function CrmApp({ initialRole = 'ADMINISTRATIVO', userName = 'Operador Fi
         userRole={userRole}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
         onLogout={onLogout}
+        canSwitchRole={canSwitchRole}
       />
 
       {/* Main Content Workspace Offset by Sidebar 256px */}
@@ -402,6 +407,7 @@ export function CrmApp({ initialRole = 'ADMINISTRATIVO', userName = 'Operador Fi
           userRole={userRole}
           onOpenAuthModal={() => setIsAuthModalOpen(true)}
           onNewOSClick={handleNewOSQuick}
+          canSwitchRole={canSwitchRole}
         />
 
         {/* View Switcher */}
@@ -519,6 +525,7 @@ export function CrmApp({ initialRole = 'ADMINISTRATIVO', userName = 'Operador Fi
               onDeletePartnerBrand={handleDeletePartnerBrand}
               pdfPrefs={pdfPrefs}
               onUpdatePdfPrefs={handleUpdatePdfPrefs}
+              canSwitchRole={canSwitchRole}
             />
           )}
         </main>
