@@ -3,6 +3,10 @@
 import React, { useState } from 'react';
 import { Supplier } from '@/lib/types';
 import { SidePanel, FormSection, Toggle } from '@/components/SidePanel';
+import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
+
+const supplierStatusColor = (status: Supplier['activeStatus']) =>
+  status === 'HOMOLOGADO' ? 'emerald' : status === 'EM AVALIACAO' ? 'amber' : 'red';
 
 interface FornecedoresViewProps {
   suppliers: Supplier[];
@@ -88,53 +92,57 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
         </button>
       </div>
 
-      {/* Grid of Suppliers */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-5">
-        {suppliers.map((s) => (
-          <div key={s.id} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
-            <div>
-              <div className="flex justify-between items-start">
-                <div>
-                  <span className="font-data-mono text-xs font-bold text-[#E63946]">{s.code}</span>
-                  <h3 className="text-lg font-bold text-slate-900 uppercase mt-0.5">{s.name}</h3>
-                  <p className="text-xs text-slate-500 font-data-mono">CNPJ: {s.cnpj}</p>
-                </div>
-                <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full uppercase">
-                  {s.activeStatus}
+      {/* Lista de fornecedores */}
+      {suppliers.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-sm py-16 text-center text-slate-400">
+          <span className="material-symbols-outlined text-4xl text-slate-300">local_shipping</span>
+          <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">Nenhum fornecedor cadastrado</p>
+          <p className="text-xs text-slate-400 mt-1">Clique em &quot;Novo Fornecedor&quot; para homologar o primeiro.</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {suppliers.map((s) => (
+            <DataListRow
+              key={s.id}
+              leading={
+                <span className="w-10 h-10 bg-[#1A1A72] text-white font-bold rounded-lg flex items-center justify-center text-xs shrink-0">
+                  {s.name.slice(0, 2).toUpperCase()}
                 </span>
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-3 text-xs font-data-mono bg-slate-50 p-3 rounded-lg border border-slate-100">
-                <div>
-                  <span className="text-slate-400 block text-[10px] uppercase">Categoria</span>
-                  <span className="font-bold text-slate-900">{s.category}</span>
+              }
+              title={<span className="uppercase">{s.name}</span>}
+              meta={
+                <>
+                  <RowMeta label="Cód" value={<span className="font-data-mono">{s.code}</span>} />
+                  <RowMeta label="CNPJ" value={<span className="font-data-mono">{s.cnpj}</span>} />
+                  <RowMeta label="Categoria" value={s.category} />
+                  <RowMeta label="Cidade" value={s.city} />
+                </>
+              }
+              center={
+                <div className="text-left md:text-center">
+                  <p className="text-slate-700 font-semibold">{s.contactName}</p>
+                  <p className="text-[10px] text-slate-500 font-data-mono">{s.phone}</p>
+                  <p className="text-[10px] text-amber-600 font-bold mt-0.5">
+                    ★ {s.rating.toFixed(1)} · {s.leadTimeDays}d
+                  </p>
                 </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px] uppercase">Prazo de Entrega</span>
-                  <span className="font-bold text-slate-900">{s.leadTimeDays} dias úteis</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px] uppercase">Localização</span>
-                  <span className="font-bold text-slate-900">{s.city}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px] uppercase">Avaliação</span>
-                  <span className="font-bold text-amber-600">★ {s.rating.toFixed(1)} / 5.0</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t border-slate-100 pt-3 text-xs flex justify-between items-center text-slate-600">
-              <div>
-                <strong className="text-slate-900 uppercase">Contato:</strong> {s.contactName} ({s.phone})
-              </div>
-              <a href={`mailto:${s.email}`} className="text-[#E63946] font-semibold hover:underline">
-                {s.email}
-              </a>
-            </div>
-          </div>
-        ))}
-      </div>
+              }
+              right={
+                <>
+                  <Badge color={supplierStatusColor(s.activeStatus)}>{s.activeStatus}</Badge>
+                  <RowAction
+                    icon="mail"
+                    label="Enviar e-mail ao fornecedor"
+                    onClick={() => {
+                      window.location.href = `mailto:${s.email}`;
+                    }}
+                  />
+                </>
+              }
+            />
+          ))}
+        </div>
+      )}
 
       {/* Drawer: Novo Fornecedor */}
       <SidePanel

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { PedidoOS, Client, Pedido, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus } from '@/lib/types';
 import { CommercialProposalModal } from '@/components/proposta/CommercialProposalModal';
 import { CommercialProposalPDFView } from '@/components/proposta/CommercialProposalPDFView';
+import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
 import {
   FileText,
   Plus,
@@ -273,229 +274,174 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
         )}
       </div>
 
-      {/* Table: Commercial Proposals (CRM) */}
-      {viewTab === 'propostas' && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="bg-[#0B1E38] px-6 py-4 text-white text-xs font-bold uppercase tracking-wider flex justify-between items-center">
-            <span>Listagem de Pedidos de Proposta Comercial Fireowl Controls</span>
-            <span className="text-[11px] text-[#F2A900]">Formato de Saída: Proposta PDF Normativa</span>
+      {/* Lista: Propostas Comerciais (CRM) */}
+      {viewTab === 'propostas' &&
+        (filteredPedidos.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm py-16 text-center text-slate-400">
+            <FileText className="w-10 h-10 text-slate-300 mx-auto" />
+            <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">
+              Nenhuma proposta encontrada
+            </p>
           </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-200">
-                  <th className="p-4">Nº Pedido / Data</th>
-                  <th className="p-4">Cliente / Projeto</th>
-                  <th className="p-4">Responsável</th>
-                  <th className="p-4 text-center">Status Workflow</th>
-                  <th className="p-4 text-right">Valor Total</th>
-                  <th className="p-4 text-center">Ações / Transições</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                {filteredPedidos.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="p-8 text-center text-slate-400 font-semibold">
-                      Nenhum pedido de proposta encontrado.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredPedidos.map((ped) => (
-                    <tr key={ped.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="p-4">
-                        <span className="font-data-mono font-bold text-[#E63946] text-sm">{ped.numeroPedido}</span>
-                        <br />
-                        <span className="text-[10px] text-slate-400 font-data-mono">{ped.dataEmissao}</span>
-                      </td>
-
-                      <td className="p-4">
-                        <span className="font-bold text-slate-900 uppercase">{ped.clienteNome}</span>
-                        <br />
-                        <span className="text-[11px] text-slate-600 font-medium">{ped.referencia}</span>
-                      </td>
-
-                      <td className="p-4">
-                        <span className="text-slate-900 font-bold">{ped.responsavelComercialNome}</span>
-                        <br />
-                        <span className="text-[10px] text-slate-400">{ped.fornecedor}</span>
-                      </td>
-
-                      <td className="p-4 text-center">{getStatusBadge(ped.status)}</td>
-
-                      <td className="p-4 text-right font-data-mono font-bold text-slate-900 text-sm">
+        ) : (
+          <div className="flex flex-col gap-3">
+            {filteredPedidos.map((ped) => (
+              <DataListRow
+                key={ped.id}
+                leading={
+                  <span className="w-10 h-10 rounded-lg bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0">
+                    <FileText className="w-5 h-5" />
+                  </span>
+                }
+                title={<span className="uppercase">{ped.clienteNome}</span>}
+                meta={
+                  <>
+                    <RowMeta label="Nº" value={<span className="font-data-mono">{ped.numeroPedido}</span>} />
+                    <RowMeta label="Ref" value={ped.referencia} />
+                    <RowMeta label="Resp" value={ped.responsavelComercialNome} />
+                    <span className="font-data-mono text-slate-400">{ped.dataEmissao}</span>
+                  </>
+                }
+                right={
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-data-mono font-bold text-slate-900 text-base md:text-lg">
                         R$ {(ped.proposal.valorTotal || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </td>
-
-                      <td className="p-4 text-center">
-                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                          {/* Preview PDF */}
-                          <button
-                            onClick={() => setPdfPreviewPedido(ped)}
-                            title="Gerar / Pré-visualizar PDF da Proposta"
-                            className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
-                          >
-                            <Eye className="w-3.5 h-3.5 text-blue-600" /> PDF
-                          </button>
-
-                          {/* Edit Proposal */}
-                          <button
-                            onClick={() => handleEditProposal(ped)}
-                            title="Editar Proposta"
-                            className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition-colors"
-                          >
-                            Editar
-                          </button>
-
-                          {/* Workflow Actions */}
-                          {ped.status === 'rascunho' && (
-                            <button
-                              onClick={() => onUpdatePedidoStatus(ped.id, 'em_revisao')}
-                              className="px-2 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded text-[10px] font-bold uppercase"
-                            >
-                              Revisar
-                            </button>
-                          )}
-
-                          {ped.status === 'em_revisao' && (
-                            <button
-                              onClick={() => onUpdatePedidoStatus(ped.id, 'aprovado_interno')}
-                              className="px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-[10px] font-bold uppercase"
-                            >
-                              Aprovar
-                            </button>
-                          )}
-
-                          {(ped.status === 'aprovado_interno' || ped.status === 'em_revisao') && (
-                            <button
-                              onClick={() => onUpdatePedidoStatus(ped.id, 'enviado_ao_cliente')}
-                              className="px-2 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded text-[10px] font-bold uppercase flex items-center gap-1"
-                            >
-                              <Send className="w-3 h-3" /> Enviar
-                            </button>
-                          )}
-
-                          {ped.status === 'enviado_ao_cliente' && (
-                            <>
-                              <button
-                                onClick={() => onUpdatePedidoStatus(ped.id, 'aceito')}
-                                className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[10px] font-bold uppercase"
-                              >
-                                Aceito
-                              </button>
-                              <button
-                                onClick={() => onUpdatePedidoStatus(ped.id, 'recusado')}
-                                className="px-2 py-1 bg-red-600 hover:bg-red-500 text-white rounded text-[10px] font-bold uppercase"
-                              >
-                                Recusado
-                              </button>
-                            </>
-                          )}
-
-                          {ped.status === 'aceito' && (
-                            <button
-                              onClick={() => onGenerateOSFromPedido(ped)}
-                              className="px-2.5 py-1 bg-[#E63946] hover:bg-[#a51515] text-white rounded text-[10px] font-bold uppercase flex items-center gap-1 shadow-xs"
-                            >
-                              <Wrench className="w-3 h-3" /> Gerar OS
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Table: Technical Field OS */}
-      {viewTab === 'ordens_servico' && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="bg-slate-900 px-6 py-4 text-white text-xs font-bold uppercase tracking-wider">
-            Listagem de Ordens de Serviço (OS) em Execução Técnica de Campo
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-200">
-                  <th className="p-4">Cód. OS / Pedido</th>
-                  <th className="p-4">Cliente / Unidade</th>
-                  <th className="p-4">Tipo &amp; Escopo</th>
-                  <th className="p-4">Técnico Responsável</th>
-                  <th className="p-4 text-center">Prioridade</th>
-                  <th className="p-4 text-center">Status OS</th>
-                  <th className="p-4 text-right">Valor do Pedido</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                {filteredOS.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="p-8 text-center text-slate-400 font-semibold">
-                      Nenhuma ordem de serviço encontrada.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredOS.map((p) => (
-                    <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="p-4">
-                        <span className="font-data-mono font-bold text-[#E63946]">{p.id}</span> <br />
-                        <span className="font-data-mono text-[10px] text-slate-400">{p.pedidoId}</span>
-                      </td>
-                      <td className="p-4">
-                        <span className="font-bold text-slate-900 uppercase">{p.clientName}</span>
-                      </td>
-                      <td className="p-4">
-                        <span className="text-slate-900 font-semibold">{p.title}</span> <br />
-                        <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold uppercase mt-1 inline-block">
-                          {p.type}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <span className="text-slate-900 font-semibold">{p.technicianName}</span> <br />
-                        <span className="text-[10px] text-slate-400 font-data-mono">{p.scheduledDate}</span>
-                      </td>
-                      <td className="p-4 text-center">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                            p.priority === 'CRITICA'
-                              ? 'bg-red-100 text-red-800'
-                              : p.priority === 'ALTA'
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-slate-100 text-slate-700'
-                          }`}
+                      </span>
+                      {getStatusBadge(ped.status)}
+                    </div>
+                    <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                      <button
+                        onClick={() => setPdfPreviewPedido(ped)}
+                        title="Pré-visualizar PDF da Proposta"
+                        className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-[11px] font-bold transition-colors flex items-center gap-1"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-blue-600" /> PDF
+                      </button>
+                      <button
+                        onClick={() => handleEditProposal(ped)}
+                        title="Editar Proposta"
+                        className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-[11px] font-bold transition-colors"
+                      >
+                        Editar
+                      </button>
+                      {ped.status === 'rascunho' && (
+                        <button
+                          onClick={() => onUpdatePedidoStatus(ped.id, 'em_revisao')}
+                          className="px-2 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded text-[10px] font-bold uppercase"
                         >
-                          {p.priority}
-                        </span>
-                      </td>
-                      <td className="p-4 text-center">
-                        <span
-                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                            p.status === 'CONCLUIDA'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : p.status === 'EM ANDAMENTO'
-                              ? 'bg-blue-100 text-blue-800'
-                              : p.status === 'ATRASADA'
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-slate-100 text-slate-700'
-                          }`}
+                          Revisar
+                        </button>
+                      )}
+                      {ped.status === 'em_revisao' && (
+                        <button
+                          onClick={() => onUpdatePedidoStatus(ped.id, 'aprovado_interno')}
+                          className="px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-[10px] font-bold uppercase"
                         >
-                          {p.status}
-                        </span>
-                      </td>
-                      <td className="p-4 text-right font-data-mono font-bold text-slate-900">
-                        R$ {p.value.toLocaleString('pt-BR')}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                          Aprovar
+                        </button>
+                      )}
+                      {(ped.status === 'aprovado_interno' || ped.status === 'em_revisao') && (
+                        <button
+                          onClick={() => onUpdatePedidoStatus(ped.id, 'enviado_ao_cliente')}
+                          className="px-2 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded text-[10px] font-bold uppercase flex items-center gap-1"
+                        >
+                          <Send className="w-3 h-3" /> Enviar
+                        </button>
+                      )}
+                      {ped.status === 'enviado_ao_cliente' && (
+                        <>
+                          <button
+                            onClick={() => onUpdatePedidoStatus(ped.id, 'aceito')}
+                            className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[10px] font-bold uppercase"
+                          >
+                            Aceito
+                          </button>
+                          <button
+                            onClick={() => onUpdatePedidoStatus(ped.id, 'recusado')}
+                            className="px-2 py-1 bg-red-600 hover:bg-red-500 text-white rounded text-[10px] font-bold uppercase"
+                          >
+                            Recusado
+                          </button>
+                        </>
+                      )}
+                      {ped.status === 'aceito' && (
+                        <button
+                          onClick={() => onGenerateOSFromPedido(ped)}
+                          className="px-2.5 py-1 bg-[#E63946] hover:bg-[#a51515] text-white rounded text-[10px] font-bold uppercase flex items-center gap-1"
+                        >
+                          <Wrench className="w-3 h-3" /> Gerar OS
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                }
+              />
+            ))}
           </div>
-        </div>
-      )}
+        ))}
+
+      {/* Lista: Ordens de Serviço (Campo) */}
+      {viewTab === 'ordens_servico' &&
+        (filteredOS.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm py-16 text-center text-slate-400">
+            <Wrench className="w-10 h-10 text-slate-300 mx-auto" />
+            <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">
+              Nenhuma ordem de serviço encontrada
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {filteredOS.map((p) => (
+              <DataListRow
+                key={p.id}
+                leading={
+                  <span className="w-10 h-10 rounded-lg bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0">
+                    <Wrench className="w-5 h-5" />
+                  </span>
+                }
+                title={<span className="uppercase">{p.clientName}</span>}
+                meta={
+                  <>
+                    <RowMeta label="OS" value={<span className="font-data-mono">{p.id}</span>} />
+                    <RowMeta label="Pedido" value={<span className="font-data-mono">{p.pedidoId}</span>} />
+                    <span className="text-slate-500">{p.title}</span>
+                    <Badge color="slate">{p.type}</Badge>
+                  </>
+                }
+                center={
+                  <div className="text-left md:text-center">
+                    <p className="text-slate-700 font-semibold">{p.technicianName}</p>
+                    <p className="text-[10px] text-slate-400 font-data-mono">{p.scheduledDate}</p>
+                  </div>
+                }
+                right={
+                  <>
+                    <span className="font-data-mono font-bold text-slate-900 text-base md:text-lg text-right">
+                      R$ {p.value.toLocaleString('pt-BR')}
+                    </span>
+                    <Badge color={p.priority === 'CRITICA' ? 'red' : p.priority === 'ALTA' ? 'amber' : 'slate'} outline>
+                      {p.priority}
+                    </Badge>
+                    <Badge
+                      color={
+                        p.status === 'CONCLUIDA'
+                          ? 'emerald'
+                          : p.status === 'EM ANDAMENTO'
+                          ? 'blue'
+                          : p.status === 'ATRASADA'
+                          ? 'red'
+                          : 'slate'
+                      }
+                    >
+                      {p.status}
+                    </Badge>
+                  </>
+                }
+              />
+            ))}
+          </div>
+        ))}
 
       {/* Commercial Proposal Form Modal */}
       <CommercialProposalModal

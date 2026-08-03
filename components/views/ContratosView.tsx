@@ -2,11 +2,16 @@
 
 import React, { useState } from 'react';
 import { Contract } from '@/lib/types';
+import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
 
 interface ContratosViewProps {
   contracts: Contract[];
   onAddContract: (contract: Contract) => void;
 }
+
+const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+const contractStatusColor = (status: Contract['status']) =>
+  status === 'ATIVO' ? 'emerald' : status === 'A VENCER' ? 'amber' : 'red';
 
 export const ContratosView: React.FC<ContratosViewProps> = ({
   contracts,
@@ -80,81 +85,70 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
         </div>
       </div>
 
-      {/* Contracts Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-slate-900 px-6 py-4 text-white text-xs font-bold uppercase tracking-wider flex justify-between items-center">
-          <span>Contratos Continuados Vigentes — Londrina &amp; Região</span>
-          <span className="font-data-mono text-slate-400 font-normal">REF: CTR_SYS_2024</span>
+      {/* Lista de contratos */}
+      {contracts.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-sm py-16 text-center text-slate-400">
+          <span className="material-symbols-outlined text-4xl text-slate-300">description</span>
+          <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">Nenhum contrato cadastrado</p>
+          <p className="text-xs text-slate-400 mt-1">Clique em &quot;Novo Contrato&quot; para começar.</p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-200">
-                <th className="p-4">Ref Contrato / Cliente</th>
-                <th className="p-4">Valor Mensal</th>
-                <th className="p-4">Renovação / Reajuste</th>
-                <th className="p-4">Bolsa de Horas</th>
-                <th className="p-4">Responsável / ART</th>
-                <th className="p-4 text-center">Status</th>
-                <th className="p-4 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-              {contracts.map((ctr) => (
-                <tr key={ctr.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="p-4">
-                    <span className="font-data-mono font-bold text-[#E63946]">{ctr.id}</span> <br />
-                    <span className="font-bold text-slate-900 text-sm uppercase">{ctr.clientName}</span>
-                    <p className="text-[11px] text-slate-500">{ctr.unit}</p>
-                  </td>
-                  <td className="p-4 font-data-mono font-bold text-slate-900">
-                    R$ {ctr.monthlyValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </td>
-                  <td className="p-4">
-                    <span className="font-data-mono text-slate-700">{ctr.renewalDate}</span> <br />
-                    <span className="text-[11px] text-emerald-700 font-bold">{ctr.readjustmentIndex}</span>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex flex-col gap-1 w-32">
-                      <span className="text-[11px] font-data-mono text-slate-600">
-                        {ctr.usedHours}h / {ctr.contractedHours}h
+      ) : (
+        <div className="flex flex-col gap-3">
+          {contracts.map((ctr) => {
+            const pct = ctr.contractedHours > 0 ? Math.round((ctr.usedHours / ctr.contractedHours) * 100) : 0;
+            return (
+              <DataListRow
+                key={ctr.id}
+                leading={
+                  <span className="w-10 h-10 rounded-lg bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-lg">description</span>
+                  </span>
+                }
+                title={<span className="uppercase">{ctr.clientName}</span>}
+                meta={
+                  <>
+                    <RowMeta label="Ref" value={<span className="font-data-mono">{ctr.id}</span>} />
+                    <RowMeta label="Unidade" value={ctr.unit} />
+                    <RowMeta label="Resp" value={ctr.responsibleTech} />
+                    <RowMeta label="ART" value={<span className="font-data-mono">{ctr.artDocumentRef}</span>} />
+                  </>
+                }
+                center={
+                  <div className="w-40">
+                    <div className="flex items-center justify-between text-[10px] text-slate-400 uppercase tracking-wider">
+                      <span>Bolsa de horas</span>
+                      <span className="font-data-mono">
+                        {ctr.usedHours}/{ctr.contractedHours}h
                       </span>
-                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className="bg-slate-800 h-full rounded-full"
-                          style={{ width: `${(ctr.usedHours / ctr.contractedHours) * 100}%` }}
-                        ></div>
-                      </div>
                     </div>
-                  </td>
-                  <td className="p-4">
-                    <span className="font-semibold text-slate-900">{ctr.responsibleTech}</span> <br />
-                    <span className="font-data-mono text-[10px] text-slate-400">{ctr.artDocumentRef}</span>
-                  </td>
-                  <td className="p-4 text-center">
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                        ctr.status === 'ATIVO' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                      }`}
-                    >
-                      {ctr.status}
-                    </span>
-                  </td>
-                  <td className="p-4 text-right">
-                    <button
-                      onClick={() => setSelectedPdfContract(ctr)}
-                      className="p-1.5 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors text-slate-700 font-semibold text-xs inline-flex items-center gap-1"
-                      title="Imprimir Resumo do Contrato"
-                    >
-                      <span className="material-symbols-outlined text-base">print</span>
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden mt-1">
+                      <div
+                        className="bg-[#1A1A72] h-full rounded-full"
+                        style={{ width: `${Math.min(100, pct)}%` }}
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1 font-data-mono">
+                      Renova: {ctr.renewalDate} · {ctr.readjustmentIndex}
+                    </p>
+                  </div>
+                }
+                right={
+                  <>
+                    <div className="text-right">
+                      <span className="font-data-mono font-bold text-emerald-600 text-base md:text-lg block">
+                        {brl(ctr.monthlyValue)}
+                      </span>
+                      <span className="text-[10px] text-slate-400 uppercase">por mês</span>
+                    </div>
+                    <Badge color={contractStatusColor(ctr.status)}>{ctr.status}</Badge>
+                    <RowAction icon="print" label="Imprimir resumo do contrato" onClick={() => setSelectedPdfContract(ctr)} />
+                  </>
+                }
+              />
+            );
+          })}
         </div>
-      </div>
+      )}
 
       {/* Modal Add Contract */}
       {showModal && (
