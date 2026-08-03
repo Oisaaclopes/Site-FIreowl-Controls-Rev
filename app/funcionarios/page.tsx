@@ -3,56 +3,37 @@
 import React, { useEffect, useState } from 'react';
 import { CrmApp } from '@/components/CrmApp';
 import { OfficialLogo } from '@/components/OfficialLogo';
-import { UserRole } from '@/lib/types';
-
-/**
- * ATENÇÃO — SEGURANÇA:
- * Esta autenticação é feita 100% no navegador (front-end) e serve apenas
- * para separar visualmente a área de funcionários da área de clientes.
- * NÃO é uma proteção real: qualquer pessoa com conhecimento técnico
- * consegue contornar. Para uso em produção, mova a validação de
- * usuário/senha para um back-end (ex.: Supabase Auth, que já está
- * configurado neste projeto em lib/supabaseClient.ts).
- */
-
-interface Funcionario {
-  senha: string;
-  nome: string;
-  role: UserRole;
-}
-
-// Usuários de demonstração (substituir por autenticação real no back-end).
-const FUNCIONARIOS: Record<string, Funcionario> = {
-  admin: { senha: 'fireowl123', nome: 'Administrador', role: 'ADMINISTRATIVO' },
-  tecnico: { senha: 'campo123', nome: 'Técnico de Campo', role: 'TECNICO' },
-  gestor: { senha: 'gestao123', nome: 'Gestor de Contrato', role: 'GESTOR' },
-  financeiro: { senha: 'caixa123', nome: 'Financeiro', role: 'FINANCEIRO' },
-};
-
-const STORAGE_KEY = 'fireowl_func_auth';
-const NAME_KEY = 'fireowl_func_name';
+import { signIn, signOut, getSessionUser, AuthUser } from '@/lib/auth';
+import { isSupabaseConfigured } from '@/lib/inventory';
 
 export default function FuncionariosPage() {
-  const [authRole, setAuthRole] = useState<UserRole | null>(null);
-  const [authName, setAuthName] = useState<string>('Operador Fireowl');
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [ready, setReady] = useState(false);
 
-  const [usuario, setUsuario] = useState('');
+  const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState('');
+  const [loading, setLoading] = useState(false);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
 
-  // Restaura sessão anterior (se houver) ao montar
+  // Restaura a sessão do Supabase (se houver) ao montar
   useEffect(() => {
-    try {
-      const saved = sessionStorage.getItem(STORAGE_KEY);
-      if (saved) setAuthRole(saved as UserRole);
-      const savedName = sessionStorage.getItem(NAME_KEY);
-      if (savedName) setAuthName(savedName);
-    } catch {
-      /* sessionStorage indisponível */
+    if (!isSupabaseConfigured()) {
+      setReady(true);
+      return;
     }
-    setReady(true);
+    let active = true;
+    getSessionUser()
+      .then((u) => {
+        if (active) setAuthUser(u);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setReady(true);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -64,33 +45,40 @@ export default function FuncionariosPage() {
 
   const handleMouseLeave = () => setTilt({ x: 0, y: 0 });
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const user = FUNCIONARIOS[usuario.trim().toLowerCase()];
-    if (user && user.senha === senha) {
-      setErro('');
-      try {
-        sessionStorage.setItem(STORAGE_KEY, user.role);
-        sessionStorage.setItem(NAME_KEY, user.nome);
-      } catch {
-        /* ignore */
+    if (loading) return;
+    setErro('');
+    if (!isSupabaseConfigured()) {
+      setErro('Supabase não configurado. Verifique as variáveis de ambiente.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const user = await signIn(email.trim(), senha);
+      setAuthUser(user);
+    } catch (err: any) {
+      const msg = String(err?.message || '');
+      if (/invalid login credentials/i.test(msg)) {
+        setErro('E-mail ou senha inválidos.');
+      } else if (/email not confirmed/i.test(msg)) {
+        setErro('E-mail ainda não confirmado. Confirme o cadastro ou peça ao administrador.');
+      } else {
+        setErro('Não foi possível entrar. Tente novamente.');
       }
-      setAuthRole(user.role);
-      setAuthName(user.nome);
-    } else {
-      setErro('Usuário ou chave de acesso inválidos.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     try {
-      sessionStorage.removeItem(STORAGE_KEY);
-      sessionStorage.removeItem(NAME_KEY);
+      await signOut();
     } catch {
       /* ignore */
     }
-    setAuthRole(null);
-    setUsuario('');
+    setAuthUser(null);
+    setEmail('');
     setSenha('');
   };
 
@@ -98,8 +86,8 @@ export default function FuncionariosPage() {
   if (!ready) return null;
 
   // Autenticado → abre o sistema de gestão
-  if (authRole) {
-    return <CrmApp initialRole={authRole} userName={authName} onLogout={handleLogout} />;
+  if (authUser) {
+    return <CrmApp initialRole={authUser.role} userName={authUser.name} onLogout={handleLogout} />;
   }
 
   // Tela de login do operador
@@ -143,19 +131,19 @@ export default function FuncionariosPage() {
 
           <form onSubmit={handleLogin} className="flex flex-col gap-5">
             <div className="flex flex-col gap-4">
-              {/* Usuário */}
+              {/* E-mail */}
               <div className="relative group">
                 <label className="font-label-caps text-xs text-[#44474d] mb-1 block uppercase tracking-wider">
-                  Identificação do Operador
+                  E-mail corporativo
                 </label>
                 <div className="relative flex items-center">
                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#E63946]" />
                   <input
                     className="w-full bg-[#eff4ff] border border-[#c5c6ce] p-3 font-data-mono text-sm text-[#131c28] focus:outline-none focus:border-[#000410] transition-colors pl-4"
-                    value={usuario}
-                    onChange={(e) => setUsuario(e.target.value)}
-                    placeholder="usuário"
-                    type="text"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="nome@fireowlcontrols.com.br"
+                    type="email"
                     autoComplete="username"
                     required
                   />
@@ -165,7 +153,7 @@ export default function FuncionariosPage() {
               {/* Senha */}
               <div className="relative group">
                 <label className="font-label-caps text-xs text-[#44474d] mb-1 block uppercase tracking-wider">
-                  Chave de Acesso
+                  Senha
                 </label>
                 <div className="relative flex items-center">
                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#E63946]" />
@@ -192,28 +180,26 @@ export default function FuncionariosPage() {
             <div className="flex items-center gap-2">
               <div className="h-px bg-[#c5c6ce] flex-1" />
               <span className="font-data-mono text-[10px] text-[#75777e] uppercase">
-                Auth_Seq_Alpha_v2.0
+                Auth &middot; Supabase
               </span>
               <div className="h-px bg-[#c5c6ce] flex-1" />
             </div>
 
             <button
               type="submit"
-              className="w-full bg-[#E63946] hover:bg-[#a51515] text-white font-headline-md text-lg py-3 transition-all active:scale-[0.98] uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"
+              disabled={loading}
+              className="w-full bg-[#E63946] hover:bg-[#a51515] text-white font-headline-md text-lg py-3 transition-all active:scale-[0.98] uppercase tracking-widest shadow-lg flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              <span className="material-symbols-outlined text-xl">login</span>
-              ENTRAR
+              <span className={`material-symbols-outlined text-xl ${loading ? 'animate-spin' : ''}`}>
+                {loading ? 'progress_activity' : 'login'}
+              </span>
+              {loading ? 'ENTRANDO...' : 'ENTRAR'}
             </button>
           </form>
 
-          {/* Dica de acesso de demonstração — remover em produção */}
-          <div className="bg-[#eff4ff] border border-[#c5c6ce] p-3 text-[10px] font-data-mono text-[#44474d] leading-relaxed">
-            <p className="font-bold uppercase text-[#1A1A72] mb-1">
-              Acessos de demonstração
-            </p>
-            <p>admin / fireowl123 &nbsp;·&nbsp; tecnico / campo123</p>
-            <p>gestor / gestao123 &nbsp;·&nbsp; financeiro / caixa123</p>
-          </div>
+          <p className="text-[10px] font-data-mono text-[#75777e] text-center leading-relaxed">
+            Acesso restrito a funcionários. As credenciais são fornecidas pelo administrador do sistema.
+          </p>
         </div>
       </div>
     </div>
