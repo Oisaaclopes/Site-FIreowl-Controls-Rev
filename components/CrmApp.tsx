@@ -324,7 +324,7 @@ export function CrmApp({ initialRole = 'ADMINISTRATIVO', onLogout }: CrmAppProps
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F5F7] font-body-md text-[#131c28]">
+    <div className="min-h-screen bg-slate-50 font-body-md text-[#131c28]">
       {/* Sidebar Navigation */}
       <Sidebar
         currentTab={currentTab}

@@ -36,7 +36,7 @@ export const Header: React.FC<HeaderProps> = ({
   }, []);
 
   return (
-    <header className="fixed top-0 left-64 right-0 h-16 bg-white z-40 flex items-center justify-between px-8 shadow-sm border-b border-slate-200">
+    <header className="fixed top-0 left-64 right-0 h-16 bg-slate-50/70 backdrop-blur-md z-40 flex items-center justify-between px-8">
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-md border border-slate-200">
           <span className="material-symbols-outlined text-slate-500 text-base">event</span>
