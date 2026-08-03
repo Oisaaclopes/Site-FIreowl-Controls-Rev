@@ -91,20 +91,29 @@ export function CrmApp({ initialRole = 'ADMINISTRATIVO', onLogout }: CrmAppProps
   const [transactions, setTransactions] = useState<FinancialTransaction[]>(INITIAL_FINANCIAL_TRANSACTIONS);
   const [suppliers, setSuppliers] = useState<Supplier[]>(INITIAL_SUPPLIERS);
   const [services] = useState<ServiceCatalogItem[]>(INITIAL_SERVICES);
-  const [inventory, setInventory] = useState<InventoryItem[]>(INITIAL_INVENTORY);
+  // Com Supabase configurado, inicia vazio e carrega do banco (evita
+  // "flash" de dados de exemplo). Sem Supabase, usa os dados locais.
+  const [inventory, setInventory] = useState<InventoryItem[]>(
+    isSupabaseConfigured() ? [] : INITIAL_INVENTORY
+  );
+  const [inventoryLoading, setInventoryLoading] = useState(isSupabaseConfigured());
   const [auditLogs, setAuditLogs] = useState(INITIAL_AUDIT_LOGS);
 
   // Carrega o estoque persistido no Supabase ao abrir o sistema.
-  // Se o Supabase não estiver disponível, mantém os dados locais de exemplo.
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
     let active = true;
+    setInventoryLoading(true);
     fetchInventory()
       .then((items) => {
         if (active) setInventory(items);
       })
       .catch((err) => {
-        console.warn('Estoque: usando dados locais (Supabase indisponível).', err);
+        console.warn('Estoque: falha ao carregar do Supabase, usando dados locais.', err);
+        if (active) setInventory(INITIAL_INVENTORY);
+      })
+      .finally(() => {
+        if (active) setInventoryLoading(false);
       });
     return () => {
       active = false;
@@ -367,7 +376,11 @@ export function CrmApp({ initialRole = 'ADMINISTRATIVO', onLogout }: CrmAppProps
           )}
 
           {currentTab === 'estoque' && (
-            <EstoqueView inventory={inventory} onAddInventoryItem={handleAddInventoryItem} />
+            <EstoqueView
+              inventory={inventory}
+              onAddInventoryItem={handleAddInventoryItem}
+              loading={inventoryLoading}
+            />
           )}
 
           {currentTab === 'servicos' && (

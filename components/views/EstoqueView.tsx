@@ -5,7 +5,8 @@ import { InventoryItem } from '@/lib/types';
 
 interface EstoqueViewProps {
   inventory: InventoryItem[];
-  onAddInventoryItem: (item: InventoryItem) => void;
+  onAddInventoryItem: (item: InventoryItem) => void | Promise<void>;
+  loading?: boolean;
 }
 
 let invSeq = 90;
@@ -97,10 +98,15 @@ const inputCls =
   'w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20 focus:border-[#E63946]/40';
 const labelCls = 'block text-slate-600 mb-1 font-semibold uppercase text-[11px] flex items-center';
 
-export const EstoqueView: React.FC<EstoqueViewProps> = ({ inventory, onAddInventoryItem }) => {
+export const EstoqueView: React.FC<EstoqueViewProps> = ({
+  inventory,
+  onAddInventoryItem,
+  loading = false,
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [showUnitModal, setShowUnitModal] = useState(false);
+  const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Foto
@@ -211,8 +217,9 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({ inventory, onAddInvent
       item.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleCreateItem = (e: React.FormEvent) => {
+  const handleCreateItem = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     if (!unit) {
       setShowUnitModal(true);
       return;
@@ -242,8 +249,13 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({ inventory, onAddInvent
       model: model || undefined,
       description: description || undefined,
     };
-    onAddInventoryItem(created);
-    setShowModal(false);
+    try {
+      setSaving(true);
+      await onAddInventoryItem(created);
+      setShowModal(false);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -328,7 +340,31 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({ inventory, onAddInvent
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-              {filteredInventory.map((item) => (
+              {loading && (
+                <tr>
+                  <td colSpan={7} className="p-10 text-center text-slate-400">
+                    <span className="material-symbols-outlined text-3xl animate-spin inline-block">progress_activity</span>
+                    <p className="mt-2 text-xs font-semibold uppercase tracking-wider">Carregando estoque...</p>
+                  </td>
+                </tr>
+              )}
+              {!loading && filteredInventory.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="p-12 text-center text-slate-400">
+                    <span className="material-symbols-outlined text-4xl text-slate-300">inventory_2</span>
+                    <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">
+                      {searchTerm ? 'Nenhum item encontrado' : 'Nenhum produto cadastrado'}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      {searchTerm
+                        ? 'Ajuste os termos da busca.'
+                        : 'Clique em "Novo Produto" para cadastrar o primeiro item.'}
+                    </p>
+                  </td>
+                </tr>
+              )}
+              {!loading &&
+                filteredInventory.map((item) => (
                 <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="p-4">
                     <span className="font-data-mono font-bold text-[#E63946]">{item.code}</span> <br />
@@ -679,16 +715,20 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({ inventory, onAddInvent
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-slate-600 hover:bg-slate-100 transition-colors"
+                  disabled={saving}
+                  className="px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleCreateItem}
-                  className="bg-[#E63946] hover:bg-[#a51515] text-white px-6 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm flex items-center gap-1.5"
+                  disabled={saving}
+                  className="bg-[#E63946] hover:bg-[#a51515] text-white px-6 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
-                  <span className="material-symbols-outlined text-base">save</span>
-                  Salvar Produto
+                  <span className={`material-symbols-outlined text-base ${saving ? 'animate-spin' : ''}`}>
+                    {saving ? 'progress_activity' : 'save'}
+                  </span>
+                  {saving ? 'Salvando...' : 'Salvar Produto'}
                 </button>
               </div>
             </div>
