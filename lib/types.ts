@@ -313,6 +313,18 @@ export interface InventoryItem {
   description?: string;
 }
 
+export interface StockMovement {
+  id: string;
+  itemId?: string;
+  itemCode?: string;
+  itemName?: string;
+  type: 'entrada' | 'saida';
+  quantity: number;
+  resultingBalance?: number;
+  note?: string;
+  createdAt?: string;
+}
+
 export interface SystemAuditLog {
   id: string;
   timestamp: string;

@@ -57,6 +57,19 @@ export const inventoryItems = pgTable("inventory_items", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Histórico de movimentações de estoque (entradas e saídas)
+export const stockMovements = pgTable("stock_movements", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  itemId: uuid("item_id"),
+  itemCode: text("item_code"),
+  itemName: text("item_name"),
+  type: text("type").notNull(),
+  quantity: integer("quantity").notNull(),
+  resultingBalance: integer("resulting_balance"),
+  note: text("note"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Table to store diagnostics from the Smart Quiz ("Diagnóstico Inteligente SDAI")
 export const sdaiDiagnostics = pgTable("sdai_diagnostics", {
   id: serial("id").primaryKey(),

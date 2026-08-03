@@ -1,7 +1,11 @@
 import { getSupabaseClient } from './supabaseClient';
-import { InventoryItem } from './types';
+import { InventoryItem, StockMovement } from './types';
 
 const TABLE = 'inventory_items';
+const MOVEMENTS_TABLE = 'stock_movements';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const isUuid = (v: string | undefined): boolean => !!v && UUID_RE.test(v);
 
 // true se as variáveis do Supabase estiverem configuradas
 export function isSupabaseConfigured(): boolean {
@@ -109,4 +113,53 @@ export async function deleteInventoryItem(id: string): Promise<void> {
   const supabase = getSupabaseClient() as any;
   const { error } = await supabase.from(TABLE).delete().eq('id', id);
   if (error) throw error;
+}
+
+// ---- Movimentações de estoque ----
+
+function movementRowToObj(r: any): StockMovement {
+  return {
+    id: String(r.id),
+    itemId: r.item_id ?? undefined,
+    itemCode: r.item_code ?? undefined,
+    itemName: r.item_name ?? undefined,
+    type: r.type === 'saida' ? 'saida' : 'entrada',
+    quantity: Number(r.quantity ?? 0),
+    resultingBalance: r.resulting_balance === null || r.resulting_balance === undefined
+      ? undefined
+      : Number(r.resulting_balance),
+    note: r.note ?? undefined,
+    createdAt: r.created_at ?? undefined,
+  };
+}
+
+// Registra uma movimentação (entrada/saída) no histórico
+export async function insertStockMovement(m: StockMovement): Promise<StockMovement> {
+  const supabase = getSupabaseClient() as any;
+  const row = {
+    item_id: isUuid(m.itemId) ? m.itemId : null,
+    item_code: m.itemCode || null,
+    item_name: m.itemName || null,
+    type: m.type,
+    quantity: m.quantity,
+    resulting_balance: m.resultingBalance ?? null,
+    note: m.note || null,
+  };
+  const { data, error } = await supabase.from(MOVEMENTS_TABLE).insert(row).select().single();
+  if (error) throw error;
+  return movementRowToObj(data);
+}
+
+// Lista o histórico de movimentações (de um item, se informado)
+export async function fetchStockMovements(itemId?: string): Promise<StockMovement[]> {
+  const supabase = getSupabaseClient() as any;
+  let query = supabase
+    .from(MOVEMENTS_TABLE)
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if (itemId && isUuid(itemId)) query = query.eq('item_id', itemId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []).map(movementRowToObj);
 }

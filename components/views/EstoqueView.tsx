@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
-import { InventoryItem } from '@/lib/types';
+import { InventoryItem, StockMovement } from '@/lib/types';
+import { insertStockMovement, fetchStockMovements, isSupabaseConfigured } from '@/lib/inventory';
 
 interface EstoqueViewProps {
   inventory: InventoryItem[];
@@ -118,7 +119,13 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
   const [movementItem, setMovementItem] = useState<InventoryItem | null>(null);
   const [movementType, setMovementType] = useState<'entrada' | 'saida'>('entrada');
   const [movementQty, setMovementQty] = useState(1);
+  const [movementNote, setMovementNote] = useState('');
   const [movementSaving, setMovementSaving] = useState(false);
+
+  // Histórico de movimentações
+  const [historyItem, setHistoryItem] = useState<InventoryItem | null>(null);
+  const [historyRows, setHistoryRows] = useState<StockMovement[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // Foto
   const [imageUrl, setImageUrl] = useState('');
@@ -218,7 +225,23 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     setMovementItem(item);
     setMovementType('entrada');
     setMovementQty(1);
+    setMovementNote('');
     setMovementSaving(false);
+  };
+
+  const openHistory = async (item: InventoryItem) => {
+    setHistoryItem(item);
+    setHistoryRows([]);
+    if (!isSupabaseConfigured()) return;
+    setHistoryLoading(true);
+    try {
+      const rows = await fetchStockMovements(item.id);
+      setHistoryRows(rows);
+    } catch (err) {
+      console.error('Falha ao carregar histórico de movimentações:', err);
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   const movementResult = (): number => {
@@ -233,10 +256,28 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     if (!movementItem || !onUpdateInventoryItem || movementSaving) return;
     const delta = Math.max(0, Math.floor(Number(movementQty) || 0));
     if (delta <= 0) return;
-    const updated: InventoryItem = { ...movementItem, quantity: movementResult() };
+    const newBalance = movementResult();
+    const updated: InventoryItem = { ...movementItem, quantity: newBalance };
     try {
       setMovementSaving(true);
       await onUpdateInventoryItem(updated);
+      // Registra no histórico (não bloqueia a operação se falhar)
+      if (isSupabaseConfigured()) {
+        try {
+          await insertStockMovement({
+            id: '',
+            itemId: movementItem.id,
+            itemCode: movementItem.code,
+            itemName: movementItem.name,
+            type: movementType,
+            quantity: delta,
+            resultingBalance: newBalance,
+            note: movementNote || undefined,
+          });
+        } catch (err) {
+          console.error('Movimentação registrada no estoque, mas falhou ao gravar o histórico:', err);
+        }
+      }
       setMovementItem(null);
     } finally {
       setMovementSaving(false);
@@ -502,6 +543,15 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                         className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
                       >
                         <span className="material-symbols-outlined text-lg">swap_vert</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openHistory(item)}
+                        title="Histórico de movimentações"
+                        aria-label="Histórico de movimentações"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-[#1A1A72] hover:bg-slate-100 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-lg">history</span>
                       </button>
                       <button
                         type="button"
@@ -947,6 +997,18 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                 </div>
               </div>
 
+              {/* Observação opcional (registrada no histórico) */}
+              <div>
+                <label className={labelCls}>Observação (opcional)</label>
+                <input
+                  type="text"
+                  value={movementNote}
+                  onChange={(e) => setMovementNote(e.target.value)}
+                  placeholder="Ex.: Nota fiscal 1234, uso em OS-2026-91..."
+                  className={inputCls}
+                />
+              </div>
+
               {/* Saldo resultante */}
               <div className="flex items-center justify-between bg-[#1A1A72]/5 border border-[#1A1A72]/15 rounded-lg p-3">
                 <span className="text-[11px] font-semibold uppercase text-slate-600">Saldo após movimentação</span>
@@ -976,6 +1038,94 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                 </span>
                 {movementSaving ? 'Salvando...' : 'Confirmar'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Janela: Histórico de movimentações do produto */}
+      {historyItem && (
+        <div className="fixed inset-0 z-[60] bg-[#1A1A72]/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white max-w-xl w-full rounded-xl border border-slate-200 shadow-2xl max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="material-symbols-outlined text-[#1A1A72]">history</span>
+                <div className="min-w-0">
+                  <h3 className="font-display text-base font-bold text-[#1A1A72] uppercase tracking-wide truncate">
+                    Histórico — {historyItem.name}
+                  </h3>
+                  <p className="font-data-mono text-[10px] text-slate-400">{historyItem.code}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setHistoryItem(null)}
+                className="text-slate-400 hover:text-slate-700 font-bold text-xl shrink-0"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="overflow-y-auto px-6 py-4">
+              {!isSupabaseConfigured() ? (
+                <div className="text-center py-10 text-slate-400 text-xs">
+                  Histórico disponível apenas com o Supabase configurado.
+                </div>
+              ) : historyLoading ? (
+                <div className="text-center py-10 text-slate-400">
+                  <span className="material-symbols-outlined text-3xl animate-spin inline-block">progress_activity</span>
+                  <p className="mt-2 text-xs font-semibold uppercase tracking-wider">Carregando histórico...</p>
+                </div>
+              ) : historyRows.length === 0 ? (
+                <div className="text-center py-12 text-slate-400">
+                  <span className="material-symbols-outlined text-4xl text-slate-300">receipt_long</span>
+                  <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">
+                    Nenhuma movimentação registrada
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    As entradas e saídas deste produto aparecerão aqui.
+                  </p>
+                </div>
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {historyRows.map((mv) => (
+                    <li key={mv.id} className="py-3 flex items-center gap-3">
+                      <span
+                        className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                          mv.type === 'entrada' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-[#E63946]'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-lg">
+                          {mv.type === 'entrada' ? 'arrow_downward' : 'arrow_upward'}
+                        </span>
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-slate-900 uppercase">
+                          {mv.type === 'entrada' ? 'Entrada' : 'Saída'} de {mv.quantity} un
+                        </p>
+                        <p className="text-[11px] text-slate-500 truncate">
+                          {mv.note || '—'}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="font-data-mono text-xs font-bold text-slate-900">
+                          Saldo: {mv.resultingBalance ?? '—'}
+                        </p>
+                        <p className="font-data-mono text-[10px] text-slate-400">
+                          {mv.createdAt
+                            ? new Date(mv.createdAt).toLocaleString('pt-BR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                            : ''}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         </div>
