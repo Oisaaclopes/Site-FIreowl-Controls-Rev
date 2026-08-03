@@ -96,7 +96,7 @@ export function CrmApp({ initialRole = 'ADMINISTRATIVO', onLogout }: CrmAppProps
   const [quotes, setQuotes] = useState<CustomQuote[]>(INITIAL_CUSTOM_QUOTES);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>(INITIAL_FINANCIAL_TRANSACTIONS);
   const [suppliers, setSuppliers] = useState<Supplier[]>(INITIAL_SUPPLIERS);
-  const [services] = useState<ServiceCatalogItem[]>(INITIAL_SERVICES);
+  const [services, setServices] = useState<ServiceCatalogItem[]>(INITIAL_SERVICES);
   // Com Supabase configurado, inicia vazio e carrega do banco (evita
   // "flash" de dados de exemplo). Sem Supabase, usa os dados locais.
   const [inventory, setInventory] = useState<InventoryItem[]>(
@@ -279,6 +279,17 @@ export function CrmApp({ initialRole = 'ADMINISTRATIVO', onLogout }: CrmAppProps
     logAction('Elaboração de Orçamento', 'Serviços', `Orçamento ${newQuote.id} criado para ${newQuote.clientName}`);
   };
 
+  const handleUpdateService = (svc: ServiceCatalogItem) => {
+    setServices((prev) => prev.map((s) => (s.id === svc.id ? svc : s)));
+    logAction('Atualização de Serviço', 'Serviços', `Serviço ${svc.code} - ${svc.title} atualizado`);
+  };
+
+  const handleDeleteService = (id: string) => {
+    const svc = services.find((s) => s.id === id);
+    setServices((prev) => prev.filter((s) => s.id !== id));
+    logAction('Exclusão de Serviço', 'Serviços', `Serviço ${svc?.code || id} removido do catálogo`);
+  };
+
   const handleSelectClientForReport = (clientName: string) => {
     setTechnicalReport((prev) => ({
       ...prev,
@@ -431,6 +442,8 @@ export function CrmApp({ initialRole = 'ADMINISTRATIVO', onLogout }: CrmAppProps
               clients={clients}
               quotes={quotes}
               onAddQuote={handleAddQuote}
+              onUpdateService={handleUpdateService}
+              onDeleteService={handleDeleteService}
               onSelectClientForReport={handleSelectClientForReport}
             />
           )}

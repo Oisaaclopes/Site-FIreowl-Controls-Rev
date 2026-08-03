@@ -2,12 +2,15 @@
 
 import React, { useState } from 'react';
 import { ServiceCatalogItem, Client, CustomQuote } from '@/lib/types';
+import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
 
 interface ServicosViewProps {
   services: ServiceCatalogItem[];
   clients: Client[];
   quotes: CustomQuote[];
   onAddQuote: (q: CustomQuote) => void;
+  onUpdateService?: (svc: ServiceCatalogItem) => void;
+  onDeleteService?: (id: string) => void;
   onSelectClientForReport?: (clientName: string) => void;
 }
 
@@ -18,10 +21,28 @@ export const ServicosView: React.FC<ServicosViewProps> = ({
   clients,
   quotes,
   onAddQuote,
+  onUpdateService,
+  onDeleteService,
   onSelectClientForReport,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'catalogo' | 'orcamentos' | 'rdo_laudo'>('catalogo');
   const [showModal, setShowModal] = useState(false);
+
+  // Edição de serviço do catálogo
+  const [editService, setEditService] = useState<ServiceCatalogItem | null>(null);
+
+  const handleDeleteService = (svc: ServiceCatalogItem) => {
+    if (!onDeleteService) return;
+    if (!window.confirm(`Excluir o serviço "${svc.title}"?\n\nEsta ação não pode ser desfeita.`)) return;
+    onDeleteService(svc.id);
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editService) return;
+    onUpdateService?.(editService);
+    setEditService(null);
+  };
 
   // Quote form state
   const [clientName, setClientName] = useState(clients[0]?.name || 'Catuaí Shopping Londrina');
@@ -111,37 +132,60 @@ export const ServicosView: React.FC<ServicosViewProps> = ({
         </button>
       </div>
 
-      {/* Subtab 1: Catálogo & Preços */}
+      {/* Subtab 1: Catálogo & Preços (lista) */}
       {activeSubTab === 'catalogo' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {services.map((s) => (
-            <div key={s.id} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-              <div>
-                <div className="flex justify-between items-start">
-                  <span className="font-data-mono text-xs font-bold text-[#E63946]">{s.code}</span>
-                  <span className="px-2.5 py-0.5 bg-blue-100 text-blue-800 text-[10px] font-bold rounded-full uppercase">
-                    {s.nbrNormRef}
-                  </span>
-                </div>
-                <h3 className="text-base font-bold text-slate-900 uppercase mt-2">{s.title}</h3>
-                <p className="text-xs text-slate-500 mt-1">Categoria: {s.category}</p>
-              </div>
-
-              <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center font-data-mono">
-                <div>
-                  <span className="text-slate-400 text-[10px] block uppercase">Horas Estimadas</span>
-                  <span className="text-slate-900 font-bold text-xs">{s.estimatedHours} horas técnicas</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-slate-400 text-[10px] block uppercase">Valor Padrão</span>
-                  <span className="text-[#E63946] font-bold text-base">
-                    R$ {s.standardValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-              </div>
+        <>
+          {services.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-sm py-16 text-center text-slate-400">
+              <span className="material-symbols-outlined text-4xl text-slate-300">construction</span>
+              <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">
+                Nenhum serviço no catálogo
+              </p>
             </div>
-          ))}
-        </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {services.map((s) => (
+                <DataListRow
+                  key={s.id}
+                  title={
+                    <div>
+                      <span className="font-data-mono text-[11px] font-bold text-[#1A1A72] block normal-case">
+                        {s.code}
+                      </span>
+                      <span className="uppercase text-sm">{s.title}</span>
+                    </div>
+                  }
+                  meta={<RowMeta label="Categoria" value={s.category} />}
+                  center={
+                    <div className="flex flex-col items-start md:items-center gap-1.5">
+                      <span className="flex items-center gap-1 text-slate-600 font-medium">
+                        <span className="material-symbols-outlined text-sm text-slate-400">schedule</span>
+                        {s.estimatedHours} horas técnicas
+                      </span>
+                      <Badge color="blue">{s.nbrNormRef}</Badge>
+                    </div>
+                  }
+                  right={
+                    <>
+                      <span className="font-data-mono font-bold text-emerald-600 text-base md:text-lg text-right">
+                        R$ {s.standardValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <RowAction
+                          icon="delete"
+                          label="Excluir serviço"
+                          danger
+                          onClick={() => handleDeleteService(s)}
+                        />
+                        <RowAction icon="edit" label="Editar serviço" onClick={() => setEditService(s)} />
+                      </div>
+                    </>
+                  }
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* Subtab 2: Orçamentos */}
@@ -231,6 +275,91 @@ export const ServicosView: React.FC<ServicosViewProps> = ({
                 </button>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar Serviço */}
+      {editService && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white max-w-md w-full rounded-xl border border-slate-200 p-6 shadow-2xl relative">
+            <button
+              onClick={() => setEditService(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 font-bold"
+            >
+              ✕
+            </button>
+            <h3 className="text-lg font-bold text-slate-900 uppercase mb-4">Editar Serviço</h3>
+            <form onSubmit={handleSaveEdit} className="space-y-4 text-xs font-medium">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-600 mb-1 font-semibold uppercase">Código</label>
+                  <input
+                    type="text"
+                    value={editService.code}
+                    onChange={(e) => setEditService({ ...editService, code: e.target.value })}
+                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-600 mb-1 font-semibold uppercase">Norma (NBR/IT)</label>
+                  <input
+                    type="text"
+                    value={editService.nbrNormRef}
+                    onChange={(e) => setEditService({ ...editService, nbrNormRef: e.target.value })}
+                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-slate-600 mb-1 font-semibold uppercase">Título do Serviço</label>
+                <input
+                  type="text"
+                  required
+                  value={editService.title}
+                  onChange={(e) => setEditService({ ...editService, title: e.target.value })}
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-600 mb-1 font-semibold uppercase">Categoria</label>
+                <input
+                  type="text"
+                  value={editService.category}
+                  onChange={(e) => setEditService({ ...editService, category: e.target.value })}
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-600 mb-1 font-semibold uppercase">Horas estimadas</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editService.estimatedHours}
+                    onChange={(e) => setEditService({ ...editService, estimatedHours: Number(e.target.value) })}
+                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-600 mb-1 font-semibold uppercase">Valor padrão (R$)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={editService.standardValue}
+                    onChange={(e) => setEditService({ ...editService, standardValue: Number(e.target.value) })}
+                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                className="w-full bg-[#E63946] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
+              >
+                Salvar Alterações
+              </button>
+            </form>
           </div>
         </div>
       )}
