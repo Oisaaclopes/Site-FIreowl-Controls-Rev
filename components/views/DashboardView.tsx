@@ -130,7 +130,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="mt-4 flex items-center gap-2">
             <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div className="bg-slate-800 h-full w-[85%] rounded-full"></div>
+              <div className="bg-[#1A1A72] h-full w-[85%] rounded-full"></div>
             </div>
             <span className="font-data-mono text-xs text-slate-500 font-semibold">85% META</span>
           </div>
@@ -224,15 +224,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* Right: Technical Highlight Card & Team Status */}
         <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
           {/* Anomalias Card */}
-          <div className="bg-[#0f172a] text-white p-6 rounded-xl shadow-lg flex flex-col justify-between relative overflow-hidden border border-slate-800">
+          <div className="bg-white p-6 rounded-xl shadow-sm flex flex-col justify-between relative overflow-hidden">
             <div>
-              <span className="text-[10px] font-bold text-[#E63946] bg-red-950/60 border border-red-800/50 px-2.5 py-1 rounded-full uppercase tracking-wider">
+              <span className="text-[10px] font-bold text-[#E63946] bg-red-50 px-2.5 py-1 rounded-full uppercase tracking-wider">
                 Módulo de Inteligência Técnica
               </span>
-              <h2 className="text-lg font-bold mt-3 tracking-tight leading-snug uppercase">
+              <h2 className="text-lg font-bold text-slate-900 mt-3 tracking-tight leading-snug uppercase">
                 Identificação de Anomalias no CRM
               </h2>
-              <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+              <p className="text-xs text-slate-500 mt-2 leading-relaxed">
                 14 clientes apresentaram inconsistências preventivas ou manutenções atrasadas neste trimestre.
               </p>
             </div>
@@ -273,7 +273,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Bottom: Recent Transactions Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-slate-900 px-6 py-4 flex justify-between items-center text-white">
+        <div className="bg-[#1A1A72] px-6 py-4 flex justify-between items-center text-white">
           <h3 className="text-xs font-bold uppercase tracking-wider">
             Últimos Lançamentos Financeiros &amp; Contratos
           </h3>

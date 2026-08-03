@@ -127,22 +127,31 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ pedidosOS }) => {
 
       {/* Map View */}
       {viewMode === 'map' && (
-        <div className="bg-[#0f172a] p-8 text-white rounded-xl border border-slate-800 shadow-xl min-h-[380px] flex flex-col justify-between relative overflow-hidden">
+        <div
+          className="bg-slate-100 p-8 rounded-xl border border-slate-200 shadow-sm min-h-[380px] flex flex-col justify-between relative overflow-hidden"
+          style={{
+            backgroundImage:
+              'radial-gradient(circle, rgba(26,26,114,0.08) 1px, transparent 1px)',
+            backgroundSize: '22px 22px',
+          }}
+        >
           <div>
-            <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest bg-emerald-950/60 border border-emerald-800 px-3 py-1 rounded-full">
-              GPS Satellite Active — Londrina / PR
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 uppercase tracking-widest bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> GPS Ativo — Londrina / PR
             </span>
-            <h3 className="text-2xl font-bold uppercase mt-4">Geolocalização &amp; Despacho em Tempo Real</h3>
+            <h3 className="text-2xl font-bold uppercase mt-4 text-slate-900">
+              Geolocalização &amp; Despacho em Tempo Real
+            </h3>
           </div>
 
-          <div className="bg-slate-900/80 p-5 rounded-lg border border-slate-800 font-data-mono text-xs space-y-3 z-10">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-              <span className="text-amber-400 font-bold">● EQUIPE ALFA:</span>
-              <span>Em atendimento no Catuaí Shopping (-23.5505, -46.6333)</span>
+          <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm font-data-mono text-xs space-y-3 z-10">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+              <span className="text-amber-600 font-bold">● EQUIPE ALFA:</span>
+              <span className="text-slate-700">Em atendimento no Catuaí Shopping (-23.5505, -46.6333)</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-emerald-400 font-bold">● EQUIPE BETA:</span>
-              <span>Em deslocamento para Londrina Norte Shopping (-23.5301, -46.6120)</span>
+              <span className="text-emerald-600 font-bold">● EQUIPE BETA:</span>
+              <span className="text-slate-700">Em deslocamento para Londrina Norte Shopping (-23.5301, -46.6120)</span>
             </div>
           </div>
 

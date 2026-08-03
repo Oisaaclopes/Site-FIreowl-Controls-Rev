@@ -80,12 +80,12 @@ export const FinancasView: React.FC<FinancasViewProps> = ({ transactions }) => {
           </span>
         </div>
 
-        <div className="bg-[#0f172a] text-white p-5 rounded-xl border border-slate-800 shadow-md">
-          <p className="text-xs font-semibold text-slate-400 uppercase">Caixa Disponível em Conta</p>
-          <h2 className="font-data-mono text-2xl font-bold text-emerald-400 mt-2">
+        <div className="bg-white p-5 rounded-xl shadow-sm">
+          <p className="text-xs font-semibold text-slate-500 uppercase">Caixa Disponível em Conta</p>
+          <h2 className="font-data-mono text-2xl font-bold text-emerald-600 mt-2">
             R$ {(lucroLiquido + 85000).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </h2>
-          <span className="text-[10px] text-slate-300 font-semibold bg-slate-800 px-2 py-0.5 rounded mt-1 inline-block">
+          <span className="text-[10px] text-slate-600 font-semibold bg-slate-100 px-2 py-0.5 rounded mt-1 inline-block">
             Banco Bradesco (Sede)
           </span>
         </div>
@@ -113,16 +113,16 @@ export const FinancasView: React.FC<FinancasViewProps> = ({ transactions }) => {
             <span>(-) Custos Operacionais de Campo &amp; Materiais</span>
             <span className="text-red-600">- R$ {totalDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
           </div>
-          <div className="flex justify-between p-3 bg-slate-900 text-white rounded font-bold text-sm">
+          <div className="flex justify-between p-3 bg-[#1A1A72] text-white rounded-lg font-bold text-sm">
             <span>(=) RESULTADO OPERACIONAL LÍQUIDO FINAL</span>
-            <span className="text-emerald-400">R$ {(totalReceitas * 0.94 - totalDespesas).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            <span className="text-emerald-300">R$ {(totalReceitas * 0.94 - totalDespesas).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
           </div>
         </div>
       </div>
 
       {/* Transactions List */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-slate-900 px-6 py-4 text-white text-xs font-bold uppercase tracking-wider flex justify-between items-center">
+        <div className="bg-[#1A1A72] px-6 py-4 text-white text-xs font-bold uppercase tracking-wider flex justify-between items-center">
           <span>Lançamentos Consolidados do Período</span>
           <div className="flex gap-2 font-normal">
             {['TODOS', 'RECEITA', 'DESPESA'].map((st) => (
