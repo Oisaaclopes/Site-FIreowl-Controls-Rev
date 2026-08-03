@@ -6,6 +6,8 @@ import { InventoryItem } from '@/lib/types';
 interface EstoqueViewProps {
   inventory: InventoryItem[];
   onAddInventoryItem: (item: InventoryItem) => void | Promise<void>;
+  onUpdateInventoryItem?: (item: InventoryItem) => void | Promise<void>;
+  onDeleteInventoryItem?: (id: string) => void | Promise<void>;
   loading?: boolean;
 }
 
@@ -101,12 +103,15 @@ const labelCls = 'block text-slate-600 mb-1 font-semibold uppercase text-[11px] 
 export const EstoqueView: React.FC<EstoqueViewProps> = ({
   inventory,
   onAddInventoryItem,
+  onUpdateInventoryItem,
+  onDeleteInventoryItem,
   loading = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [showUnitModal, setShowUnitModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Foto
@@ -147,6 +152,7 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
   };
 
   const openModal = () => {
+    setEditingItem(null);
     setImageUrl('');
     setName('');
     setCategory('');
@@ -166,6 +172,40 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     setModel('');
     setDescription('');
     setShowModal(true);
+  };
+
+  const openEdit = (item: InventoryItem) => {
+    setEditingItem(item);
+    setImageUrl(item.imageUrl || '');
+    setName(item.name);
+    setCategory(item.category || '');
+    setCode(item.code || '');
+    setUnit(item.unit || '');
+    setSalePrice(item.salePrice ?? item.unitPrice ?? 0);
+    setCostPrice(item.costPrice ?? 0);
+    setMargin(item.profitMargin ?? 0);
+    setMarkup(item.markup ?? 0);
+    setStockManaged(item.stockManaged ?? true);
+    setQuantity(item.quantity ?? 0);
+    setIdealQuantity(item.idealQuantity ?? 0);
+    setMinQuantity(item.minQuantity ?? 0);
+    setReservedQuantity(item.reservedQuantity ?? 0);
+    setSupplier(item.supplier || '');
+    setBrand(item.brand || '');
+    setModel(item.model || '');
+    setDescription(item.description || '');
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingItem(null);
+  };
+
+  const handleDelete = async (item: InventoryItem) => {
+    if (!onDeleteInventoryItem) return;
+    if (!window.confirm(`Excluir o produto "${item.name}"?\n\nEsta ação não pode ser desfeita.`)) return;
+    await onDeleteInventoryItem(item.id);
   };
 
   const handleImage = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -225,17 +265,17 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
       return;
     }
     const seq = (invSeq++).toString();
-    const created: InventoryItem = {
-      id: `inv-${seq}`,
+    const payload: InventoryItem = {
+      id: editingItem ? editingItem.id : `inv-${seq}`,
       code: code || generateCode(category),
-      serialBP: `BP-EQUIP-${seq}00`,
+      serialBP: editingItem ? editingItem.serialBP : `BP-EQUIP-${seq}00`,
       name,
       category,
       quantity: stockManaged ? Number(quantity) : 0,
       minQuantity: stockManaged ? Number(minQuantity) : 0,
       unitPrice: Number(salePrice),
       supplier,
-      location: '',
+      location: editingItem?.location ?? '',
       imageUrl: imageUrl || undefined,
       unit,
       salePrice: Number(salePrice),
@@ -251,8 +291,12 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     };
     try {
       setSaving(true);
-      await onAddInventoryItem(created);
-      setShowModal(false);
+      if (editingItem) {
+        await onUpdateInventoryItem?.(payload);
+      } else {
+        await onAddInventoryItem(payload);
+      }
+      closeModal();
     } finally {
       setSaving(false);
     }
@@ -337,12 +381,13 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                 <th className="p-4 text-center">Qtd. Atual</th>
                 <th className="p-4 text-right">Valor Unitário</th>
                 <th className="p-4 text-right">Subtotal</th>
+                <th className="p-4 text-center">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
               {loading && (
                 <tr>
-                  <td colSpan={7} className="p-10 text-center text-slate-400">
+                  <td colSpan={8} className="p-10 text-center text-slate-400">
                     <span className="material-symbols-outlined text-3xl animate-spin inline-block">progress_activity</span>
                     <p className="mt-2 text-xs font-semibold uppercase tracking-wider">Carregando estoque...</p>
                   </td>
@@ -350,7 +395,7 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
               )}
               {!loading && filteredInventory.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-12 text-center text-slate-400">
+                  <td colSpan={8} className="p-12 text-center text-slate-400">
                     <span className="material-symbols-outlined text-4xl text-slate-300">inventory_2</span>
                     <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">
                       {searchTerm ? 'Nenhum item encontrado' : 'Nenhum produto cadastrado'}
@@ -412,6 +457,28 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                   <td className="p-4 text-right font-data-mono font-bold text-slate-900">
                     R$ {(item.quantity * item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </td>
+                  <td className="p-4">
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => openEdit(item)}
+                        title="Editar produto"
+                        aria-label="Editar produto"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-[#1A1A72] hover:bg-slate-100 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-lg">edit</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(item)}
+                        title="Excluir produto"
+                        aria-label="Excluir produto"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-[#E63946] hover:bg-red-50 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-lg">delete</span>
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -426,10 +493,10 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
             {/* Cabeçalho fixo */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
               <h3 className="font-display text-lg font-bold text-[#1A1A72] uppercase tracking-wide">
-                Cadastrar Novo Produto
+                {editingItem ? 'Editar Produto' : 'Cadastrar Novo Produto'}
               </h3>
               <button
-                onClick={() => setShowModal(false)}
+                onClick={closeModal}
                 className="text-slate-400 hover:text-slate-700 font-bold text-xl"
               >
                 ✕
@@ -714,7 +781,7 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
+                  onClick={closeModal}
                   disabled={saving}
                   className="px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50"
                 >
@@ -728,7 +795,7 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                   <span className={`material-symbols-outlined text-base ${saving ? 'animate-spin' : ''}`}>
                     {saving ? 'progress_activity' : 'save'}
                   </span>
-                  {saving ? 'Salvando...' : 'Salvar Produto'}
+                  {saving ? 'Salvando...' : editingItem ? 'Salvar Alterações' : 'Salvar Produto'}
                 </button>
               </div>
             </div>

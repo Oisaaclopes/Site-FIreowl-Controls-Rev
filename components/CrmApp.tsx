@@ -4,7 +4,13 @@ import React, { useEffect, useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { Header } from '@/components/Header';
 import { AuthModal } from '@/components/AuthModal';
-import { fetchInventory, insertInventoryItem, isSupabaseConfigured } from '@/lib/inventory';
+import {
+  fetchInventory,
+  insertInventoryItem,
+  updateInventoryItem,
+  deleteInventoryItem,
+  isSupabaseConfigured,
+} from '@/lib/inventory';
 
 import {
   TabPath,
@@ -229,6 +235,40 @@ export function CrmApp({ initialRole = 'ADMINISTRATIVO', onLogout }: CrmAppProps
     }
   };
 
+  const handleUpdateInventoryItem = async (item: InventoryItem) => {
+    if (!isSupabaseConfigured()) {
+      setInventory((prev) => prev.map((i) => (i.id === item.id ? item : i)));
+      logAction('Atualização de Item', 'Estoque', `Item ${item.code} - ${item.name} atualizado`);
+      return;
+    }
+    try {
+      const saved = await updateInventoryItem(item);
+      setInventory((prev) => prev.map((i) => (i.id === saved.id ? saved : i)));
+      logAction('Atualização de Item', 'Estoque', `Item ${saved.code} - ${saved.name} atualizado`);
+    } catch (err) {
+      console.error('Falha ao atualizar o item no Supabase:', err);
+      setInventory((prev) => prev.map((i) => (i.id === item.id ? item : i)));
+      alert('Não foi possível atualizar o item no banco de dados (Supabase). A alteração vale só nesta sessão.');
+    }
+  };
+
+  const handleDeleteInventoryItem = async (id: string) => {
+    const target = inventory.find((i) => i.id === id);
+    if (!isSupabaseConfigured()) {
+      setInventory((prev) => prev.filter((i) => i.id !== id));
+      logAction('Exclusão de Item', 'Estoque', `Item ${target?.code || id} removido`);
+      return;
+    }
+    try {
+      await deleteInventoryItem(id);
+      setInventory((prev) => prev.filter((i) => i.id !== id));
+      logAction('Exclusão de Item', 'Estoque', `Item ${target?.code || id} removido`);
+    } catch (err) {
+      console.error('Falha ao excluir o item no Supabase:', err);
+      alert('Não foi possível excluir o item no banco de dados (Supabase). Tente novamente.');
+    }
+  };
+
   const handleAddPunch = (newPunch: TimePunch) => {
     setPunches([newPunch, ...punches]);
     logAction('Batida de Ponto', 'Ponto Eletrônico', `Ponto registrado por ${newPunch.employeeName} (${newPunch.type})`);
@@ -379,6 +419,8 @@ export function CrmApp({ initialRole = 'ADMINISTRATIVO', onLogout }: CrmAppProps
             <EstoqueView
               inventory={inventory}
               onAddInventoryItem={handleAddInventoryItem}
+              onUpdateInventoryItem={handleUpdateInventoryItem}
+              onDeleteInventoryItem={handleDeleteInventoryItem}
               loading={inventoryLoading}
             />
           )}

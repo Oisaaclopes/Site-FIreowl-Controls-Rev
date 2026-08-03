@@ -90,3 +90,23 @@ export async function insertInventoryItem(item: InventoryItem): Promise<Inventor
   if (error) throw error;
   return rowToItem(data);
 }
+
+// Atualiza um item existente (pelo id) e retorna a linha persistida
+export async function updateInventoryItem(item: InventoryItem): Promise<InventoryItem> {
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase
+    .from(TABLE)
+    .update(itemToRow(item))
+    .eq('id', item.id)
+    .select()
+    .single();
+  if (error) throw error;
+  return rowToItem(data);
+}
+
+// Remove um item pelo id
+export async function deleteInventoryItem(id: string): Promise<void> {
+  const supabase = getSupabaseClient() as any;
+  const { error } = await supabase.from(TABLE).delete().eq('id', id);
+  if (error) throw error;
+}
