@@ -269,8 +269,16 @@ export function CrmApp({ initialRole = 'ADMINISTRATIVO', onLogout }: CrmAppProps
           {currentTab === 'pedidos' && (
             <PedidosView
               pedidosOS={pedidosOS}
+              pedidos={pedidos}
               clients={clients}
+              inventory={inventory}
+              partnerBrands={partnerBrands}
+              templates={templates}
+              companyProfile={companyProfile}
               onAddOS={handleAddOS}
+              onSavePedido={handleSavePedido}
+              onUpdatePedidoStatus={handleUpdatePedidoStatus}
+              onGenerateOSFromPedido={handleGenerateOSFromPedido}
               onSelectClientForReport={handleSelectClientForReport}
             />
           )}
@@ -336,7 +344,16 @@ export function CrmApp({ initialRole = 'ADMINISTRATIVO', onLogout }: CrmAppProps
           {currentTab === 'ponto' && <PontoView punches={punches} onAddPunch={handleAddPunch} />}
 
           {currentTab === 'conta' && (
-            <ContaView logs={auditLogs} userRole={userRole} onSelectRole={setUserRole} />
+            <ContaView
+              logs={auditLogs}
+              userRole={userRole}
+              onSelectRole={setUserRole}
+              companyProfile={companyProfile}
+              onUpdateCompanyProfile={handleUpdateCompanyProfile}
+              partnerBrands={partnerBrands}
+              onAddPartnerBrand={handleAddPartnerBrand}
+              onDeletePartnerBrand={handleDeletePartnerBrand}
+            />
           )}
         </main>
       </div>
