@@ -256,6 +256,132 @@ const MoneyInput: React.FC<{ value: number; onChange: (n: number) => void; icon:
   </div>
 );
 
+// Card/linha de um produto na listagem (List View)
+const StockItemCard: React.FC<{
+  item: InventoryItem;
+  onMovement: (item: InventoryItem) => void;
+  onHistory: (item: InventoryItem) => void;
+  onEdit: (item: InventoryItem) => void;
+  onDelete: (item: InventoryItem) => void;
+}> = ({ item, onMovement, onHistory, onEdit, onDelete }) => {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const price = item.salePrice ?? item.unitPrice ?? 0;
+  const esgotado = item.quantity <= 0;
+
+  const Meta = ({ label, value }: { label: string; value: React.ReactNode }) => (
+    <span className="whitespace-nowrap">
+      <span className="text-slate-400">{label}:</span>{' '}
+      <span className="text-slate-600 font-semibold">{value}</span>
+    </span>
+  );
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col md:flex-row md:items-center gap-4 hover:shadow-md hover:border-slate-300 transition-all">
+      {/* Esquerda: imagem + dados */}
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        {item.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={item.imageUrl}
+            alt={item.name}
+            className="w-11 h-11 rounded-lg object-cover border border-slate-200 shrink-0"
+          />
+        ) : (
+          <span className="w-11 h-11 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 shrink-0">
+            <span className="material-symbols-outlined text-lg">inventory_2</span>
+          </span>
+        )}
+        <div className="min-w-0">
+          <p className="font-semibold text-slate-900 text-sm truncate">{item.name}</p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] mt-0.5">
+            {item.brand && <Meta label="Marca" value={item.brand} />}
+            {item.model && <Meta label="Modelo" value={item.model} />}
+            <Meta label="Qtd." value={`${item.quantity}${item.unit ? ' ' + item.unit.split(' ')[0] : ''}`} />
+            <Meta label="Código" value={<span className="font-data-mono">{item.code}</span>} />
+          </div>
+        </div>
+      </div>
+
+      {/* Direita: preço, status, ações */}
+      <div className="flex items-center justify-between md:justify-end gap-4 shrink-0">
+        <p className="font-data-mono font-bold text-emerald-600 text-base md:text-lg text-right">{brl(price)}</p>
+
+        {esgotado ? (
+          <span className="shrink-0 px-2.5 py-1 rounded-full border border-[#E63946] text-[#E63946] text-[10px] font-bold uppercase tracking-wide">
+            Esgotado
+          </span>
+        ) : (
+          <span className="shrink-0 px-2.5 py-1 rounded-full border border-[#1A1A72]/30 bg-[#1A1A72]/5 text-[#1A1A72] text-[10px] font-bold uppercase tracking-wide">
+            Estoque regular
+          </span>
+        )}
+
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onDelete(item)}
+            title="Excluir produto"
+            aria-label="Excluir produto"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-[#E63946] hover:bg-red-50 transition-colors"
+          >
+            <span className="material-symbols-outlined text-lg">delete</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onEdit(item)}
+            title="Editar produto"
+            aria-label="Editar produto"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-[#1A1A72] hover:bg-slate-100 transition-colors"
+          >
+            <span className="material-symbols-outlined text-lg">edit</span>
+          </button>
+          {/* Mais ações: movimentar / histórico */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              title="Mais ações"
+              aria-label="Mais ações"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            >
+              <span className="material-symbols-outlined text-lg">more_vert</span>
+            </button>
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                <div className="absolute right-0 top-9 z-20 w-44 bg-white border border-slate-200 rounded-lg shadow-xl py-1 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onMovement(item);
+                    }}
+                    className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
+                  >
+                    <span className="material-symbols-outlined text-base text-emerald-600">swap_vert</span>
+                    Movimentar estoque
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onHistory(item);
+                    }}
+                    className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
+                  >
+                    <span className="material-symbols-outlined text-base text-[#1A1A72]">history</span>
+                    Histórico
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const EstoqueView: React.FC<EstoqueViewProps> = ({
   inventory,
   onAddInventoryItem,
@@ -264,6 +390,10 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
   loading = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [tab, setTab] = useState<'produtos' | 'compras'>('produtos');
+  const [showSearch, setShowSearch] = useState(false);
+  const [showHeaderMenu, setShowHeaderMenu] = useState(false);
+  const [criticalOnly, setCriticalOnly] = useState(false);
   const [showPanel, setShowPanel] = useState(false);
   const [showUnitModal, setShowUnitModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -500,13 +630,20 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     setMargin(sale > 0 ? round2(((sale - costPrice) / sale) * 100) : 0);
   };
 
-  const filteredInventory = inventory.filter(
-    (item) =>
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.serialBP || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const term = searchTerm.toLowerCase();
+  const filteredInventory = inventory
+    // Aba "Lista de compras": só itens no nível mínimo ou abaixo
+    .filter((item) => (tab === 'compras' ? item.quantity <= item.minQuantity : true))
+    // Filtro "somente nível crítico" (menu de mais opções)
+    .filter((item) => (criticalOnly ? item.quantity <= item.minQuantity : true))
+    .filter(
+      (item) =>
+        item.name.toLowerCase().includes(term) ||
+        item.code.toLowerCase().includes(term) ||
+        (item.serialBP || '').toLowerCase().includes(term) ||
+        (item.brand || '').toLowerCase().includes(term) ||
+        item.category.toLowerCase().includes(term)
+    );
 
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -575,24 +712,106 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
 
   return (
     <div className="flex flex-col w-full p-8 gap-6">
-      {/* Header */}
-      <div className="flex justify-between items-center border-b border-slate-200 pb-5">
-        <div>
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            Gestão de Almoxarifado, Peças &amp; Rastreabilidade BP
-          </span>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">
-            Estoque de Componentes SDAI &amp; Equipamentos
-          </h1>
-        </div>
+      {/* Título */}
+      <div className="border-b border-slate-200 pb-5">
+        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+          Gestão de Almoxarifado, Peças &amp; Rastreabilidade BP
+        </span>
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">
+          Estoque de Componentes SDAI &amp; Equipamentos
+        </h1>
+      </div>
 
+      {/* Toolbar: Novo produto (esq) · Tabs (centro) · Buscar / Mais (dir) */}
+      <div className="flex flex-col md:flex-row md:items-center gap-3">
+        {/* Novo produto (outline) */}
         <button
           onClick={openPanel}
-          className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[#1A1A72] text-[#1A1A72] hover:bg-[#1A1A72] hover:text-white text-xs font-semibold uppercase tracking-wide transition-colors self-start"
         >
-          <span className="material-symbols-outlined text-base">add</span> Novo Produto
+          <span className="material-symbols-outlined text-base">add</span> Novo produto
         </button>
+
+        {/* Tabs (toggle) */}
+        <div className="flex-1 flex md:justify-center">
+          <div className="inline-flex bg-slate-100 rounded-lg p-1">
+            {(
+              [
+                { key: 'produtos', label: 'Produtos' },
+                { key: 'compras', label: 'Lista de compras' },
+              ] as const
+            ).map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`px-4 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wide transition-colors ${
+                  tab === t.key ? 'bg-white text-[#1A1A72] shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Ações: buscar + mais opções */}
+        <div className="flex items-center gap-2 self-end md:self-auto">
+          <button
+            onClick={() => setShowSearch((v) => !v)}
+            title="Buscar"
+            aria-label="Buscar"
+            className={`w-9 h-9 rounded-full flex items-center justify-center border transition-colors ${
+              showSearch ? 'border-[#1A1A72] text-[#1A1A72] bg-[#1A1A72]/5' : 'border-slate-200 text-slate-500 hover:bg-slate-100'
+            }`}
+          >
+            <span className="material-symbols-outlined text-lg">search</span>
+          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowHeaderMenu((v) => !v)}
+              title="Mais opções"
+              aria-label="Mais opções"
+              className="w-9 h-9 rounded-full flex items-center justify-center border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors"
+            >
+              <span className="material-symbols-outlined text-lg">more_horiz</span>
+            </button>
+            {showHeaderMenu && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowHeaderMenu(false)} />
+                <div className="absolute right-0 top-11 z-20 w-52 bg-white border border-slate-200 rounded-lg shadow-xl py-1 text-xs">
+                  <button
+                    onClick={() => {
+                      setCriticalOnly((v) => !v);
+                      setShowHeaderMenu(false);
+                    }}
+                    className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"
+                  >
+                    <span className={`material-symbols-outlined text-base ${criticalOnly ? 'text-[#E63946]' : 'text-slate-400'}`}>
+                      {criticalOnly ? 'check_box' : 'check_box_outline_blank'}
+                    </span>
+                    Somente nível crítico
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </div>
+
+      {/* Campo de busca (aparece ao clicar na lupa) */}
+      {showSearch && (
+        <div className="relative w-full sm:w-96">
+          <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-lg">search</span>
+          <input
+            autoFocus
+            type="text"
+            placeholder="Buscar por nome, código, marca ou categoria..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+          />
+        </div>
+      )}
 
       {/* Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -620,158 +839,52 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
         </div>
       </div>
 
-      {/* Search */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <div className="relative w-full sm:w-96">
-          <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-lg">search</span>
-          <input
-            type="text"
-            placeholder="Buscar por código, série BP, nome ou categoria..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E63946]/20 uppercase"
-          />
+      {/* Lista de produtos (List View) */}
+      {loading ? (
+        <div className="py-16 text-center text-slate-400">
+          <span className="material-symbols-outlined text-3xl animate-spin inline-block">progress_activity</span>
+          <p className="mt-2 text-xs font-semibold uppercase tracking-wider">Carregando estoque...</p>
         </div>
-      </div>
-
-      {/* Inventory Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-[#1A1A72] px-6 py-4 text-white text-xs font-bold uppercase tracking-wider">
-          Listagem de Estoque e Equipamentos
+      ) : filteredInventory.length === 0 ? (
+        <div className="bg-white rounded-xl border border-slate-200 py-16 text-center text-slate-400">
+          <span className="material-symbols-outlined text-4xl text-slate-300">
+            {tab === 'compras' ? 'shopping_cart' : 'inventory_2'}
+          </span>
+          <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">
+            {tab === 'compras'
+              ? 'Nada para comprar'
+              : searchTerm || criticalOnly
+              ? 'Nenhum item encontrado'
+              : 'Nenhum produto cadastrado'}
+          </p>
+          <p className="text-xs text-slate-400 mt-1">
+            {tab === 'compras'
+              ? 'Nenhum produto está no nível mínimo no momento.'
+              : searchTerm || criticalOnly
+              ? 'Ajuste a busca ou os filtros.'
+              : 'Clique em "Novo produto" para cadastrar o primeiro item.'}
+          </p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-200">
-                <th className="p-4">Cód. Peça / Série BP</th>
-                <th className="p-4">Descrição do Componente</th>
-                <th className="p-4">Categoria</th>
-                <th className="p-4">Fornecedor</th>
-                <th className="p-4 text-center">Qtd. Atual</th>
-                <th className="p-4 text-right">Valor Unitário</th>
-                <th className="p-4 text-right">Subtotal</th>
-                <th className="p-4 text-center">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-              {loading && (
-                <tr>
-                  <td colSpan={8} className="p-10 text-center text-slate-400">
-                    <span className="material-symbols-outlined text-3xl animate-spin inline-block">progress_activity</span>
-                    <p className="mt-2 text-xs font-semibold uppercase tracking-wider">Carregando estoque...</p>
-                  </td>
-                </tr>
-              )}
-              {!loading && filteredInventory.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="p-12 text-center text-slate-400">
-                    <span className="material-symbols-outlined text-4xl text-slate-300">inventory_2</span>
-                    <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">
-                      {searchTerm ? 'Nenhum item encontrado' : 'Nenhum produto cadastrado'}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {searchTerm
-                        ? 'Ajuste os termos da busca.'
-                        : 'Clique em "Novo Produto" para cadastrar o primeiro item.'}
-                    </p>
-                  </td>
-                </tr>
-              )}
-              {!loading &&
-                filteredInventory.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="p-4">
-                      <span className="font-data-mono font-bold text-[#E63946]">{item.code}</span> <br />
-                      <span className="font-data-mono text-[10px] text-slate-400">{item.serialBP}</span>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        {item.imageUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={item.imageUrl}
-                            alt={item.name}
-                            className="w-9 h-9 rounded-md object-cover border border-slate-200 shrink-0"
-                          />
-                        ) : (
-                          <span className="w-9 h-9 rounded-md bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 shrink-0">
-                            <span className="material-symbols-outlined text-base">inventory_2</span>
-                          </span>
-                        )}
-                        <span className="font-bold text-slate-900 uppercase">{item.name}</span>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <span className="text-slate-900 font-semibold">{item.category}</span>
-                      {item.unit ? (
-                        <>
-                          <br />
-                          <span className="text-[10px] text-slate-500 font-data-mono">{item.unit}</span>
-                        </>
-                      ) : null}
-                    </td>
-                    <td className="p-4 text-slate-600">{item.supplier}</td>
-                    <td className="p-4 text-center font-data-mono font-bold">
-                      <span
-                        className={`px-2 py-1 rounded text-xs ${
-                          item.quantity <= item.minQuantity ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'
-                        }`}
-                      >
-                        {item.quantity} un (mín: {item.minQuantity})
-                      </span>
-                    </td>
-                    <td className="p-4 text-right font-data-mono text-slate-900">
-                      R$ {item.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="p-4 text-right font-data-mono font-bold text-slate-900">
-                      R$ {(item.quantity * item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => openMovement(item)}
-                          title="Entrada / Saída de estoque"
-                          aria-label="Movimentar estoque"
-                          className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
-                        >
-                          <span className="material-symbols-outlined text-lg">swap_vert</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openHistory(item)}
-                          title="Histórico de movimentações"
-                          aria-label="Histórico de movimentações"
-                          className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-[#1A1A72] hover:bg-slate-100 transition-colors"
-                        >
-                          <span className="material-symbols-outlined text-lg">history</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openEdit(item)}
-                          title="Editar produto"
-                          aria-label="Editar produto"
-                          className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-[#1A1A72] hover:bg-slate-100 transition-colors"
-                        >
-                          <span className="material-symbols-outlined text-lg">edit</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(item)}
-                          title="Excluir produto"
-                          aria-label="Excluir produto"
-                          className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-[#E63946] hover:bg-red-50 transition-colors"
-                        >
-                          <span className="material-symbols-outlined text-lg">delete</span>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {tab === 'compras' && (
+            <p className="text-[11px] text-slate-500 flex items-center gap-1">
+              <span className="material-symbols-outlined text-sm text-[#E63946]">shopping_cart</span>
+              Itens no nível mínimo ou abaixo — sugeridos para reposição.
+            </p>
+          )}
+          {filteredInventory.map((item) => (
+            <StockItemCard
+              key={item.id}
+              item={item}
+              onMovement={openMovement}
+              onHistory={openHistory}
+              onEdit={openEdit}
+              onDelete={handleDelete}
+            />
+          ))}
         </div>
-      </div>
+      )}
 
       {/* ===== SIDE-PANEL: Novo / Editar Produto ===== */}
       {showPanel && (
