@@ -29,7 +29,8 @@ import {
   PartnerBrand,
   CompanyProfile,
   PedidoTemplate,
-  PedidoStatus
+  PedidoStatus,
+  PdfPrefs
 } from '@/lib/types';
 
 import {
@@ -104,6 +105,34 @@ export function CrmApp({ initialRole = 'ADMINISTRATIVO', onLogout }: CrmAppProps
   );
   const [inventoryLoading, setInventoryLoading] = useState(isSupabaseConfigured());
   const [auditLogs, setAuditLogs] = useState(INITIAL_AUDIT_LOGS);
+
+  // Preferências de geração de PDF (persistidas no navegador)
+  const DEFAULT_PDF_PREFS: PdfPrefs = {
+    configBeforeGenerate: true,
+    detailedSubtotal: true,
+    showLogo: true,
+    showBankData: false,
+  };
+  const [pdfPrefs, setPdfPrefs] = useState<PdfPrefs>(DEFAULT_PDF_PREFS);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('fireowl_pdf_prefs');
+      if (saved) setPdfPrefs({ ...DEFAULT_PDF_PREFS, ...JSON.parse(saved) });
+    } catch {
+      /* localStorage indisponível */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleUpdatePdfPrefs = (p: PdfPrefs) => {
+    setPdfPrefs(p);
+    try {
+      localStorage.setItem('fireowl_pdf_prefs', JSON.stringify(p));
+    } catch {
+      /* ignore */
+    }
+  };
 
   // Carrega o estoque persistido no Supabase ao abrir o sistema.
   useEffect(() => {
@@ -390,6 +419,7 @@ export function CrmApp({ initialRole = 'ADMINISTRATIVO', onLogout }: CrmAppProps
               onUpdatePedidoStatus={handleUpdatePedidoStatus}
               onGenerateOSFromPedido={handleGenerateOSFromPedido}
               onSelectClientForReport={handleSelectClientForReport}
+              pdfPrefs={pdfPrefs}
             />
           )}
 
@@ -475,6 +505,8 @@ export function CrmApp({ initialRole = 'ADMINISTRATIVO', onLogout }: CrmAppProps
               partnerBrands={partnerBrands}
               onAddPartnerBrand={handleAddPartnerBrand}
               onDeletePartnerBrand={handleDeletePartnerBrand}
+              pdfPrefs={pdfPrefs}
+              onUpdatePdfPrefs={handleUpdatePdfPrefs}
             />
           )}
         </main>

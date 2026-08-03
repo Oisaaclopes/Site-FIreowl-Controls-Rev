@@ -86,6 +86,13 @@ export interface PartnerBrand {
   logoUrl?: string;
 }
 
+export interface PdfPrefs {
+  configBeforeGenerate: boolean;
+  detailedSubtotal: boolean;
+  showLogo: boolean;
+  showBankData: boolean;
+}
+
 export interface CompanyProfile {
   razaoSocial: string;
   cnpj: string;

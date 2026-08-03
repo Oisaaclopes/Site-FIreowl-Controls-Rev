@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { PedidoOS, Client, Pedido, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus } from '@/lib/types';
+import { PedidoOS, Client, Pedido, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs } from '@/lib/types';
 import { CommercialProposalModal } from '@/components/proposta/CommercialProposalModal';
 import { CommercialProposalPDFView } from '@/components/proposta/CommercialProposalPDFView';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
+import { Toggle } from '@/components/SidePanel';
 import {
   FileText,
   Plus,
@@ -35,6 +36,7 @@ interface PedidosViewProps {
   onUpdatePedidoStatus: (pedidoId: string, newStatus: PedidoStatus) => void;
   onGenerateOSFromPedido: (pedido: Pedido) => void;
   onSelectClientForReport?: (clientName: string) => void;
+  pdfPrefs: PdfPrefs;
 }
 
 export const PedidosView: React.FC<PedidosViewProps> = ({
@@ -50,6 +52,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   onUpdatePedidoStatus,
   onGenerateOSFromPedido,
   onSelectClientForReport,
+  pdfPrefs,
 }) => {
   // Main view tab: 'propostas' (CRM Pedidos) or 'ordens_servico' (OS de Campo)
   const [viewTab, setViewTab] = useState<'propostas' | 'ordens_servico'>('propostas');
@@ -63,6 +66,28 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   const [editingPedido, setEditingPedido] = useState<Pedido | null>(null);
 
   const [pdfPreviewPedido, setPdfPreviewPedido] = useState<Pedido | null>(null);
+
+  // Opções de geração de PDF (aplicadas ao documento) + config antes de gerar
+  const [pdfOptions, setPdfOptions] = useState({
+    showLogo: pdfPrefs.showLogo,
+    detailedSubtotal: pdfPrefs.detailedSubtotal,
+    showBankData: pdfPrefs.showBankData,
+  });
+  const [pdfConfigPedido, setPdfConfigPedido] = useState<Pedido | null>(null);
+
+  const openPdf = (ped: Pedido) => {
+    const base = {
+      showLogo: pdfPrefs.showLogo,
+      detailedSubtotal: pdfPrefs.detailedSubtotal,
+      showBankData: pdfPrefs.showBankData,
+    };
+    setPdfOptions(base);
+    if (pdfPrefs.configBeforeGenerate) {
+      setPdfConfigPedido(ped);
+    } else {
+      setPdfPreviewPedido(ped);
+    }
+  };
 
   // Filtered Pedidos (Commercial Proposals)
   const filteredPedidos = pedidos.filter((p) => {
@@ -312,7 +337,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                     </div>
                     <div className="flex items-center justify-end gap-1.5 flex-wrap">
                       <button
-                        onClick={() => setPdfPreviewPedido(ped)}
+                        onClick={() => openPdf(ped)}
                         title="Pré-visualizar PDF da Proposta"
                         className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-[11px] font-bold transition-colors flex items-center gap-1"
                       >
@@ -456,11 +481,70 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
         onPreviewPDF={(ped) => setPdfPreviewPedido(ped)}
       />
 
+      {/* Config antes de gerar o PDF */}
+      {pdfConfigPedido && (
+        <div className="fixed inset-0 z-[55] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white max-w-md w-full rounded-xl border border-slate-200 shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-[#1A1A72]" />
+                <h3 className="font-display text-base font-bold text-[#1A1A72] uppercase tracking-wide">
+                  Opções do PDF
+                </h3>
+              </div>
+              <button
+                onClick={() => setPdfConfigPedido(null)}
+                className="text-slate-400 hover:text-slate-700 font-bold text-xl"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-3 text-xs">
+              <p className="text-slate-500">
+                Proposta <span className="font-data-mono font-bold text-slate-700">{pdfConfigPedido.numeroPedido}</span> — ajuste o que incluir no documento.
+              </p>
+              {[
+                { key: 'showLogo', label: 'Incluir logotipo no cabeçalho' },
+                { key: 'detailedSubtotal', label: 'Detalhar itens e subtotais' },
+                { key: 'showBankData', label: 'Mostrar dados para pagamento' },
+              ].map((opt) => (
+                <div key={opt.key} className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
+                  <span className="font-semibold text-slate-700">{opt.label}</span>
+                  <Toggle
+                    checked={(pdfOptions as any)[opt.key]}
+                    onChange={(v) => setPdfOptions((prev) => ({ ...prev, [opt.key]: v }))}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2">
+              <button
+                onClick={() => setPdfConfigPedido(null)}
+                className="px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  const ped = pdfConfigPedido;
+                  setPdfConfigPedido(null);
+                  setPdfPreviewPedido(ped);
+                }}
+                className="bg-[#E63946] hover:bg-[#a51515] text-white px-5 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm flex items-center gap-1.5"
+              >
+                <Eye className="w-4 h-4" /> Gerar PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* PDF View Overlay */}
       {pdfPreviewPedido && (
         <CommercialProposalPDFView
           pedido={pdfPreviewPedido}
           companyProfile={companyProfile}
+          options={pdfOptions}
           onClose={() => setPdfPreviewPedido(null)}
           onSendEmail={(ped) => {
             alert(`Proposta comercial ${ped.numeroPedido} enviada com sucesso para o e-mail do cliente!`);

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { SystemAuditLog, UserRole, CompanyProfile, PartnerBrand } from '@/lib/types';
+import { SystemAuditLog, UserRole, CompanyProfile, PartnerBrand, PdfPrefs } from '@/lib/types';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
 import { Toggle } from '@/components/SidePanel';
 
@@ -14,6 +14,8 @@ interface ContaViewProps {
   partnerBrands: PartnerBrand[];
   onAddPartnerBrand: (brand: PartnerBrand) => void;
   onDeletePartnerBrand: (id: string) => void;
+  pdfPrefs: PdfPrefs;
+  onUpdatePdfPrefs: (p: PdfPrefs) => void;
 }
 
 const inputCls =
@@ -35,6 +37,8 @@ export const ContaView: React.FC<ContaViewProps> = ({
   partnerBrands,
   onAddPartnerBrand,
   onDeletePartnerBrand,
+  pdfPrefs,
+  onUpdatePdfPrefs,
 }) => {
   const [tab, setTab] = useState<'conta' | 'preferencias' | 'pdf'>('conta');
 
@@ -49,12 +53,6 @@ export const ContaView: React.FC<ContaViewProps> = ({
     criticalStock: true,
     confirmDelete: true,
     compactMode: false,
-  });
-  const [pdfPrefs, setPdfPrefs] = useState({
-    configBeforeGenerate: true,
-    detailedSubtotal: true,
-    showLogo: true,
-    showBankData: false,
   });
 
   const handleSaveCompanyProfile = (e: React.FormEvent) => {
@@ -362,7 +360,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
             right={
               <Toggle
                 checked={pdfPrefs.configBeforeGenerate}
-                onChange={(v) => setPdfPrefs({ ...pdfPrefs, configBeforeGenerate: v })}
+                onChange={(v) => onUpdatePdfPrefs({ ...pdfPrefs, configBeforeGenerate: v })}
               />
             }
           />
@@ -373,7 +371,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
             right={
               <Toggle
                 checked={pdfPrefs.detailedSubtotal}
-                onChange={(v) => setPdfPrefs({ ...pdfPrefs, detailedSubtotal: v })}
+                onChange={(v) => onUpdatePdfPrefs({ ...pdfPrefs, detailedSubtotal: v })}
               />
             }
           />
@@ -381,14 +379,14 @@ export const ContaView: React.FC<ContaViewProps> = ({
             leading={<SettingIcon icon="image" />}
             title="Incluir logotipo no cabeçalho"
             meta="Exibe o logo da empresa no topo do documento."
-            right={<Toggle checked={pdfPrefs.showLogo} onChange={(v) => setPdfPrefs({ ...pdfPrefs, showLogo: v })} />}
+            right={<Toggle checked={pdfPrefs.showLogo} onChange={(v) => onUpdatePdfPrefs({ ...pdfPrefs, showLogo: v })} />}
           />
           <DataListRow
             leading={<SettingIcon icon="account_balance" />}
             title="Mostrar dados bancários"
             meta="Inclui os dados para pagamento no rodapé do PDF."
             right={
-              <Toggle checked={pdfPrefs.showBankData} onChange={(v) => setPdfPrefs({ ...pdfPrefs, showBankData: v })} />
+              <Toggle checked={pdfPrefs.showBankData} onChange={(v) => onUpdatePdfPrefs({ ...pdfPrefs, showBankData: v })} />
             }
           />
           <p className="text-[11px] text-slate-400 px-1 pt-1 flex items-center gap-1">

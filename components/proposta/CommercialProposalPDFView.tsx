@@ -4,11 +4,18 @@ import React from 'react';
 import { Pedido, CompanyProfile } from '@/lib/types';
 import { Download, Printer, ArrowLeft, Send, CheckCircle2, Building2, ShieldCheck, FileCheck2 } from 'lucide-react';
 
+interface PdfDisplayOptions {
+  showLogo: boolean;
+  detailedSubtotal: boolean;
+  showBankData: boolean;
+}
+
 interface CommercialProposalPDFViewProps {
   pedido: Pedido;
   companyProfile: CompanyProfile;
   onClose: () => void;
   onSendEmail?: (pedido: Pedido) => void;
+  options?: PdfDisplayOptions;
 }
 
 export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps> = ({
@@ -16,8 +23,12 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
   companyProfile,
   onClose,
   onSendEmail,
+  options,
 }) => {
   const { proposal } = pedido;
+  const showLogo = options?.showLogo ?? true;
+  const detailedSubtotal = options?.detailedSubtotal ?? true;
+  const showBankData = options?.showBankData ?? false;
 
   const handlePrint = () => {
     window.print();
@@ -66,7 +77,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
           {/* Navy Banner */}
           <div className="bg-[#0B1E38] text-white p-6 md:p-8 rounded-t-xl mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              {companyProfile.logoUrl ? (
+              {showLogo && companyProfile.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={companyProfile.logoUrl} alt="Logo" className="h-12 object-contain mb-2" />
               ) : (
@@ -187,7 +198,8 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
           </div>
         </section>
 
-        {/* ==================== 5. EQUIPAMENTOS ==================== */}
+        {/* ==================== 5. EQUIPAMENTOS (detalhamento — opcional) ==================== */}
+        {detailedSubtotal && (
         <section className="mb-8">
           <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
             <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">04</span>
@@ -241,6 +253,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
             </table>
           </div>
         </section>
+        )}
 
         {/* ==================== 6. MARCAS E FABRICANTES ==================== */}
         <section className="mb-8">
@@ -399,6 +412,25 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
             </p>
           </div>
         </section>
+
+        {/* ==================== DADOS PARA PAGAMENTO (opcional) ==================== */}
+        {showBankData && (
+          <section className="mb-8">
+            <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
+              <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">$</span>
+              <h3 className="text-base font-bold text-[#0B1E38] uppercase font-display tracking-wide">
+                DADOS PARA PAGAMENTO
+              </h3>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-xs text-slate-700 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <p><strong className="text-slate-900 uppercase">Beneficiário:</strong> {companyProfile.razaoSocial}</p>
+              <p><strong className="text-slate-900 uppercase">Chave PIX (CNPJ):</strong> <span className="font-data-mono">{companyProfile.cnpj}</span></p>
+              <p className="sm:col-span-2 text-[10px] text-slate-500">
+                Pagamento mediante emissão de nota fiscal. Confirme o comprovante junto ao responsável comercial.
+              </p>
+            </div>
+          </section>
+        )}
 
         {/* ==================== 13. CONCLUSÃO ==================== */}
         <section className="mb-12">
