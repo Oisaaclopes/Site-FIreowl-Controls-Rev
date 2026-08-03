@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Supplier } from '@/lib/types';
+import { SidePanel, FormSection, Toggle } from '@/components/SidePanel';
 
 interface FornecedoresViewProps {
   suppliers: Supplier[];
@@ -10,24 +11,43 @@ interface FornecedoresViewProps {
 
 let fornSeq = 10;
 
+const inputCls =
+  'w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#E63946]/20 focus:border-[#E63946]/40';
+const labelCls = 'block text-slate-600 mb-1 font-semibold uppercase text-[11px]';
+
 export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
   suppliers,
   onAddSupplier,
 }) => {
-  const [showModal, setShowModal] = useState(false);
+  const [showPanel, setShowPanel] = useState(false);
 
   // Form State
-  const [name, setName] = useState('Siemens Building Technologies');
-  const [cnpj, setCNPJ] = useState('11.222.333/0001-99');
-  const [category, setCategory] = useState('Centrais & Detecção');
-  const [contactName, setContactName] = useState('Marcelo Prado');
-  const [phone, setPhone] = useState('(11) 4004-9000');
-  const [email, setEmail] = useState('vendas.siemens@siemens.com');
-  const [city, setCity] = useState('São Paulo / SP');
-  const [leadTimeDays, setLeadTimeDays] = useState(4);
+  const [isPJ, setIsPJ] = useState(true);
+  const [name, setName] = useState('');
+  const [cnpj, setCNPJ] = useState('');
+  const [category, setCategory] = useState('');
+  const [contactName, setContactName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [city, setCity] = useState('');
+  const [leadTimeDays, setLeadTimeDays] = useState(0);
 
-  const handleCreateSupplier = (e: React.FormEvent) => {
-    e.preventDefault();
+  const openPanel = () => {
+    setIsPJ(true);
+    setName('');
+    setCNPJ('');
+    setCategory('');
+    setContactName('');
+    setPhone('');
+    setEmail('');
+    setCity('');
+    setLeadTimeDays(0);
+    setShowPanel(true);
+  };
+
+  const handleCreateSupplier = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!name.trim()) return;
     const seq = (fornSeq++).toString();
     const created: Supplier = {
       id: `forn-${seq}`,
@@ -44,7 +64,7 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
       activeStatus: 'HOMOLOGADO',
     };
     onAddSupplier(created);
-    setShowModal(false);
+    setShowPanel(false);
   };
 
   return (
@@ -61,10 +81,10 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
         </div>
 
         <button
-          onClick={() => setShowModal(true)}
+          onClick={openPanel}
           className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
         >
-          <span className="material-symbols-outlined text-base">add</span> Homologar Fornecedor
+          <span className="material-symbols-outlined text-base">add</span> Novo Fornecedor
         </button>
       </div>
 
@@ -116,119 +136,127 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
         ))}
       </div>
 
-      {/* Modal Add Supplier */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white max-w-md w-full rounded-xl border border-slate-200 p-6 shadow-2xl relative">
-            <button
-              onClick={() => setShowModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 font-bold"
-            >
-              ✕
-            </button>
-            <h3 className="text-lg font-bold text-slate-900 uppercase mb-4">Cadastrar Fornecedor</h3>
-            <form onSubmit={handleCreateSupplier} className="space-y-4 text-xs font-medium">
+      {/* Drawer: Novo Fornecedor */}
+      <SidePanel
+        open={showPanel}
+        title="Novo fornecedor"
+        subtitle="Cadastro e homologação"
+        onClose={() => setShowPanel(false)}
+        onSave={() => handleCreateSupplier()}
+        saveLabel="Salvar"
+      >
+        <form onSubmit={handleCreateSupplier} className="space-y-5 text-xs font-medium">
+          {/* Bloco: Dados da empresa */}
+          <FormSection
+            icon="apartment"
+            title="Dados da empresa"
+            action={<Toggle checked={isPJ} onChange={setIsPJ} label={isPJ ? 'Pessoa jurídica' : 'Pessoa física'} />}
+          >
+            <div className="space-y-3">
               <div>
-                <label className="block text-slate-600 mb-1 font-semibold uppercase">Razão Social</label>
+                <label className={labelCls}>Razão social / Nome *</label>
                 <input
                   type="text"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                  placeholder="Ex.: Siemens Building Technologies"
+                  className={inputCls}
                 />
               </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-600 mb-1 font-semibold uppercase">CNPJ</label>
+                  <label className={labelCls}>{isPJ ? 'CNPJ' : 'CPF'}</label>
                   <input
                     type="text"
-                    required
                     value={cnpj}
                     onChange={(e) => setCNPJ(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                    placeholder={isPJ ? '00.000.000/0001-00' : '000.000.000-00'}
+                    className={`${inputCls} font-data-mono`}
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-600 mb-1 font-semibold uppercase">Categoria</label>
+                  <label className={labelCls}>Categoria</label>
                   <input
                     type="text"
-                    required
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                    placeholder="Ex.: Centrais & Detecção"
+                    className={inputCls}
                   />
                 </div>
               </div>
+            </div>
+          </FormSection>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-600 mb-1 font-semibold uppercase">Contato Principal</label>
-                  <input
-                    type="text"
-                    required
-                    value={contactName}
-                    onChange={(e) => setContactName(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-600 mb-1 font-semibold uppercase">Telefone</label>
-                  <input
-                    type="text"
-                    required
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
-                  />
-                </div>
-              </div>
-
+          {/* Bloco: Contatos */}
+          <FormSection icon="contacts" title="Contatos">
+            <div className="space-y-3">
               <div>
-                <label className="block text-slate-600 mb-1 font-semibold uppercase">E-mail Comercial</label>
+                <label className={labelCls}>Contato principal</label>
                 <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                  type="text"
+                  value={contactName}
+                  onChange={(e) => setContactName(e.target.value)}
+                  placeholder="Nome do responsável"
+                  className={inputCls}
                 />
               </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-600 mb-1 font-semibold uppercase">Cidade / UF</label>
+                  <label className={labelCls}>Telefone</label>
                   <input
                     type="text"
-                    required
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="(00) 0000-0000"
+                    className={inputCls}
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-600 mb-1 font-semibold uppercase">Prazo de Entrega (Dias)</label>
+                  <label className={labelCls}>E-mail comercial</label>
                   <input
-                    type="number"
-                    required
-                    value={leadTimeDays}
-                    onChange={(e) => setLeadTimeDays(Number(e.target.value))}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="vendas@fornecedor.com"
+                    className={inputCls}
                   />
                 </div>
               </div>
+            </div>
+          </FormSection>
 
-              <button
-                type="submit"
-                className="w-full bg-[#E63946] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
-              >
-                Cadastrar e Homologar Fornecedor
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+          {/* Bloco: Logística & homologação */}
+          <FormSection icon="local_shipping" title="Logística & homologação">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Cidade / UF</label>
+                <input
+                  type="text"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="Londrina / PR"
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Prazo de entrega (dias)</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={leadTimeDays}
+                  onChange={(e) => setLeadTimeDays(Number(e.target.value))}
+                  className={`${inputCls} font-data-mono`}
+                />
+              </div>
+            </div>
+          </FormSection>
+
+          {/* submit oculto: permite salvar com Enter */}
+          <button type="submit" className="hidden" aria-hidden="true" tabIndex={-1} />
+        </form>
+      </SidePanel>
     </div>
   );
 };
