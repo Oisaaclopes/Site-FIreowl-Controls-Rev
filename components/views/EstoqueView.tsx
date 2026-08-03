@@ -114,6 +114,12 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Movimentação rápida (entrada/saída de estoque)
+  const [movementItem, setMovementItem] = useState<InventoryItem | null>(null);
+  const [movementType, setMovementType] = useState<'entrada' | 'saida'>('entrada');
+  const [movementQty, setMovementQty] = useState(1);
+  const [movementSaving, setMovementSaving] = useState(false);
+
   // Foto
   const [imageUrl, setImageUrl] = useState('');
   // Básicas
@@ -206,6 +212,35 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     if (!onDeleteInventoryItem) return;
     if (!window.confirm(`Excluir o produto "${item.name}"?\n\nEsta ação não pode ser desfeita.`)) return;
     await onDeleteInventoryItem(item.id);
+  };
+
+  const openMovement = (item: InventoryItem) => {
+    setMovementItem(item);
+    setMovementType('entrada');
+    setMovementQty(1);
+    setMovementSaving(false);
+  };
+
+  const movementResult = (): number => {
+    if (!movementItem) return 0;
+    const delta = Math.max(0, Math.floor(Number(movementQty) || 0));
+    return movementType === 'entrada'
+      ? movementItem.quantity + delta
+      : Math.max(0, movementItem.quantity - delta);
+  };
+
+  const handleConfirmMovement = async () => {
+    if (!movementItem || !onUpdateInventoryItem || movementSaving) return;
+    const delta = Math.max(0, Math.floor(Number(movementQty) || 0));
+    if (delta <= 0) return;
+    const updated: InventoryItem = { ...movementItem, quantity: movementResult() };
+    try {
+      setMovementSaving(true);
+      await onUpdateInventoryItem(updated);
+      setMovementItem(null);
+    } finally {
+      setMovementSaving(false);
+    }
   };
 
   const handleImage = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -459,6 +494,15 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                   </td>
                   <td className="p-4">
                     <div className="flex items-center justify-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => openMovement(item)}
+                        title="Entrada / Saída de estoque"
+                        aria-label="Movimentar estoque"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-lg">swap_vert</span>
+                      </button>
                       <button
                         type="button"
                         onClick={() => openEdit(item)}
@@ -798,6 +842,140 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                   {saving ? 'Salvando...' : editingItem ? 'Salvar Alterações' : 'Salvar Produto'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Janela: Movimentação rápida de estoque (entrada/saída) */}
+      {movementItem && (
+        <div className="fixed inset-0 z-[60] bg-[#1A1A72]/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white max-w-md w-full rounded-xl border border-slate-200 shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#1A1A72]">swap_vert</span>
+                <h3 className="font-display text-base font-bold text-[#1A1A72] uppercase tracking-wide">
+                  Movimentar Estoque
+                </h3>
+              </div>
+              <button
+                onClick={() => setMovementItem(null)}
+                className="text-slate-400 hover:text-slate-700 font-bold text-xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4 text-xs font-medium">
+              {/* Produto + saldo atual */}
+              <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg p-3">
+                <div>
+                  <p className="font-bold text-slate-900 uppercase">{movementItem.name}</p>
+                  <p className="font-data-mono text-[10px] text-slate-400">{movementItem.code}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] text-slate-500 uppercase">Saldo atual</p>
+                  <p className="font-data-mono text-lg font-bold text-slate-900">{movementItem.quantity}</p>
+                </div>
+              </div>
+
+              {/* Tipo: Entrada / Saída */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMovementType('entrada')}
+                  className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg border font-semibold uppercase tracking-wide transition-colors ${
+                    movementType === 'entrada'
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                      : 'border-slate-200 text-slate-500 hover:border-emerald-300'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-base">arrow_downward</span>
+                  Entrada
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMovementType('saida')}
+                  className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg border font-semibold uppercase tracking-wide transition-colors ${
+                    movementType === 'saida'
+                      ? 'border-[#E63946] bg-red-50 text-[#E63946]'
+                      : 'border-slate-200 text-slate-500 hover:border-red-300'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-base">arrow_upward</span>
+                  Saída
+                </button>
+              </div>
+
+              {/* Quantidade + atalhos */}
+              <div>
+                <label className={labelCls}>Quantidade</label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMovementQty((q) => Math.max(1, Math.floor(Number(q) || 0) - 1))}
+                    className="w-9 h-9 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 flex items-center justify-center shrink-0"
+                  >
+                    <span className="material-symbols-outlined text-base">remove</span>
+                  </button>
+                  <input
+                    type="number"
+                    min={1}
+                    value={movementQty}
+                    onChange={(e) => setMovementQty(Number(e.target.value))}
+                    className={`${inputCls} font-data-mono text-center`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMovementQty((q) => Math.floor(Number(q) || 0) + 1)}
+                    className="w-9 h-9 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 flex items-center justify-center shrink-0"
+                  >
+                    <span className="material-symbols-outlined text-base">add</span>
+                  </button>
+                </div>
+                <div className="flex gap-1.5 mt-2">
+                  {[5, 10, 50].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setMovementQty(n)}
+                      className="px-3 py-1 rounded-md border border-slate-200 text-slate-500 hover:border-[#1A1A72] hover:text-[#1A1A72] font-data-mono text-[11px]"
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Saldo resultante */}
+              <div className="flex items-center justify-between bg-[#1A1A72]/5 border border-[#1A1A72]/15 rounded-lg p-3">
+                <span className="text-[11px] font-semibold uppercase text-slate-600">Saldo após movimentação</span>
+                <span className="font-data-mono text-lg font-bold text-[#1A1A72]">{movementResult()}</span>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setMovementItem(null)}
+                disabled={movementSaving}
+                className="px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmMovement}
+                disabled={movementSaving || Math.floor(Number(movementQty) || 0) <= 0}
+                className={`px-6 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-white transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed ${
+                  movementType === 'entrada' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#E63946] hover:bg-[#a51515]'
+                }`}
+              >
+                <span className={`material-symbols-outlined text-base ${movementSaving ? 'animate-spin' : ''}`}>
+                  {movementSaving ? 'progress_activity' : 'check'}
+                </span>
+                {movementSaving ? 'Salvando...' : 'Confirmar'}
+              </button>
             </div>
           </div>
         </div>
