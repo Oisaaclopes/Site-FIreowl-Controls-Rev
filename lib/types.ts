@@ -298,6 +298,19 @@ export interface InventoryItem {
   unitPrice: number;
   supplier: string;
   location: string;
+  // Campos estendidos do cadastro de produto (todos opcionais)
+  imageUrl?: string;
+  unit?: string;
+  salePrice?: number;
+  costPrice?: number;
+  profitMargin?: number;
+  markup?: number;
+  stockManaged?: boolean;
+  idealQuantity?: number;
+  reservedQuantity?: number;
+  brand?: string;
+  model?: string;
+  description?: string;
 }
 
 export interface SystemAuditLog {

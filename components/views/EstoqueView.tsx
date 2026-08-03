@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { InventoryItem } from '@/lib/types';
 
 interface EstoqueViewProps {
@@ -10,21 +10,198 @@ interface EstoqueViewProps {
 
 let invSeq = 90;
 
-export const EstoqueView: React.FC<EstoqueViewProps> = ({
-  inventory,
-  onAddInventoryItem,
-}) => {
+// Unidades de medida agrupadas — exibidas na "nova janela" de seleção
+const UNIT_GROUPS: { group: string; units: { code: string; label: string }[] }[] = [
+  {
+    group: 'Contagem',
+    units: [
+      { code: 'UN', label: 'Unidade' },
+      { code: 'PC', label: 'Peça' },
+      { code: 'PAR', label: 'Par' },
+      { code: 'DZ', label: 'Dúzia' },
+      { code: 'CX', label: 'Caixa' },
+      { code: 'PCT', label: 'Pacote' },
+      { code: 'KIT', label: 'Kit' },
+      { code: 'CJ', label: 'Conjunto' },
+      { code: 'JG', label: 'Jogo' },
+      { code: 'RL', label: 'Rolo' },
+    ],
+  },
+  {
+    group: 'Comprimento',
+    units: [
+      { code: 'M', label: 'Metro' },
+      { code: 'ML', label: 'Metro linear' },
+      { code: 'CM', label: 'Centímetro' },
+      { code: 'MM', label: 'Milímetro' },
+      { code: 'KM', label: 'Quilômetro' },
+    ],
+  },
+  {
+    group: 'Área',
+    units: [{ code: 'M2', label: 'Metro quadrado' }],
+  },
+  {
+    group: 'Volume',
+    units: [
+      { code: 'M3', label: 'Metro cúbico' },
+      { code: 'L', label: 'Litro' },
+      { code: 'MLT', label: 'Mililitro' },
+    ],
+  },
+  {
+    group: 'Peso',
+    units: [
+      { code: 'KG', label: 'Quilograma' },
+      { code: 'G', label: 'Grama' },
+      { code: 'T', label: 'Tonelada' },
+    ],
+  },
+  {
+    group: 'Embalagem',
+    units: [
+      { code: 'FD', label: 'Fardo' },
+      { code: 'SC', label: 'Saco' },
+      { code: 'GL', label: 'Galão' },
+      { code: 'TB', label: 'Tubo' },
+      { code: 'BOB', label: 'Bobina' },
+    ],
+  },
+];
+
+const round2 = (n: number) => Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
+
+// Ponto de informação (tooltip no hover)
+const InfoDot: React.FC<{ text: string }> = ({ text }) => (
+  <span className="relative inline-flex group/info align-middle ml-1">
+    <span
+      className="w-4 h-4 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold flex items-center justify-center cursor-help select-none"
+      tabIndex={0}
+    >
+      ?
+    </span>
+    <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 bg-[#1A1A72] text-white text-[10px] leading-relaxed rounded-lg p-2.5 opacity-0 group-hover/info:opacity-100 group-focus-within/info:opacity-100 transition-opacity z-20 shadow-xl normal-case font-normal tracking-normal">
+      {text}
+    </span>
+  </span>
+);
+
+const SectionTitle: React.FC<{ icon: string; children: React.ReactNode }> = ({ icon, children }) => (
+  <div className="flex items-center gap-2 pl-3 border-l-4 border-[#E63946] mb-3 mt-2">
+    <span className="material-symbols-outlined text-[#1A1A72] text-lg">{icon}</span>
+    <h4 className="font-display text-sm font-bold uppercase tracking-wide text-[#1A1A72]">{children}</h4>
+  </div>
+);
+
+const inputCls =
+  'w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20 focus:border-[#E63946]/40';
+const labelCls = 'block text-slate-600 mb-1 font-semibold uppercase text-[11px] flex items-center';
+
+export const EstoqueView: React.FC<EstoqueViewProps> = ({ inventory, onAddInventoryItem }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [showUnitModal, setShowUnitModal] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  // Form State
-  const [name, setName] = useState('Sirene Bitonal 24V Strobe IP66');
-  const [category, setCategory] = useState('Sirenes & Sinalização');
-  const [quantity, setQuantity] = useState(15);
-  const [minQuantity, setMinQuantity] = useState(5);
-  const [unitPrice, setUnitPrice] = useState(185);
-  const [supplier, setSupplier] = useState('Intelbras Fire Systems');
-  const [location, setLocation] = useState('Bancada A - Prateleira 2');
+  // Foto
+  const [imageUrl, setImageUrl] = useState('');
+  // Básicas
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState('');
+  const [code, setCode] = useState('');
+  const [unit, setUnit] = useState('');
+  // Preços
+  const [salePrice, setSalePrice] = useState(0);
+  const [costPrice, setCostPrice] = useState(0);
+  const [margin, setMargin] = useState(0);
+  const [markup, setMarkup] = useState(0);
+  // Estoque
+  const [stockManaged, setStockManaged] = useState(true);
+  const [quantity, setQuantity] = useState(0);
+  const [idealQuantity, setIdealQuantity] = useState(0);
+  const [minQuantity, setMinQuantity] = useState(0);
+  const [reservedQuantity, setReservedQuantity] = useState(0);
+  // Outras
+  const [supplier, setSupplier] = useState('');
+  const [brand, setBrand] = useState('');
+  const [model, setModel] = useState('');
+  const [description, setDescription] = useState('');
+
+  const generateCode = (cat: string) => {
+    const prefix =
+      (cat || 'PROD')
+        .normalize('NFD')
+        .replace(/[^A-Za-z ]/g, '')
+        .trim()
+        .split(/\s+/)[0]
+        .substring(0, 4)
+        .toUpperCase() || 'PROD';
+    const rand = Math.floor(1000 + Math.random() * 9000);
+    return `${prefix}-${rand}`;
+  };
+
+  const openModal = () => {
+    setImageUrl('');
+    setName('');
+    setCategory('');
+    setCode(generateCode(''));
+    setUnit('');
+    setSalePrice(0);
+    setCostPrice(0);
+    setMargin(0);
+    setMarkup(0);
+    setStockManaged(true);
+    setQuantity(0);
+    setIdealQuantity(0);
+    setMinQuantity(0);
+    setReservedQuantity(0);
+    setSupplier('');
+    setBrand('');
+    setModel('');
+    setDescription('');
+    setShowModal(true);
+  };
+
+  const handleImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setImageUrl(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  // ---- Cálculos de preço ----
+  // Margem = (venda - custo) / venda * 100   |   Markup = (venda - custo) / custo * 100
+  const onCostChange = (cost: number) => {
+    setCostPrice(cost);
+    if (salePrice > 0) {
+      setMargin(round2(((salePrice - cost) / salePrice) * 100));
+      setMarkup(cost > 0 ? round2(((salePrice - cost) / cost) * 100) : 0);
+    }
+  };
+
+  const onSaleChange = (sale: number) => {
+    setSalePrice(sale);
+    setMargin(sale > 0 ? round2(((sale - costPrice) / sale) * 100) : 0);
+    setMarkup(costPrice > 0 ? round2(((sale - costPrice) / costPrice) * 100) : 0);
+  };
+
+  // Ao adicionar a margem de lucro, calcula automaticamente o markup e o preço de venda
+  const onMarginChange = (m: number) => {
+    setMargin(m);
+    if (m < 100) {
+      const sale = costPrice / (1 - m / 100);
+      setSalePrice(round2(sale));
+      setMarkup(costPrice > 0 ? round2(((sale - costPrice) / costPrice) * 100) : 0);
+    }
+  };
+
+  const onMarkupChange = (mk: number) => {
+    setMarkup(mk);
+    const sale = costPrice * (1 + mk / 100);
+    setSalePrice(round2(sale));
+    setMargin(sale > 0 ? round2(((sale - costPrice) / sale) * 100) : 0);
+  };
 
   const filteredInventory = inventory.filter(
     (item) =>
@@ -36,22 +213,40 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
 
   const handleCreateItem = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!unit) {
+      setShowUnitModal(true);
+      return;
+    }
     const seq = (invSeq++).toString();
     const created: InventoryItem = {
       id: `inv-${seq}`,
-      code: `PROD-SDAI-${seq}`,
+      code: code || generateCode(category),
       serialBP: `BP-EQUIP-${seq}00`,
       name,
       category,
-      quantity: Number(quantity),
-      minQuantity: Number(minQuantity),
-      unitPrice: Number(unitPrice),
+      quantity: stockManaged ? Number(quantity) : 0,
+      minQuantity: stockManaged ? Number(minQuantity) : 0,
+      unitPrice: Number(salePrice),
       supplier,
-      location,
+      location: '',
+      imageUrl: imageUrl || undefined,
+      unit,
+      salePrice: Number(salePrice),
+      costPrice: Number(costPrice),
+      profitMargin: Number(margin),
+      markup: Number(markup),
+      stockManaged,
+      idealQuantity: stockManaged ? Number(idealQuantity) : undefined,
+      reservedQuantity: stockManaged ? Number(reservedQuantity) : undefined,
+      brand: brand || undefined,
+      model: model || undefined,
+      description: description || undefined,
     };
     onAddInventoryItem(created);
     setShowModal(false);
   };
+
+  const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
   return (
     <div className="flex flex-col w-full p-8 gap-6">
@@ -67,10 +262,10 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
         </div>
 
         <button
-          onClick={() => setShowModal(true)}
+          onClick={openModal}
           className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
         >
-          <span className="material-symbols-outlined text-base">add</span> Dar Entrada em Item
+          <span className="material-symbols-outlined text-base">add</span> Novo Produto
         </button>
       </div>
 
@@ -92,8 +287,8 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
             {inventory.reduce((acc, i) => acc + i.quantity, 0)}
           </p>
         </div>
-        <div className="bg-[#0f172a] text-white p-4 rounded-xl border border-slate-800 shadow-sm">
-          <p className="text-[11px] font-semibold text-slate-400 uppercase">Patrimônio de Almoxarifado</p>
+        <div className="bg-[#1A1A72] text-white p-4 rounded-xl border border-[#1A1A72] shadow-sm">
+          <p className="text-[11px] font-semibold text-white/60 uppercase">Patrimônio de Almoxarifado</p>
           <p className="font-data-mono text-2xl font-bold text-emerald-400 mt-1">
             R$ {inventory.reduce((acc, i) => acc + i.quantity * i.unitPrice, 0).toLocaleString('pt-BR')}
           </p>
@@ -103,9 +298,7 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
       {/* Search */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
         <div className="relative w-full sm:w-96">
-          <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-lg">
-            search
-          </span>
+          <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-lg">search</span>
           <input
             type="text"
             placeholder="Buscar por código, série BP, nome ou prateleira..."
@@ -118,7 +311,7 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
 
       {/* Inventory Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-slate-900 px-6 py-4 text-white text-xs font-bold uppercase tracking-wider">
+        <div className="bg-[#1A1A72] px-6 py-4 text-white text-xs font-bold uppercase tracking-wider">
           Listagem de Estoque e Equipamentos
         </div>
         <div className="overflow-x-auto">
@@ -127,7 +320,7 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
               <tr className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-200">
                 <th className="p-4">Cód. Peça / Série BP</th>
                 <th className="p-4">Descrição do Componente</th>
-                <th className="p-4">Categoria / Localização</th>
+                <th className="p-4">Categoria</th>
                 <th className="p-4">Fornecedor</th>
                 <th className="p-4 text-center">Qtd. Atual</th>
                 <th className="p-4 text-right">Valor Unitário</th>
@@ -141,10 +334,31 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                     <span className="font-data-mono font-bold text-[#E63946]">{item.code}</span> <br />
                     <span className="font-data-mono text-[10px] text-slate-400">{item.serialBP}</span>
                   </td>
-                  <td className="p-4 font-bold text-slate-900 uppercase">{item.name}</td>
                   <td className="p-4">
-                    <span className="text-slate-900 font-semibold">{item.category}</span> <br />
-                    <span className="text-[10px] text-slate-500 font-data-mono">{item.location}</span>
+                    <div className="flex items-center gap-3">
+                      {item.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={item.imageUrl}
+                          alt={item.name}
+                          className="w-9 h-9 rounded-md object-cover border border-slate-200 shrink-0"
+                        />
+                      ) : (
+                        <span className="w-9 h-9 rounded-md bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 shrink-0">
+                          <span className="material-symbols-outlined text-base">inventory_2</span>
+                        </span>
+                      )}
+                      <span className="font-bold text-slate-900 uppercase">{item.name}</span>
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <span className="text-slate-900 font-semibold">{item.category}</span>
+                    {item.unit ? (
+                      <>
+                        <br />
+                        <span className="text-[10px] text-slate-500 font-data-mono">{item.unit}</span>
+                      </>
+                    ) : null}
                   </td>
                   <td className="p-4 text-slate-600">{item.supplier}</td>
                   <td className="p-4 text-center font-data-mono font-bold">
@@ -169,105 +383,370 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
         </div>
       </div>
 
-      {/* Modal Add Item */}
+      {/* Modal Novo Produto */}
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white max-w-md w-full rounded-xl border border-slate-200 p-6 shadow-2xl relative">
-            <button
-              onClick={() => setShowModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 font-bold"
-            >
-              ✕
-            </button>
-            <h3 className="text-lg font-bold text-slate-900 uppercase mb-4">Cadastrar / Dar Entrada em Item</h3>
-            <form onSubmit={handleCreateItem} className="space-y-4 text-xs font-medium">
+        <div className="fixed inset-0 z-50 bg-[#1A1A72]/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white max-w-3xl w-full rounded-xl border border-slate-200 shadow-2xl relative max-h-[92vh] flex flex-col">
+            {/* Cabeçalho fixo */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <h3 className="font-display text-lg font-bold text-[#1A1A72] uppercase tracking-wide">
+                Cadastrar Novo Produto
+              </h3>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-slate-400 hover:text-slate-700 font-bold text-xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateItem} className="overflow-y-auto px-6 py-5 space-y-6 text-xs font-medium">
+              {/* FOTO + BÁSICAS */}
+              <div className="grid md:grid-cols-[160px_1fr] gap-5">
+                {/* Foto do produto */}
+                <div>
+                  <SectionTitle icon="photo_camera">Foto</SectionTitle>
+                  <input ref={fileRef} type="file" accept="image/*" onChange={handleImage} className="hidden" />
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    className="w-full aspect-square rounded-xl border-2 border-dashed border-slate-300 hover:border-[#E63946] flex flex-col items-center justify-center gap-1 text-slate-400 hover:text-[#E63946] transition-colors overflow-hidden relative"
+                  >
+                    {imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={imageUrl} alt="Prévia" className="absolute inset-0 w-full h-full object-cover" />
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-3xl">add_a_photo</span>
+                        <span className="text-[10px] font-semibold uppercase">Adicionar imagem</span>
+                      </>
+                    )}
+                  </button>
+                  {imageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setImageUrl('')}
+                      className="w-full mt-2 text-[10px] font-semibold uppercase text-slate-500 hover:text-[#E63946]"
+                    >
+                      Remover foto
+                    </button>
+                  )}
+                </div>
+
+                {/* Informações básicas */}
+                <div>
+                  <SectionTitle icon="badge">Informações básicas</SectionTitle>
+                  <div className="space-y-3">
+                    <div>
+                      <label className={labelCls}>Nome do produto</label>
+                      <input
+                        type="text"
+                        required
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Ex.: Sirene Bitonal 24V Strobe IP66"
+                        className={inputCls}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelCls}>Categoria</label>
+                        <input
+                          type="text"
+                          value={category}
+                          onChange={(e) => setCategory(e.target.value)}
+                          placeholder="Ex.: Sirenes & Sinalização"
+                          className={inputCls}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Código do produto</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={code}
+                            onChange={(e) => setCode(e.target.value)}
+                            className={`${inputCls} font-data-mono`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setCode(generateCode(category))}
+                            title="Gerar código automaticamente"
+                            className="shrink-0 px-3 rounded-lg bg-[#1A1A72] text-white hover:bg-[#12124f] transition-colors flex items-center"
+                          >
+                            <span className="material-symbols-outlined text-base">autorenew</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <label className={labelCls}>Unidade de medida</label>
+                      <button
+                        type="button"
+                        onClick={() => setShowUnitModal(true)}
+                        className={`${inputCls} flex items-center justify-between text-left ${
+                          unit ? 'text-slate-900' : 'text-slate-400'
+                        }`}
+                      >
+                        <span className="font-data-mono">{unit || 'Selecionar unidade de medida...'}</span>
+                        <span className="material-symbols-outlined text-base text-slate-400">straighten</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* PREÇOS */}
               <div>
-                <label className="block text-slate-600 mb-1 font-semibold uppercase">Descrição do Equipamento</label>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                <SectionTitle icon="payments">Preço de venda e custo</SectionTitle>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div>
+                    <label className={labelCls}>Preço de custo (R$)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={costPrice}
+                      onChange={(e) => onCostChange(Number(e.target.value))}
+                      className={`${inputCls} font-data-mono`}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Preço de venda (R$)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={salePrice}
+                      onChange={(e) => onSaleChange(Number(e.target.value))}
+                      className={`${inputCls} font-data-mono`}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>
+                      Margem de lucro %
+                      <InfoDot text="Margem de lucro = (Preço de venda − Preço de custo) ÷ Preço de venda × 100. Representa quanto do preço de venda é lucro. Ao informar a margem, o markup e o preço de venda são calculados automaticamente." />
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={margin}
+                      onChange={(e) => onMarginChange(Number(e.target.value))}
+                      className={`${inputCls} font-data-mono`}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>
+                      Markup %
+                      <InfoDot text="Markup = (Preço de venda − Preço de custo) ÷ Preço de custo × 100. Representa o quanto foi acrescentado sobre o custo para chegar ao preço de venda." />
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={markup}
+                      onChange={(e) => onMarkupChange(Number(e.target.value))}
+                      className={`${inputCls} font-data-mono`}
+                    />
+                  </div>
+                </div>
+                <p className="mt-2 text-[10px] text-slate-500 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-sm text-[#1A1A72]">info</span>
+                  Ao informar a <strong>margem de lucro</strong>, o <strong>markup</strong> e o{' '}
+                  <strong>preço de venda</strong> são recalculados automaticamente a partir do custo.
+                </p>
+              </div>
+
+              {/* GERENCIAMENTO DE ESTOQUE */}
+              <div>
+                <div className="flex items-center justify-between">
+                  <SectionTitle icon="inventory">Gerenciamento de estoque</SectionTitle>
+                  {/* Toggle ativar/desativar */}
+                  <button
+                    type="button"
+                    onClick={() => setStockManaged((v) => !v)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      stockManaged ? 'bg-[#E63946]' : 'bg-slate-300'
+                    }`}
+                    title={stockManaged ? 'Gerenciamento ativado' : 'Gerenciamento desativado'}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        stockManaged ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-500 mb-3 -mt-1">
+                  {stockManaged
+                    ? 'Controle de quantidades ativado para este produto.'
+                    : 'Produto sem controle de estoque (serviço ou item não estocável).'}
+                </p>
+                <div
+                  className={`grid grid-cols-2 md:grid-cols-4 gap-3 transition-opacity ${
+                    stockManaged ? '' : 'opacity-40 pointer-events-none'
+                  }`}
+                >
+                  <div>
+                    <label className={labelCls}>Quantidade</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={quantity}
+                      disabled={!stockManaged}
+                      onChange={(e) => setQuantity(Number(e.target.value))}
+                      className={`${inputCls} font-data-mono`}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Quantidade ideal</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={idealQuantity}
+                      disabled={!stockManaged}
+                      onChange={(e) => setIdealQuantity(Number(e.target.value))}
+                      className={`${inputCls} font-data-mono`}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Quantidade mínima</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={minQuantity}
+                      disabled={!stockManaged}
+                      onChange={(e) => setMinQuantity(Number(e.target.value))}
+                      className={`${inputCls} font-data-mono`}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Quantidade reservada</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={reservedQuantity}
+                      disabled={!stockManaged}
+                      onChange={(e) => setReservedQuantity(Number(e.target.value))}
+                      className={`${inputCls} font-data-mono`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* OUTRAS INFORMAÇÕES */}
+              <div>
+                <SectionTitle icon="more_horiz">Outras informações</SectionTitle>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className={labelCls}>Fornecedor</label>
+                    <input
+                      type="text"
+                      value={supplier}
+                      onChange={(e) => setSupplier(e.target.value)}
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Marca</label>
+                    <input type="text" value={brand} onChange={(e) => setBrand(e.target.value)} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Modelo</label>
+                    <input type="text" value={model} onChange={(e) => setModel(e.target.value)} className={inputCls} />
+                  </div>
+                </div>
+              </div>
+
+              {/* DESCRIÇÃO */}
+              <div>
+                <SectionTitle icon="description">Descrição</SectionTitle>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  placeholder="Detalhes técnicos, aplicação, observações..."
+                  className={`${inputCls} resize-none`}
                 />
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-600 mb-1 font-semibold uppercase">Categoria</label>
-                  <input
-                    type="text"
-                    required
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-600 mb-1 font-semibold uppercase">Fornecedor</label>
-                  <input
-                    type="text"
-                    required
-                    value={supplier}
-                    onChange={(e) => setSupplier(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-600 mb-1 font-semibold uppercase">Quantidade Inicial</label>
-                  <input
-                    type="number"
-                    required
-                    value={quantity}
-                    onChange={(e) => setQuantity(Number(e.target.value))}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-600 mb-1 font-semibold uppercase">Estoque Mínimo</label>
-                  <input
-                    type="number"
-                    required
-                    value={minQuantity}
-                    onChange={(e) => setMinQuantity(Number(e.target.value))}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-600 mb-1 font-semibold uppercase">Preço Unitário (R$)</label>
-                  <input
-                    type="number"
-                    required
-                    value={unitPrice}
-                    onChange={(e) => setUnitPrice(Number(e.target.value))}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-600 mb-1 font-semibold uppercase">Local / Prateleira</label>
-                  <input
-                    type="text"
-                    required
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-[#E63946] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
-              >
-                Registrar no Almoxarifado
-              </button>
             </form>
+
+            {/* Rodapé fixo */}
+            <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between gap-3">
+              <div className="text-[11px] text-slate-500 font-data-mono">
+                Venda {brl(salePrice)} · Custo {brl(costPrice)} · Margem {round2(margin)}%
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleCreateItem}
+                  className="bg-[#E63946] hover:bg-[#a51515] text-white px-6 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-base">save</span>
+                  Salvar Produto
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Nova janela: seleção de Unidade de Medida */}
+      {showUnitModal && (
+        <div className="fixed inset-0 z-[60] bg-[#1A1A72]/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white max-w-lg w-full rounded-xl border border-slate-200 shadow-2xl max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#E63946]">straighten</span>
+                <h3 className="font-display text-base font-bold text-[#1A1A72] uppercase tracking-wide">
+                  Unidades de Medida
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowUnitModal(false)}
+                className="text-slate-400 hover:text-slate-700 font-bold text-xl"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="overflow-y-auto px-6 py-4 space-y-5">
+              {UNIT_GROUPS.map((g) => (
+                <div key={g.group}>
+                  <p className="font-display text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                    {g.group}
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {g.units.map((u) => {
+                      const value = `${u.code} — ${u.label}`;
+                      const selected = unit === value;
+                      return (
+                        <button
+                          key={u.code}
+                          type="button"
+                          onClick={() => {
+                            setUnit(value);
+                            setShowUnitModal(false);
+                          }}
+                          className={`text-left px-3 py-2 rounded-lg border transition-colors ${
+                            selected
+                              ? 'border-[#E63946] bg-red-50 text-[#E63946]'
+                              : 'border-slate-200 hover:border-[#1A1A72] hover:bg-slate-50 text-slate-700'
+                          }`}
+                        >
+                          <span className="font-data-mono font-bold text-xs block">{u.code}</span>
+                          <span className="text-[10px] text-slate-500">{u.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
