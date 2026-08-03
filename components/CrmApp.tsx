@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { Header } from '@/components/Header';
 import { AuthModal } from '@/components/AuthModal';
+import { fetchInventory, insertInventoryItem, isSupabaseConfigured } from '@/lib/inventory';
 
 import {
   TabPath,
@@ -93,6 +94,23 @@ export function CrmApp({ initialRole = 'ADMINISTRATIVO', onLogout }: CrmAppProps
   const [inventory, setInventory] = useState<InventoryItem[]>(INITIAL_INVENTORY);
   const [auditLogs, setAuditLogs] = useState(INITIAL_AUDIT_LOGS);
 
+  // Carrega o estoque persistido no Supabase ao abrir o sistema.
+  // Se o Supabase não estiver disponível, mantém os dados locais de exemplo.
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    let active = true;
+    fetchInventory()
+      .then((items) => {
+        if (active) setInventory(items);
+      })
+      .catch((err) => {
+        console.warn('Estoque: usando dados locais (Supabase indisponível).', err);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   // Handlers
   const handleSavePedido = (savedPedido: Pedido) => {
     setPedidos((prev) => {
@@ -176,9 +194,30 @@ export function CrmApp({ initialRole = 'ADMINISTRATIVO', onLogout }: CrmAppProps
     logAction('Homologação de Fornecedor', 'Fornecedores', `Homologado ${newSupplier.name}`);
   };
 
-  const handleAddInventoryItem = (newItem: InventoryItem) => {
-    setInventory([newItem, ...inventory]);
-    logAction('Entrada no Almoxarifado', 'Estoque', `Cadastrado item ${newItem.code} - ${newItem.name}`);
+  const handleAddInventoryItem = async (newItem: InventoryItem) => {
+    if (!isSupabaseConfigured()) {
+      setInventory((prev) => [newItem, ...prev]);
+      logAction('Entrada no Almoxarifado', 'Estoque', `Cadastrado item ${newItem.code} - ${newItem.name}`);
+      return;
+    }
+    try {
+      const saved = await insertInventoryItem(newItem);
+      setInventory((prev) => [saved, ...prev]);
+      logAction('Entrada no Almoxarifado', 'Estoque', `Cadastrado item ${saved.code} - ${saved.name}`);
+    } catch (err) {
+      console.error('Falha ao salvar o item no Supabase:', err);
+      setInventory((prev) => [newItem, ...prev]);
+      logAction(
+        'Entrada no Almoxarifado (local)',
+        'Estoque',
+        `Item ${newItem.code} - ${newItem.name} adicionado apenas localmente (não persistido)`
+      );
+      alert(
+        'Não foi possível salvar no banco de dados (Supabase).\n\n' +
+          'O item foi adicionado apenas nesta sessão. Verifique se a tabela ' +
+          '"inventory_items" foi criada no Supabase (script lib/db/migrations/0002_inventory_items.sql).'
+      );
+    }
   };
 
   const handleAddPunch = (newPunch: TimePunch) => {
