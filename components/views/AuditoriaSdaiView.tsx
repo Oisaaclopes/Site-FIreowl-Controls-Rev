@@ -26,7 +26,7 @@ export const AuditoriaSdaiView: React.FC<AuditoriaSdaiViewProps> = ({ audit }) =
 
         <button
           onClick={() => setShowModal(true)}
-          className="bg-[#ba1a1a] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm uppercase tracking-wide flex items-center gap-1.5"
+          className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm uppercase tracking-wide flex items-center gap-1.5"
         >
           <span className="material-symbols-outlined text-base">assignment</span> Gerar Plano de Ação
         </button>
@@ -43,7 +43,7 @@ export const AuditoriaSdaiView: React.FC<AuditoriaSdaiViewProps> = ({ audit }) =
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
           <p className="text-xs font-semibold text-slate-500 uppercase">Resumo de Não-Conformidades</p>
           <div className="flex gap-4 mt-3 font-data-mono text-xs font-bold">
-            <span className="text-[#ba1a1a] bg-red-50 px-2.5 py-1 rounded">R1 Crítico: {currentAudit.riskCount.r1}</span>
+            <span className="text-[#E63946] bg-red-50 px-2.5 py-1 rounded">R1 Crítico: {currentAudit.riskCount.r1}</span>
             <span className="text-amber-700 bg-amber-50 px-2.5 py-1 rounded">R2 Alto: {currentAudit.riskCount.r2}</span>
             <span className="text-slate-700 bg-slate-100 px-2.5 py-1 rounded">R3 Médio: {currentAudit.riskCount.r3}</span>
           </div>
@@ -89,7 +89,7 @@ export const AuditoriaSdaiView: React.FC<AuditoriaSdaiViewProps> = ({ audit }) =
                   </td>
                   <td className="p-4">
                     {item.riskLevel && (
-                      <span className="font-bold text-[#ba1a1a] mr-2">RISCO {item.riskLevel} —</span>
+                      <span className="font-bold text-[#E63946] mr-2">RISCO {item.riskLevel} —</span>
                     )}
                     <span className="text-slate-600">{item.observation || 'Sem apontamentos de risco.'}</span>
                   </td>
@@ -121,7 +121,7 @@ export const AuditoriaSdaiView: React.FC<AuditoriaSdaiViewProps> = ({ audit }) =
                   alert('Plano de Ação NBR 17240 exportado em PDF com sucesso!');
                   setShowModal(false);
                 }}
-                className="flex-1 bg-[#ba1a1a] hover:bg-[#a51515] text-white font-semibold py-2.5 rounded-lg text-xs uppercase transition-colors"
+                className="flex-1 bg-[#E63946] hover:bg-[#a51515] text-white font-semibold py-2.5 rounded-lg text-xs uppercase transition-colors"
               >
                 Exportar PDF do Plano de Ação
               </button>

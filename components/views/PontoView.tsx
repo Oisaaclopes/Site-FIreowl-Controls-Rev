@@ -92,7 +92,7 @@ export const PontoView: React.FC<PontoViewProps> = ({ punches, onAddPunch }) => 
       <div className="bg-[#0f172a] text-white p-6 rounded-xl border border-slate-800 shadow-xl relative overflow-hidden">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 relative z-10">
           <div>
-            <span className="text-[10px] font-bold text-[#ba1a1a] bg-red-950/60 border border-red-800/50 px-2.5 py-1 rounded-full uppercase tracking-wider">
+            <span className="text-[10px] font-bold text-[#E63946] bg-red-950/60 border border-red-800/50 px-2.5 py-1 rounded-full uppercase tracking-wider">
               Terminal de Batida com GPS Verificado
             </span>
             <h2 className="text-xl font-bold uppercase mt-3">Registrar Ponto do Técnico Operacional</h2>
@@ -125,7 +125,7 @@ export const PontoView: React.FC<PontoViewProps> = ({ punches, onAddPunch }) => 
 
             <button
               onClick={handleBaterPonto}
-              className="w-full sm:w-auto bg-[#ba1a1a] hover:bg-[#a51515] text-white font-semibold text-xs px-6 py-2.5 rounded-lg uppercase tracking-wider transition-colors shadow-md flex items-center justify-center gap-2"
+              className="w-full sm:w-auto bg-[#E63946] hover:bg-[#a51515] text-white font-semibold text-xs px-6 py-2.5 rounded-lg uppercase tracking-wider transition-colors shadow-md flex items-center justify-center gap-2"
             >
               <span className="material-symbols-outlined text-lg">touch_app</span>
               Bater Ponto Agora
@@ -154,7 +154,7 @@ export const PontoView: React.FC<PontoViewProps> = ({ punches, onAddPunch }) => 
               {punches.map((p) => (
                 <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="p-4 font-bold text-slate-900">{p.employeeName}</td>
-                  <td className="p-4 font-data-mono text-[#ba1a1a] font-bold">{p.timestamp}</td>
+                  <td className="p-4 font-data-mono text-[#E63946] font-bold">{p.timestamp}</td>
                   <td className="p-4">
                     <span className="bg-slate-900 text-white px-2.5 py-0.5 rounded text-[10px] font-bold">
                       {p.type}
@@ -193,7 +193,7 @@ export const PontoView: React.FC<PontoViewProps> = ({ punches, onAddPunch }) => 
                   window.print();
                   setShowFolhaModal(false);
                 }}
-                className="flex-1 bg-[#ba1a1a] hover:bg-[#a51515] text-white font-semibold py-2.5 rounded-lg text-xs uppercase"
+                className="flex-1 bg-[#E63946] hover:bg-[#a51515] text-white font-semibold py-2.5 rounded-lg text-xs uppercase"
               >
                 Imprimir Folha de Ponto
               </button>

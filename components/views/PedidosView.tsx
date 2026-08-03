@@ -132,7 +132,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={handleOpenNewProposal}
-            className="bg-[#ba1a1a] hover:bg-[#a51515] text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
+            className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
           >
             <Plus className="w-4 h-4" /> Nova Proposta Comercial
           </button>
@@ -191,7 +191,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           </div>
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <p className="text-[11px] font-semibold text-slate-500 uppercase">Volume Comercial R$</p>
-            <p className="font-data-mono text-2xl font-bold text-[#ba1a1a] mt-1">
+            <p className="font-data-mono text-2xl font-bold text-[#E63946] mt-1">
               R$ {pedidos.reduce((acc, p) => acc + (p.proposal.valorTotal || 0), 0).toLocaleString('pt-BR')}
             </p>
           </div>
@@ -216,7 +216,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           </div>
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <p className="text-[11px] font-semibold text-slate-500 uppercase">Faturamento de OS</p>
-            <p className="font-data-mono text-2xl font-bold text-[#ba1a1a] mt-1">
+            <p className="font-data-mono text-2xl font-bold text-[#E63946] mt-1">
               R$ {pedidosOS.reduce((acc, p) => acc + p.value, 0).toLocaleString('pt-BR')}
             </p>
           </div>
@@ -232,7 +232,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
             placeholder="Buscar por número, cliente, referência..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+            className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
           />
         </div>
 
@@ -304,7 +304,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                   filteredPedidos.map((ped) => (
                     <tr key={ped.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="p-4">
-                        <span className="font-data-mono font-bold text-[#ba1a1a] text-sm">{ped.numeroPedido}</span>
+                        <span className="font-data-mono font-bold text-[#E63946] text-sm">{ped.numeroPedido}</span>
                         <br />
                         <span className="text-[10px] text-slate-400 font-data-mono">{ped.dataEmissao}</span>
                       </td>
@@ -395,7 +395,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                           {ped.status === 'aceito' && (
                             <button
                               onClick={() => onGenerateOSFromPedido(ped)}
-                              className="px-2.5 py-1 bg-[#ba1a1a] hover:bg-[#a51515] text-white rounded text-[10px] font-bold uppercase flex items-center gap-1 shadow-xs"
+                              className="px-2.5 py-1 bg-[#E63946] hover:bg-[#a51515] text-white rounded text-[10px] font-bold uppercase flex items-center gap-1 shadow-xs"
                             >
                               <Wrench className="w-3 h-3" /> Gerar OS
                             </button>
@@ -441,7 +441,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                   filteredOS.map((p) => (
                     <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="p-4">
-                        <span className="font-data-mono font-bold text-[#ba1a1a]">{p.id}</span> <br />
+                        <span className="font-data-mono font-bold text-[#E63946]">{p.id}</span> <br />
                         <span className="font-data-mono text-[10px] text-slate-400">{p.pedidoId}</span>
                       </td>
                       <td className="p-4">

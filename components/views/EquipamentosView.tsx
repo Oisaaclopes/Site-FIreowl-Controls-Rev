@@ -51,7 +51,7 @@ export const EquipamentosView: React.FC<EquipamentosViewProps> = ({
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="bg-[#ba1a1a] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
+          className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
         >
           <span className="material-symbols-outlined text-base">add</span> Cadastrar Ativo
         </button>
@@ -79,7 +79,7 @@ export const EquipamentosView: React.FC<EquipamentosViewProps> = ({
               {equipmentList.map((eq) => (
                 <tr key={eq.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="p-4">
-                    <span className="font-data-mono font-bold text-[#ba1a1a]">{eq.id}</span> <br />
+                    <span className="font-data-mono font-bold text-[#E63946]">{eq.id}</span> <br />
                     <span className="font-data-mono text-[11px] font-bold text-slate-900 bg-amber-100 px-2 py-0.5 rounded-md mt-1 inline-block">
                       {eq.serialBP}
                     </span>
@@ -141,7 +141,7 @@ export const EquipamentosView: React.FC<EquipamentosViewProps> = ({
                   required
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                 />
               </div>
               <div>
@@ -151,7 +151,7 @@ export const EquipamentosView: React.FC<EquipamentosViewProps> = ({
                   required
                   value={centralModel}
                   onChange={(e) => setCentralModel(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                 />
               </div>
               <div>
@@ -161,12 +161,12 @@ export const EquipamentosView: React.FC<EquipamentosViewProps> = ({
                   required
                   value={serialBP}
                   onChange={(e) => setSerialBP(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                 />
               </div>
               <button
                 type="submit"
-                className="w-full bg-[#ba1a1a] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
+                className="w-full bg-[#E63946] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
               >
                 Salvar Ativo
               </button>
@@ -207,7 +207,7 @@ export const EquipamentosView: React.FC<EquipamentosViewProps> = ({
                   window.print();
                   setSelectedQrEquipment(null);
                 }}
-                className="flex-1 bg-[#ba1a1a] hover:bg-[#a51515] text-white font-semibold py-2 rounded-lg text-xs uppercase"
+                className="flex-1 bg-[#E63946] hover:bg-[#a51515] text-white font-semibold py-2 rounded-lg text-xs uppercase"
               >
                 Imprimir Etiqueta
               </button>

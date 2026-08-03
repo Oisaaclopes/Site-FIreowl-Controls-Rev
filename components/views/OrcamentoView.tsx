@@ -60,7 +60,7 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
 
         <button
           onClick={() => setShowModal(true)}
-          className="bg-[#ba1a1a] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase"
+          className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase"
         >
           <span className="material-symbols-outlined text-base">add</span> Elaborar Orçamento
         </button>
@@ -86,7 +86,7 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
               {quotes.map((q) => (
                 <tr key={q.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="p-4">
-                    <span className="font-data-mono font-bold text-[#ba1a1a]">{q.id}</span> <br />
+                    <span className="font-data-mono font-bold text-[#E63946]">{q.id}</span> <br />
                     <span className="font-bold text-slate-900 text-sm uppercase">{q.clientName}</span>
                   </td>
                   <td className="p-4 text-slate-600 max-w-xs">{q.description}</td>
@@ -108,7 +108,7 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
                           onConvertToOS(q);
                           alert(`Orçamento ${q.id} convertido em Pedido e Ordem de Serviço!`);
                         }}
-                        className="bg-[#ba1a1a] hover:bg-[#a51515] text-white text-[10px] font-semibold px-3 py-1 rounded transition-colors uppercase tracking-wider shadow-sm"
+                        className="bg-[#E63946] hover:bg-[#a51515] text-white text-[10px] font-semibold px-3 py-1 rounded transition-colors uppercase tracking-wider shadow-sm"
                       >
                         Converter em OS
                       </button>
@@ -137,7 +137,7 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
                   required
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                 />
               </div>
               <div>
@@ -147,7 +147,7 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
                   required
                   value={desc}
                   onChange={(e) => setDesc(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                 />
               </div>
               <div>
@@ -157,7 +157,7 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
                   required
                   value={totalVal}
                   onChange={(e) => setTotalVal(Number(e.target.value))}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                 />
               </div>
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 font-data-mono text-xs space-y-1">
@@ -171,12 +171,12 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
                   type="number"
                   value={discount}
                   onChange={(e) => setDiscount(Number(e.target.value))}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                 />
               </div>
               <button
                 type="submit"
-                className="w-full bg-[#ba1a1a] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
+                className="w-full bg-[#E63946] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
               >
                 Gerar Proposta Comercial
               </button>

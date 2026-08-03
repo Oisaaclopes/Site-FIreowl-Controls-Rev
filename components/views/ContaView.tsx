@@ -72,7 +72,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex justify-between items-center border-b border-slate-100 pb-3">
             <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-[#ba1a1a]" /> Dados Cadastrais da Empresa (Capa e Propostas)
+              <Building2 className="w-4 h-4 text-[#E63946]" /> Dados Cadastrais da Empresa (Capa e Propostas)
             </h3>
           </div>
 
@@ -165,7 +165,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex justify-between items-center border-b border-slate-100 pb-3">
             <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <Layers className="w-4 h-4 text-[#ba1a1a]" /> Biblioteca Global de Marcas Parceiras
+              <Layers className="w-4 h-4 text-[#E63946]" /> Biblioteca Global de Marcas Parceiras
             </h3>
           </div>
 
@@ -202,7 +202,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
               />
               <button
                 type="submit"
-                className="px-4 py-2 bg-[#ba1a1a] hover:bg-[#a51515] text-white font-bold rounded-lg uppercase text-xs flex items-center gap-1"
+                className="px-4 py-2 bg-[#E63946] hover:bg-[#a51515] text-white font-bold rounded-lg uppercase text-xs flex items-center gap-1"
               >
                 <Plus className="w-4 h-4" /> Cadastrar
               </button>
@@ -249,7 +249,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
         <select
           value={userRole}
           onChange={(e) => onSelectRole(e.target.value as UserRole)}
-          className="w-full border border-slate-200 rounded-lg p-3 text-xs font-semibold text-slate-900 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+          className="w-full border border-slate-200 rounded-lg p-3 text-xs font-semibold text-slate-900 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
         >
           <option value="ADMINISTRATIVO">ADMINISTRATIVO — Acesso Irrestrito Aos Módulos</option>
           <option value="TECNICO">TÉCNICO DE CAMPO — Execução de OS, Ponto &amp; Relatórios</option>
@@ -277,7 +277,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
               {logs.map((log) => (
                 <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="p-4">
-                    <span className="font-data-mono font-bold text-[#ba1a1a]">{log.timestamp}</span> <br />
+                    <span className="font-data-mono font-bold text-[#E63946]">{log.timestamp}</span> <br />
                     <span className="font-data-mono text-[10px] text-slate-400">{log.ip}</span>
                   </td>
                   <td className="p-4 font-bold text-slate-900">{log.user}</td>

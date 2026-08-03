@@ -69,7 +69,7 @@ export const DespesasView: React.FC<DespesasViewProps> = ({
 
         <button
           onClick={() => setShowModal(true)}
-          className="bg-[#ba1a1a] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase"
+          className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase"
         >
           <span className="material-symbols-outlined text-base">add</span> Nova Despesa
         </button>
@@ -79,7 +79,7 @@ export const DespesasView: React.FC<DespesasViewProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
           <p className="text-xs font-semibold text-slate-500 uppercase">Despesas Pagas</p>
-          <h2 className="font-data-mono text-3xl font-bold text-[#ba1a1a] mt-2">
+          <h2 className="font-data-mono text-3xl font-bold text-[#E63946] mt-2">
             R$ {totalConfirmed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </h2>
         </div>
@@ -133,7 +133,7 @@ export const DespesasView: React.FC<DespesasViewProps> = ({
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
               {filteredDespesas.map((t) => (
                 <tr key={t.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="p-4 font-data-mono font-bold text-[#ba1a1a]">{t.id}</td>
+                  <td className="p-4 font-data-mono font-bold text-[#E63946]">{t.id}</td>
                   <td className="p-4 font-bold uppercase text-slate-900">{t.clientOrVendor}</td>
                   <td className="p-4 text-slate-600">{t.description}</td>
                   <td className="p-4 font-data-mono text-slate-500">{t.date}</td>
@@ -148,7 +148,7 @@ export const DespesasView: React.FC<DespesasViewProps> = ({
                       {t.status}
                     </span>
                   </td>
-                  <td className="p-4 text-right font-data-mono font-bold text-[#ba1a1a]">
+                  <td className="p-4 text-right font-data-mono font-bold text-[#E63946]">
                     R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </td>
                 </tr>
@@ -175,7 +175,7 @@ export const DespesasView: React.FC<DespesasViewProps> = ({
                 <select
                   value={clientOrVendor}
                   onChange={(e) => setClientOrVendor(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                 >
                   {suppliers.map((s) => (
                     <option key={s.id} value={s.name}>
@@ -193,7 +193,7 @@ export const DespesasView: React.FC<DespesasViewProps> = ({
                   required
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                 />
               </div>
 
@@ -204,13 +204,13 @@ export const DespesasView: React.FC<DespesasViewProps> = ({
                   required
                   value={amount}
                   onChange={(e) => setAmount(Number(e.target.value))}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-[#ba1a1a] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
+                className="w-full bg-[#E63946] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
               >
                 Confirmar Lançamento de Despesa
               </button>

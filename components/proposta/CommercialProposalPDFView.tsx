@@ -51,7 +51,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
           )}
           <button
             onClick={handlePrint}
-            className="px-4 py-2 bg-[#ba1a1a] hover:bg-[#a51515] text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 shadow-sm uppercase tracking-wider"
+            className="px-4 py-2 bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 shadow-sm uppercase tracking-wider"
           >
             <Printer className="w-4 h-4" /> Imprimir / Baixar PDF
           </button>
@@ -62,7 +62,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
       <div className="w-full max-w-4xl bg-white text-slate-800 shadow-2xl rounded-none border border-slate-200 p-8 md:p-12 font-body-md print:shadow-none print:border-none print:p-0 print:w-full print:max-w-none">
         
         {/* ==================== 1. CAPA ==================== */}
-        <div className="border-b-4 border-[#ba1a1a] pb-8 mb-10">
+        <div className="border-b-4 border-[#E63946] pb-8 mb-10">
           {/* Navy Banner */}
           <div className="bg-[#0B1E38] text-white p-6 md:p-8 rounded-t-xl mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
@@ -94,7 +94,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
           {/* Proposal Header Block */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-lg border border-slate-200">
             <div>
-              <span className="text-[10px] font-bold text-[#ba1a1a] uppercase tracking-widest block mb-1">
+              <span className="text-[10px] font-bold text-[#E63946] uppercase tracking-widest block mb-1">
                 PROPOSTA COMERCIAL & TÉCNICA
               </span>
               <h2 className="text-3xl font-black text-slate-900 font-display">
@@ -111,7 +111,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
               <p><strong className="text-slate-900 uppercase">Responsável Comercial:</strong> {pedido.responsavelComercialNome}</p>
               <p className="pt-1">
                 <strong className="text-slate-900 uppercase">Status da Proposta:</strong>{' '}
-                <span className="uppercase font-bold text-[#ba1a1a]">{pedido.status.replace('_', ' ')}</span>
+                <span className="uppercase font-bold text-[#E63946]">{pedido.status.replace('_', ' ')}</span>
               </p>
             </div>
           </div>
@@ -119,7 +119,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
 
         {/* ==================== 2. OBJETIVO ==================== */}
         <section className="mb-8">
-          <div className="border-b-2 border-[#ba1a1a] pb-1 mb-3 flex items-center gap-2">
+          <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
             <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">01</span>
             <h3 className="text-base font-bold text-[#0B1E38] uppercase font-display tracking-wide">
               OBJETIVO
@@ -132,7 +132,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
 
         {/* ==================== 3. DIRETRIZES NORMATIVAS ==================== */}
         <section className="mb-8">
-          <div className="border-b-2 border-[#ba1a1a] pb-1 mb-3 flex items-center gap-2">
+          <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
             <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">02</span>
             <h3 className="text-base font-bold text-[#0B1E38] uppercase font-display tracking-wide">
               DIRETRIZES NORMATIVAS E REFERÊNCIAS
@@ -142,7 +142,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
             {proposal.diretrizesNormativas && proposal.diretrizesNormativas.length > 0 ? (
               proposal.diretrizesNormativas.map((item, idx) => (
                 <li key={idx} className="flex items-start gap-2 bg-slate-50 p-2 rounded border border-slate-200">
-                  <ShieldCheck className="w-4 h-4 text-[#ba1a1a] shrink-0 mt-0.5" />
+                  <ShieldCheck className="w-4 h-4 text-[#E63946] shrink-0 mt-0.5" />
                   <span>{item}</span>
                 </li>
               ))
@@ -154,7 +154,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
 
         {/* ==================== 4. DESCRIÇÃO DO SERVIÇO ==================== */}
         <section className="mb-8">
-          <div className="border-b-2 border-[#ba1a1a] pb-1 mb-3 flex items-center gap-2">
+          <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
             <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">03</span>
             <h3 className="text-base font-bold text-[#0B1E38] uppercase font-display tracking-wide">
               DESCRIÇÃO DOS SERVIÇOS & ENTREGÁVEIS
@@ -189,7 +189,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
 
         {/* ==================== 5. EQUIPAMENTOS ==================== */}
         <section className="mb-8">
-          <div className="border-b-2 border-[#ba1a1a] pb-1 mb-3 flex items-center gap-2">
+          <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
             <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">04</span>
             <h3 className="text-base font-bold text-[#0B1E38] uppercase font-display tracking-wide">
               ESPECIFICAÇÃO DOS EQUIPAMENTOS E MATERIAIS
@@ -216,7 +216,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
                     const totalItem = unitPrice * eq.quantidade;
                     return (
                       <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                        <td className="p-2.5 text-center font-bold text-[#ba1a1a] font-data-mono">{eq.itemNumero || i + 1}</td>
+                        <td className="p-2.5 text-center font-bold text-[#E63946] font-data-mono">{eq.itemNumero || i + 1}</td>
                         <td className="p-2.5 font-semibold text-slate-900">{eq.descricao}</td>
                         <td className="p-2.5 text-slate-600">{eq.marcaModelo}</td>
                         <td className="p-2.5 text-center font-bold uppercase">{eq.unidade}</td>
@@ -244,7 +244,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
 
         {/* ==================== 6. MARCAS E FABRICANTES ==================== */}
         <section className="mb-8">
-          <div className="border-b-2 border-[#ba1a1a] pb-1 mb-3 flex items-center gap-2">
+          <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
             <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">05</span>
             <h3 className="text-base font-bold text-[#0B1E38] uppercase font-display tracking-wide">
               MARCAS E FABRICANTES HOMOLOGADOS
@@ -280,7 +280,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
 
         {/* ==================== 7. PREMISSAS ==================== */}
         <section className="mb-8">
-          <div className="border-b-2 border-[#ba1a1a] pb-1 mb-3 flex items-center gap-2">
+          <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
             <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">06</span>
             <h3 className="text-base font-bold text-[#0B1E38] uppercase font-display tracking-wide">
               PREMISSAS ADOTADAS
@@ -290,7 +290,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
             {proposal.premissas && proposal.premissas.length > 0 ? (
               proposal.premissas.map((prem, idx) => (
                 <li key={idx} className="flex items-start gap-2">
-                  <span className="text-[#ba1a1a] font-bold">•</span>
+                  <span className="text-[#E63946] font-bold">•</span>
                   <span>{prem}</span>
                 </li>
               ))
@@ -302,7 +302,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
 
         {/* ==================== 8. RESPONSABILIDADES ==================== */}
         <section className="mb-8">
-          <div className="border-b-2 border-[#ba1a1a] pb-1 mb-3 flex items-center gap-2">
+          <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
             <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">07</span>
             <h3 className="text-base font-bold text-[#0B1E38] uppercase font-display tracking-wide">
               DIVISÃO DE RESPONSABILIDADES
@@ -352,7 +352,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
 
         {/* ==================== 9 & 10. CONDIÇÕES COMERCIAIS & PRAZO ==================== */}
         <section className="mb-8">
-          <div className="border-b-2 border-[#ba1a1a] pb-1 mb-3 flex items-center gap-2">
+          <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
             <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">08</span>
             <h3 className="text-base font-bold text-[#0B1E38] uppercase font-display tracking-wide">
               CONDIÇÕES COMERCIAIS & PRAZOS
@@ -402,7 +402,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
 
         {/* ==================== 13. CONCLUSÃO ==================== */}
         <section className="mb-12">
-          <div className="border-b-2 border-[#ba1a1a] pb-1 mb-3 flex items-center gap-2">
+          <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
             <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">09</span>
             <h3 className="text-base font-bold text-[#0B1E38] uppercase font-display tracking-wide">
               CONCLUSÃO

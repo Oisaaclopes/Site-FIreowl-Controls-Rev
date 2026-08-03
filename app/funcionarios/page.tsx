@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { CrmApp } from '@/components/CrmApp';
+import { OfficialLogo } from '@/components/OfficialLogo';
 import { UserRole } from '@/lib/types';
 
 /**
@@ -96,7 +97,7 @@ export default function FuncionariosPage() {
 
   // Tela de login do operador
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b1e38] p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1A1A72] p-4">
       <div className="absolute inset-0 pointer-events-none opacity-20 bg-blueprint-grid" />
 
       <div
@@ -107,8 +108,8 @@ export default function FuncionariosPage() {
           transform: `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
         }}
       >
-        <div className="absolute -top-4 -left-4 w-8 h-8 border-t-2 border-l-2 border-[#ba1a1a]" />
-        <div className="absolute -bottom-4 -right-4 w-8 h-8 border-b-2 border-r-2 border-[#ba1a1a]" />
+        <div className="absolute -top-4 -left-4 w-8 h-8 border-t-2 border-l-2 border-[#E63946]" />
+        <div className="absolute -bottom-4 -right-4 w-8 h-8 border-b-2 border-r-2 border-[#E63946]" />
 
         <div className="bg-[#f8f9ff] p-8 shadow-2xl flex flex-col gap-6 border border-[#c5c6ce] relative">
           {/* Voltar ao site */}
@@ -120,16 +121,12 @@ export default function FuncionariosPage() {
             ← Voltar ao site
           </a>
 
-          {/* Logo Header */}
+          {/* Logo Header — logo oficial da Fireowl Controls */}
           <div className="flex flex-col items-center gap-3 mt-2">
-            <div className="w-24 h-24 relative flex items-center justify-center bg-[#0b1e38] rounded-full p-2 border-2 border-[#ba1a1a]">
-              <span className="material-symbols-outlined text-[#ba1a1a] text-6xl">
-                local_fire_department
-              </span>
-            </div>
+            <OfficialLogo className="w-24 h-24" />
             <div className="text-center">
-              <h1 className="font-headline-lg text-2xl text-[#131c28] uppercase tracking-tight">
-                FIREOWL <span className="text-[#ba1a1a]">CONTROLS</span>
+              <h1 className="font-display-lg text-2xl text-[#1A1A72] uppercase tracking-tight">
+                FIREOWL <span className="text-[#E63946]">CONTROLS</span>
               </h1>
               <p className="font-data-mono text-[11px] text-[#75777e] tracking-widest uppercase mt-1">
                 Área do Funcionário &middot; Acesso Restrito
@@ -145,7 +142,7 @@ export default function FuncionariosPage() {
                   Identificação do Operador
                 </label>
                 <div className="relative flex items-center">
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#ba1a1a]" />
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#E63946]" />
                   <input
                     className="w-full bg-[#eff4ff] border border-[#c5c6ce] p-3 font-data-mono text-sm text-[#131c28] focus:outline-none focus:border-[#000410] transition-colors pl-4"
                     value={usuario}
@@ -164,7 +161,7 @@ export default function FuncionariosPage() {
                   Chave de Acesso
                 </label>
                 <div className="relative flex items-center">
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#ba1a1a]" />
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#E63946]" />
                   <input
                     className="w-full bg-[#eff4ff] border border-[#c5c6ce] p-3 font-data-mono text-sm text-[#131c28] focus:outline-none focus:border-[#000410] transition-colors pl-4"
                     value={senha}
@@ -179,7 +176,7 @@ export default function FuncionariosPage() {
             </div>
 
             {erro && (
-              <div className="bg-red-50 border border-[#ba1a1a]/40 text-[#ba1a1a] text-xs font-semibold px-3 py-2 flex items-center gap-2">
+              <div className="bg-red-50 border border-[#E63946]/40 text-[#E63946] text-xs font-semibold px-3 py-2 flex items-center gap-2">
                 <span className="material-symbols-outlined text-base">error</span>
                 {erro}
               </div>
@@ -195,7 +192,7 @@ export default function FuncionariosPage() {
 
             <button
               type="submit"
-              className="w-full bg-[#ba1a1a] hover:bg-[#a51515] text-white font-headline-md text-lg py-3 transition-all active:scale-[0.98] uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"
+              className="w-full bg-[#E63946] hover:bg-[#a51515] text-white font-headline-md text-lg py-3 transition-all active:scale-[0.98] uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"
             >
               <span className="material-symbols-outlined text-xl">login</span>
               ENTRAR
@@ -204,7 +201,7 @@ export default function FuncionariosPage() {
 
           {/* Dica de acesso de demonstração — remover em produção */}
           <div className="bg-[#eff4ff] border border-[#c5c6ce] p-3 text-[10px] font-data-mono text-[#44474d] leading-relaxed">
-            <p className="font-bold uppercase text-[#0b1e38] mb-1">
+            <p className="font-bold uppercase text-[#1A1A72] mb-1">
               Acessos de demonstração
             </p>
             <p>admin / fireowl123 &nbsp;·&nbsp; tecnico / campo123</p>

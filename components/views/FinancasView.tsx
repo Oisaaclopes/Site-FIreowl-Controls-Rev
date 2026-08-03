@@ -62,7 +62,7 @@ export const FinancasView: React.FC<FinancasViewProps> = ({ transactions }) => {
 
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
           <p className="text-xs font-semibold text-slate-500 uppercase">Despesas &amp; Custos Totais</p>
-          <h2 className="font-data-mono text-2xl font-bold text-[#ba1a1a] mt-2">
+          <h2 className="font-data-mono text-2xl font-bold text-[#E63946] mt-2">
             R$ {totalDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </h2>
           <span className="text-[10px] text-slate-500 font-semibold bg-slate-100 px-2 py-0.5 rounded mt-1 inline-block">
@@ -167,7 +167,7 @@ export const FinancasView: React.FC<FinancasViewProps> = ({ transactions }) => {
                   <td className="p-4 font-bold text-slate-900 uppercase">{t.clientOrVendor}</td>
                   <td className="p-4 text-slate-600">{t.description}</td>
                   <td className="p-4 font-data-mono text-slate-500">{t.date}</td>
-                  <td className={`p-4 text-right font-data-mono font-bold ${t.type === 'RECEITA' ? 'text-emerald-600' : 'text-[#ba1a1a]'}`}>
+                  <td className={`p-4 text-right font-data-mono font-bold ${t.type === 'RECEITA' ? 'text-emerald-600' : 'text-[#E63946]'}`}>
                     {t.type === 'RECEITA' ? '+' : '-'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </td>
                 </tr>

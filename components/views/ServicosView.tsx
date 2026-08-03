@@ -65,7 +65,7 @@ export const ServicosView: React.FC<ServicosViewProps> = ({
         <div className="flex gap-2">
           <button
             onClick={() => setActiveSubTab('orcamentos')}
-            className="bg-[#ba1a1a] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
+            className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
           >
             <span className="material-symbols-outlined text-base">request_quote</span> Novo Orçamento
           </button>
@@ -118,7 +118,7 @@ export const ServicosView: React.FC<ServicosViewProps> = ({
             <div key={s.id} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
               <div>
                 <div className="flex justify-between items-start">
-                  <span className="font-data-mono text-xs font-bold text-[#ba1a1a]">{s.code}</span>
+                  <span className="font-data-mono text-xs font-bold text-[#E63946]">{s.code}</span>
                   <span className="px-2.5 py-0.5 bg-blue-100 text-blue-800 text-[10px] font-bold rounded-full uppercase">
                     {s.nbrNormRef}
                   </span>
@@ -134,7 +134,7 @@ export const ServicosView: React.FC<ServicosViewProps> = ({
                 </div>
                 <div className="text-right">
                   <span className="text-slate-400 text-[10px] block uppercase">Valor Padrão</span>
-                  <span className="text-[#ba1a1a] font-bold text-base">
+                  <span className="text-[#E63946] font-bold text-base">
                     R$ {s.standardValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
@@ -151,7 +151,7 @@ export const ServicosView: React.FC<ServicosViewProps> = ({
             <span>Orçamentos &amp; Propostas Técnicas Registradas</span>
             <button
               onClick={() => setShowModal(true)}
-              className="bg-[#ba1a1a] hover:bg-[#a51515] text-white px-3 py-1 rounded text-xs uppercase"
+              className="bg-[#E63946] hover:bg-[#a51515] text-white px-3 py-1 rounded text-xs uppercase"
             >
               + Novo Orçamento
             </button>
@@ -171,7 +171,7 @@ export const ServicosView: React.FC<ServicosViewProps> = ({
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                 {quotes.map((q) => (
                   <tr key={q.id} className="hover:bg-slate-50/80">
-                    <td className="p-4 font-data-mono font-bold text-[#ba1a1a]">{q.id}</td>
+                    <td className="p-4 font-data-mono font-bold text-[#E63946]">{q.id}</td>
                     <td className="p-4 font-bold uppercase text-slate-900">{q.clientName}</td>
                     <td className="p-4 text-slate-600">{q.description}</td>
                     <td className="p-4 font-data-mono text-slate-500">{q.createdAt}</td>
@@ -217,7 +217,7 @@ export const ServicosView: React.FC<ServicosViewProps> = ({
             {clients.map((c) => (
               <div key={c.id} className="p-4 border border-slate-200 rounded-lg bg-slate-50 flex justify-between items-center">
                 <div>
-                  <span className="font-data-mono text-xs font-bold text-[#ba1a1a]">{c.code}</span>
+                  <span className="font-data-mono text-xs font-bold text-[#E63946]">{c.code}</span>
                   <h4 className="font-bold text-slate-900 uppercase text-sm">{c.name}</h4>
                   <p className="text-xs text-slate-500">{c.address}</p>
                 </div>
@@ -252,7 +252,7 @@ export const ServicosView: React.FC<ServicosViewProps> = ({
                 <select
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                 >
                   {clients.map((c) => (
                     <option key={c.id} value={c.name}>
@@ -269,7 +269,7 @@ export const ServicosView: React.FC<ServicosViewProps> = ({
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                 />
               </div>
 
@@ -280,13 +280,13 @@ export const ServicosView: React.FC<ServicosViewProps> = ({
                   required
                   value={value}
                   onChange={(e) => setValue(Number(e.target.value))}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-[#ba1a1a] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
+                className="w-full bg-[#E63946] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
               >
                 Emitir Orçamento
               </button>

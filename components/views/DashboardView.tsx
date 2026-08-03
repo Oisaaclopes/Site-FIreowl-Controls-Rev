@@ -57,7 +57,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </button>
           <button
             onClick={onNewOSClick}
-            className="bg-[#ba1a1a] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
+            className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
           >
             <span className="material-symbols-outlined text-base">add</span> Nova Ordem
           </button>
@@ -104,7 +104,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               184.212
             </span>
           </div>
-          <div className="mt-4 flex items-center gap-1 text-xs font-semibold text-[#ba1a1a]">
+          <div className="mt-4 flex items-center gap-1 text-xs font-semibold text-[#E63946]">
             <span className="material-symbols-outlined text-sm">arrow_downward</span>
             <span>-2.1% otimização de custo</span>
           </div>
@@ -142,19 +142,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           className="bg-red-50/60 p-5 rounded-xl border border-red-200 shadow-sm relative overflow-hidden group cursor-pointer hover:bg-red-100/50 transition-all"
         >
           <div className="flex justify-between items-start">
-            <p className="text-xs font-bold text-[#ba1a1a] uppercase tracking-wider flex items-center gap-1">
+            <p className="text-xs font-bold text-[#E63946] uppercase tracking-wider flex items-center gap-1">
               <span className="material-symbols-outlined text-sm">warning</span> OS Atrasadas
             </p>
-            <div className="w-10 h-10 rounded-lg bg-red-100 text-[#ba1a1a] flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-red-100 text-[#E63946] flex items-center justify-center">
               <span className="material-symbols-outlined text-[22px]">error</span>
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-1">
-            <span className="font-data-mono text-3xl font-bold text-[#ba1a1a] tabular-nums">
+            <span className="font-data-mono text-3xl font-bold text-[#E63946] tabular-nums">
               24
             </span>
           </div>
-          <div className="mt-4 flex items-center gap-1 text-xs font-semibold text-[#ba1a1a] group-hover:underline">
+          <div className="mt-4 flex items-center gap-1 text-xs font-semibold text-[#E63946] group-hover:underline">
             <span>Intervenção técnica pendente →</span>
           </div>
         </div>
@@ -179,7 +179,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <span className="text-xs font-medium text-slate-600">Receita</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-sm bg-[#ba1a1a]"></div>
+                <div className="w-3 h-3 rounded-sm bg-[#E63946]"></div>
                 <span className="text-xs font-medium text-slate-600">Despesa</span>
               </div>
             </div>
@@ -209,7 +209,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   title={`Receita ${bar.week}: R$ ${(parseInt(bar.rec) * 1200).toLocaleString()}`}
                 ></div>
                 <div
-                  className="w-full bg-[#ba1a1a] hover:bg-[#a51515] transition-all rounded-t-md shadow-sm"
+                  className="w-full bg-[#E63946] hover:bg-[#a51515] transition-all rounded-t-md shadow-sm"
                   style={{ height: bar.desp }}
                   title={`Despesa ${bar.week}: R$ ${(parseInt(bar.desp) * 1000).toLocaleString()}`}
                 ></div>
@@ -226,7 +226,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {/* Anomalias Card */}
           <div className="bg-[#0f172a] text-white p-6 rounded-xl shadow-lg flex flex-col justify-between relative overflow-hidden border border-slate-800">
             <div>
-              <span className="text-[10px] font-bold text-[#ba1a1a] bg-red-950/60 border border-red-800/50 px-2.5 py-1 rounded-full uppercase tracking-wider">
+              <span className="text-[10px] font-bold text-[#E63946] bg-red-950/60 border border-red-800/50 px-2.5 py-1 rounded-full uppercase tracking-wider">
                 Módulo de Inteligência Técnica
               </span>
               <h2 className="text-lg font-bold mt-3 tracking-tight leading-snug uppercase">
@@ -239,7 +239,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             <button
               onClick={() => onNavigateToTab('auditoria')}
-              className="mt-6 w-full py-2.5 bg-[#ba1a1a] hover:bg-[#a51515] text-white rounded-lg font-semibold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-md"
+              className="mt-6 w-full py-2.5 bg-[#E63946] hover:bg-[#a51515] text-white rounded-lg font-semibold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-md"
             >
               <span>Executar Auditoria NBR 17240</span>
               <span className="material-symbols-outlined text-base">arrow_forward</span>

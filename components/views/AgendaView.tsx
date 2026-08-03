@@ -57,7 +57,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ pedidosOS }) => {
         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-base font-bold text-slate-900 uppercase">Maio 2024 — Escala Semanal Londrina</h3>
-            <span className="text-xs font-bold text-[#ba1a1a] bg-red-50 border border-red-200 px-3 py-1 rounded-full uppercase">
+            <span className="text-xs font-bold text-[#E63946] bg-red-50 border border-red-200 px-3 py-1 rounded-full uppercase">
               Recorrência NBR 17240 Ativa
             </span>
           </div>
@@ -75,12 +75,12 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ pedidosOS }) => {
                 <div
                   key={day}
                   className={`border rounded-lg p-2 min-h-[85px] flex flex-col justify-between font-data-mono text-xs transition-colors ${
-                    day === 24 ? 'bg-red-50/60 border-2 border-[#ba1a1a]' : 'bg-white border-slate-200 hover:bg-slate-50'
+                    day === 24 ? 'bg-red-50/60 border-2 border-[#E63946]' : 'bg-white border-slate-200 hover:bg-slate-50'
                   }`}
                 >
                   <div className="flex justify-between items-center">
-                    <span className={`font-bold ${day === 24 ? 'text-[#ba1a1a]' : 'text-slate-700'}`}>{day}</span>
-                    {day === 24 && <span className="text-[9px] bg-[#ba1a1a] text-white px-1.5 py-0.5 rounded font-bold">HOJE</span>}
+                    <span className={`font-bold ${day === 24 ? 'text-[#E63946]' : 'text-slate-700'}`}>{day}</span>
+                    {day === 24 && <span className="text-[9px] bg-[#E63946] text-white px-1.5 py-0.5 rounded font-bold">HOJE</span>}
                   </div>
                   {hasOS && (
                     <div className="bg-slate-900 text-white p-1.5 rounded text-[10px] truncate font-medium shadow-sm">
@@ -110,7 +110,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ pedidosOS }) => {
                   .filter((os) => os.status === status)
                   .map((os) => (
                     <div key={os.id} className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm hover:border-slate-300 transition-all">
-                      <span className="font-data-mono text-[10px] text-[#ba1a1a] font-bold">{os.id}</span>
+                      <span className="font-data-mono text-[10px] text-[#E63946] font-bold">{os.id}</span>
                       <h5 className="font-bold text-xs uppercase text-slate-900 mt-1">{os.clientName}</h5>
                       <p className="text-xs text-slate-500 mt-1">{os.title}</p>
                       <div className="mt-3 font-data-mono text-[10px] text-slate-400 border-t border-slate-100 pt-2 flex justify-between items-center">

@@ -56,7 +56,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="bg-[#ba1a1a] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
+          className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
         >
           <span className="material-symbols-outlined text-base">add</span> Novo Contrato
         </button>
@@ -76,7 +76,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
         </div>
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
           <p className="text-xs font-semibold text-slate-500 uppercase">Índice de Reajuste Anual</p>
-          <h2 className="font-data-mono text-3xl font-bold text-[#ba1a1a] mt-2">IPCA (+4.8%)</h2>
+          <h2 className="font-data-mono text-3xl font-bold text-[#E63946] mt-2">IPCA (+4.8%)</h2>
         </div>
       </div>
 
@@ -103,7 +103,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
               {contracts.map((ctr) => (
                 <tr key={ctr.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="p-4">
-                    <span className="font-data-mono font-bold text-[#ba1a1a]">{ctr.id}</span> <br />
+                    <span className="font-data-mono font-bold text-[#E63946]">{ctr.id}</span> <br />
                     <span className="font-bold text-slate-900 text-sm uppercase">{ctr.clientName}</span>
                     <p className="text-[11px] text-slate-500">{ctr.unit}</p>
                   </td>
@@ -172,7 +172,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                   required
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                   placeholder="Ex: Londrina Norte Shopping"
                 />
               </div>
@@ -183,12 +183,12 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                   required
                   value={monthlyVal}
                   onChange={(e) => setMonthlyVal(Number(e.target.value))}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                 />
               </div>
               <button
                 type="submit"
-                className="w-full bg-[#ba1a1a] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
+                className="w-full bg-[#E63946] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
               >
                 Salvar e Ativar Contrato
               </button>
@@ -205,7 +205,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
               ✕
             </button>
             <div className="border-b border-slate-200 pb-3 mb-4">
-              <span className="font-data-mono text-xs text-[#ba1a1a] font-bold">{selectedPdfContract.id}</span>
+              <span className="font-data-mono text-xs text-[#E63946] font-bold">{selectedPdfContract.id}</span>
               <h3 className="text-xl font-bold text-slate-900 uppercase">{selectedPdfContract.clientName}</h3>
               <p className="text-xs text-slate-500">Contrato de Manutenção de Sistemas SDAI &amp; Hidráulicos</p>
             </div>
@@ -225,7 +225,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                   window.print();
                   setSelectedPdfContract(null);
                 }}
-                className="bg-[#ba1a1a] hover:bg-[#a51515] text-white font-semibold px-5 py-2 rounded-lg text-xs uppercase"
+                className="bg-[#E63946] hover:bg-[#a51515] text-white font-semibold px-5 py-2 rounded-lg text-xs uppercase"
               >
                 Imprimir Documento
               </button>

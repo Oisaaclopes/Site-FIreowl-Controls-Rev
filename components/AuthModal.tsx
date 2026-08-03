@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { UserRole } from '@/lib/types';
+import { OfficialLogo } from '@/components/OfficialLogo';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -42,7 +43,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b1e38]/80 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1A1A72]/85 backdrop-blur-sm p-4">
       {/* Background blueprint grid */}
       <div className="absolute inset-0 pointer-events-none opacity-20 bg-blueprint-grid"></div>
 
@@ -56,8 +57,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         }}
       >
         {/* Corner Brackets */}
-        <div className="absolute -top-4 -left-4 w-8 h-8 border-t-2 border-l-2 border-[#ba1a1a]"></div>
-        <div className="absolute -bottom-4 -right-4 w-8 h-8 border-b-2 border-r-2 border-[#ba1a1a]"></div>
+        <div className="absolute -top-4 -left-4 w-8 h-8 border-t-2 border-l-2 border-[#E63946]"></div>
+        <div className="absolute -bottom-4 -right-4 w-8 h-8 border-b-2 border-r-2 border-[#E63946]"></div>
 
         <div className="bg-[#f8f9ff] p-8 shadow-2xl flex flex-col gap-6 border border-[#c5c6ce] relative">
           <button
@@ -68,16 +69,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             ✕
           </button>
 
-          {/* Logo Header */}
+          {/* Logo Header — logo oficial da Fireowl Controls */}
           <div className="flex flex-col items-center gap-3">
-            <div className="w-24 h-24 relative flex items-center justify-center bg-[#0b1e38] rounded-full p-2 border-2 border-[#ba1a1a]">
-              <span className="material-symbols-outlined text-[#ba1a1a] text-6xl">
-                local_fire_department
-              </span>
-            </div>
+            <OfficialLogo className="w-24 h-24" />
             <div className="text-center">
-              <h1 className="font-headline-lg text-2xl text-[#131c28] uppercase tracking-tight">
-                FIREOWL <span className="text-[#ba1a1a]">CONTROLS</span>
+              <h1 className="font-display-lg text-2xl text-[#1A1A72] uppercase tracking-tight">
+                FIREOWL <span className="text-[#E63946]">CONTROLS</span>
               </h1>
               <p className="font-data-mono text-[11px] text-[#75777e] tracking-widest uppercase mt-1">
                 Autenticação de Operador de Campo &amp; Gestão
@@ -94,7 +91,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   Identificação do Operador
                 </label>
                 <div className="relative flex items-center">
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#ba1a1a]"></div>
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#E63946]"></div>
                   <input
                     className="w-full bg-[#eff4ff] border border-[#c5c6ce] p-3 font-data-mono text-sm text-[#131c28] focus:outline-none focus:border-[#000410] transition-colors pl-4"
                     value={userId}
@@ -112,7 +109,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   Chave de Acesso
                 </label>
                 <div className="relative flex items-center">
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#ba1a1a]"></div>
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#E63946]"></div>
                   <input
                     className="w-full bg-[#eff4ff] border border-[#c5c6ce] p-3 font-data-mono text-sm text-[#131c28] focus:outline-none focus:border-[#000410] transition-colors pl-4"
                     value={password}
@@ -156,7 +153,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <div className="flex flex-col gap-3">
               <button
                 type="submit"
-                className="w-full bg-[#ba1a1a] hover:bg-[#a51515] text-white font-headline-md text-lg py-3 transition-all active:scale-[0.98] uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"
+                className="w-full bg-[#E63946] hover:bg-[#a51515] text-white font-headline-md text-lg py-3 transition-all active:scale-[0.98] uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"
               >
                 <span className="material-symbols-outlined text-xl">login</span>
                 ENTRAR

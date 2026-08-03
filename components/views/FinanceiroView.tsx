@@ -56,7 +56,7 @@ export const FinanceiroView: React.FC<FinanceiroViewProps> = ({ transactions }) 
         </div>
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
           <p className="text-xs font-semibold text-slate-500 uppercase">Despesas Totais</p>
-          <h2 className="font-data-mono text-3xl font-bold text-[#ba1a1a] mt-2">
+          <h2 className="font-data-mono text-3xl font-bold text-[#E63946] mt-2">
             R$ {despesasTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </h2>
         </div>

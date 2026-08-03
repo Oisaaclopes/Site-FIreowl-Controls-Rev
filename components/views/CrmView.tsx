@@ -82,7 +82,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
             search
           </span>
           <input
-            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20 focus:border-[#ba1a1a] transition-all placeholder:text-slate-400 uppercase"
+            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20 focus:border-[#E63946] transition-all placeholder:text-slate-400 uppercase"
             placeholder="Buscar por cliente, ID ou CNPJ..."
             type="text"
             value={searchTerm}
@@ -117,7 +117,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
 
         <button
           onClick={() => setShowAddClientModal(true)}
-          className="bg-[#ba1a1a] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
+          className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
         >
           <span className="material-symbols-outlined text-base">add</span> Novo Cliente
         </button>
@@ -136,8 +136,8 @@ export const CrmView: React.FC<CrmViewProps> = ({
 
             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
               <p className="text-xs font-semibold text-slate-500 uppercase">Inadimplência</p>
-              <h3 className="text-3xl font-bold text-[#ba1a1a] mt-1">4.2%</h3>
-              <p className="text-xs text-[#ba1a1a] mt-2 font-medium">Revisão contratual</p>
+              <h3 className="text-3xl font-bold text-[#E63946] mt-1">4.2%</h3>
+              <p className="text-xs text-[#E63946] mt-2 font-medium">Revisão contratual</p>
             </div>
 
             <div className="md:col-span-2 bg-[#0f172a] text-white p-5 rounded-xl shadow-md border border-slate-800 flex justify-between items-center">
@@ -224,7 +224,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
                                 onSelectClientForReport(client.name);
                               }
                             }}
-                            className="p-1.5 bg-[#ba1a1a] hover:bg-[#a51515] text-white rounded-lg transition-colors shadow-sm"
+                            className="p-1.5 bg-[#E63946] hover:bg-[#a51515] text-white rounded-lg transition-colors shadow-sm"
                             title="Abrir Relatório Técnico SDAI"
                           >
                             <span className="material-symbols-outlined text-base">description</span>
@@ -256,7 +256,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
               <div key={os.id} className="border border-slate-200 rounded-lg p-4 bg-slate-50/50 flex flex-col justify-between gap-3">
                 <div className="flex justify-between items-start">
                   <div>
-                    <span className="font-data-mono text-xs font-bold text-[#ba1a1a]">{os.id}</span>
+                    <span className="font-data-mono text-xs font-bold text-[#E63946]">{os.id}</span>
                     <h4 className="font-bold text-slate-900 text-sm uppercase">{os.title}</h4>
                     <p className="text-xs text-slate-500 mt-0.5">{os.clientName}</p>
                   </div>
@@ -302,14 +302,14 @@ export const CrmView: React.FC<CrmViewProps> = ({
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                 {inventory.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/80">
-                    <td className="py-3 px-4 font-data-mono font-bold text-[#ba1a1a]">
+                    <td className="py-3 px-4 font-data-mono font-bold text-[#E63946]">
                       {item.code} <br />
                       <span className="text-[10px] text-slate-400 font-normal">{item.serialBP}</span>
                     </td>
                     <td className="py-3 px-4 font-bold text-slate-900 uppercase">{item.name}</td>
                     <td className="py-3 px-4 text-slate-500">{item.category}</td>
                     <td className="py-3 px-4 text-center font-data-mono font-bold">
-                      <span className={item.quantity <= item.minQuantity ? 'text-[#ba1a1a]' : 'text-emerald-700'}>
+                      <span className={item.quantity <= item.minQuantity ? 'text-[#E63946]' : 'text-emerald-700'}>
                         {item.quantity} un
                       </span>
                     </td>
@@ -339,7 +339,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
                   <h4 className="font-bold uppercase text-slate-900 text-sm">{serv.title}</h4>
                   <p className="text-xs text-slate-500 mt-2 leading-relaxed">{serv.desc}</p>
                 </div>
-                <p className="font-data-mono text-sm font-bold text-[#ba1a1a] mt-4">{serv.price}</p>
+                <p className="font-data-mono text-sm font-bold text-[#E63946] mt-4">{serv.price}</p>
               </div>
             ))}
           </div>
@@ -365,7 +365,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
                   type="text"
                   value={newClientName}
                   onChange={(e) => setNewClientName(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                   placeholder="Ex: Londrina Norte Shopping"
                 />
               </div>
@@ -375,7 +375,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
                   type="text"
                   value={newClientCNPJ}
                   onChange={(e) => setNewClientCNPJ(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                   placeholder="00.000.000/0001-00"
                 />
               </div>
@@ -384,7 +384,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
                 <select
                   value={newClientSegment}
                   onChange={(e) => setNewClientSegment(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                 >
                   <option value="Shopping Center">Shopping Center</option>
                   <option value="Indústria">Indústria</option>
@@ -399,13 +399,13 @@ export const CrmView: React.FC<CrmViewProps> = ({
                   type="text"
                   value={newClientAddress}
                   onChange={(e) => setNewClientAddress(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                   placeholder="Londrina/PR"
                 />
               </div>
               <button
                 type="submit"
-                className="w-full bg-[#ba1a1a] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
+                className="w-full bg-[#E63946] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
               >
                 Cadastrar Cliente
               </button>
@@ -424,7 +424,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
             >
               ✕
             </button>
-            <span className="font-data-mono text-xs text-[#ba1a1a] font-bold">{selectedClientDetail.code}</span>
+            <span className="font-data-mono text-xs text-[#E63946] font-bold">{selectedClientDetail.code}</span>
             <h3 className="text-xl font-bold text-slate-900 uppercase mt-0.5">{selectedClientDetail.name}</h3>
             <p className="text-xs text-slate-500 mb-4">{selectedClientDetail.cnpj} | {selectedClientDetail.segment}</p>
 

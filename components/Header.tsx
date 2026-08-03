@@ -54,7 +54,7 @@ export const Header: React.FC<HeaderProps> = ({
         {onNewOSClick && (
           <button
             onClick={onNewOSClick}
-            className="hidden sm:flex items-center gap-1.5 bg-[#ba1a1a] hover:bg-[#a51515] text-white font-semibold text-xs px-4 py-2 rounded-md transition-colors shadow-sm uppercase tracking-wide"
+            className="hidden sm:flex items-center gap-1.5 bg-[#E63946] hover:bg-[#a51515] text-white font-semibold text-xs px-4 py-2 rounded-md transition-colors shadow-sm uppercase tracking-wide"
           >
             <span className="material-symbols-outlined text-base">add</span>
             Nova Ordem
@@ -69,18 +69,18 @@ export const Header: React.FC<HeaderProps> = ({
             title="Notificações do Sistema"
           >
             <span className="material-symbols-outlined">notifications</span>
-            <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-[#ba1a1a] rounded-full ring-2 ring-white"></div>
+            <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-[#E63946] rounded-full ring-2 ring-white"></div>
           </button>
 
           {showNotifications && (
             <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-lg shadow-xl z-50 p-4 text-xs">
               <div className="flex justify-between items-center border-b border-slate-200 pb-3 mb-3">
                 <span className="font-bold text-slate-800 uppercase text-xs">Notificações Críticas</span>
-                <span className="font-data-mono text-[10px] bg-red-100 text-[#ba1a1a] px-2 py-0.5 rounded-full font-bold">3 Alertas</span>
+                <span className="font-data-mono text-[10px] bg-red-100 text-[#E63946] px-2 py-0.5 rounded-full font-bold">3 Alertas</span>
               </div>
               <div className="space-y-2.5">
-                <div className="p-2.5 bg-red-50 border-l-4 border-[#ba1a1a] rounded-r-md">
-                  <p className="font-bold text-[#ba1a1a] uppercase text-[11px]">OS Atrasada - Condomínio Solar</p>
+                <div className="p-2.5 bg-red-50 border-l-4 border-[#E63946] rounded-r-md">
+                  <p className="font-bold text-[#E63946] uppercase text-[11px]">OS Atrasada - Condomínio Solar</p>
                   <p className="text-[11px] text-slate-600 mt-0.5">Aferição de baterias 24V pendente há 10 dias.</p>
                 </div>
                 <div className="p-2.5 bg-slate-50 border-l-4 border-slate-800 rounded-r-md">
@@ -110,7 +110,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
           <button
             onClick={onOpenAuthModal}
-            className="w-9 h-9 rounded-full bg-[#0f172a] flex items-center justify-center text-white hover:ring-2 hover:ring-[#ba1a1a] transition-all shadow-sm"
+            className="w-9 h-9 rounded-full bg-[#1A1A72] flex items-center justify-center text-white hover:ring-2 hover:ring-[#E63946] transition-all shadow-sm"
             title="Painel de Acesso do Operador"
           >
             <span className="material-symbols-outlined text-[20px]">person</span>

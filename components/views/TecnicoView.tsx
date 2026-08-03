@@ -62,7 +62,7 @@ export const TecnicoView: React.FC<TecnicoViewProps> = ({
           <div className="font-data-mono text-xs text-slate-500 flex gap-4 mt-1 font-medium">
             <span>REF: {currentReport.id}</span>
             <span>GPS: {currentReport.coordStr}</span>
-            <span className="text-[#ba1a1a] font-bold">STATUS: {currentReport.status}</span>
+            <span className="text-[#E63946] font-bold">STATUS: {currentReport.status}</span>
           </div>
         </div>
 
@@ -73,7 +73,7 @@ export const TecnicoView: React.FC<TecnicoViewProps> = ({
           </div>
           <div className="text-right border-l border-slate-200 pl-6">
             <p className="text-[10px] font-semibold text-slate-400 uppercase">Falhas Críticas</p>
-            <p className="text-3xl font-bold text-[#ba1a1a] mt-0.5">0{currentReport.criticalFailures}</p>
+            <p className="text-3xl font-bold text-[#E63946] mt-0.5">0{currentReport.criticalFailures}</p>
           </div>
         </div>
       </div>
@@ -94,7 +94,7 @@ export const TecnicoView: React.FC<TecnicoViewProps> = ({
                   Cliente / Unidade
                 </label>
                 <input
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-900 uppercase focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-900 uppercase focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                   type="text"
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
@@ -106,7 +106,7 @@ export const TecnicoView: React.FC<TecnicoViewProps> = ({
                   Código da Central de Alarme
                 </label>
                 <input
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-data-mono font-bold text-slate-900 uppercase focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-data-mono font-bold text-slate-900 uppercase focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                   type="text"
                   value={centralCode}
                   onChange={(e) => setCentralCode(e.target.value)}
@@ -118,7 +118,7 @@ export const TecnicoView: React.FC<TecnicoViewProps> = ({
                   Diagnóstico Técnico &amp; Ocorrência
                 </label>
                 <textarea
-                  className="w-full border border-slate-200 rounded-lg p-3 text-xs text-slate-800 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-200 rounded-lg p-3 text-xs text-slate-800 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                   rows={3}
                   value={occurrenceDesc}
                   onChange={(e) => setOccurrenceDesc(e.target.value)}
@@ -165,12 +165,12 @@ export const TecnicoView: React.FC<TecnicoViewProps> = ({
                   <div className="flex items-center gap-2.5">
                     <div
                       className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
-                        chk.status === 'FALHA' ? 'border-[#ba1a1a] bg-red-950' : 'border-emerald-500 bg-emerald-950'
+                        chk.status === 'FALHA' ? 'border-[#E63946] bg-red-950' : 'border-emerald-500 bg-emerald-950'
                       }`}
                     >
                       <div
                         className={`w-1.5 h-1.5 rounded-full ${
-                          chk.status === 'FALHA' ? 'bg-[#ba1a1a]' : 'bg-emerald-500'
+                          chk.status === 'FALHA' ? 'bg-[#E63946]' : 'bg-emerald-500'
                         }`}
                       ></div>
                     </div>
@@ -178,7 +178,7 @@ export const TecnicoView: React.FC<TecnicoViewProps> = ({
                   </div>
                   <span
                     className={`font-data-mono text-xs font-bold ${
-                      chk.status === 'FALHA' ? 'text-[#ba1a1a]' : 'text-emerald-400'
+                      chk.status === 'FALHA' ? 'text-[#E63946]' : 'text-emerald-400'
                     }`}
                   >
                     {chk.status}
@@ -219,7 +219,7 @@ export const TecnicoView: React.FC<TecnicoViewProps> = ({
         <div className="flex items-center gap-3">
           <button
             onClick={handleSaveReport}
-            className="bg-[#ba1a1a] hover:bg-[#a51515] text-white font-semibold px-5 py-2.5 rounded-lg text-xs uppercase tracking-wider transition-colors shadow-sm flex items-center gap-2"
+            className="bg-[#E63946] hover:bg-[#a51515] text-white font-semibold px-5 py-2.5 rounded-lg text-xs uppercase tracking-wider transition-colors shadow-sm flex items-center gap-2"
           >
             <span className="material-symbols-outlined text-base">save</span>
             Salvar Relatório
@@ -251,7 +251,7 @@ export const TecnicoView: React.FC<TecnicoViewProps> = ({
 
             <div className="border-b border-slate-200 pb-3 mb-4">
               <h2 className="text-xl font-bold text-slate-900 uppercase">Laudo Técnico de Inspeção SDAI</h2>
-              <p className="font-data-mono text-xs text-[#ba1a1a] font-bold mt-0.5">FIREOWL CONTROLS — REF: {currentReport.id}</p>
+              <p className="font-data-mono text-xs text-[#E63946] font-bold mt-0.5">FIREOWL CONTROLS — REF: {currentReport.id}</p>
             </div>
 
             <div className="space-y-4 text-xs font-medium text-slate-700">
@@ -288,7 +288,7 @@ export const TecnicoView: React.FC<TecnicoViewProps> = ({
                       window.print();
                       setShowPdfModal(false);
                     }}
-                    className="bg-[#ba1a1a] hover:bg-[#a51515] text-white font-semibold px-5 py-2 rounded-lg text-xs uppercase"
+                    className="bg-[#E63946] hover:bg-[#a51515] text-white font-semibold px-5 py-2 rounded-lg text-xs uppercase"
                   >
                     Imprimir Documento PDF
                   </button>

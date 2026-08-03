@@ -62,7 +62,7 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
 
         <button
           onClick={() => setShowModal(true)}
-          className="bg-[#ba1a1a] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
+          className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
         >
           <span className="material-symbols-outlined text-base">add</span> Homologar Fornecedor
         </button>
@@ -75,7 +75,7 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
             <div>
               <div className="flex justify-between items-start">
                 <div>
-                  <span className="font-data-mono text-xs font-bold text-[#ba1a1a]">{s.code}</span>
+                  <span className="font-data-mono text-xs font-bold text-[#E63946]">{s.code}</span>
                   <h3 className="text-lg font-bold text-slate-900 uppercase mt-0.5">{s.name}</h3>
                   <p className="text-xs text-slate-500 font-data-mono">CNPJ: {s.cnpj}</p>
                 </div>
@@ -108,7 +108,7 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
               <div>
                 <strong className="text-slate-900 uppercase">Contato:</strong> {s.contactName} ({s.phone})
               </div>
-              <a href={`mailto:${s.email}`} className="text-[#ba1a1a] font-semibold hover:underline">
+              <a href={`mailto:${s.email}`} className="text-[#E63946] font-semibold hover:underline">
                 {s.email}
               </a>
             </div>
@@ -135,7 +135,7 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                 />
               </div>
 
@@ -147,7 +147,7 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
                     required
                     value={cnpj}
                     onChange={(e) => setCNPJ(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                   />
                 </div>
                 <div>
@@ -157,7 +157,7 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
                     required
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                   />
                 </div>
               </div>
@@ -170,7 +170,7 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
                     required
                     value={contactName}
                     onChange={(e) => setContactName(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                   />
                 </div>
                 <div>
@@ -180,7 +180,7 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
                     required
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                   />
                 </div>
               </div>
@@ -192,7 +192,7 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                 />
               </div>
 
@@ -204,7 +204,7 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
                     required
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                   />
                 </div>
                 <div>
@@ -214,14 +214,14 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
                     required
                     value={leadTimeDays}
                     onChange={(e) => setLeadTimeDays(Number(e.target.value))}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                   />
                 </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-[#ba1a1a] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
+                className="w-full bg-[#E63946] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
               >
                 Cadastrar e Homologar Fornecedor
               </button>

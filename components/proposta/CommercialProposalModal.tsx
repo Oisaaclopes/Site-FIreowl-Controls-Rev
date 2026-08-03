@@ -408,7 +408,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         {/* Header */}
         <div className="bg-[#0B1E38] text-white p-5 px-6 flex justify-between items-center shrink-0 border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#ba1a1a] text-white rounded-xl flex items-center justify-center font-bold">
+            <div className="w-10 h-10 bg-[#E63946] text-white rounded-xl flex items-center justify-center font-bold">
               <FileText className="w-5 h-5" />
             </div>
             <div>
@@ -528,7 +528,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                     value={referencia}
                     onChange={(e) => setReferencia(e.target.value)}
                     placeholder="Ex.: Retrofit SDAI Bloco A"
-                    className="w-full border border-slate-300 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                    className="w-full border border-slate-300 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                   />
                 </div>
 
@@ -539,7 +539,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                   <select
                     value={clienteId}
                     onChange={(e) => setClienteId(e.target.value)}
-                    className="w-full border border-slate-300 rounded-lg p-2.5 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                    className="w-full border border-slate-300 rounded-lg p-2.5 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                   >
                     {clients.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -589,14 +589,14 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               {/* Objetivo da Proposta */}
               <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-2">
                 <h3 className="font-bold text-[#0B1E38] uppercase text-sm flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-[#ba1a1a]" /> Objetivo da Proposta
+                  <FileText className="w-4 h-4 text-[#E63946]" /> Objetivo da Proposta
                 </h3>
                 <textarea
                   rows={3}
                   value={objetivo}
                   onChange={(e) => setObjetivo(e.target.value)}
                   placeholder="Descreva o objetivo geral da proposta comercial..."
-                  className="w-full border border-slate-300 rounded-lg p-3 text-slate-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                  className="w-full border border-slate-300 rounded-lg p-3 text-slate-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                 />
               </div>
 
@@ -623,7 +623,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                         type="text"
                         value={norm}
                         onChange={(e) => handleUpdateListString(setDiretrizes, idx, e.target.value)}
-                        className="flex-1 border border-slate-300 rounded-lg p-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                        className="flex-1 border border-slate-300 rounded-lg p-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                       />
                       <button
                         type="button"
@@ -652,7 +652,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                     rows={5}
                     value={escopoServico}
                     onChange={(e) => setEscopoServico(e.target.value)}
-                    className="w-full border border-slate-300 rounded-lg p-3 text-slate-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#ba1a1a]/20"
+                    className="w-full border border-slate-300 rounded-lg p-3 text-slate-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                   />
                 </div>
 
@@ -697,7 +697,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                 <div className="flex flex-wrap justify-between items-center gap-2 border-b border-slate-200 pb-3">
                   <div>
                     <h3 className="font-bold text-[#0B1E38] uppercase text-sm flex items-center gap-2">
-                      <Wrench className="w-4 h-4 text-[#ba1a1a]" /> Especificação de Equipamentos e Materiais
+                      <Wrench className="w-4 h-4 text-[#E63946]" /> Especificação de Equipamentos e Materiais
                     </h3>
                     <p className="text-[11px] text-slate-500">
                       Você pode digitar manualmente ou vincular itens cadastrados no Almoxarifado / Estoque.
@@ -707,7 +707,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                   <button
                     type="button"
                     onClick={handleAddEquipment}
-                    className="px-3.5 py-2 bg-[#ba1a1a] hover:bg-[#a51515] text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 uppercase shadow-sm"
+                    className="px-3.5 py-2 bg-[#E63946] hover:bg-[#a51515] text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 uppercase shadow-sm"
                   >
                     <Plus className="w-4 h-4" /> Adicionar Item de Equipamento
                   </button>
@@ -733,7 +733,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                         const subtotal = (item.precoUnitario || 0) * item.quantidade;
                         return (
                           <tr key={idx} className="hover:bg-slate-50">
-                            <td className="p-2.5 text-center font-bold font-data-mono text-[#ba1a1a]">
+                            <td className="p-2.5 text-center font-bold font-data-mono text-[#E63946]">
                               {idx + 1}
                             </td>
                             <td className="p-2.5">
@@ -829,7 +829,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-4">
                 <div>
                   <h3 className="font-bold text-[#0B1E38] uppercase text-sm flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-[#ba1a1a]" /> Biblioteca de Marcas e Fabricantes Homologados
+                    <Layers className="w-4 h-4 text-[#E63946]" /> Biblioteca de Marcas e Fabricantes Homologados
                   </h3>
                   <p className="text-[11px] text-slate-500 mt-0.5">
                     Selecione quais marcas da biblioteca corporativa aparecem na Proposta Comercial.
@@ -1216,7 +1216,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             <button
               type="button"
               onClick={() => handleSaveWithValidation('enviado_ao_cliente')}
-              className="px-5 py-2.5 bg-[#ba1a1a] hover:bg-[#a51515] text-white font-bold rounded-xl text-xs transition-colors uppercase tracking-wide shadow-md flex items-center gap-1.5"
+              className="px-5 py-2.5 bg-[#E63946] hover:bg-[#a51515] text-white font-bold rounded-xl text-xs transition-colors uppercase tracking-wide shadow-md flex items-center gap-1.5"
             >
               <CheckCircle className="w-4 h-4" /> Salvar &amp; Emitir Proposta
             </button>
