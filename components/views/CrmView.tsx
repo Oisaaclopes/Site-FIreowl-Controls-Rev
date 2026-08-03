@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Client, PedidoOS, InventoryItem } from '@/lib/types';
+import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
 
 interface CrmViewProps {
   clients: Client[];
@@ -128,120 +129,104 @@ export const CrmView: React.FC<CrmViewProps> = ({
         <div className="flex flex-col gap-6">
           {/* Bento Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+            <div className="bg-white p-6 rounded-xl shadow-sm">
               <p className="text-xs font-semibold text-slate-500 uppercase">Total Ativos</p>
-              <h3 className="text-3xl font-bold text-slate-900 mt-1">{clients.length}</h3>
+              <h3 className="text-3xl font-bold text-slate-900 mt-2">{clients.length}</h3>
               <p className="text-xs text-emerald-600 mt-2 font-medium">100% monitorados</p>
             </div>
 
-            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+            <div className="bg-white p-6 rounded-xl shadow-sm">
               <p className="text-xs font-semibold text-slate-500 uppercase">Inadimplência</p>
-              <h3 className="text-3xl font-bold text-[#E63946] mt-1">4.2%</h3>
+              <h3 className="text-3xl font-bold text-[#E63946] mt-2">4.2%</h3>
               <p className="text-xs text-[#E63946] mt-2 font-medium">Revisão contratual</p>
             </div>
 
-            <div className="md:col-span-2 bg-[#0f172a] text-white p-5 rounded-xl shadow-md border border-slate-800 flex justify-between items-center">
+            <div className="md:col-span-2 bg-white p-6 rounded-xl shadow-sm flex justify-between items-center gap-4">
               <div>
-                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800/50 px-2.5 py-1 rounded-full uppercase">
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full uppercase">
                   Capacidade de Atendimento
                 </span>
-                <h3 className="text-base font-bold mt-2">Unidade Londrina &amp; Região</h3>
-                <p className="text-xs text-slate-400 mt-1">Saturação operacional atual: 92%</p>
+                <h3 className="text-base font-bold text-slate-900 mt-2">Unidade Londrina &amp; Região</h3>
+                <p className="text-xs text-slate-500 mt-1">Saturação operacional atual: 92%</p>
               </div>
               <button
                 onClick={() => alert('Relatório técnico de saturação operacional exportado.')}
-                className="bg-white hover:bg-slate-100 text-slate-900 font-semibold text-xs px-4 py-2 rounded-lg transition-colors"
+                className="shrink-0 border border-[#1A1A72] text-[#1A1A72] hover:bg-[#1A1A72] hover:text-white font-semibold text-xs px-4 py-2 rounded-lg transition-colors"
               >
                 Exportar Laudo
               </button>
             </div>
           </div>
 
-          {/* Table */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-200">
-                    <th className="py-3.5 px-6">Código ID</th>
-                    <th className="py-3.5 px-6">Cliente / Razão Social</th>
-                    <th className="py-3.5 px-6 text-center">Status Contratual</th>
-                    <th className="py-3.5 px-6">Última OS</th>
-                    <th className="py-3.5 px-6 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                  {filteredClients.map((client) => (
-                    <tr
-                      key={client.id}
-                      className="hover:bg-slate-50/80 transition-colors cursor-pointer"
-                      onClick={() => setSelectedClientDetail(client)}
-                    >
-                      <td className="py-4 px-6 font-data-mono font-bold text-slate-500">
-                        {client.code}
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex flex-col">
-                          <span className="font-bold text-slate-900 uppercase">
-                            {client.name}
-                          </span>
-                          <span className="text-[11px] text-slate-500">
-                            CNPJ: {client.cnpj} | {client.segment}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6 text-center">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                            client.contractStatus === 'EM DIA'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : client.contractStatus === 'PENDENTE'
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}
-                        >
-                          {client.contractStatus}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6 font-data-mono">
-                        <div className="flex flex-col">
-                          <span className="text-slate-900 font-bold">{client.lastOSDate}</span>
-                          <span className="text-[10px] text-slate-500 uppercase">{client.lastOSType}</span>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex justify-end gap-2">
-                          <button
+          {/* Lista de clientes (DataListRow) */}
+          {filteredClients.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-sm py-16 text-center text-slate-400">
+              <span className="material-symbols-outlined text-4xl text-slate-300">domain_disabled</span>
+              <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">
+                {searchTerm ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'}
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                {searchTerm ? 'Ajuste os termos da busca.' : 'Clique em "Novo Cliente" para começar.'}
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {filteredClients.map((client) => {
+                const statusColor =
+                  client.contractStatus === 'EM DIA'
+                    ? 'emerald'
+                    : client.contractStatus === 'PENDENTE'
+                    ? 'amber'
+                    : 'red';
+                return (
+                  <DataListRow
+                    key={client.id}
+                    onClick={() => setSelectedClientDetail(client)}
+                    leading={
+                      <span className="w-10 h-10 rounded-lg bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined text-lg">domain</span>
+                      </span>
+                    }
+                    title={<span className="uppercase">{client.name}</span>}
+                    meta={
+                      <>
+                        <RowMeta label="CNPJ" value={<span className="font-data-mono">{client.cnpj}</span>} />
+                        <RowMeta label="Código" value={<span className="font-data-mono">{client.code}</span>} />
+                        <RowMeta label="Segmento" value={client.segment} />
+                      </>
+                    }
+                    center={
+                      <div className="text-left md:text-center">
+                        <p className="text-[10px] text-slate-400 uppercase tracking-wider">Última OS</p>
+                        <p className="font-data-mono text-slate-900 font-bold">{client.lastOSDate}</p>
+                        <p className="text-[10px] text-slate-500 uppercase">{client.lastOSType}</p>
+                      </div>
+                    }
+                    right={
+                      <>
+                        <Badge color={statusColor}>{client.contractStatus}</Badge>
+                        <div className="flex items-center gap-1">
+                          <RowAction
+                            icon="visibility"
+                            label="Ver detalhes do cliente"
                             onClick={() => setSelectedClientDetail(client)}
-                            className="p-1.5 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors text-slate-700"
-                            title="Ver Detalhes do Cliente"
-                          >
-                            <span className="material-symbols-outlined text-base">visibility</span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (onSelectClientForReport) {
-                                onSelectClientForReport(client.name);
-                              }
-                            }}
-                            className="p-1.5 bg-[#E63946] hover:bg-[#a51515] text-white rounded-lg transition-colors shadow-sm"
-                            title="Abrir Relatório Técnico SDAI"
-                          >
-                            <span className="material-symbols-outlined text-base">description</span>
-                          </button>
+                          />
+                          <RowAction
+                            icon="description"
+                            label="Abrir relatório técnico SDAI"
+                            onClick={() => onSelectClientForReport?.(client.name)}
+                          />
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </>
+                    }
+                  />
+                );
+              })}
+              <p className="text-xs text-slate-500 px-1 pt-1">
+                Mostrando {filteredClients.length} de {clients.length} clientes cadastrados
+              </p>
             </div>
-
-            <div className="bg-slate-50 px-6 py-3 flex items-center justify-between border-t border-slate-200 text-xs text-slate-500">
-              <span>Mostrando {filteredClients.length} de {clients.length} clientes cadastrados</span>
-              <span className="font-data-mono">FOWL_CRM_V2.1</span>
-            </div>
-          </div>
+          )}
         </div>
       )}
 
