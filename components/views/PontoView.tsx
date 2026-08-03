@@ -2,11 +2,17 @@
 
 import React, { useState } from 'react';
 import { TimePunch } from '@/lib/types';
+import { DataListRow, Badge } from '@/components/DataListRow';
 
 interface PontoViewProps {
   punches: TimePunch[];
   onAddPunch: (punch: TimePunch) => void;
 }
+
+const typeBadge = (type: TimePunch['type']) =>
+  type === 'ENTRADA' ? 'emerald' : type === 'PAUSA' ? 'amber' : type === 'SAIDA' ? 'red' : 'blue';
+const statusBadgeColor = (status: TimePunch['status']) =>
+  status === 'APROVADO' ? 'emerald' : status === 'PENDENTE' ? 'amber' : 'blue';
 
 export const PontoView: React.FC<PontoViewProps> = ({ punches, onAddPunch }) => {
   const [punchType, setPunchType] = useState<'ENTRADA' | 'PAUSA' | 'RETORNO' | 'SAIDA'>('ENTRADA');
@@ -88,44 +94,50 @@ export const PontoView: React.FC<PontoViewProps> = ({ punches, onAddPunch }) => 
         </button>
       </div>
 
-      {/* Clock-in Terminal Card */}
-      <div className="bg-[#0f172a] text-white p-6 rounded-xl border border-slate-800 shadow-xl relative overflow-hidden">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 relative z-10">
+      {/* Clock-in Terminal Card (dashboard claro) */}
+      <div className="bg-white p-6 rounded-xl shadow-sm">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
           <div>
-            <span className="text-[10px] font-bold text-[#E63946] bg-red-950/60 border border-red-800/50 px-2.5 py-1 rounded-full uppercase tracking-wider">
-              Terminal de Batida com GPS Verificado
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full uppercase tracking-wider">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Terminal de Batida com GPS Verificado
             </span>
-            <h2 className="text-xl font-bold uppercase mt-3">Registrar Ponto do Técnico Operacional</h2>
-            <p className="text-xs text-slate-300 mt-1">
+            <h2 className="text-lg font-bold text-slate-900 uppercase mt-3">Registrar Ponto do Técnico Operacional</h2>
+            <p className="text-xs text-slate-500 mt-1">
               Registro instantâneo de entrada, pausas de refeição e saída das equipes externas.
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
-            <select
-              value={techName}
-              onChange={(e) => setTechName(e.target.value)}
-              className="bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-xs font-medium text-white focus:outline-none w-full sm:w-auto"
-            >
-              <option value="Eng. Ricardo M.">Eng. Ricardo M. (CREA 4289)</option>
-              <option value="Carlos Silva">Carlos Silva (Técnico Senior)</option>
-              <option value="Amanda Souza">Amanda Souza (Técnica Operacional)</option>
-            </select>
+          <div className="flex flex-col sm:flex-row items-stretch gap-3 w-full lg:w-auto">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-semibold uppercase text-slate-400">Técnico</label>
+              <select
+                value={techName}
+                onChange={(e) => setTechName(e.target.value)}
+                className="bg-white border border-slate-200 p-2.5 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20 w-full sm:w-56"
+              >
+                <option value="Eng. Ricardo M.">Eng. Ricardo M. (CREA 4289)</option>
+                <option value="Carlos Silva">Carlos Silva (Técnico Senior)</option>
+                <option value="Amanda Souza">Amanda Souza (Técnica Operacional)</option>
+              </select>
+            </div>
 
-            <select
-              value={punchType}
-              onChange={(e) => setPunchType(e.target.value as any)}
-              className="bg-slate-900 border border-slate-700 p-2.5 rounded-lg text-xs font-medium text-white focus:outline-none w-full sm:w-auto"
-            >
-              <option value="ENTRADA">ENTRADA</option>
-              <option value="PAUSA">PAUSA REFEIÇÃO</option>
-              <option value="RETORNO">RETORNO PAUSA</option>
-              <option value="SAIDA">SAÍDA</option>
-            </select>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-semibold uppercase text-slate-400">Tipo de batida</label>
+              <select
+                value={punchType}
+                onChange={(e) => setPunchType(e.target.value as any)}
+                className="bg-white border border-slate-200 p-2.5 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20 w-full sm:w-44"
+              >
+                <option value="ENTRADA">ENTRADA</option>
+                <option value="PAUSA">PAUSA REFEIÇÃO</option>
+                <option value="RETORNO">RETORNO PAUSA</option>
+                <option value="SAIDA">SAÍDA</option>
+              </select>
+            </div>
 
             <button
               onClick={handleBaterPonto}
-              className="w-full sm:w-auto bg-[#E63946] hover:bg-[#a51515] text-white font-semibold text-xs px-6 py-2.5 rounded-lg uppercase tracking-wider transition-colors shadow-md flex items-center justify-center gap-2"
+              className="w-full sm:w-auto bg-[#1A1A72] hover:bg-[#12124f] text-white font-semibold text-xs px-6 py-2.5 rounded-lg uppercase tracking-wider transition-colors shadow-sm flex items-center justify-center gap-2 self-end"
             >
               <span className="material-symbols-outlined text-lg">touch_app</span>
               Bater Ponto Agora
@@ -134,43 +146,51 @@ export const PontoView: React.FC<PontoViewProps> = ({ punches, onAddPunch }) => 
         </div>
       </div>
 
-      {/* Punch Logs Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-slate-900 px-6 py-4 text-white text-xs font-bold uppercase tracking-wider">
+      {/* Lista de Frequência (DataListRow) */}
+      <div>
+        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
           Registros Recentes de Frequência
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-200">
-                <th className="p-4">Funcionário</th>
-                <th className="p-4">Data &amp; Hora Servidor</th>
-                <th className="p-4">Tipo de Batida</th>
-                <th className="p-4">Coordenadas GPS</th>
-                <th className="p-4 text-center">Status MTP 671</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-              {punches.map((p) => (
-                <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="p-4 font-bold text-slate-900">{p.employeeName}</td>
-                  <td className="p-4 font-data-mono text-[#E63946] font-bold">{p.timestamp}</td>
-                  <td className="p-4">
-                    <span className="bg-slate-900 text-white px-2.5 py-0.5 rounded text-[10px] font-bold">
-                      {p.type}
-                    </span>
-                  </td>
-                  <td className="p-4 font-data-mono text-slate-500">{p.locationStr}</td>
-                  <td className="p-4 text-center">
-                    <span className="bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase">
-                      {p.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        </h3>
+        {punches.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm py-16 text-center text-slate-400">
+            <span className="material-symbols-outlined text-4xl text-slate-300">schedule</span>
+            <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">Nenhuma batida registrada</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {punches.map((p) => (
+              <DataListRow
+                key={p.id}
+                leading={
+                  <span className="w-10 h-10 rounded-full bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-lg">person</span>
+                  </span>
+                }
+                title={p.employeeName}
+                meta={
+                  <span className="flex items-center gap-1">
+                    <span className="material-symbols-outlined text-sm text-slate-400">location_on</span>
+                    <span className="font-data-mono">{p.locationStr}</span>
+                  </span>
+                }
+                center={
+                  <div className="text-left md:text-center">
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wider">Data &amp; hora</p>
+                    <p className="font-data-mono text-slate-700 font-semibold">{p.timestamp}</p>
+                  </div>
+                }
+                right={
+                  <>
+                    <Badge color={typeBadge(p.type)}>{p.type}</Badge>
+                    <Badge color={statusBadgeColor(p.status)} outline>
+                      MTP 671: {p.status}
+                    </Badge>
+                  </>
+                }
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Modal Espelho de Ponto */}

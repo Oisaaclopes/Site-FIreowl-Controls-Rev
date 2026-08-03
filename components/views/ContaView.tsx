@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import { SystemAuditLog, UserRole, CompanyProfile, PartnerBrand } from '@/lib/types';
-import { Building2, Layers, Plus, Trash2, Save, ShieldCheck } from 'lucide-react';
+import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
+import { Toggle } from '@/components/SidePanel';
 
 interface ContaViewProps {
   logs: SystemAuditLog[];
@@ -15,6 +16,16 @@ interface ContaViewProps {
   onDeletePartnerBrand: (id: string) => void;
 }
 
+const inputCls =
+  'w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20 focus:border-[#1A1A72]/40';
+const labelCls = 'block text-slate-600 mb-1 font-semibold uppercase text-[11px]';
+
+const SettingIcon: React.FC<{ icon: string }> = ({ icon }) => (
+  <span className="w-10 h-10 rounded-lg bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0">
+    <span className="material-symbols-outlined text-lg">{icon}</span>
+  </span>
+);
+
 export const ContaView: React.FC<ContaViewProps> = ({
   logs,
   userRole,
@@ -25,13 +36,26 @@ export const ContaView: React.FC<ContaViewProps> = ({
   onAddPartnerBrand,
   onDeletePartnerBrand,
 }) => {
-  // Local state for editing Company Profile
+  const [tab, setTab] = useState<'conta' | 'preferencias' | 'pdf'>('conta');
+
   const [profile, setProfile] = useState<CompanyProfile>(companyProfile);
 
-  // Local state for adding new partner brand
   const [newBrandName, setNewBrandName] = useState('');
   const [newBrandCategory, setNewBrandCategory] = useState('');
   const [newBrandLogo, setNewBrandLogo] = useState('');
+
+  // Preferências (estado de UI — front-end)
+  const [prefs, setPrefs] = useState({
+    criticalStock: true,
+    confirmDelete: true,
+    compactMode: false,
+  });
+  const [pdfPrefs, setPdfPrefs] = useState({
+    configBeforeGenerate: true,
+    detailedSubtotal: true,
+    showLogo: true,
+    showBankData: false,
+  });
 
   const handleSaveCompanyProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,247 +77,326 @@ export const ContaView: React.FC<ContaViewProps> = ({
     setNewBrandLogo('');
   };
 
+  const TABS = [
+    { key: 'conta', label: 'Conta', icon: 'account_circle' },
+    { key: 'preferencias', label: 'Preferências', icon: 'tune' },
+    { key: 'pdf', label: 'PDF', icon: 'picture_as_pdf' },
+  ] as const;
+
   return (
     <div className="flex flex-col w-full p-8 gap-6">
       {/* Header */}
-      <div className="flex justify-between items-center border-b border-slate-200 pb-5">
-        <div>
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            Configurações da Empresa &amp; Rastreabilidade Integrada
-          </span>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">
-            Conta, Dados da Empresa, Marcas Parceiras &amp; Auditoria
-          </h1>
+      <div className="border-b border-slate-200 pb-5">
+        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+          Configurações da Empresa &amp; Rastreabilidade Integrada
+        </span>
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">Configurações</h1>
+      </div>
+
+      {/* Tabs centralizadas */}
+      <div className="flex justify-center">
+        <div className="inline-flex bg-slate-100 rounded-lg p-1">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wide transition-colors ${
+                tab === t.key ? 'bg-white text-[#1A1A72] shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <span className="material-symbols-outlined text-base">{t.icon}</span>
+              {t.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Section 7: Company Profile Settings */}
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-          <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-[#E63946]" /> Dados Cadastrais da Empresa (Capa e Propostas)
-            </h3>
-          </div>
-
-          <form onSubmit={handleSaveCompanyProfile} className="space-y-3 text-xs font-medium">
-            <div>
-              <label className="block text-slate-600 font-bold uppercase mb-1">Razão Social</label>
-              <input
-                type="text"
-                required
-                value={profile.razaoSocial}
-                onChange={(e) => setProfile({ ...profile, razaoSocial: e.target.value })}
-                className="w-full border border-slate-300 rounded-lg p-2.5 text-slate-900 font-bold"
-              />
+      {/* ===== TAB: CONTA ===== */}
+      {tab === 'conta' && (
+        <div className="flex flex-col gap-6">
+          {/* Card: Dados da empresa */}
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <SettingIcon icon="apartment" />
+              <div>
+                <h3 className="font-display text-sm font-bold uppercase tracking-wide text-[#1A1A72]">
+                  Dados cadastrais da empresa
+                </h3>
+                <p className="text-[11px] text-slate-400">Usados na capa e nas propostas comerciais.</p>
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <form onSubmit={handleSaveCompanyProfile} className="space-y-3 text-xs font-medium">
               <div>
-                <label className="block text-slate-600 font-bold uppercase mb-1">CNPJ</label>
+                <label className={labelCls}>Razão social</label>
                 <input
                   type="text"
                   required
-                  value={profile.cnpj}
-                  onChange={(e) => setProfile({ ...profile, cnpj: e.target.value })}
-                  className="w-full border border-slate-300 rounded-lg p-2.5 font-data-mono text-slate-900"
+                  value={profile.razaoSocial}
+                  onChange={(e) => setProfile({ ...profile, razaoSocial: e.target.value })}
+                  className={`${inputCls} font-bold`}
                 />
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>CNPJ</label>
+                  <input
+                    type="text"
+                    required
+                    value={profile.cnpj}
+                    onChange={(e) => setProfile({ ...profile, cnpj: e.target.value })}
+                    className={`${inputCls} font-data-mono`}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Regime tributário</label>
+                  <input
+                    type="text"
+                    value={profile.regimeTributario}
+                    onChange={(e) => setProfile({ ...profile, regimeTributario: e.target.value })}
+                    className={inputCls}
+                  />
+                </div>
+              </div>
               <div>
-                <label className="block text-slate-600 font-bold uppercase mb-1">Regime Tributário</label>
+                <label className={labelCls}>Endereço completo</label>
                 <input
                   type="text"
-                  value={profile.regimeTributario}
-                  onChange={(e) => setProfile({ ...profile, regimeTributario: e.target.value })}
-                  className="w-full border border-slate-300 rounded-lg p-2.5 text-slate-900"
+                  value={profile.endereco}
+                  onChange={(e) => setProfile({ ...profile, endereco: e.target.value })}
+                  className={inputCls}
                 />
               </div>
-            </div>
-
-            <div>
-              <label className="block text-slate-600 font-bold uppercase mb-1">Endereço Completo</label>
-              <input
-                type="text"
-                value={profile.endereco}
-                onChange={(e) => setProfile({ ...profile, endereco: e.target.value })}
-                className="w-full border border-slate-300 rounded-lg p-2.5 text-slate-900"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Telefone</label>
+                  <input
+                    type="text"
+                    value={profile.telefone}
+                    onChange={(e) => setProfile({ ...profile, telefone: e.target.value })}
+                    className={`${inputCls} font-data-mono`}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>E-mail comercial</label>
+                  <input
+                    type="email"
+                    value={profile.email}
+                    onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                    className={inputCls}
+                  />
+                </div>
+              </div>
               <div>
-                <label className="block text-slate-600 font-bold uppercase mb-1">Telefone de Contato</label>
+                <label className={labelCls}>URL do logotipo (opcional)</label>
                 <input
                   type="text"
-                  value={profile.telefone}
-                  onChange={(e) => setProfile({ ...profile, telefone: e.target.value })}
-                  className="w-full border border-slate-300 rounded-lg p-2.5 font-data-mono text-slate-900"
+                  placeholder="https://..."
+                  value={profile.logoUrl || ''}
+                  onChange={(e) => setProfile({ ...profile, logoUrl: e.target.value })}
+                  className={inputCls}
                 />
               </div>
-              <div>
-                <label className="block text-slate-600 font-bold uppercase mb-1">E-mail Comercial</label>
-                <input
-                  type="email"
-                  value={profile.email}
-                  onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                  className="w-full border border-slate-300 rounded-lg p-2.5 text-slate-900"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-slate-600 font-bold uppercase mb-1">URL / Logo da Empresa (Opcional)</label>
-              <input
-                type="text"
-                placeholder="https://..."
-                value={profile.logoUrl || ''}
-                onChange={(e) => setProfile({ ...profile, logoUrl: e.target.value })}
-                className="w-full border border-slate-300 rounded-lg p-2.5 text-slate-900"
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="w-full bg-[#0B1E38] hover:bg-slate-800 text-white font-bold py-2.5 rounded-lg uppercase tracking-wider text-xs transition-colors shadow-sm flex items-center justify-center gap-1.5"
-            >
-              <Save className="w-4 h-4 text-[#F2A900]" /> Salvar Dados da Empresa
-            </button>
-          </form>
-        </div>
-
-        {/* Section 6: Global Partner Brands Library */}
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-          <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <Layers className="w-4 h-4 text-[#E63946]" /> Biblioteca Global de Marcas Parceiras
-            </h3>
-          </div>
-
-          <p className="text-xs text-slate-500">
-            Cadastre fabricantes homologados para disponibilizar no seletor de Propostas Comerciais.
-          </p>
-
-          <form onSubmit={handleCreateBrand} className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2 text-xs">
-            <span className="font-bold text-slate-800 uppercase block text-[11px]">Nova Marca Parceira</span>
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                type="text"
-                required
-                placeholder="Nome (ex.: Edwards EST3X)"
-                value={newBrandName}
-                onChange={(e) => setNewBrandName(e.target.value)}
-                className="border border-slate-300 rounded-lg p-2 bg-white text-slate-900"
-              />
-              <input
-                type="text"
-                placeholder="Categoria (ex.: Centrais & Alarme)"
-                value={newBrandCategory}
-                onChange={(e) => setNewBrandCategory(e.target.value)}
-                className="border border-slate-300 rounded-lg p-2 bg-white text-slate-900"
-              />
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="URL do Logotipo (Opcional)"
-                value={newBrandLogo}
-                onChange={(e) => setNewBrandLogo(e.target.value)}
-                className="flex-1 border border-slate-300 rounded-lg p-2 bg-white text-slate-900"
-              />
               <button
                 type="submit"
-                className="px-4 py-2 bg-[#E63946] hover:bg-[#a51515] text-white font-bold rounded-lg uppercase text-xs flex items-center gap-1"
+                className="bg-[#1A1A72] hover:bg-[#12124f] text-white font-semibold py-2.5 px-5 rounded-lg uppercase tracking-wider text-xs transition-colors shadow-sm flex items-center gap-1.5"
               >
-                <Plus className="w-4 h-4" /> Cadastrar
+                <span className="material-symbols-outlined text-base">save</span> Salvar dados da empresa
               </button>
-            </div>
-          </form>
+            </form>
+          </div>
 
-          {/* List of Partner Brands */}
-          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-            {partnerBrands.map((pb) => (
-              <div
-                key={pb.id}
-                className="p-3 bg-white border border-slate-200 rounded-lg flex items-center justify-between shadow-2xs"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-[#0B1E38] text-[#F2A900] font-bold rounded flex items-center justify-center text-xs">
-                    {pb.name.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <h5 className="font-bold text-slate-900 text-xs">{pb.name}</h5>
-                    <p className="text-[10px] text-slate-500 uppercase">{pb.category}</p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => onDeletePartnerBrand(pb.id)}
-                  className="p-1.5 text-slate-400 hover:text-red-600 rounded"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+          {/* Card: Permissões (RBAC) */}
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <SettingIcon icon="admin_panel_settings" />
+              <div>
+                <h3 className="font-display text-sm font-bold uppercase tracking-wide text-[#1A1A72]">
+                  Matriz de permissões (RBAC)
+                </h3>
+                <p className="text-[11px] text-slate-400">Perfil ativo que define o nível de acesso da interface.</p>
               </div>
-            ))}
+            </div>
+            <select
+              value={userRole}
+              onChange={(e) => onSelectRole(e.target.value as UserRole)}
+              className={`${inputCls} font-semibold`}
+            >
+              <option value="ADMINISTRATIVO">ADMINISTRATIVO — Acesso irrestrito aos módulos</option>
+              <option value="TECNICO">TÉCNICO DE CAMPO — Execução de OS, ponto &amp; relatórios</option>
+              <option value="GESTOR">GESTOR DE CONTRATO — Aprovação &amp; escala da equipe</option>
+              <option value="FINANCEIRO">FINANCEIRO — Receitas, despesas &amp; DRE</option>
+            </select>
+          </div>
+
+          {/* Log de auditoria */}
+          <div>
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+              Log geral de auditoria do sistema
+            </h3>
+            <div className="flex flex-col gap-3">
+              {logs.map((log) => (
+                <DataListRow
+                  key={log.id}
+                  leading={<SettingIcon icon="history" />}
+                  title={log.action}
+                  meta={
+                    <>
+                      <RowMeta label="Usuário" value={log.user} />
+                      <span className="text-slate-500 truncate max-w-[260px] inline-block align-bottom">{log.details}</span>
+                    </>
+                  }
+                  center={
+                    <div className="text-left md:text-center">
+                      <p className="font-data-mono text-slate-700 font-semibold">{log.timestamp}</p>
+                      <p className="font-data-mono text-[10px] text-slate-400">{log.ip}</p>
+                    </div>
+                  }
+                  right={<Badge color="slate">{log.module}</Badge>}
+                />
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Role Selector Box */}
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-2 border-b border-slate-100 pb-2 flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-emerald-600" /> Matriz de Permissões de Usuário (RBAC)
-        </h3>
-        <p className="text-xs text-slate-500 mb-4">
-          Selecione o perfil ativo para simular o nível de permissão de acesso da interface:
-        </p>
-        <select
-          value={userRole}
-          onChange={(e) => onSelectRole(e.target.value as UserRole)}
-          className="w-full border border-slate-200 rounded-lg p-3 text-xs font-semibold text-slate-900 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
-        >
-          <option value="ADMINISTRATIVO">ADMINISTRATIVO — Acesso Irrestrito Aos Módulos</option>
-          <option value="TECNICO">TÉCNICO DE CAMPO — Execução de OS, Ponto &amp; Relatórios</option>
-          <option value="GESTOR">GESTOR DE CONTRATO — Aprovação &amp; Escala da Equipe</option>
-          <option value="FINANCEIRO">FINANCEIRO — Receitas, Despesas &amp; DRE</option>
-        </select>
-      </div>
+      {/* ===== TAB: PREFERÊNCIAS ===== */}
+      {tab === 'preferencias' && (
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-3">
+            <DataListRow
+              leading={<SettingIcon icon="notifications_active" />}
+              title="Alertas de estoque crítico"
+              meta="Destaca produtos no nível mínimo ou abaixo."
+              right={<Toggle checked={prefs.criticalStock} onChange={(v) => setPrefs({ ...prefs, criticalStock: v })} />}
+            />
+            <DataListRow
+              leading={<SettingIcon icon="delete_forever" />}
+              title="Confirmar antes de excluir"
+              meta="Pede confirmação ao remover registros."
+              right={<Toggle checked={prefs.confirmDelete} onChange={(v) => setPrefs({ ...prefs, confirmDelete: v })} />}
+            />
+            <DataListRow
+              leading={<SettingIcon icon="density_small" />}
+              title="Modo compacto"
+              meta="Reduz o espaçamento das listas."
+              right={<Toggle checked={prefs.compactMode} onChange={(v) => setPrefs({ ...prefs, compactMode: v })} />}
+            />
+          </div>
 
-      {/* Audit Logs Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-slate-900 px-6 py-4 text-white text-xs font-bold uppercase tracking-wider">
-          Log Geral de Auditoria do Sistema (Rastreabilidade Integrada)
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-200">
-                <th className="p-4">Timestamp / IP</th>
-                <th className="p-4">Usuário</th>
-                <th className="p-4">Módulo / Ação</th>
-                <th className="p-4">Detalhes da Alteração</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-              {logs.map((log) => (
-                <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="p-4">
-                    <span className="font-data-mono font-bold text-[#E63946]">{log.timestamp}</span> <br />
-                    <span className="font-data-mono text-[10px] text-slate-400">{log.ip}</span>
-                  </td>
-                  <td className="p-4 font-bold text-slate-900">{log.user}</td>
-                  <td className="p-4">
-                    <span className="bg-slate-900 text-white px-2.5 py-0.5 rounded text-[10px] font-bold">
-                      {log.module}
-                    </span> <br />
-                    <span className="text-[11px] font-bold text-slate-900 mt-1 inline-block">{log.action}</span>
-                  </td>
-                  <td className="p-4 text-slate-600 max-w-sm">{log.details}</td>
-                </tr>
+          {/* Marcas parceiras */}
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <SettingIcon icon="layers" />
+              <div>
+                <h3 className="font-display text-sm font-bold uppercase tracking-wide text-[#1A1A72]">
+                  Biblioteca de marcas parceiras
+                </h3>
+                <p className="text-[11px] text-slate-400">Fabricantes homologados para o seletor de propostas.</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleCreateBrand} className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2 text-xs mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  required
+                  placeholder="Nome (ex.: Edwards EST3X)"
+                  value={newBrandName}
+                  onChange={(e) => setNewBrandName(e.target.value)}
+                  className={inputCls}
+                />
+                <input
+                  type="text"
+                  placeholder="Categoria (ex.: Centrais & Alarme)"
+                  value={newBrandCategory}
+                  onChange={(e) => setNewBrandCategory(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="URL do logotipo (opcional)"
+                  value={newBrandLogo}
+                  onChange={(e) => setNewBrandLogo(e.target.value)}
+                  className={inputCls}
+                />
+                <button
+                  type="submit"
+                  className="shrink-0 px-4 bg-[#E63946] hover:bg-[#a51515] text-white font-bold rounded-lg uppercase text-xs flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-base">add</span> Cadastrar
+                </button>
+              </div>
+            </form>
+
+            <div className="flex flex-col gap-2">
+              {partnerBrands.map((pb) => (
+                <DataListRow
+                  key={pb.id}
+                  leading={
+                    <span className="w-10 h-10 bg-[#1A1A72] text-[#FFD700] font-bold rounded-lg flex items-center justify-center text-xs shrink-0">
+                      {pb.name.slice(0, 2).toUpperCase()}
+                    </span>
+                  }
+                  title={pb.name}
+                  meta={pb.category}
+                  right={
+                    <RowAction icon="delete" label="Remover marca" danger onClick={() => onDeletePartnerBrand(pb.id)} />
+                  }
+                />
               ))}
-            </tbody>
-          </table>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ===== TAB: PDF ===== */}
+      {tab === 'pdf' && (
+        <div className="flex flex-col gap-3">
+          <DataListRow
+            leading={<SettingIcon icon="tune" />}
+            title="Configurar antes de gerar"
+            meta="Abre a tela de opções antes de gerar o PDF da proposta."
+            right={
+              <Toggle
+                checked={pdfPrefs.configBeforeGenerate}
+                onChange={(v) => setPdfPrefs({ ...pdfPrefs, configBeforeGenerate: v })}
+              />
+            }
+          />
+          <DataListRow
+            leading={<SettingIcon icon="receipt_long" />}
+            title="Subtotal detalhado"
+            meta="Mostra o detalhamento de itens e subtotais no PDF."
+            right={
+              <Toggle
+                checked={pdfPrefs.detailedSubtotal}
+                onChange={(v) => setPdfPrefs({ ...pdfPrefs, detailedSubtotal: v })}
+              />
+            }
+          />
+          <DataListRow
+            leading={<SettingIcon icon="image" />}
+            title="Incluir logotipo no cabeçalho"
+            meta="Exibe o logo da empresa no topo do documento."
+            right={<Toggle checked={pdfPrefs.showLogo} onChange={(v) => setPdfPrefs({ ...pdfPrefs, showLogo: v })} />}
+          />
+          <DataListRow
+            leading={<SettingIcon icon="account_balance" />}
+            title="Mostrar dados bancários"
+            meta="Inclui os dados para pagamento no rodapé do PDF."
+            right={
+              <Toggle checked={pdfPrefs.showBankData} onChange={(v) => setPdfPrefs({ ...pdfPrefs, showBankData: v })} />
+            }
+          />
+          <p className="text-[11px] text-slate-400 px-1 pt-1 flex items-center gap-1">
+            <span className="material-symbols-outlined text-sm">info</span>
+            Preferências de geração de PDF (aplicadas às propostas comerciais).
+          </p>
+        </div>
+      )}
     </div>
   );
 };
