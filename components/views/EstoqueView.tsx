@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { InventoryItem, StockMovement } from '@/lib/types';
 import { insertStockMovement, fetchStockMovements, isSupabaseConfigured } from '@/lib/inventory';
 
@@ -73,7 +73,22 @@ const UNIT_GROUPS: { group: string; units: { code: string; label: string }[] }[]
   },
 ];
 
+const BASE_CATEGORIES = [
+  'Sirenes & Sinalização',
+  'Detecção de Incêndio',
+  'Centrais & Painéis',
+  'Acionadores Manuais',
+  'Cabos & Infraestrutura',
+  'Fontes & Baterias',
+  'Câmeras & CFTV',
+  'Controle de Acesso',
+  'Automação Predial (BMS)',
+  'Ferramentas & Insumos',
+  'Diversos',
+];
+
 const round2 = (n: number) => Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
+const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
 // Ponto de informação (tooltip no hover)
 const InfoDot: React.FC<{ text: string }> = ({ text }) => (
@@ -91,15 +106,124 @@ const InfoDot: React.FC<{ text: string }> = ({ text }) => (
 );
 
 const SectionTitle: React.FC<{ icon: string; children: React.ReactNode }> = ({ icon, children }) => (
-  <div className="flex items-center gap-2 pl-3 border-l-4 border-[#E63946] mb-3 mt-2">
-    <span className="material-symbols-outlined text-[#1A1A72] text-lg">{icon}</span>
+  <div className="flex items-center gap-2 mb-4">
+    <span className="w-8 h-8 rounded-lg bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center">
+      <span className="material-symbols-outlined text-lg">{icon}</span>
+    </span>
     <h4 className="font-display text-sm font-bold uppercase tracking-wide text-[#1A1A72]">{children}</h4>
   </div>
 );
 
 const inputCls =
-  'w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20 focus:border-[#E63946]/40';
-const labelCls = 'block text-slate-600 mb-1 font-semibold uppercase text-[11px] flex items-center';
+  'w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#E63946]/20 focus:border-[#E63946]/40';
+const labelCls = 'text-slate-600 mb-1 font-semibold uppercase text-[11px] flex items-center';
+const cardCls = 'bg-white rounded-xl border border-slate-200 shadow-sm p-5';
+
+// Select com opção de adicionar novo valor livre
+const SelectOrAdd: React.FC<{
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  placeholder: string;
+  error?: boolean;
+}> = ({ value, onChange, options, placeholder, error }) => {
+  const [adding, setAdding] = useState(false);
+
+  if (adding) {
+    return (
+      <div className="flex gap-2">
+        <input
+          autoFocus
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Digite o novo valor..."
+          className={inputCls}
+        />
+        <button
+          type="button"
+          onClick={() => setAdding(false)}
+          title="Voltar à lista"
+          className="shrink-0 px-3 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 flex items-center"
+        >
+          <span className="material-symbols-outlined text-base">list</span>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex gap-2">
+      <select
+        value={options.includes(value) ? value : value ? '__custom__' : ''}
+        onChange={(e) => {
+          if (e.target.value === '__add__') {
+            onChange('');
+            setAdding(true);
+          } else if (e.target.value !== '__custom__') {
+            onChange(e.target.value);
+          }
+        }}
+        className={`${inputCls} ${error ? 'border-red-400 ring-2 ring-red-100' : ''}`}
+      >
+        <option value="">{placeholder}</option>
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+        {value && !options.includes(value) && <option value="__custom__">{value}</option>}
+        <option value="__add__">+ Adicionar novo...</option>
+      </select>
+      <button
+        type="button"
+        onClick={() => {
+          onChange('');
+          setAdding(true);
+        }}
+        title="Adicionar novo"
+        className="shrink-0 px-3 rounded-lg bg-[#1A1A72] text-white hover:bg-[#12124f] transition-colors flex items-center"
+      >
+        <span className="material-symbols-outlined text-base">add</span>
+      </button>
+    </div>
+  );
+};
+
+// Campo numérico com botões diminuir (-) e aumentar (+)
+const NumberStepper: React.FC<{
+  value: number;
+  onChange: (n: number) => void;
+  disabled?: boolean;
+  min?: number;
+}> = ({ value, onChange, disabled, min = 0 }) => (
+  <div className="flex items-center gap-2">
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => onChange(Math.max(min, Math.floor(Number(value) || 0) - 1))}
+      className="w-9 h-9 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 flex items-center justify-center shrink-0 disabled:opacity-40"
+    >
+      <span className="material-symbols-outlined text-base">remove</span>
+    </button>
+    <input
+      type="number"
+      min={min}
+      disabled={disabled}
+      value={value}
+      onChange={(e) => onChange(Number(e.target.value))}
+      className={`${inputCls} font-data-mono text-center`}
+    />
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => onChange(Math.floor(Number(value) || 0) + 1)}
+      className="w-9 h-9 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 flex items-center justify-center shrink-0 disabled:opacity-40"
+    >
+      <span className="material-symbols-outlined text-base">add</span>
+    </button>
+  </div>
+);
 
 export const EstoqueView: React.FC<EstoqueViewProps> = ({
   inventory,
@@ -109,10 +233,11 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
   loading = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [showModal, setShowModal] = useState(false);
+  const [showPanel, setShowPanel] = useState(false);
   const [showUnitModal, setShowUnitModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [errors, setErrors] = useState<{ name?: boolean; category?: boolean; unit?: boolean }>({});
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Movimentação rápida (entrada/saída de estoque)
@@ -151,6 +276,25 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
   const [model, setModel] = useState('');
   const [description, setDescription] = useState('');
 
+  // Listas para os selects (base + valores já existentes no estoque)
+  const categoryOptions = useMemo(() => {
+    const set = new Set<string>(BASE_CATEGORIES);
+    inventory.forEach((i) => i.category && set.add(i.category));
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [inventory]);
+
+  const supplierOptions = useMemo(() => {
+    const set = new Set<string>();
+    inventory.forEach((i) => i.supplier && set.add(i.supplier));
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [inventory]);
+
+  const brandOptions = useMemo(() => {
+    const set = new Set<string>();
+    inventory.forEach((i) => i.brand && set.add(i.brand));
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [inventory]);
+
   const generateCode = (cat: string) => {
     const prefix =
       (cat || 'PROD')
@@ -164,8 +308,9 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     return `${prefix}-${rand}`;
   };
 
-  const openModal = () => {
+  const openPanel = () => {
     setEditingItem(null);
+    setErrors({});
     setImageUrl('');
     setName('');
     setCategory('');
@@ -184,11 +329,12 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     setBrand('');
     setModel('');
     setDescription('');
-    setShowModal(true);
+    setShowPanel(true);
   };
 
   const openEdit = (item: InventoryItem) => {
     setEditingItem(item);
+    setErrors({});
     setImageUrl(item.imageUrl || '');
     setName(item.name);
     setCategory(item.category || '');
@@ -207,11 +353,11 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     setBrand(item.brand || '');
     setModel(item.model || '');
     setDescription(item.description || '');
-    setShowModal(true);
+    setShowPanel(true);
   };
 
-  const closeModal = () => {
-    setShowModal(false);
+  const closePanel = () => {
+    setShowPanel(false);
     setEditingItem(null);
   };
 
@@ -261,7 +407,6 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     try {
       setMovementSaving(true);
       await onUpdateInventoryItem(updated);
-      // Registra no histórico (não bloqueia a operação se falhar)
       if (isSupabaseConfigured()) {
         try {
           await insertStockMovement({
@@ -292,8 +437,7 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     reader.readAsDataURL(file);
   };
 
-  // ---- Cálculos de preço ----
-  // Margem = (venda - custo) / venda * 100   |   Markup = (venda - custo) / custo * 100
+  // ---- Cálculos de preço (reativos) ----
   const onCostChange = (cost: number) => {
     setCostPrice(cost);
     if (salePrice > 0) {
@@ -308,7 +452,7 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     setMarkup(costPrice > 0 ? round2(((sale - costPrice) / costPrice) * 100) : 0);
   };
 
-  // Ao adicionar a margem de lucro, calcula automaticamente o markup e o preço de venda
+  // Ao informar a margem, calcula automaticamente markup e preço de venda
   const onMarginChange = (m: number) => {
     setMargin(m);
     if (m < 100) {
@@ -333,13 +477,19 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
       item.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleCreateItem = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (saving) return;
-    if (!unit) {
+
+    // Validação dos campos obrigatórios
+    const errs = { name: !name.trim(), category: !category.trim(), unit: !unit };
+    setErrors(errs);
+    if (errs.unit && !errs.name && !errs.category) {
       setShowUnitModal(true);
       return;
     }
+    if (errs.name || errs.category || errs.unit) return;
+
     const seq = (invSeq++).toString();
     const payload: InventoryItem = {
       id: editingItem ? editingItem.id : `inv-${seq}`,
@@ -372,13 +522,25 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
       } else {
         await onAddInventoryItem(payload);
       }
-      closeModal();
+      closePanel();
     } finally {
       setSaving(false);
     }
   };
 
-  const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+  const SaveButton = (
+    <button
+      type="button"
+      onClick={() => handleSave()}
+      disabled={saving}
+      className="bg-[#E63946] hover:bg-[#a51515] text-white px-5 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed"
+    >
+      <span className={`material-symbols-outlined text-base ${saving ? 'animate-spin' : ''}`}>
+        {saving ? 'progress_activity' : 'save'}
+      </span>
+      {saving ? 'Salvando...' : 'Salvar'}
+    </button>
+  );
 
   return (
     <div className="flex flex-col w-full p-8 gap-6">
@@ -394,7 +556,7 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
         </div>
 
         <button
-          onClick={openModal}
+          onClick={openPanel}
           className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
         >
           <span className="material-symbols-outlined text-base">add</span> Novo Produto
@@ -433,7 +595,7 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
           <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-lg">search</span>
           <input
             type="text"
-            placeholder="Buscar por código, série BP, nome ou prateleira..."
+            placeholder="Buscar por código, série BP, nome ou categoria..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E63946]/20 uppercase"
@@ -486,411 +648,429 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
               )}
               {!loading &&
                 filteredInventory.map((item) => (
-                <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="p-4">
-                    <span className="font-data-mono font-bold text-[#E63946]">{item.code}</span> <br />
-                    <span className="font-data-mono text-[10px] text-slate-400">{item.serialBP}</span>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-3">
-                      {item.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={item.imageUrl}
-                          alt={item.name}
-                          className="w-9 h-9 rounded-md object-cover border border-slate-200 shrink-0"
-                        />
-                      ) : (
-                        <span className="w-9 h-9 rounded-md bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 shrink-0">
-                          <span className="material-symbols-outlined text-base">inventory_2</span>
-                        </span>
-                      )}
-                      <span className="font-bold text-slate-900 uppercase">{item.name}</span>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <span className="text-slate-900 font-semibold">{item.category}</span>
-                    {item.unit ? (
-                      <>
-                        <br />
-                        <span className="text-[10px] text-slate-500 font-data-mono">{item.unit}</span>
-                      </>
-                    ) : null}
-                  </td>
-                  <td className="p-4 text-slate-600">{item.supplier}</td>
-                  <td className="p-4 text-center font-data-mono font-bold">
-                    <span
-                      className={`px-2 py-1 rounded text-xs ${
-                        item.quantity <= item.minQuantity ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'
-                      }`}
-                    >
-                      {item.quantity} un (mín: {item.minQuantity})
-                    </span>
-                  </td>
-                  <td className="p-4 text-right font-data-mono text-slate-900">
-                    R$ {item.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </td>
-                  <td className="p-4 text-right font-data-mono font-bold text-slate-900">
-                    R$ {(item.quantity * item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center justify-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => openMovement(item)}
-                        title="Entrada / Saída de estoque"
-                        aria-label="Movimentar estoque"
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                  <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="p-4">
+                      <span className="font-data-mono font-bold text-[#E63946]">{item.code}</span> <br />
+                      <span className="font-data-mono text-[10px] text-slate-400">{item.serialBP}</span>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-3">
+                        {item.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={item.imageUrl}
+                            alt={item.name}
+                            className="w-9 h-9 rounded-md object-cover border border-slate-200 shrink-0"
+                          />
+                        ) : (
+                          <span className="w-9 h-9 rounded-md bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 shrink-0">
+                            <span className="material-symbols-outlined text-base">inventory_2</span>
+                          </span>
+                        )}
+                        <span className="font-bold text-slate-900 uppercase">{item.name}</span>
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <span className="text-slate-900 font-semibold">{item.category}</span>
+                      {item.unit ? (
+                        <>
+                          <br />
+                          <span className="text-[10px] text-slate-500 font-data-mono">{item.unit}</span>
+                        </>
+                      ) : null}
+                    </td>
+                    <td className="p-4 text-slate-600">{item.supplier}</td>
+                    <td className="p-4 text-center font-data-mono font-bold">
+                      <span
+                        className={`px-2 py-1 rounded text-xs ${
+                          item.quantity <= item.minQuantity ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'
+                        }`}
                       >
-                        <span className="material-symbols-outlined text-lg">swap_vert</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openHistory(item)}
-                        title="Histórico de movimentações"
-                        aria-label="Histórico de movimentações"
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-[#1A1A72] hover:bg-slate-100 transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-lg">history</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openEdit(item)}
-                        title="Editar produto"
-                        aria-label="Editar produto"
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-[#1A1A72] hover:bg-slate-100 transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-lg">edit</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(item)}
-                        title="Excluir produto"
-                        aria-label="Excluir produto"
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-[#E63946] hover:bg-red-50 transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-lg">delete</span>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {item.quantity} un (mín: {item.minQuantity})
+                      </span>
+                    </td>
+                    <td className="p-4 text-right font-data-mono text-slate-900">
+                      R$ {item.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="p-4 text-right font-data-mono font-bold text-slate-900">
+                      R$ {(item.quantity * item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => openMovement(item)}
+                          title="Entrada / Saída de estoque"
+                          aria-label="Movimentar estoque"
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-lg">swap_vert</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openHistory(item)}
+                          title="Histórico de movimentações"
+                          aria-label="Histórico de movimentações"
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-[#1A1A72] hover:bg-slate-100 transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-lg">history</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openEdit(item)}
+                          title="Editar produto"
+                          aria-label="Editar produto"
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-[#1A1A72] hover:bg-slate-100 transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-lg">edit</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(item)}
+                          title="Excluir produto"
+                          aria-label="Excluir produto"
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-[#E63946] hover:bg-red-50 transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-lg">delete</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Modal Novo Produto */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 bg-[#1A1A72]/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white max-w-3xl w-full rounded-xl border border-slate-200 shadow-2xl relative max-h-[92vh] flex flex-col">
+      {/* ===== SIDE-PANEL: Novo / Editar Produto ===== */}
+      {showPanel && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-[#1A1A72]/50 backdrop-blur-sm">
+          {/* área para fechar clicando fora */}
+          <div className="flex-1 hidden md:block" onClick={closePanel} />
+
+          <div className="bg-slate-50 w-full max-w-2xl h-full shadow-2xl flex flex-col">
             {/* Cabeçalho fixo */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-              <h3 className="font-display text-lg font-bold text-[#1A1A72] uppercase tracking-wide">
-                {editingItem ? 'Editar Produto' : 'Cadastrar Novo Produto'}
-              </h3>
-              <button
-                onClick={closeModal}
-                className="text-slate-400 hover:text-slate-700 font-bold text-xl"
-              >
-                ✕
-              </button>
+            <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-200">
+              <div>
+                <h3 className="font-display text-lg font-bold text-[#1A1A72] uppercase tracking-wide">
+                  {editingItem ? 'Editar produto' : 'Novo produto'}
+                </h3>
+                <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
+                  {editingItem ? code : 'Preencha as informações do item'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {SaveButton}
+                <button
+                  onClick={closePanel}
+                  aria-label="Fechar"
+                  className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
             </div>
 
-            <form onSubmit={handleCreateItem} className="overflow-y-auto px-6 py-5 space-y-6 text-xs font-medium">
-              {/* FOTO + BÁSICAS */}
-              <div className="grid md:grid-cols-[160px_1fr] gap-5">
-                {/* Foto do produto */}
-                <div>
-                  <SectionTitle icon="photo_camera">Foto</SectionTitle>
-                  <input ref={fileRef} type="file" accept="image/*" onChange={handleImage} className="hidden" />
+            {/* Corpo rolável */}
+            <form onSubmit={handleSave} className="overflow-y-auto px-6 py-5 space-y-5 text-xs font-medium flex-1">
+              {/* FOTO */}
+              <div className={cardCls}>
+                <SectionTitle icon="photo_camera">Foto do produto</SectionTitle>
+                <input ref={fileRef} type="file" accept="image/*" onChange={handleImage} className="hidden" />
+                <div className="flex items-center gap-4">
                   <button
                     type="button"
                     onClick={() => fileRef.current?.click()}
-                    className="w-full aspect-square rounded-xl border-2 border-dashed border-slate-300 hover:border-[#E63946] flex flex-col items-center justify-center gap-1 text-slate-400 hover:text-[#E63946] transition-colors overflow-hidden relative"
+                    className="w-24 h-24 rounded-xl border-2 border-dashed border-slate-300 hover:border-[#E63946] flex items-center justify-center text-slate-400 hover:text-[#E63946] transition-colors overflow-hidden relative shrink-0"
                   >
                     {imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={imageUrl} alt="Prévia" className="absolute inset-0 w-full h-full object-cover" />
                     ) : (
-                      <>
-                        <span className="material-symbols-outlined text-3xl">add_a_photo</span>
-                        <span className="text-[10px] font-semibold uppercase">Adicionar imagem</span>
-                      </>
+                      <span className="material-symbols-outlined text-3xl">image</span>
                     )}
                   </button>
-                  {imageUrl && (
+                  <div className="flex flex-col gap-2">
                     <button
                       type="button"
-                      onClick={() => setImageUrl('')}
-                      className="w-full mt-2 text-[10px] font-semibold uppercase text-slate-500 hover:text-[#E63946]"
+                      onClick={() => fileRef.current?.click()}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-wide transition-colors shadow-sm flex items-center gap-1.5"
                     >
-                      Remover foto
+                      <span className="material-symbols-outlined text-base">photo_camera</span>
+                      Adicionar imagem
                     </button>
-                  )}
-                </div>
-
-                {/* Informações básicas */}
-                <div>
-                  <SectionTitle icon="badge">Informações básicas</SectionTitle>
-                  <div className="space-y-3">
-                    <div>
-                      <label className={labelCls}>Nome do produto</label>
-                      <input
-                        type="text"
-                        required
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="Ex.: Sirene Bitonal 24V Strobe IP66"
-                        className={inputCls}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={labelCls}>Categoria</label>
-                        <input
-                          type="text"
-                          value={category}
-                          onChange={(e) => setCategory(e.target.value)}
-                          placeholder="Ex.: Sirenes & Sinalização"
-                          className={inputCls}
-                        />
-                      </div>
-                      <div>
-                        <label className={labelCls}>Código do produto</label>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={code}
-                            onChange={(e) => setCode(e.target.value)}
-                            className={`${inputCls} font-data-mono`}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setCode(generateCode(category))}
-                            title="Gerar código automaticamente"
-                            className="shrink-0 px-3 rounded-lg bg-[#1A1A72] text-white hover:bg-[#12124f] transition-colors flex items-center"
-                          >
-                            <span className="material-symbols-outlined text-base">autorenew</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <label className={labelCls}>Unidade de medida</label>
+                    {imageUrl && (
                       <button
                         type="button"
-                        onClick={() => setShowUnitModal(true)}
-                        className={`${inputCls} flex items-center justify-between text-left ${
-                          unit ? 'text-slate-900' : 'text-slate-400'
-                        }`}
+                        onClick={() => setImageUrl('')}
+                        className="text-[10px] font-semibold uppercase text-slate-500 hover:text-[#E63946] text-left"
                       >
-                        <span className="font-data-mono">{unit || 'Selecionar unidade de medida...'}</span>
-                        <span className="material-symbols-outlined text-base text-slate-400">straighten</span>
+                        Remover foto
                       </button>
+                    )}
+                    <p className="text-[10px] text-slate-400">JPG ou PNG. A imagem aparece na listagem do estoque.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* INFORMAÇÕES BÁSICAS */}
+              <div className={cardCls}>
+                <SectionTitle icon="info">Informações básicas</SectionTitle>
+                <div className="space-y-3">
+                  <div>
+                    <label className={labelCls}>Nome *</label>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        if (errors.name) setErrors((p) => ({ ...p, name: false }));
+                      }}
+                      placeholder="Ex.: Sirene Bitonal 24V Strobe IP66"
+                      className={`${inputCls} ${errors.name ? 'border-red-400 ring-2 ring-red-100' : ''}`}
+                    />
+                    {errors.name && <p className="text-[10px] text-[#E63946] mt-1 font-semibold">Informe o nome do produto.</p>}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>Categoria *</label>
+                      <SelectOrAdd
+                        value={category}
+                        onChange={(v) => {
+                          setCategory(v);
+                          if (errors.category) setErrors((p) => ({ ...p, category: false }));
+                        }}
+                        options={categoryOptions}
+                        placeholder="Selecionar categoria..."
+                        error={errors.category}
+                      />
+                      {errors.category && (
+                        <p className="text-[10px] text-[#E63946] mt-1 font-semibold">Selecione ou informe a categoria.</p>
+                      )}
                     </div>
+                    <div>
+                      <label className={labelCls}>Código</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={code}
+                          onChange={(e) => setCode(e.target.value)}
+                          className={`${inputCls} font-data-mono`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setCode(generateCode(category))}
+                          title="Gerar código automaticamente"
+                          className="shrink-0 px-3 rounded-lg bg-[#1A1A72] text-white hover:bg-[#12124f] transition-colors flex items-center"
+                        >
+                          <span className="material-symbols-outlined text-base">refresh</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Unidade de medida *</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowUnitModal(true)}
+                      className={`${inputCls} flex items-center justify-between text-left ${
+                        unit ? 'text-slate-900' : 'text-slate-400'
+                      } ${errors.unit ? 'border-red-400 ring-2 ring-red-100' : ''}`}
+                    >
+                      <span className="font-data-mono">{unit || 'Selecionar unidade de medida...'}</span>
+                      <span className="material-symbols-outlined text-base text-slate-400">straighten</span>
+                    </button>
+                    {errors.unit && <p className="text-[10px] text-[#E63946] mt-1 font-semibold">Selecione a unidade de medida.</p>}
                   </div>
                 </div>
               </div>
 
               {/* PREÇOS */}
-              <div>
-                <SectionTitle icon="payments">Preço de venda e custo</SectionTitle>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className={cardCls}>
+                <SectionTitle icon="attach_money">Preço de venda e custo</SectionTitle>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className={labelCls}>Preço de custo (R$)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={costPrice}
-                      onChange={(e) => onCostChange(Number(e.target.value))}
-                      className={`${inputCls} font-data-mono`}
-                    />
+                    <label className={labelCls}>Preço de venda</label>
+                    <div className="relative">
+                      <span className="material-symbols-outlined absolute left-2.5 top-2.5 text-slate-400 text-base">sell</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={salePrice}
+                        onChange={(e) => onSaleChange(Number(e.target.value))}
+                        className={`${inputCls} pl-9 font-data-mono`}
+                      />
+                    </div>
                   </div>
                   <div>
-                    <label className={labelCls}>Preço de venda (R$)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={salePrice}
-                      onChange={(e) => onSaleChange(Number(e.target.value))}
-                      className={`${inputCls} font-data-mono`}
-                    />
+                    <label className={labelCls}>Preço de custo</label>
+                    <div className="relative">
+                      <span className="material-symbols-outlined absolute left-2.5 top-2.5 text-slate-400 text-base">point_of_sale</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={costPrice}
+                        onChange={(e) => onCostChange(Number(e.target.value))}
+                        className={`${inputCls} pl-9 font-data-mono`}
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className={labelCls}>
-                      Margem de lucro %
+                      Margem de lucro
                       <InfoDot text="Margem de lucro = (Preço de venda − Preço de custo) ÷ Preço de venda × 100. Representa quanto do preço de venda é lucro. Ao informar a margem, o markup e o preço de venda são calculados automaticamente." />
                     </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={margin}
-                      onChange={(e) => onMarginChange(Number(e.target.value))}
-                      className={`${inputCls} font-data-mono`}
-                    />
+                    <div className="relative">
+                      <span className="material-symbols-outlined absolute left-2.5 top-2.5 text-slate-400 text-base">percent</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={margin}
+                        onChange={(e) => onMarginChange(Number(e.target.value))}
+                        className={`${inputCls} pl-9 font-data-mono`}
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className={labelCls}>
-                      Markup %
+                      Markup
                       <InfoDot text="Markup = (Preço de venda − Preço de custo) ÷ Preço de custo × 100. Representa o quanto foi acrescentado sobre o custo para chegar ao preço de venda." />
                     </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={markup}
-                      onChange={(e) => onMarkupChange(Number(e.target.value))}
-                      className={`${inputCls} font-data-mono`}
-                    />
+                    <div className="relative">
+                      <span className="material-symbols-outlined absolute left-2.5 top-2.5 text-slate-400 text-base">percent</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={markup}
+                        onChange={(e) => onMarkupChange(Number(e.target.value))}
+                        className={`${inputCls} pl-9 font-data-mono`}
+                      />
+                    </div>
                   </div>
                 </div>
-                <p className="mt-2 text-[10px] text-slate-500 flex items-center gap-1">
+                <p className="mt-3 text-[10px] text-slate-500 flex items-start gap-1">
                   <span className="material-symbols-outlined text-sm text-[#1A1A72]">info</span>
-                  Ao informar a <strong>margem de lucro</strong>, o <strong>markup</strong> e o{' '}
-                  <strong>preço de venda</strong> são recalculados automaticamente a partir do custo.
+                  <span>
+                    Ao informar o <strong>preço de custo</strong> e a <strong>margem de lucro</strong>, o{' '}
+                    <strong>markup</strong> e o <strong>preço de venda</strong> são calculados automaticamente.
+                  </span>
                 </p>
               </div>
 
               {/* GERENCIAMENTO DE ESTOQUE */}
-              <div>
+              <div className={cardCls}>
                 <div className="flex items-center justify-between">
-                  <SectionTitle icon="inventory">Gerenciamento de estoque</SectionTitle>
-                  {/* Toggle ativar/desativar */}
-                  <button
-                    type="button"
-                    onClick={() => setStockManaged((v) => !v)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      stockManaged ? 'bg-[#E63946]' : 'bg-slate-300'
-                    }`}
-                    title={stockManaged ? 'Gerenciamento ativado' : 'Gerenciamento desativado'}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        stockManaged ? 'translate-x-6' : 'translate-x-1'
+                  <SectionTitle icon="monitoring">Gerenciamento de estoque</SectionTitle>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <span className="text-[10px] font-semibold uppercase text-slate-500">Ativar gerenciamento</span>
+                    <button
+                      type="button"
+                      onClick={() => setStockManaged((v) => !v)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        stockManaged ? 'bg-[#E63946]' : 'bg-slate-300'
                       }`}
-                    />
-                  </button>
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          stockManaged ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </label>
                 </div>
-                <p className="text-[10px] text-slate-500 mb-3 -mt-1">
-                  {stockManaged
-                    ? 'Controle de quantidades ativado para este produto.'
-                    : 'Produto sem controle de estoque (serviço ou item não estocável).'}
-                </p>
                 <div
-                  className={`grid grid-cols-2 md:grid-cols-4 gap-3 transition-opacity ${
+                  className={`grid grid-cols-1 sm:grid-cols-2 gap-4 transition-opacity ${
                     stockManaged ? '' : 'opacity-40 pointer-events-none'
                   }`}
                 >
                   <div>
-                    <label className={labelCls}>Quantidade</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={quantity}
-                      disabled={!stockManaged}
-                      onChange={(e) => setQuantity(Number(e.target.value))}
-                      className={`${inputCls} font-data-mono`}
-                    />
+                    <label className={labelCls}>Quantidade (estoque atual)</label>
+                    <NumberStepper value={quantity} onChange={setQuantity} disabled={!stockManaged} />
                   </div>
                   <div>
                     <label className={labelCls}>Quantidade ideal</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={idealQuantity}
-                      disabled={!stockManaged}
-                      onChange={(e) => setIdealQuantity(Number(e.target.value))}
-                      className={`${inputCls} font-data-mono`}
-                    />
+                    <NumberStepper value={idealQuantity} onChange={setIdealQuantity} disabled={!stockManaged} />
                   </div>
                   <div>
                     <label className={labelCls}>Quantidade mínima</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={minQuantity}
-                      disabled={!stockManaged}
-                      onChange={(e) => setMinQuantity(Number(e.target.value))}
-                      className={`${inputCls} font-data-mono`}
-                    />
+                    <NumberStepper value={minQuantity} onChange={setMinQuantity} disabled={!stockManaged} />
                   </div>
                   <div>
-                    <label className={labelCls}>Quantidade reservada</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={reservedQuantity}
-                      disabled={!stockManaged}
-                      onChange={(e) => setReservedQuantity(Number(e.target.value))}
-                      className={`${inputCls} font-data-mono`}
-                    />
+                    <label className={labelCls}>
+                      Quantidade reservada
+                      <InfoDot text="Quantidade já comprometida (ex.: vinculada a pedidos/OS). É apenas informativa e não pode ser editada manualmente." />
+                    </label>
+                    <div className="relative">
+                      <span className="material-symbols-outlined absolute left-2.5 top-2.5 text-slate-400 text-base">lock</span>
+                      <input
+                        type="number"
+                        value={reservedQuantity}
+                        readOnly
+                        disabled
+                        className={`${inputCls} pl-9 font-data-mono bg-slate-100 text-slate-500 cursor-not-allowed`}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* OUTRAS INFORMAÇÕES */}
-              <div>
-                <SectionTitle icon="more_horiz">Outras informações</SectionTitle>
+              <div className={cardCls}>
+                <SectionTitle icon="assignment">Outras informações</SectionTitle>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
                     <label className={labelCls}>Fornecedor</label>
-                    <input
-                      type="text"
+                    <SelectOrAdd
                       value={supplier}
-                      onChange={(e) => setSupplier(e.target.value)}
-                      className={inputCls}
+                      onChange={setSupplier}
+                      options={supplierOptions}
+                      placeholder="Selecionar fornecedor..."
                     />
                   </div>
                   <div>
                     <label className={labelCls}>Marca</label>
-                    <input type="text" value={brand} onChange={(e) => setBrand(e.target.value)} className={inputCls} />
+                    <SelectOrAdd
+                      value={brand}
+                      onChange={setBrand}
+                      options={brandOptions}
+                      placeholder="Selecionar marca..."
+                    />
                   </div>
                   <div>
                     <label className={labelCls}>Modelo</label>
                     <input type="text" value={model} onChange={(e) => setModel(e.target.value)} className={inputCls} />
                   </div>
                 </div>
-              </div>
-
-              {/* DESCRIÇÃO */}
-              <div>
-                <SectionTitle icon="description">Descrição</SectionTitle>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
-                  placeholder="Detalhes técnicos, aplicação, observações..."
-                  className={`${inputCls} resize-none`}
-                />
+                <div className="mt-3">
+                  <label className={labelCls}>Descrição</label>
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={3}
+                    placeholder="Detalhes técnicos, aplicação, observações..."
+                    className={`${inputCls} resize-none`}
+                  />
+                </div>
               </div>
             </form>
 
             {/* Rodapé fixo */}
-            <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between gap-3">
+            <div className="px-6 py-4 bg-white border-t border-slate-200 flex items-center justify-between gap-3">
               <div className="text-[11px] text-slate-500 font-data-mono">
                 Venda {brl(salePrice)} · Custo {brl(costPrice)} · Margem {round2(margin)}%
               </div>
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={closeModal}
+                  onClick={closePanel}
                   disabled={saving}
                   className="px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50"
                 >
                   Cancelar
                 </button>
-                <button
-                  onClick={handleCreateItem}
-                  disabled={saving}
-                  className="bg-[#E63946] hover:bg-[#a51515] text-white px-6 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed"
-                >
-                  <span className={`material-symbols-outlined text-base ${saving ? 'animate-spin' : ''}`}>
-                    {saving ? 'progress_activity' : 'save'}
-                  </span>
-                  {saving ? 'Salvando...' : editingItem ? 'Salvar Alterações' : 'Salvar Produto'}
-                </button>
+                {SaveButton}
               </div>
             </div>
           </div>
@@ -917,7 +1097,6 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
             </div>
 
             <div className="px-6 py-5 space-y-4 text-xs font-medium">
-              {/* Produto + saldo atual */}
               <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg p-3">
                 <div>
                   <p className="font-bold text-slate-900 uppercase">{movementItem.name}</p>
@@ -929,7 +1108,6 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                 </div>
               </div>
 
-              {/* Tipo: Entrada / Saída */}
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -957,32 +1135,9 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                 </button>
               </div>
 
-              {/* Quantidade + atalhos */}
               <div>
                 <label className={labelCls}>Quantidade</label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setMovementQty((q) => Math.max(1, Math.floor(Number(q) || 0) - 1))}
-                    className="w-9 h-9 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 flex items-center justify-center shrink-0"
-                  >
-                    <span className="material-symbols-outlined text-base">remove</span>
-                  </button>
-                  <input
-                    type="number"
-                    min={1}
-                    value={movementQty}
-                    onChange={(e) => setMovementQty(Number(e.target.value))}
-                    className={`${inputCls} font-data-mono text-center`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setMovementQty((q) => Math.floor(Number(q) || 0) + 1)}
-                    className="w-9 h-9 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 flex items-center justify-center shrink-0"
-                  >
-                    <span className="material-symbols-outlined text-base">add</span>
-                  </button>
-                </div>
+                <NumberStepper value={movementQty} onChange={setMovementQty} min={1} />
                 <div className="flex gap-1.5 mt-2">
                   {[5, 10, 50].map((n) => (
                     <button
@@ -997,7 +1152,6 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                 </div>
               </div>
 
-              {/* Observação opcional (registrada no histórico) */}
               <div>
                 <label className={labelCls}>Observação (opcional)</label>
                 <input
@@ -1009,7 +1163,6 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                 />
               </div>
 
-              {/* Saldo resultante */}
               <div className="flex items-center justify-between bg-[#1A1A72]/5 border border-[#1A1A72]/15 rounded-lg p-3">
                 <span className="text-[11px] font-semibold uppercase text-slate-600">Saldo após movimentação</span>
                 <span className="font-data-mono text-lg font-bold text-[#1A1A72]">{movementResult()}</span>
@@ -1081,9 +1234,7 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                   <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">
                     Nenhuma movimentação registrada
                   </p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    As entradas e saídas deste produto aparecerão aqui.
-                  </p>
+                  <p className="text-xs text-slate-400 mt-1">As entradas e saídas deste produto aparecerão aqui.</p>
                 </div>
               ) : (
                 <ul className="divide-y divide-slate-100">
@@ -1102,14 +1253,10 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                         <p className="text-xs font-bold text-slate-900 uppercase">
                           {mv.type === 'entrada' ? 'Entrada' : 'Saída'} de {mv.quantity} un
                         </p>
-                        <p className="text-[11px] text-slate-500 truncate">
-                          {mv.note || '—'}
-                        </p>
+                        <p className="text-[11px] text-slate-500 truncate">{mv.note || '—'}</p>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="font-data-mono text-xs font-bold text-slate-900">
-                          Saldo: {mv.resultingBalance ?? '—'}
-                        </p>
+                        <p className="font-data-mono text-xs font-bold text-slate-900">Saldo: {mv.resultingBalance ?? '—'}</p>
                         <p className="font-data-mono text-[10px] text-slate-400">
                           {mv.createdAt
                             ? new Date(mv.createdAt).toLocaleString('pt-BR', {
@@ -1133,7 +1280,7 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
 
       {/* Nova janela: seleção de Unidade de Medida */}
       {showUnitModal && (
-        <div className="fixed inset-0 z-[60] bg-[#1A1A72]/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[70] bg-[#1A1A72]/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white max-w-lg w-full rounded-xl border border-slate-200 shadow-2xl max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
               <div className="flex items-center gap-2">
@@ -1165,6 +1312,7 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                           type="button"
                           onClick={() => {
                             setUnit(value);
+                            setErrors((p) => ({ ...p, unit: false }));
                             setShowUnitModal(false);
                           }}
                           className={`text-left px-3 py-2 rounded-lg border transition-colors ${
