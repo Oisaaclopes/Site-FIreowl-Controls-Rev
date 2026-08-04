@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { SystemAuditLog, UserRole, CompanyProfile, PartnerBrand, PdfPrefs } from '@/lib/types';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
 import { Toggle, SidePanel } from '@/components/SidePanel';
@@ -13,6 +13,7 @@ import {
   ManagedUser,
 } from '@/lib/users';
 import { WorkSchedule, DEFAULT_SCHEDULE, WEEKDAY_SHORT } from '@/lib/schedule';
+import { listEmployeeDocs, uploadEmployeeDoc, signedDocUrl, deleteEmployeeDoc, EmployeeDoc } from '@/lib/storage';
 
 interface ContaViewProps {
   logs: SystemAuditLog[];
@@ -135,7 +136,63 @@ export const ContaView: React.FC<ContaViewProps> = ({
     schedule: DEFAULT_SCHEDULE.map((d) => ({ ...d })) as WorkSchedule,
   });
 
+  // Documentos do funcionário (Storage privado)
+  const [docs, setDocs] = useState<EmployeeDoc[]>([]);
+  const [docsLoading, setDocsLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const docFileRef = useRef<HTMLInputElement>(null);
+
+  const loadDocs = async (id: string) => {
+    setDocsLoading(true);
+    try {
+      setDocs(await listEmployeeDocs(id));
+    } catch (err) {
+      console.warn('Documentos: falha ao carregar.', err);
+      setDocs([]);
+    } finally {
+      setDocsLoading(false);
+    }
+  };
+
+  const handleUploadDoc = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editUser) return;
+    setUploading(true);
+    try {
+      await uploadEmployeeDoc(editUser.id, file);
+      await loadDocs(editUser.id);
+    } catch (err) {
+      console.error('Falha ao enviar documento:', err);
+      alert('Não foi possível enviar o documento.');
+    } finally {
+      setUploading(false);
+      if (docFileRef.current) docFileRef.current.value = '';
+    }
+  };
+
+  const handleOpenDoc = async (path: string) => {
+    try {
+      window.open(await signedDocUrl(path), '_blank');
+    } catch (err) {
+      console.error('Falha ao abrir documento:', err);
+      alert('Não foi possível abrir o documento.');
+    }
+  };
+
+  const handleDeleteDoc = async (d: EmployeeDoc) => {
+    if (!window.confirm(`Excluir o documento "${d.name.replace(/^\d+_/, '')}"?`)) return;
+    try {
+      await deleteEmployeeDoc(d.path);
+      setDocs((prev) => prev.filter((x) => x.path !== d.path));
+    } catch (err) {
+      console.error('Falha ao excluir documento:', err);
+      alert('Não foi possível excluir o documento.');
+    }
+  };
+
   const openEditUser = (u: ManagedUser) => {
+    setDocs([]);
+    loadDocs(u.id);
     setEuForm({
       name: u.name || '',
       fullName: u.fullName || '',
@@ -863,6 +920,58 @@ export const ContaView: React.FC<ContaViewProps> = ({
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
           <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Escala de trabalho</p>
           <ScheduleEditor value={euForm.schedule} onChange={(s) => setEuForm({ ...euForm, schedule: s })} />
+        </div>
+
+        {/* Documentos (Storage privado) */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              Documentos (diplomas, NRs, currículo)
+            </p>
+            <input ref={docFileRef} type="file" onChange={handleUploadDoc} className="hidden" />
+            <button
+              type="button"
+              onClick={() => docFileRef.current?.click()}
+              disabled={uploading}
+              className="inline-flex items-center gap-1.5 bg-[#1A1A72] hover:bg-[#12124f] text-white text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-70"
+            >
+              <span className={`material-symbols-outlined text-base ${uploading ? 'animate-spin' : ''}`}>
+                {uploading ? 'progress_activity' : 'upload_file'}
+              </span>
+              {uploading ? 'Enviando...' : 'Enviar documento'}
+            </button>
+          </div>
+
+          {docsLoading ? (
+            <p className="text-xs text-slate-400">Carregando documentos...</p>
+          ) : docs.length === 0 ? (
+            <p className="text-xs text-slate-400">Nenhum documento enviado.</p>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {docs.map((d) => (
+                <li key={d.path} className="flex items-center justify-between py-2 text-xs">
+                  <span className="flex items-center gap-2 min-w-0">
+                    <span className="material-symbols-outlined text-base text-slate-400">description</span>
+                    <span className="truncate text-slate-700">{d.name.replace(/^\d+_/, '')}</span>
+                  </span>
+                  <span className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenDoc(d.path)}
+                      className="text-[#1A1A72] font-semibold hover:underline px-2"
+                    >
+                      abrir
+                    </button>
+                    <RowAction icon="delete" label="Excluir documento" danger onClick={() => handleDeleteDoc(d)} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="text-[10px] text-slate-400 mt-2 flex items-center gap-1">
+            <span className="material-symbols-outlined text-sm">lock</span>
+            Armazenamento privado — acesso só do próprio funcionário e do administrador, via link temporário.
+          </p>
         </div>
       </SidePanel>
     </div>
