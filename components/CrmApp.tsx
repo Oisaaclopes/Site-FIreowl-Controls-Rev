@@ -67,6 +67,7 @@ import { ServicosView } from '@/components/views/ServicosView';
 import { PontoView } from '@/components/views/PontoView';
 import { ContaView } from '@/components/views/ContaView';
 import { allowedTabs, isTabAllowed } from '@/lib/rbac';
+import { fetchPunches, insertPunch } from '@/lib/timepunch';
 
 let idSeq = 1000;
 function getNextSeq() {
@@ -107,7 +108,9 @@ export function CrmApp({
   const [templates, setTemplates] = useState<PedidoTemplate[]>(INITIAL_TEMPLATES);
   const [contracts, setContracts] = useState<Contract[]>(INITIAL_CONTRACTS);
   const [equipmentList, setEquipmentList] = useState<ClientEquipment[]>(INITIAL_EQUIPMENT);
-  const [punches, setPunches] = useState<TimePunch[]>(INITIAL_PUNCH_LOGS);
+  const [punches, setPunches] = useState<TimePunch[]>(
+    isSupabaseConfigured() ? [] : INITIAL_PUNCH_LOGS
+  );
   const [technicalReport, setTechnicalReport] = useState(INITIAL_TECHNICAL_REPORT);
   const [auditSdai] = useState(INITIAL_AUDIT_SDAI);
   const [quotes, setQuotes] = useState<CustomQuote[]>(INITIAL_CUSTOM_QUOTES);
@@ -325,11 +328,17 @@ export function CrmApp({
     }
   };
 
-  // Ponto NÃO usa banco de dados — persiste só localmente (localStorage),
-  // custo zero de DB. Mantém os últimos 300 registros.
+  // Ponto no Supabase (tabela enxuta, sem foto). Sem Supabase, cai no
+  // localStorage como reserva.
   const PUNCHES_KEY = 'fireowl_punches';
 
   useEffect(() => {
+    if (isSupabaseConfigured()) {
+      fetchPunches()
+        .then((rows) => setPunches(rows))
+        .catch((err) => console.warn('Ponto: falha ao carregar do Supabase.', err));
+      return;
+    }
     try {
       const saved = localStorage.getItem(PUNCHES_KEY);
       if (saved) setPunches(JSON.parse(saved));
@@ -339,7 +348,18 @@ export function CrmApp({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleAddPunch = (newPunch: TimePunch) => {
+  const handleAddPunch = async (newPunch: TimePunch) => {
+    if (isSupabaseConfigured()) {
+      try {
+        const saved = await insertPunch(newPunch);
+        setPunches((prev) => [saved, ...prev]);
+        logAction('Batida de Ponto', 'Ponto Eletrônico', `Ponto registrado por ${saved.employeeName} (${saved.type})`);
+        return;
+      } catch (err) {
+        console.error('Falha ao registrar ponto no Supabase:', err);
+        // segue para o fallback local
+      }
+    }
     setPunches((prev) => {
       const next = [newPunch, ...prev].slice(0, 300);
       try {
