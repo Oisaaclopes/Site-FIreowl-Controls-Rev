@@ -11,6 +11,8 @@ const supplierStatusColor = (status: Supplier['activeStatus']) =>
 interface FornecedoresViewProps {
   suppliers: Supplier[];
   onAddSupplier: (s: Supplier) => void;
+  onUpdateSupplier?: (s: Supplier) => void;
+  onDeleteSupplier?: (id: string) => void;
 }
 
 let fornSeq = 10;
@@ -22,8 +24,11 @@ const labelCls = 'block text-slate-600 mb-1 font-semibold uppercase text-[11px]'
 export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
   suppliers,
   onAddSupplier,
+  onUpdateSupplier,
+  onDeleteSupplier,
 }) => {
   const [showPanel, setShowPanel] = useState(false);
+  const [editing, setEditing] = useState<Supplier | null>(null);
 
   // Form State
   const [isPJ, setIsPJ] = useState(true);
@@ -37,6 +42,7 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
   const [leadTimeDays, setLeadTimeDays] = useState(0);
 
   const openPanel = () => {
+    setEditing(null);
     setIsPJ(true);
     setName('');
     setCNPJ('');
@@ -49,9 +55,45 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
     setShowPanel(true);
   };
 
+  const openEdit = (s: Supplier) => {
+    setEditing(s);
+    setIsPJ(true);
+    setName(s.name);
+    setCNPJ(s.cnpj);
+    setCategory(s.category);
+    setContactName(s.contactName);
+    setPhone(s.phone);
+    setEmail(s.email);
+    setCity(s.city);
+    setLeadTimeDays(s.leadTimeDays);
+    setShowPanel(true);
+  };
+
+  const handleDelete = (s: Supplier) => {
+    if (!onDeleteSupplier) return;
+    if (!window.confirm(`Excluir o fornecedor "${s.name}"?\n\nEsta ação não pode ser desfeita.`)) return;
+    onDeleteSupplier(s.id);
+  };
+
   const handleCreateSupplier = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!name.trim()) return;
+    if (editing) {
+      onUpdateSupplier?.({
+        ...editing,
+        name,
+        cnpj,
+        category,
+        contactName,
+        phone,
+        email,
+        city,
+        leadTimeDays: Number(leadTimeDays),
+      });
+      setShowPanel(false);
+      setEditing(null);
+      return;
+    }
     const seq = (fornSeq++).toString();
     const created: Supplier = {
       id: `forn-${seq}`,
@@ -130,13 +172,17 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
               right={
                 <>
                   <Badge color={supplierStatusColor(s.activeStatus)}>{s.activeStatus}</Badge>
-                  <RowAction
-                    icon="mail"
-                    label="Enviar e-mail ao fornecedor"
-                    onClick={() => {
-                      window.location.href = `mailto:${s.email}`;
-                    }}
-                  />
+                  <div className="flex items-center gap-1">
+                    <RowAction
+                      icon="mail"
+                      label="Enviar e-mail ao fornecedor"
+                      onClick={() => {
+                        window.location.href = `mailto:${s.email}`;
+                      }}
+                    />
+                    <RowAction icon="edit" label="Editar fornecedor" onClick={() => openEdit(s)} />
+                    <RowAction icon="delete" label="Excluir fornecedor" danger onClick={() => handleDelete(s)} />
+                  </div>
                 </>
               }
             />
@@ -144,12 +190,15 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
         </div>
       )}
 
-      {/* Drawer: Novo Fornecedor */}
+      {/* Drawer: Novo / Editar Fornecedor */}
       <SidePanel
         open={showPanel}
-        title="Novo fornecedor"
-        subtitle="Cadastro e homologação"
-        onClose={() => setShowPanel(false)}
+        title={editing ? 'Editar fornecedor' : 'Novo fornecedor'}
+        subtitle={editing ? editing.code : 'Cadastro e homologação'}
+        onClose={() => {
+          setShowPanel(false);
+          setEditing(null);
+        }}
         onSave={() => handleCreateSupplier()}
         saveLabel="Salvar"
       >

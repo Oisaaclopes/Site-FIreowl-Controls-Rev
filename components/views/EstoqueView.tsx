@@ -487,10 +487,37 @@ const StockItemCard: React.FC<{
   onHistory: (item: InventoryItem) => void;
   onEdit: (item: InventoryItem) => void;
   onDelete: (item: InventoryItem) => void;
-}> = ({ item, onMovement, onHistory, onEdit, onDelete }) => {
+  onSaveInline: (item: InventoryItem) => void | Promise<void>;
+}> = ({ item, onMovement, onHistory, onEdit, onDelete, onSaveInline }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const price = item.salePrice ?? item.unitPrice ?? 0;
   const esgotado = item.quantity <= 0;
+
+  // Edição in-line dos dados financeiros
+  const [editingFin, setEditingFin] = useState(false);
+  const [cost, setCost] = useState(item.costPrice ?? 0);
+  const [margin, setMargin] = useState(item.profitMargin ?? 0);
+  const costN = Number(cost) || 0;
+  const marginN = Number(margin) || 0;
+  const liveSale = marginN < 100 && marginN >= 0 ? round2(costN / (1 - marginN / 100)) : 0;
+  const liveMarkup = costN > 0 ? round2(((liveSale - costN) / costN) * 100) : 0;
+
+  const startEditFin = () => {
+    setCost(item.costPrice ?? 0);
+    setMargin(item.profitMargin ?? 0);
+    setEditingFin(true);
+  };
+  const saveFin = () => {
+    onSaveInline({
+      ...item,
+      costPrice: costN,
+      profitMargin: marginN,
+      markup: liveMarkup,
+      salePrice: liveSale,
+      unitPrice: liveSale,
+    });
+    setEditingFin(false);
+  };
 
   const Meta = ({ label, value }: { label: string; value: React.ReactNode }) => (
     <span className="whitespace-nowrap">
@@ -542,7 +569,71 @@ const StockItemCard: React.FC<{
 
       {/* Direita: preço, status, ações */}
       <div className="flex items-center justify-between md:justify-end gap-4 shrink-0">
-        <p className="font-data-mono font-bold text-emerald-600 text-base md:text-lg text-right">{brl(price)}</p>
+        {/* Preço + dados financeiros (com edição in-line) */}
+        <div className="text-right min-w-[190px]">
+          <p className="font-data-mono font-bold text-emerald-600 text-base md:text-lg">
+            {brl(editingFin ? liveSale : price)}
+          </p>
+          {editingFin ? (
+            <div className="mt-1 flex items-center justify-end gap-2 text-[11px]" onClick={(e) => e.stopPropagation()}>
+              <label className="flex items-center gap-1 text-slate-500">
+                Custo
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  autoFocus
+                  value={cost}
+                  onChange={(e) => setCost(Number(e.target.value))}
+                  className="w-16 bg-transparent border-b border-slate-300 focus:border-[#1A1A72] outline-none text-right font-data-mono text-slate-800"
+                />
+              </label>
+              <label className="flex items-center gap-1 text-slate-500">
+                Margem
+                <input
+                  type="number"
+                  step="0.1"
+                  value={margin}
+                  onChange={(e) => setMargin(Number(e.target.value))}
+                  className="w-12 bg-transparent border-b border-slate-300 focus:border-[#1A1A72] outline-none text-right font-data-mono text-slate-800"
+                />
+                %
+              </label>
+              <span className="text-slate-400">Markup {liveMarkup}%</span>
+              <button
+                type="button"
+                onClick={saveFin}
+                title="Salvar"
+                className="w-6 h-6 rounded flex items-center justify-center text-emerald-600 hover:bg-emerald-50"
+              >
+                <span className="material-symbols-outlined text-base">check</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingFin(false)}
+                title="Cancelar"
+                className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-[#E63946] hover:bg-red-50"
+              >
+                <span className="material-symbols-outlined text-base">close</span>
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={startEditFin}
+              title="Editar custo / margem"
+              className="mt-0.5 flex items-center justify-end gap-1 text-[11px] text-slate-400 hover:text-[#1A1A72] group/fin w-full"
+            >
+              <span className="font-data-mono">
+                Custo: {brl(item.costPrice ?? 0)} · Margem: {round2(item.profitMargin ?? 0)}% · Markup:{' '}
+                {round2(item.markup ?? 0)}%
+              </span>
+              <span className="material-symbols-outlined text-xs opacity-0 group-hover/fin:opacity-100 transition-opacity">
+                edit
+              </span>
+            </button>
+          )}
+        </div>
 
         {esgotado ? (
           <span className="shrink-0 px-2.5 py-1 rounded-full border border-[#E63946] text-[#E63946] text-[10px] font-bold uppercase tracking-wide">
@@ -1188,6 +1279,7 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
               onHistory={openHistory}
               onEdit={openEdit}
               onDelete={handleDelete}
+              onSaveInline={(updated) => onUpdateInventoryItem?.(updated)}
             />
           ))}
         </div>

@@ -306,6 +306,17 @@ export function CrmApp({
     logAction('Homologação de Fornecedor', 'Fornecedores', `Homologado ${newSupplier.name}`);
   };
 
+  const handleUpdateSupplier = (s: Supplier) => {
+    setSuppliers((prev) => prev.map((x) => (x.id === s.id ? s : x)));
+    logAction('Atualização de Fornecedor', 'Fornecedores', `Atualizado ${s.name}`);
+  };
+
+  const handleDeleteSupplier = (id: string) => {
+    const s = suppliers.find((x) => x.id === id);
+    setSuppliers((prev) => prev.filter((x) => x.id !== id));
+    logAction('Exclusão de Fornecedor', 'Fornecedores', `Removido ${s?.name || id}`);
+  };
+
   const handleAddInventoryItem = async (newItem: InventoryItem) => {
     if (!isSupabaseConfigured()) {
       setInventory((prev) => [newItem, ...prev]);
@@ -583,7 +594,12 @@ export function CrmApp({
           )}
 
           {currentTab === 'fornecedores' && (
-            <FornecedoresView suppliers={suppliers} onAddSupplier={handleAddSupplier} />
+            <FornecedoresView
+              suppliers={suppliers}
+              onAddSupplier={handleAddSupplier}
+              onUpdateSupplier={handleUpdateSupplier}
+              onDeleteSupplier={handleDeleteSupplier}
+            />
           )}
 
           {currentTab === 'estoque' && (
