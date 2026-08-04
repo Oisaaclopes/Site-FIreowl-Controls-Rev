@@ -516,7 +516,21 @@ const StockItemCard: React.FC<{
         )}
         <div className="min-w-0">
           <p className="font-semibold text-slate-900 text-sm truncate">{item.name}</p>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] mt-0.5">
+          {(item.category || item.subcategory) && (
+            <div className="flex flex-wrap items-center gap-1.5 mt-1">
+              {item.category && (
+                <span className="text-[10px] font-bold uppercase tracking-wide text-[#1A1A72] bg-[#1A1A72]/5 px-2 py-0.5 rounded-full">
+                  {item.category}
+                </span>
+              )}
+              {item.subcategory && (
+                <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                  {item.subcategory}
+                </span>
+              )}
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] mt-1">
             {item.brand && <Meta label="Marca" value={item.brand} />}
             {item.model && <Meta label="Modelo" value={item.model} />}
             <Meta label="Qtd." value={`${item.quantity}${item.unit ? ' ' + item.unit.split(' ')[0] : ''}`} />
@@ -617,6 +631,8 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
   const [showSearch, setShowSearch] = useState(false);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
   const [criticalOnly, setCriticalOnly] = useState(false);
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterSubcategory, setFilterSubcategory] = useState('');
   const [showPanel, setShowPanel] = useState(false);
   const [showUnitModal, setShowUnitModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -874,12 +890,16 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     .filter((item) => (tab === 'compras' ? item.quantity <= item.minQuantity : true))
     // Filtro "somente nível crítico" (menu de mais opções)
     .filter((item) => (criticalOnly ? item.quantity <= item.minQuantity : true))
+    // Filtro por categoria macro e subcategoria
+    .filter((item) => (filterCategory ? item.category === filterCategory : true))
+    .filter((item) => (filterSubcategory ? item.subcategory === filterSubcategory : true))
     .filter(
       (item) =>
         item.name.toLowerCase().includes(term) ||
         item.code.toLowerCase().includes(term) ||
         (item.serialBP || '').toLowerCase().includes(term) ||
         (item.brand || '').toLowerCase().includes(term) ||
+        (item.subcategory || '').toLowerCase().includes(term) ||
         item.category.toLowerCase().includes(term)
     );
 
@@ -1037,18 +1057,61 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
         </div>
       </div>
 
-      {/* Campo de busca (aparece ao clicar na lupa) */}
+      {/* Busca + filtros por categoria/subcategoria (aparecem ao clicar na lupa) */}
       {showSearch && (
-        <div className="relative w-full sm:w-96">
-          <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-lg">search</span>
-          <input
-            autoFocus
-            type="text"
-            placeholder="Buscar por nome, código, marca ou categoria..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
-          />
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="relative w-full sm:w-80">
+            <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-lg">search</span>
+            <input
+              autoFocus
+              type="text"
+              placeholder="Buscar por nome, código, marca..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+            />
+          </div>
+          <select
+            value={filterCategory}
+            onChange={(e) => {
+              setFilterCategory(e.target.value);
+              setFilterSubcategory('');
+            }}
+            className="w-full sm:w-56 px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+          >
+            <option value="">Todas as categorias</option>
+            {MACRO_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          <select
+            value={filterSubcategory}
+            onChange={(e) => setFilterSubcategory(e.target.value)}
+            disabled={!filterCategory}
+            className="w-full sm:w-64 px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#E63946]/20 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+          >
+            <option value="">{filterCategory ? 'Todas as subcategorias' : 'Escolha a categoria'}</option>
+            {(filterCategory ? CATALOG[filterCategory] || [] : []).map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          {(filterCategory || filterSubcategory || searchTerm) && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm('');
+                setFilterCategory('');
+                setFilterSubcategory('');
+              }}
+              className="shrink-0 px-3 py-2 text-xs font-semibold text-slate-500 hover:text-[#E63946] border border-slate-200 rounded-lg"
+            >
+              Limpar
+            </button>
+          )}
         </div>
       )}
 
