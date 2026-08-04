@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { SystemAuditLog, UserRole, CompanyProfile, PartnerBrand, PdfPrefs } from '@/lib/types';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
 import { Toggle } from '@/components/SidePanel';
+import { listUsers, createUser, updateUserRole, deleteUserProfile, ManagedUser } from '@/lib/users';
 
 interface ContaViewProps {
   logs: SystemAuditLog[];
@@ -17,7 +18,15 @@ interface ContaViewProps {
   pdfPrefs: PdfPrefs;
   onUpdatePdfPrefs: (p: PdfPrefs) => void;
   canSwitchRole?: boolean;
+  currentEmail?: string;
 }
+
+const ROLE_LABELS: Record<UserRole, string> = {
+  ADMINISTRATIVO: 'Administrativo',
+  GESTOR: 'Gestor',
+  FINANCEIRO: 'Financeiro',
+  TECNICO: 'Técnico',
+};
 
 const inputCls =
   'w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20 focus:border-[#1A1A72]/40';
@@ -41,8 +50,93 @@ export const ContaView: React.FC<ContaViewProps> = ({
   pdfPrefs,
   onUpdatePdfPrefs,
   canSwitchRole = false,
+  currentEmail = '',
 }) => {
-  const [tab, setTab] = useState<'conta' | 'preferencias' | 'pdf'>('conta');
+  const [tab, setTab] = useState<'conta' | 'preferencias' | 'pdf' | 'usuarios'>('conta');
+
+  // Gestão de usuários (apenas admin)
+  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersError, setUsersError] = useState('');
+  const [nuName, setNuName] = useState('');
+  const [nuEmail, setNuEmail] = useState('');
+  const [nuPassword, setNuPassword] = useState('');
+  const [nuRole, setNuRole] = useState<UserRole>('TECNICO');
+  const [creating, setCreating] = useState(false);
+  const [createMsg, setCreateMsg] = useState('');
+
+  const refreshUsers = () => {
+    setUsersLoading(true);
+    setUsersError('');
+    listUsers()
+      .then(setUsers)
+      .catch((err) => {
+        console.error('Falha ao listar usuários:', err);
+        setUsersError('Não foi possível carregar os usuários.');
+      })
+      .finally(() => setUsersLoading(false));
+  };
+
+  useEffect(() => {
+    if (canSwitchRole) refreshUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canSwitchRole]);
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (creating) return;
+    setCreateMsg('');
+    if (!nuEmail.trim() || nuPassword.length < 6) {
+      setCreateMsg('Informe um e-mail válido e uma senha de pelo menos 6 caracteres.');
+      return;
+    }
+    setCreating(true);
+    try {
+      await createUser(nuEmail.trim(), nuPassword, nuName.trim(), nuRole);
+      setCreateMsg('OK: usuário criado. Já pode fazer login (se a confirmação de e-mail estiver desativada).');
+      setNuName('');
+      setNuEmail('');
+      setNuPassword('');
+      setNuRole('TECNICO');
+      setTimeout(refreshUsers, 600);
+    } catch (err: any) {
+      const msg = String(err?.message || '');
+      if (/already registered|already exists/i.test(msg)) {
+        setCreateMsg('Já existe um usuário com esse e-mail.');
+      } else if (/signups? not allowed|disabled/i.test(msg)) {
+        setCreateMsg('Cadastro desativado no Supabase (Auth → Providers → Email → habilite os cadastros).');
+      } else {
+        setCreateMsg('Não foi possível criar o usuário: ' + msg);
+      }
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleRoleChange = async (u: ManagedUser, role: UserRole) => {
+    try {
+      await updateUserRole(u.id, role);
+      setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, role } : x)));
+    } catch (err) {
+      console.error('Falha ao alterar papel:', err);
+      alert('Não foi possível alterar o nível de acesso.');
+    }
+  };
+
+  const handleDeleteUser = async (u: ManagedUser) => {
+    if (u.email && currentEmail && u.email.toLowerCase() === currentEmail.toLowerCase()) {
+      alert('Você não pode remover o seu próprio acesso.');
+      return;
+    }
+    if (!window.confirm(`Remover o acesso de "${u.name || u.email}"?\n\nO usuário perde o acesso ao sistema.`)) return;
+    try {
+      await deleteUserProfile(u.id);
+      setUsers((prev) => prev.filter((x) => x.id !== u.id));
+    } catch (err) {
+      console.error('Falha ao remover usuário:', err);
+      alert('Não foi possível remover o usuário.');
+    }
+  };
 
   const [profile, setProfile] = useState<CompanyProfile>(companyProfile);
 
@@ -81,7 +175,8 @@ export const ContaView: React.FC<ContaViewProps> = ({
     { key: 'conta', label: 'Conta', icon: 'account_circle' },
     { key: 'preferencias', label: 'Preferências', icon: 'tune' },
     { key: 'pdf', label: 'PDF', icon: 'picture_as_pdf' },
-  ] as const;
+    ...(canSwitchRole ? [{ key: 'usuarios', label: 'Usuários', icon: 'group' }] : []),
+  ] as { key: 'conta' | 'preferencias' | 'pdf' | 'usuarios'; label: string; icon: string }[];
 
   return (
     <div className="flex flex-col w-full p-8 gap-6">
@@ -409,6 +504,128 @@ export const ContaView: React.FC<ContaViewProps> = ({
             <span className="material-symbols-outlined text-sm">info</span>
             Preferências de geração de PDF (aplicadas às propostas comerciais).
           </p>
+        </div>
+      )}
+
+      {/* ===== TAB: USUÁRIOS (apenas admin) ===== */}
+      {tab === 'usuarios' && canSwitchRole && (
+        <div className="flex flex-col gap-6">
+          {/* Novo usuário */}
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <SettingIcon icon="person_add" />
+              <div>
+                <h3 className="font-display text-sm font-bold uppercase tracking-wide text-[#1A1A72]">
+                  Novo usuário
+                </h3>
+                <p className="text-[11px] text-slate-400">Cria o login e já define o nível de acesso.</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleCreateUser} className="space-y-3 text-xs font-medium">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Nome</label>
+                  <input type="text" value={nuName} onChange={(e) => setNuName(e.target.value)} className={inputCls} placeholder="Nome do funcionário" />
+                </div>
+                <div>
+                  <label className={labelCls}>Nível de acesso</label>
+                  <select value={nuRole} onChange={(e) => setNuRole(e.target.value as UserRole)} className={`${inputCls} font-semibold`}>
+                    <option value="ADMINISTRATIVO">Administrativo — acesso total</option>
+                    <option value="GESTOR">Gestor — operação e contratos</option>
+                    <option value="FINANCEIRO">Financeiro — receitas e despesas</option>
+                    <option value="TECNICO">Técnico — campo e ponto</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>E-mail</label>
+                  <input type="email" value={nuEmail} onChange={(e) => setNuEmail(e.target.value)} className={`${inputCls} font-data-mono`} placeholder="nome@fireowlcontrols.com.br" />
+                </div>
+                <div>
+                  <label className={labelCls}>Senha inicial</label>
+                  <input type="text" value={nuPassword} onChange={(e) => setNuPassword(e.target.value)} className={`${inputCls} font-data-mono`} placeholder="mín. 6 caracteres" />
+                </div>
+              </div>
+
+              {createMsg && (
+                <p className={`text-[11px] font-semibold ${createMsg.startsWith('OK') ? 'text-emerald-700' : 'text-[#E63946]'}`}>
+                  {createMsg.replace(/^OK: /, '')}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={creating}
+                className="bg-[#E63946] hover:bg-[#a51515] text-white font-semibold py-2.5 px-5 rounded-lg uppercase tracking-wider text-xs transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-70"
+              >
+                <span className={`material-symbols-outlined text-base ${creating ? 'animate-spin' : ''}`}>
+                  {creating ? 'progress_activity' : 'person_add'}
+                </span>
+                {creating ? 'Criando...' : 'Criar usuário'}
+              </button>
+            </form>
+          </div>
+
+          {/* Lista de usuários */}
+          <div>
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Usuários com acesso</h3>
+            {usersLoading ? (
+              <div className="bg-white rounded-xl shadow-sm py-12 text-center text-slate-400">
+                <span className="material-symbols-outlined text-3xl animate-spin inline-block">progress_activity</span>
+              </div>
+            ) : usersError ? (
+              <div className="bg-white rounded-xl shadow-sm py-10 text-center text-[#E63946] text-xs font-semibold">{usersError}</div>
+            ) : users.length === 0 ? (
+              <div className="bg-white rounded-xl shadow-sm py-12 text-center text-slate-400">
+                <span className="material-symbols-outlined text-4xl text-slate-300">group</span>
+                <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">Nenhum usuário</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {users.map((u) => {
+                  const isSelf = !!currentEmail && u.email.toLowerCase() === currentEmail.toLowerCase();
+                  return (
+                    <DataListRow
+                      key={u.id}
+                      leading={
+                        <span className="w-10 h-10 rounded-lg bg-[#1A1A72] text-white font-bold flex items-center justify-center text-xs shrink-0">
+                          {(u.name || u.email).slice(0, 2).toUpperCase()}
+                        </span>
+                      }
+                      title={
+                        <span>
+                          {u.name || '—'}
+                          {isSelf && <span className="ml-2 text-[10px] text-slate-400 uppercase">(você)</span>}
+                        </span>
+                      }
+                      meta={<span className="font-data-mono text-slate-500">{u.email}</span>}
+                      right={
+                        <>
+                          <select
+                            value={u.role}
+                            onChange={(e) => handleRoleChange(u, e.target.value as UserRole)}
+                            className="border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                          >
+                            <option value="ADMINISTRATIVO">Administrativo</option>
+                            <option value="GESTOR">Gestor</option>
+                            <option value="FINANCEIRO">Financeiro</option>
+                            <option value="TECNICO">Técnico</option>
+                          </select>
+                          {!isSelf && (
+                            <RowAction icon="delete" label="Remover acesso" danger onClick={() => handleDeleteUser(u)} />
+                          )}
+                        </>
+                      }
+                    />
+                  );
+                })}
+              </div>
+            )}
+            <p className="text-[10px] text-slate-400 mt-3 flex items-center gap-1">
+              <span className="material-symbols-outlined text-sm">info</span>
+              &quot;Remover&quot; revoga o acesso ao sistema. A exclusão total da conta de login é feita no painel do Supabase.
+            </p>
+          </div>
         </div>
       )}
     </div>

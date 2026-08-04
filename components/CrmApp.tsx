@@ -76,10 +76,16 @@ function getNextSeq() {
 interface CrmAppProps {
   initialRole?: UserRole;
   userName?: string;
+  userEmail?: string;
   onLogout?: () => void;
 }
 
-export function CrmApp({ initialRole = 'ADMINISTRATIVO', userName = 'Operador Fireowl', onLogout }: CrmAppProps) {
+export function CrmApp({
+  initialRole = 'ADMINISTRATIVO',
+  userName = 'Operador Fireowl',
+  userEmail = '',
+  onLogout,
+}: CrmAppProps) {
   const [currentTab, setCurrentTab] = useState<TabPath>(allowedTabs(initialRole)[0]);
   const [userRole, setUserRole] = useState<UserRole>(initialRole);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -526,6 +532,7 @@ export function CrmApp({ initialRole = 'ADMINISTRATIVO', userName = 'Operador Fi
               pdfPrefs={pdfPrefs}
               onUpdatePdfPrefs={handleUpdatePdfPrefs}
               canSwitchRole={canSwitchRole}
+              currentEmail={userEmail}
             />
           )}
         </main>

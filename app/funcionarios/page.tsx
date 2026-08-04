@@ -63,6 +63,8 @@ export default function FuncionariosPage() {
         setErro('E-mail ou senha inválidos.');
       } else if (/email not confirmed/i.test(msg)) {
         setErro('E-mail ainda não confirmado. Confirme o cadastro ou peça ao administrador.');
+      } else if (/PROFILE_NOT_AUTHORIZED/.test(msg)) {
+        setErro('Acesso não autorizado. Fale com o administrador do sistema.');
       } else {
         setErro('Não foi possível entrar. Tente novamente.');
       }
@@ -87,7 +89,14 @@ export default function FuncionariosPage() {
 
   // Autenticado → abre o sistema de gestão
   if (authUser) {
-    return <CrmApp initialRole={authUser.role} userName={authUser.name} onLogout={handleLogout} />;
+    return (
+      <CrmApp
+        initialRole={authUser.role}
+        userName={authUser.name}
+        userEmail={authUser.email}
+        onLogout={handleLogout}
+      />
+    );
   }
 
   // Tela de login do operador
