@@ -220,6 +220,8 @@ export interface TimePunch {
   status: 'APROVADO' | 'PENDENTE' | 'AJUSTADO';
   photoUrl?: string;
   notes?: string;
+  at?: number; // epoch ms do registro (para cálculos de jornada)
+  accuracy?: number; // precisão do GPS em metros
 }
 
 export interface TechnicalReportSDAI {
