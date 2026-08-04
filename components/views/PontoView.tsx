@@ -4,6 +4,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { TimePunch, UserRole } from '@/lib/types';
 import { DataListRow, Badge } from '@/components/DataListRow';
 import { WorkSchedule, DEFAULT_SCHEDULE, normalizeSchedule, hmToMinutes, WEEKDAY_SHORT } from '@/lib/schedule';
+import { fetchAdjustments, createAdjustment, updateAdjustmentStatus, PunchAdjustment } from '@/lib/adjustments';
+import { isSupabaseConfigured } from '@/lib/inventory';
 
 interface PontoViewProps {
   punches: TimePunch[];
@@ -40,6 +42,10 @@ const fmtDuration = (ms: number) => {
   const totalMin = Math.max(0, Math.floor(ms / 60000));
   return `${pad2(Math.floor(totalMin / 60))}h${pad2(totalMin % 60)}min`;
 };
+const inputCls =
+  'w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20 focus:border-[#1A1A72]/40';
+const labelCls = 'block text-slate-600 mb-1 font-semibold uppercase text-[11px]';
+
 const friendlyDate = (d: Date) =>
   d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
 
@@ -59,6 +65,27 @@ export const PontoView: React.FC<PontoViewProps> = ({
   const [online, setOnline] = useState(true);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [showEspelho, setShowEspelho] = useState(false);
+
+  // Solicitações de ajuste de ponto
+  const [adjustments, setAdjustments] = useState<PunchAdjustment[]>([]);
+  const [showAdj, setShowAdj] = useState(false);
+  const [adjSaving, setAdjSaving] = useState(false);
+  const [adjForm, setAdjForm] = useState<{ refDate: string; type: TimePunch['type']; time: string; reason: string }>({
+    refDate: '',
+    type: 'SAIDA',
+    time: '',
+    reason: '',
+  });
+
+  const loadAdjustments = () => {
+    if (!isSupabaseConfigured()) return;
+    fetchAdjustments()
+      .then(setAdjustments)
+      .catch((err) => console.warn('Ajustes: falha ao carregar.', err));
+  };
+  useEffect(() => {
+    loadAdjustments();
+  }, []);
 
   // Exportação da folha (admin/gestor)
   const [expEmployee, setExpEmployee] = useState('');
@@ -232,6 +259,48 @@ export const PontoView: React.FC<PontoViewProps> = ({
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const greeting = now.getHours() < 12 ? 'Bom dia' : now.getHours() < 18 ? 'Boa tarde' : 'Boa noite';
+
+  const fmtDateInput = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  const openAdj = (prefill?: Date) => {
+    setAdjForm({
+      refDate: prefill ? fmtDateInput(prefill) : fmtDateInput(new Date()),
+      type: 'SAIDA',
+      time: '',
+      reason: '',
+    });
+    setShowAdj(true);
+  };
+  const submitAdj = async () => {
+    if (adjSaving || !adjForm.refDate || !adjForm.reason.trim()) return;
+    setAdjSaving(true);
+    try {
+      await createAdjustment({
+        employeeName: currentUser,
+        refDate: adjForm.refDate,
+        type: adjForm.type,
+        requestedTime: adjForm.time,
+        reason: adjForm.reason.trim(),
+      });
+      setShowAdj(false);
+      loadAdjustments();
+    } catch (err) {
+      console.error('Falha ao enviar solicitação de ajuste:', err);
+      alert('Não foi possível enviar a solicitação.');
+    } finally {
+      setAdjSaving(false);
+    }
+  };
+  const reviewAdj = async (id: string, status: 'APROVADO' | 'REJEITADO') => {
+    try {
+      await updateAdjustmentStatus(id, status);
+      setAdjustments((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
+    } catch (err) {
+      console.error('Falha ao revisar solicitação:', err);
+      alert('Não foi possível atualizar a solicitação.');
+    }
+  };
+  const adjStatusColor = (s: PunchAdjustment['status']) =>
+    s === 'APROVADO' ? 'emerald' : s === 'REJEITADO' ? 'red' : 'amber';
 
   // ---- Exportação da folha de ponto (admin/gestor) ----
   const TYPE_LABEL: Record<PunchType, string> = {
@@ -459,10 +528,17 @@ export const PontoView: React.FC<PontoViewProps> = ({
             </div>
           )}
           {missingDay && (
-            <div className="flex items-center gap-2 bg-red-50 border border-[#E63946]/30 text-[#E63946] rounded-xl px-4 py-3 text-xs font-semibold">
-              <span className="material-symbols-outlined text-base">error</span>
-              Você não registrou a saída de {missingDay.toLocaleDateString('pt-BR')}. Procure o gestor para solicitar
-              ajuste.
+            <div className="flex items-center justify-between gap-2 bg-red-50 border border-[#E63946]/30 text-[#E63946] rounded-xl px-4 py-3 text-xs font-semibold">
+              <span className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-base">error</span>
+                Você não registrou a saída de {missingDay.toLocaleDateString('pt-BR')}.
+              </span>
+              <button
+                onClick={() => openAdj(missingDay || undefined)}
+                className="shrink-0 bg-[#E63946] hover:bg-[#a51515] text-white px-3 py-1.5 rounded-lg text-[11px] uppercase tracking-wide"
+              >
+                Solicitar ajuste
+              </button>
             </div>
           )}
         </div>
@@ -703,6 +779,72 @@ export const PontoView: React.FC<PontoViewProps> = ({
         </div>
       )}
 
+      {/* ===== Solicitações de ajuste ===== */}
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <span className="w-8 h-8 rounded-lg bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center">
+              <span className="material-symbols-outlined text-lg">edit_calendar</span>
+            </span>
+            <div>
+              <h3 className="font-display text-sm font-bold uppercase tracking-wide text-[#1A1A72]">
+                Solicitações de ajuste
+              </h3>
+              <p className="text-[11px] text-slate-400">
+                {isManager ? 'Aprove ou rejeite ajustes da equipe.' : 'Peça correção de uma batida.'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => openAdj()}
+            className="inline-flex items-center gap-1.5 bg-[#1A1A72] hover:bg-[#12124f] text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
+          >
+            <span className="material-symbols-outlined text-base">add</span> Nova solicitação
+          </button>
+        </div>
+
+        {adjustments.length === 0 ? (
+          <p className="text-xs text-slate-400">Nenhuma solicitação registrada.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {adjustments.map((a) => (
+              <div
+                key={a.id}
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border border-slate-100 rounded-lg p-3 text-xs"
+              >
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-800">
+                    {isManager && <span className="text-slate-500">{a.employeeName} · </span>}
+                    {a.type} em {a.refDate.split('-').reverse().join('/')}
+                    {a.requestedTime ? ` às ${a.requestedTime}` : ''}
+                  </p>
+                  <p className="text-slate-500 truncate">{a.reason || '—'}</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Badge color={adjStatusColor(a.status)}>{a.status}</Badge>
+                  {isManager && a.status === 'PENDENTE' && (
+                    <>
+                      <button
+                        onClick={() => reviewAdj(a.id, 'APROVADO')}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold"
+                      >
+                        Aprovar
+                      </button>
+                      <button
+                        onClick={() => reviewAdj(a.id, 'REJEITADO')}
+                        className="px-2.5 py-1 rounded-lg bg-[#E63946] hover:bg-[#a51515] text-white text-[11px] font-semibold"
+                      >
+                        Rejeitar
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* ===== Registros recentes ===== */}
       <div id="card-registros">
         <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Registros recentes de frequência</h3>
@@ -762,6 +904,85 @@ export const PontoView: React.FC<PontoViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Modal Solicitar ajuste de ponto */}
+      {showAdj && (
+        <div className="fixed inset-0 z-50 bg-[#1A1A72]/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white max-w-md w-full rounded-xl border border-slate-200 shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <h3 className="font-display text-base font-bold text-[#1A1A72] uppercase tracking-wide">
+                Solicitar ajuste de ponto
+              </h3>
+              <button onClick={() => setShowAdj(false)} className="text-slate-400 hover:text-slate-700 font-bold text-xl">
+                ✕
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4 text-xs font-medium">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Data</label>
+                  <input
+                    type="date"
+                    value={adjForm.refDate}
+                    onChange={(e) => setAdjForm({ ...adjForm, refDate: e.target.value })}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Batida</label>
+                  <select
+                    value={adjForm.type}
+                    onChange={(e) => setAdjForm({ ...adjForm, type: e.target.value as TimePunch['type'] })}
+                    className={inputCls}
+                  >
+                    <option value="ENTRADA">Entrada</option>
+                    <option value="PAUSA">Saída Almoço</option>
+                    <option value="RETORNO">Retorno</option>
+                    <option value="SAIDA">Saída</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className={labelCls}>Horário correto</label>
+                <input
+                  type="time"
+                  value={adjForm.time}
+                  onChange={(e) => setAdjForm({ ...adjForm, time: e.target.value })}
+                  className={`${inputCls} font-data-mono`}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Motivo *</label>
+                <textarea
+                  value={adjForm.reason}
+                  onChange={(e) => setAdjForm({ ...adjForm, reason: e.target.value })}
+                  rows={3}
+                  placeholder="Ex.: Esqueci de registrar a saída às 19:00."
+                  className={`${inputCls} resize-none`}
+                />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2">
+              <button
+                onClick={() => setShowAdj(false)}
+                className="px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-slate-600 hover:bg-slate-100"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={submitAdj}
+                disabled={adjSaving || !adjForm.reason.trim()}
+                className="bg-[#1A1A72] hover:bg-[#12124f] text-white px-5 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 disabled:opacity-60"
+              >
+                <span className={`material-symbols-outlined text-base ${adjSaving ? 'animate-spin' : ''}`}>
+                  {adjSaving ? 'progress_activity' : 'send'}
+                </span>
+                {adjSaving ? 'Enviando...' : 'Enviar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Meu Espelho de Ponto */}
       {showEspelho && (
