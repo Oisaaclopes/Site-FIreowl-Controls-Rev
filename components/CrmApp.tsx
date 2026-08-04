@@ -70,6 +70,7 @@ import { allowedTabs, isTabAllowed } from '@/lib/rbac';
 import { fetchPunches, insertPunch } from '@/lib/timepunch';
 import { fetchPedidos, upsertPedido, updatePedidoStatus } from '@/lib/pedidos';
 import { fetchQuotes, insertQuote } from '@/lib/quotes';
+import { WorkSchedule } from '@/lib/schedule';
 
 let idSeq = 1000;
 function getNextSeq() {
@@ -80,6 +81,7 @@ interface CrmAppProps {
   initialRole?: UserRole;
   userName?: string;
   userEmail?: string;
+  userSchedule?: WorkSchedule;
   onLogout?: () => void;
 }
 
@@ -87,6 +89,7 @@ export function CrmApp({
   initialRole = 'ADMINISTRATIVO',
   userName = 'Operador Fireowl',
   userEmail = '',
+  userSchedule,
   onLogout,
 }: CrmAppProps) {
   const [currentTab, setCurrentTab] = useState<TabPath>(allowedTabs(initialRole)[0]);
@@ -607,7 +610,13 @@ export function CrmApp({
           )}
 
           {currentTab === 'ponto' && (
-            <PontoView punches={punches} onAddPunch={handleAddPunch} currentUser={userName} userRole={userRole} />
+            <PontoView
+              punches={punches}
+              onAddPunch={handleAddPunch}
+              currentUser={userName}
+              userRole={userRole}
+              schedule={userSchedule}
+            />
           )}
 
           {currentTab === 'conta' && (

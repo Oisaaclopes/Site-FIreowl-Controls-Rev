@@ -5,6 +5,7 @@ import { SystemAuditLog, UserRole, CompanyProfile, PartnerBrand, PdfPrefs } from
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
 import { Toggle } from '@/components/SidePanel';
 import { listUsers, createUser, updateUserRole, deleteUserProfile, ManagedUser } from '@/lib/users';
+import { WorkSchedule, DEFAULT_SCHEDULE, WEEKDAY_SHORT } from '@/lib/schedule';
 
 interface ContaViewProps {
   logs: SystemAuditLog[];
@@ -62,6 +63,12 @@ export const ContaView: React.FC<ContaViewProps> = ({
   const [nuEmail, setNuEmail] = useState('');
   const [nuPassword, setNuPassword] = useState('');
   const [nuRole, setNuRole] = useState<UserRole>('TECNICO');
+  const [nuFullName, setNuFullName] = useState('');
+  const [nuCpf, setNuCpf] = useState('');
+  const [nuBirth, setNuBirth] = useState('');
+  const [nuPhone, setNuPhone] = useState('');
+  const [nuCourses, setNuCourses] = useState('');
+  const [nuSchedule, setNuSchedule] = useState<WorkSchedule>(() => DEFAULT_SCHEDULE.map((d) => ({ ...d })));
   const [creating, setCreating] = useState(false);
   const [createMsg, setCreateMsg] = useState('');
 
@@ -92,12 +99,32 @@ export const ContaView: React.FC<ContaViewProps> = ({
     }
     setCreating(true);
     try {
-      await createUser(nuEmail.trim(), nuPassword, nuName.trim(), nuRole);
+      await createUser({
+        email: nuEmail.trim(),
+        password: nuPassword,
+        name: (nuName || nuFullName || nuEmail.split('@')[0]).trim(),
+        role: nuRole,
+        fullName: nuFullName.trim() || undefined,
+        cpf: nuCpf.trim() || undefined,
+        birthDate: nuBirth || undefined,
+        phone: nuPhone.trim() || undefined,
+        schedule: nuSchedule,
+        courses: nuCourses
+          .split('\n')
+          .map((s) => s.trim())
+          .filter(Boolean),
+      });
       setCreateMsg('OK: usuário criado. Já pode fazer login (se a confirmação de e-mail estiver desativada).');
       setNuName('');
       setNuEmail('');
       setNuPassword('');
       setNuRole('TECNICO');
+      setNuFullName('');
+      setNuCpf('');
+      setNuBirth('');
+      setNuPhone('');
+      setNuCourses('');
+      setNuSchedule(DEFAULT_SCHEDULE.map((d) => ({ ...d })));
       setTimeout(refreshUsers, 600);
     } catch (err: any) {
       const msg = String(err?.message || '');
@@ -525,8 +552,8 @@ export const ContaView: React.FC<ContaViewProps> = ({
             <form onSubmit={handleCreateUser} className="space-y-3 text-xs font-medium">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Nome</label>
-                  <input type="text" value={nuName} onChange={(e) => setNuName(e.target.value)} className={inputCls} placeholder="Nome do funcionário" />
+                  <label className={labelCls}>Nome de exibição</label>
+                  <input type="text" value={nuName} onChange={(e) => setNuName(e.target.value)} className={inputCls} placeholder="Ex.: Isaac L." />
                 </div>
                 <div>
                   <label className={labelCls}>Nível de acesso</label>
@@ -538,12 +565,102 @@ export const ContaView: React.FC<ContaViewProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className={labelCls}>E-mail</label>
+                  <label className={labelCls}>E-mail (login)</label>
                   <input type="email" value={nuEmail} onChange={(e) => setNuEmail(e.target.value)} className={`${inputCls} font-data-mono`} placeholder="nome@fireowlcontrols.com.br" />
                 </div>
                 <div>
                   <label className={labelCls}>Senha inicial</label>
                   <input type="text" value={nuPassword} onChange={(e) => setNuPassword(e.target.value)} className={`${inputCls} font-data-mono`} placeholder="mín. 6 caracteres" />
+                </div>
+              </div>
+
+              {/* Dados do funcionário */}
+              <div className="pt-2 border-t border-slate-100">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Dados do funcionário</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>Nome completo</label>
+                    <input type="text" value={nuFullName} onChange={(e) => setNuFullName(e.target.value)} className={inputCls} placeholder="Nome civil completo" />
+                  </div>
+                  <div>
+                    <label className={labelCls}>CPF</label>
+                    <input type="text" value={nuCpf} onChange={(e) => setNuCpf(e.target.value)} className={`${inputCls} font-data-mono`} placeholder="000.000.000-00" />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Data de nascimento</label>
+                    <input type="date" value={nuBirth} onChange={(e) => setNuBirth(e.target.value)} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Telefone</label>
+                    <input type="text" value={nuPhone} onChange={(e) => setNuPhone(e.target.value)} className={`${inputCls} font-data-mono`} placeholder="(00) 00000-0000" />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <label className={labelCls}>Cursos, NRs e diplomas (um por linha)</label>
+                  <textarea
+                    value={nuCourses}
+                    onChange={(e) => setNuCourses(e.target.value)}
+                    rows={3}
+                    placeholder={'Ex.: NR-10 (validade 2027)\nNR-35 Trabalho em Altura\nTécnico em Eletrônica'}
+                    className={`${inputCls} resize-none`}
+                  />
+                </div>
+              </div>
+
+              {/* Escala de trabalho */}
+              <div className="pt-2 border-t border-slate-100">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                  Escala de trabalho (usada nos alertas de ponto)
+                </p>
+                <div className="space-y-1.5">
+                  {nuSchedule.map((d, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <label className="flex items-center gap-1.5 w-20 shrink-0 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={d.works}
+                          onChange={(e) =>
+                            setNuSchedule((prev) => prev.map((x, idx) => (idx === i ? { ...x, works: e.target.checked } : x)))
+                          }
+                        />
+                        <span className="text-[11px] font-semibold text-slate-600">{WEEKDAY_SHORT[i]}</span>
+                      </label>
+                      <input
+                        type="time"
+                        value={d.start}
+                        disabled={!d.works}
+                        onChange={(e) =>
+                          setNuSchedule((prev) => prev.map((x, idx) => (idx === i ? { ...x, start: e.target.value } : x)))
+                        }
+                        className={`${inputCls} font-data-mono py-1.5 disabled:bg-slate-100 disabled:text-slate-300`}
+                      />
+                      <span className="text-slate-400 text-[11px]">às</span>
+                      <input
+                        type="time"
+                        value={d.end}
+                        disabled={!d.works}
+                        onChange={(e) =>
+                          setNuSchedule((prev) => prev.map((x, idx) => (idx === i ? { ...x, end: e.target.value } : x)))
+                        }
+                        className={`${inputCls} font-data-mono py-1.5 disabled:bg-slate-100 disabled:text-slate-300`}
+                      />
+                      <div className="flex items-center gap-1 shrink-0">
+                        <input
+                          type="number"
+                          min={0}
+                          value={d.lunchMinutes}
+                          disabled={!d.works}
+                          onChange={(e) =>
+                            setNuSchedule((prev) =>
+                              prev.map((x, idx) => (idx === i ? { ...x, lunchMinutes: Number(e.target.value) } : x))
+                            )
+                          }
+                          className={`${inputCls} font-data-mono py-1.5 w-16 text-center disabled:bg-slate-100 disabled:text-slate-300`}
+                        />
+                        <span className="text-slate-400 text-[10px]">min almoço</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 

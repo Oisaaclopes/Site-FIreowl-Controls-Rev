@@ -3,12 +3,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { TimePunch, UserRole } from '@/lib/types';
 import { DataListRow, Badge } from '@/components/DataListRow';
+import { WorkSchedule, DEFAULT_SCHEDULE, normalizeSchedule, hmToMinutes, WEEKDAY_SHORT } from '@/lib/schedule';
 
 interface PontoViewProps {
   punches: TimePunch[];
   onAddPunch: (punch: TimePunch) => void;
   currentUser?: string;
   userRole?: UserRole;
+  schedule?: WorkSchedule;
 }
 
 // Escala fixa (poderia vir do cadastro do funcionário)
@@ -46,8 +48,10 @@ export const PontoView: React.FC<PontoViewProps> = ({
   onAddPunch,
   currentUser = 'Operador Fireowl',
   userRole = 'TECNICO',
+  schedule,
 }) => {
   const isManager = userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR';
+  const sched = useMemo(() => normalizeSchedule(schedule ?? DEFAULT_SCHEDULE), [schedule]);
   const [now, setNow] = useState(() => new Date());
   const [punching, setPunching] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -130,6 +134,38 @@ export const PontoView: React.FC<PontoViewProps> = ({
     : { label: 'Trabalhando', dot: 'bg-emerald-500', badge: 'emerald' as const };
 
   const punchTime = (p?: TimePunch) => (p?.at ? fmtHM(new Date(p.at)) : '--');
+
+  // ---- Alertas de escala (5 min antes) e batida faltante ----
+  const todayCfg = sched[now.getDay()];
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const entryMin = hmToMinutes(todayCfg.start);
+  const exitMin = hmToMinutes(todayCfg.end);
+  // Alerta de entrada: a partir de 5 min antes até 90 min depois, enquanto não bater
+  const entryDue = todayCfg.works && !entrada && nowMin >= entryMin - 5 && nowMin <= entryMin + 90;
+  // Alerta de saída: a partir de 5 min antes, com entrada já batida e sem saída
+  const exitDue = todayCfg.works && !!entrada && !saida && nowMin >= exitMin - 5;
+
+  const dayKeyToday = new Date(nowMs).toDateString();
+  const missingDay = useMemo(() => {
+    const byDay = new Map<string, TimePunch[]>();
+    punches
+      .filter((p) => p.employeeName === currentUser && p.at)
+      .forEach((p) => {
+        const key = new Date(p.at!).toDateString();
+        if (!byDay.has(key)) byDay.set(key, []);
+        byDay.get(key)!.push(p);
+      });
+    let found: Date | null = null;
+    byDay.forEach((list, key) => {
+      if (key === dayKeyToday) return;
+      const d = new Date(key);
+      if (!sched[d.getDay()].works) return;
+      const hasEntrada = list.some((p) => p.type === 'ENTRADA');
+      const hasSaida = list.some((p) => p.type === 'SAIDA');
+      if (hasEntrada && !hasSaida && (!found || d > found)) found = d as Date;
+    });
+    return found as Date | null;
+  }, [punches, currentUser, sched, dayKeyToday]);
 
   // A permissão de GPS é solicitada APENAS aqui, no clique de bater ponto
   // (nunca no carregamento do site).
@@ -403,6 +439,35 @@ export const PontoView: React.FC<PontoViewProps> = ({
         </button>
       </div>
 
+      {/* ===== Alertas / lembretes ===== */}
+      {(entryDue || exitDue || missingDay) && (
+        <div className="flex flex-col gap-2">
+          {entryDue && (
+            <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 text-xs font-semibold">
+              <span className="material-symbols-outlined text-base">notifications_active</span>
+              {nowMin < entryMin
+                ? `Faltam ${entryMin - nowMin} min para o horário de entrada (${todayCfg.start}). Não esqueça de bater o ponto.`
+                : `Você ainda não registrou a entrada de hoje (previsto ${todayCfg.start}).`}
+            </div>
+          )}
+          {exitDue && (
+            <div className="flex items-center gap-2 bg-[#1A1A72]/5 border border-[#1A1A72]/20 text-[#1A1A72] rounded-xl px-4 py-3 text-xs font-semibold">
+              <span className="material-symbols-outlined text-base">notifications_active</span>
+              {nowMin < exitMin
+                ? `Faltam ${exitMin - nowMin} min para o horário de saída (${todayCfg.end}).`
+                : `Passou do horário de saída (${todayCfg.end}). Registre sua saída.`}
+            </div>
+          )}
+          {missingDay && (
+            <div className="flex items-center gap-2 bg-red-50 border border-[#E63946]/30 text-[#E63946] rounded-xl px-4 py-3 text-xs font-semibold">
+              <span className="material-symbols-outlined text-base">error</span>
+              Você não registrou a saída de {missingDay.toLocaleDateString('pt-BR')}. Procure o gestor para solicitar
+              ajuste.
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* ===== Card da Jornada + Botão inteligente ===== */}
         <div id="card-jornada" className="lg:col-span-2 bg-white rounded-xl shadow-sm p-6 relative overflow-hidden">
@@ -451,7 +516,10 @@ export const PontoView: React.FC<PontoViewProps> = ({
           {/* Previsto x trabalhado */}
           <div className="flex flex-wrap items-center justify-between gap-3 mt-4 text-xs">
             <span className="text-slate-500">
-              Jornada prevista: <strong className="text-slate-800 font-data-mono">{SCALE.start} às {SCALE.end}</strong>
+              Jornada prevista:{' '}
+              <strong className="text-slate-800 font-data-mono">
+                {todayCfg.works ? `${todayCfg.start} às ${todayCfg.end}` : 'Folga hoje'}
+              </strong>
             </span>
             <span className="text-slate-500">
               Horas trabalhadas: <strong className="text-[#1A1A72] font-data-mono">{fmtDuration(workedMs)}</strong>
@@ -489,13 +557,18 @@ export const PontoView: React.FC<PontoViewProps> = ({
           {/* Escala */}
           <div className="bg-white rounded-xl shadow-sm p-5">
             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Sua escala</h4>
-            <div className="flex items-center justify-between text-xs mb-2">
-              <span className="text-slate-500">Seg a Sex</span>
-              <span className="font-data-mono font-bold text-slate-900">{SCALE.start} às {SCALE.end}</span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500">Almoço</span>
-              <span className="font-data-mono font-bold text-slate-900">{SCALE.lunchStart} às {SCALE.lunchEnd}</span>
+            <div className="space-y-1.5 text-xs">
+              {sched.map((d, i) => (
+                <div
+                  key={i}
+                  className={`flex items-center justify-between ${i === now.getDay() ? 'font-bold text-[#1A1A72]' : 'text-slate-500'}`}
+                >
+                  <span>{WEEKDAY_SHORT[i]}</span>
+                  <span className="font-data-mono">
+                    {d.works ? `${d.start}–${d.end} · ${d.lunchMinutes}min` : 'Folga'}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
 

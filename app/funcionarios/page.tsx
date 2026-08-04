@@ -94,6 +94,7 @@ export default function FuncionariosPage() {
         initialRole={authUser.role}
         userName={authUser.name}
         userEmail={authUser.email}
+        userSchedule={authUser.schedule}
         onLogout={handleLogout}
       />
     );

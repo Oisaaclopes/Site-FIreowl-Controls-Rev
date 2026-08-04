@@ -1,11 +1,13 @@
 import { getSupabaseClient } from './supabaseClient';
 import { UserRole } from './types';
+import { WorkSchedule, normalizeSchedule } from './schedule';
 
 export interface AuthUser {
   id: string;
   email: string;
   name: string;
   role: UserRole;
+  schedule?: WorkSchedule;
 }
 
 const VALID_ROLES: UserRole[] = ['ADMINISTRATIVO', 'TECNICO', 'GESTOR', 'FINANCEIRO'];
@@ -16,7 +18,7 @@ const normalizeRole = (r: unknown): UserRole =>
 async function toAuthUser(supabase: any, user: any): Promise<AuthUser | null> {
   const { data: profile } = await supabase
     .from('profiles')
-    .select('name, role')
+    .select('name, role, schedule')
     .eq('id', user.id)
     .maybeSingle();
 
@@ -28,6 +30,7 @@ async function toAuthUser(supabase: any, user: any): Promise<AuthUser | null> {
     email: user.email || '',
     name,
     role: normalizeRole(profile.role),
+    schedule: profile.schedule ? normalizeSchedule(profile.schedule) : undefined,
   };
 }
 
