@@ -309,6 +309,7 @@ export interface InventoryItem {
   location: string;
   // Campos estendidos do cadastro de produto (todos opcionais)
   imageUrl?: string;
+  subcategory?: string;
   unit?: string;
   salePrice?: number;
   costPrice?: number;

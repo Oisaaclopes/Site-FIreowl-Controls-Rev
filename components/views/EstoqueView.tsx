@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { InventoryItem, StockMovement } from '@/lib/types';
 import { insertStockMovement, fetchStockMovements, isSupabaseConfigured } from '@/lib/inventory';
 
@@ -73,18 +73,170 @@ const UNIT_GROUPS: { group: string; units: { code: string; label: string }[] }[]
   },
 ];
 
-const BASE_CATEGORIES = [
-  'Sirenes & Sinalização',
-  'Detecção de Incêndio',
-  'Centrais & Painéis',
-  'Acionadores Manuais',
-  'Cabos & Infraestrutura',
-  'Fontes & Baterias',
-  'Câmeras & CFTV',
-  'Controle de Acesso',
-  'Automação Predial (BMS)',
-  'Ferramentas & Insumos',
-  'Diversos',
+// Dicionário do catálogo técnico: Categoria macro -> Subcategorias
+const CATALOG: Record<string, string[]> = {
+  SDAI: [
+    'Central de Alarme Endereçável',
+    'Central de Alarme Convencional',
+    'Central de Supressão / Extinção de Incêndio',
+    'Painel Repetidor / Sinótico (Display Remoto)',
+    'Fonte de Alimentação Auxiliar (SDAI)',
+    'Placa / Cartão de Laço Adicional (Expansão)',
+    'Placa de Rede / Comunicação (Integração)',
+    'Detector de Fumaça Endereçável (Óptico)',
+    'Detector de Fumaça Convencional',
+    'Detector de Temperatura (Termovelocimétrico / Fixo)',
+    'Detector Multissensor (Fumaça + Temperatura)',
+    'Detector Linear de Fumaça (Feixe / Barreira)',
+    'Detector de Chama (UV / IR / UV-IR)',
+    'Detector de Duto (Duct Smoke Detector)',
+    'Detector de Gás (CO / GLP / Amônia)',
+    'Cabo Sensor de Temperatura (Linear Heat)',
+    'Acionador Manual Endereçável (Rearmável)',
+    'Acionador Manual Endereçável (Quebra-Vidro)',
+    'Acionador Manual Convencional',
+    'Acionador Manual à Prova de Tempo (IP66)',
+    'Acionador Manual à Prova de Explosão (EX)',
+    'Sirene Audiovisual Endereçável (Strobe)',
+    'Sirene Audiovisual Convencional',
+    'Sirene Apenas Áudio (Bitonal)',
+    'Sinalizador Visual (Flash / Giroflex)',
+    'Sirene à Prova de Tempo (IP66)',
+    'Sirene à Prova de Explosão (EX)',
+    'Alto-falante para Evacuação por Voz',
+    'Módulo Isolador de Curto-Circuito',
+    'Módulo Monitor / Entrada',
+    'Módulo Mini Monitor (4x2)',
+    'Módulo de Relé / Saída',
+    'Módulo de Comando de Sirenes',
+    'Módulo Endereçador de Zona Convencional',
+    'Base para Detector (Padrão / Isolador / Relé)',
+    'Gás de Teste (Aerossol)',
+    'Bastão de Teste / Extrator de Detectores',
+    'Chave de Rearme para Botoeiras',
+  ],
+  CFTV: [
+    'Câmera IP (Bullet, Dome, Speed Dome)',
+    'Câmera Analógica / HDCVI / TVI / AHD',
+    'Câmera LPR (Leitura de Placas)',
+    'Câmera Térmica',
+    'Gravador NVR',
+    'Gravador DVR / HVR',
+    'HD (Disco Rígido para Vigilância)',
+    'Switch de Rede (PoE / Gerenciável)',
+    'Fonte de Alimentação (Colmeia / Estabilizada)',
+    'Balun / Transceptor',
+  ],
+  'Infraestrutura Metálica': [
+    'Eletroduto de Ferro Galvanizado 1/2"',
+    'Eletroduto de Ferro Galvanizado 3/4"',
+    'Eletroduto de Ferro Galvanizado 1"',
+    'Curva de Ferro Galvanizado 1/2"',
+    'Curva de Ferro Galvanizado 3/4"',
+    'Curva de Ferro Galvanizado 1"',
+    'Luva de Ferro Galvanizado 1/2"',
+    'Luva de Ferro Galvanizado 3/4"',
+    'Luva de Ferro Galvanizado 1"',
+    'Bucha de Ferro Galvanizado 1/2"',
+    'Bucha de Ferro Galvanizado 3/4"',
+    'Bucha de Ferro Galvanizado 1"',
+    'Arruela de Ferro Galvanizado 1/2"',
+    'Arruela de Ferro Galvanizado 3/4"',
+    'Arruela de Ferro Galvanizado 1"',
+    'Unidut Cônico 1/2"',
+    'Unidut Cônico 3/4"',
+    'Unidut Cônico 1"',
+    'Unidut Reto 1/2"',
+    'Unidut Reto 3/4"',
+    'Unidut Reto 1"',
+    'Abraçadeira Tipo D com Cunha 1/2"',
+    'Abraçadeira Tipo D com Cunha 3/4"',
+    'Abraçadeira Tipo D com Cunha 1"',
+    'Caixa de Passagem Metálica 4x2',
+    'Caixa de Passagem Metálica 4x4',
+    'Caixa Octogonal Metálica',
+    'Perfilado Metálico',
+    'Eletrocalha Metálica',
+  ],
+  'Infraestrutura PVC Antichama': [
+    'Eletroduto de PVC Vermelho Antichama 1/2"',
+    'Eletroduto de PVC Vermelho Antichama 3/4"',
+    'Eletroduto de PVC Vermelho Antichama 1"',
+    'Curva de PVC Vermelho Antichama 1/2"',
+    'Curva de PVC Vermelho Antichama 3/4"',
+    'Curva de PVC Vermelho Antichama 1"',
+    'Luva de PVC Vermelho Antichama 1/2"',
+    'Luva de PVC Vermelho Antichama 3/4"',
+    'Luva de PVC Vermelho Antichama 1"',
+    'Adaptador de PVC Vermelho Antichama 1/2"',
+    'Adaptador de PVC Vermelho Antichama 3/4"',
+    'Adaptador de PVC Vermelho Antichama 1"',
+    'Caixa de Passagem PVC Vermelha 4x2',
+    'Caixa de Passagem PVC Vermelha 4x4',
+    'Caixa Octogonal PVC Vermelha',
+  ],
+  'Cabeamento & Fios': [
+    'Cabo de Incêndio Blindado 2 Vias',
+    'Cabo de Incêndio Blindado 3 Vias',
+    'Cabo de Incêndio Blindado 4 Vias',
+    'Cabo de Rede (UTP Cat5e / Cat6 / Cat6a)',
+    'Cabo Coaxial (CFTV)',
+    'Cabo de Alarme / Multivias (CCI)',
+    'Cabo Elétrico Flexível (PP / Singelo)',
+  ],
+  'Controle de Acesso': [
+    'Controladora de Acesso (Placa / Painel)',
+    'Leitor Biométrico / Facial',
+    'Leitor RFID / Proximidade',
+    'Catraca (Balcão / Flap / Torniquete)',
+    'Fechadura Eletroímã',
+    'Fechadura Eletromecânica / Solenoide',
+    'Mola Aérea Hidráulica',
+    'Botoeira de Saída (Inox / No-Touch)',
+  ],
+  'Alarme de Intrusão': [
+    'Central de Alarme de Intrusão',
+    'Sensor Infravermelho (IVP / IVA)',
+    'Sensor Magnético (Embutir / Sobrepor)',
+    'Teclado de Comando (LCD / Touch / LED)',
+    'Módulo de Comunicação (GPRS / IP)',
+    'Sirene de Alta Potência',
+    'Cerca Elétrica e Acessórios',
+  ],
+  'Elétrica & Energia': [
+    'Nobreak (UPS) e Fontes Auxiliares',
+    'Bateria Selada (VRLA / Chumbo-Ácido)',
+    'Bateria Estacionária',
+    'Quadro de Distribuição (QDC)',
+    'Disjuntor, DR e DPS',
+    'Transformador / Contatora',
+  ],
+  'Insumos & Fixação': [
+    'Bucha e Parafuso',
+    'Parabolt (Bucha Metálica)',
+    'Abraçadeira de Nylon (Enforca Gato)',
+    'Fita Isolante',
+    'Fita de Alta Fusão',
+    'Fita Veda Rosca',
+    'Conector Wago',
+    'Borne Sindal',
+    'Conectores (BNC, P4, RJ45)',
+  ],
+};
+
+const MACRO_CATEGORIES = Object.keys(CATALOG);
+
+const DEFAULT_BRANDS = [
+  'Intelbras',
+  'Tecnohold',
+  'Ascael',
+  'Ilumac',
+  'Notifier',
+  'Edwards',
+  'Bosch',
+  'Global Fire',
+  'Siemens',
+  'Simplex',
 ];
 
 const round2 = (n: number) => Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
@@ -198,6 +350,77 @@ const SelectOrAdd: React.FC<{
       >
         <span className="material-symbols-outlined text-base">add</span>
       </button>
+    </div>
+  );
+};
+
+// Combobox com busca + opção de adicionar valor digitado (padronização de marca)
+const Combobox: React.FC<{
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  placeholder: string;
+}> = ({ value, onChange, options, placeholder }) => {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const q = query.trim();
+  const filtered = options.filter((o) => o.toLowerCase().includes(q.toLowerCase()));
+  const showAdd = q.length > 0 && !options.some((o) => o.toLowerCase() === q.toLowerCase());
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <span className="material-symbols-outlined absolute left-2.5 top-2.5 text-slate-400 text-base">search</span>
+        <input
+          type="text"
+          value={open ? query : value}
+          placeholder={placeholder}
+          onFocus={() => {
+            setOpen(true);
+            setQuery('');
+          }}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            if (!open) setOpen(true);
+          }}
+          className={`${inputCls} pl-9`}
+        />
+      </div>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-xl max-h-52 overflow-y-auto py-1 text-xs">
+            {filtered.map((o) => (
+              <button
+                key={o}
+                type="button"
+                onClick={() => {
+                  onChange(o);
+                  setOpen(false);
+                  setQuery('');
+                }}
+                className={`w-full text-left px-3 py-2 hover:bg-slate-50 ${o === value ? 'text-[#E63946] font-semibold' : 'text-slate-700'}`}
+              >
+                {o}
+              </button>
+            ))}
+            {showAdd && (
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(q);
+                  setOpen(false);
+                  setQuery('');
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-slate-50 text-[#1A1A72] font-semibold flex items-center gap-1"
+              >
+                <span className="material-symbols-outlined text-base">add</span> Adicionar &quot;{q}&quot;
+              </button>
+            )}
+            {filtered.length === 0 && !showAdd && <p className="px-3 py-2 text-slate-400">Digite para buscar...</p>}
+          </div>
+        </>
+      )}
     </div>
   );
 };
@@ -417,9 +640,11 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
   const [imageUrl, setImageUrl] = useState('');
   // Básicas
   const [name, setName] = useState('');
-  const [category, setCategory] = useState('');
+  const [category, setCategory] = useState(''); // categoria macro
+  const [subcategory, setSubcategory] = useState('');
   const [code, setCode] = useState('');
   const [unit, setUnit] = useState('');
+  const lastAutoName = useRef('');
   // Preços
   const [salePrice, setSalePrice] = useState(0);
   const [costPrice, setCostPrice] = useState(0);
@@ -437,12 +662,8 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
   const [model, setModel] = useState('');
   const [description, setDescription] = useState('');
 
-  // Listas para os selects (base + valores já existentes no estoque)
-  const categoryOptions = useMemo(() => {
-    const set = new Set<string>(BASE_CATEGORIES);
-    inventory.forEach((i) => i.category && set.add(i.category));
-    return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-  }, [inventory]);
+  // Subcategorias dependentes da categoria macro
+  const subcategoryOptions = category ? CATALOG[category] || [] : [];
 
   const supplierOptions = useMemo(() => {
     const set = new Set<string>();
@@ -450,11 +671,24 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   }, [inventory]);
 
+  // Marcas: padrão de mercado + as já cadastradas no estoque
   const brandOptions = useMemo(() => {
-    const set = new Set<string>();
+    const set = new Set<string>(DEFAULT_BRANDS);
     inventory.forEach((i) => i.brand && set.add(i.brand));
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   }, [inventory]);
+
+  // Autopreenchimento inteligente do nome (subcategoria + marca), sem
+  // sobrescrever o que o usuário já digitou manualmente.
+  useEffect(() => {
+    if (!subcategory) return;
+    const auto = brand ? `${subcategory} - ${brand}` : subcategory;
+    if (name === '' || name === lastAutoName.current) {
+      lastAutoName.current = auto;
+      setName(auto);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subcategory, brand]);
 
   const generateCode = (cat: string) => {
     const prefix =
@@ -472,9 +706,11 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
   const openPanel = () => {
     setEditingItem(null);
     setErrors({});
+    lastAutoName.current = '';
     setImageUrl('');
     setName('');
     setCategory('');
+    setSubcategory('');
     setCode(generateCode(''));
     setUnit('');
     setSalePrice(0);
@@ -496,9 +732,11 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
   const openEdit = (item: InventoryItem) => {
     setEditingItem(item);
     setErrors({});
+    lastAutoName.current = '';
     setImageUrl(item.imageUrl || '');
     setName(item.name);
     setCategory(item.category || '');
+    setSubcategory(item.subcategory || '');
     setCode(item.code || '');
     setUnit(item.unit || '');
     setSalePrice(item.salePrice ?? item.unitPrice ?? 0);
@@ -665,6 +903,7 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
       serialBP: editingItem ? editingItem.serialBP : `BP-EQUIP-${seq}00`,
       name,
       category,
+      subcategory: subcategory || undefined,
       quantity: stockManaged ? Number(quantity) : 0,
       minQuantity: stockManaged ? Number(minQuantity) : 0,
       unitPrice: Number(salePrice),
@@ -978,38 +1217,66 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                       <label className={labelCls}>Categoria *</label>
-                      <SelectOrAdd
+                      <select
                         value={category}
-                        onChange={(v) => {
-                          setCategory(v);
+                        onChange={(e) => {
+                          setCategory(e.target.value);
+                          setSubcategory(''); // reset ao trocar a categoria macro
                           if (errors.category) setErrors((p) => ({ ...p, category: false }));
                         }}
-                        options={categoryOptions}
-                        placeholder="Selecionar categoria..."
-                        error={errors.category}
-                      />
+                        className={`${inputCls} ${errors.category ? 'border-red-400 ring-2 ring-red-100' : ''}`}
+                      >
+                        <option value="">Selecionar categoria...</option>
+                        {MACRO_CATEGORIES.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                        {category && !MACRO_CATEGORIES.includes(category) && <option value={category}>{category}</option>}
+                      </select>
                       {errors.category && (
-                        <p className="text-[10px] text-[#E63946] mt-1 font-semibold">Selecione ou informe a categoria.</p>
+                        <p className="text-[10px] text-[#E63946] mt-1 font-semibold">Selecione a categoria.</p>
                       )}
                     </div>
                     <div>
-                      <label className={labelCls}>Código</label>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={code}
-                          onChange={(e) => setCode(e.target.value)}
-                          className={`${inputCls} font-data-mono`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setCode(generateCode(category))}
-                          title="Gerar código automaticamente"
-                          className="shrink-0 px-3 rounded-lg bg-[#1A1A72] text-white hover:bg-[#12124f] transition-colors flex items-center"
-                        >
-                          <span className="material-symbols-outlined text-base">refresh</span>
-                        </button>
-                      </div>
+                      <label className={labelCls}>Subcategoria</label>
+                      <select
+                        value={subcategory}
+                        onChange={(e) => setSubcategory(e.target.value)}
+                        disabled={!category}
+                        className={`${inputCls} disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed`}
+                      >
+                        <option value="">
+                          {category ? 'Selecionar subcategoria...' : 'Escolha a categoria primeiro'}
+                        </option>
+                        {subcategoryOptions.map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                        {subcategory && !subcategoryOptions.includes(subcategory) && (
+                          <option value={subcategory}>{subcategory}</option>
+                        )}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Código</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={code}
+                        onChange={(e) => setCode(e.target.value)}
+                        className={`${inputCls} font-data-mono`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setCode(generateCode(category))}
+                        title="Gerar código automaticamente"
+                        className="shrink-0 px-3 rounded-lg bg-[#1A1A72] text-white hover:bg-[#12124f] transition-colors flex items-center"
+                      >
+                        <span className="material-symbols-outlined text-base">refresh</span>
+                      </button>
                     </div>
                   </div>
                   <div>
@@ -1155,11 +1422,11 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                   </div>
                   <div>
                     <label className={labelCls}>Marca</label>
-                    <SelectOrAdd
+                    <Combobox
                       value={brand}
                       onChange={setBrand}
                       options={brandOptions}
-                      placeholder="Selecionar marca..."
+                      placeholder="Buscar marca..."
                     />
                   </div>
                   <div>
