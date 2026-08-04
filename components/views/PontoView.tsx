@@ -50,6 +50,7 @@ export const PontoView: React.FC<PontoViewProps> = ({
   const isManager = userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR';
   const [now, setNow] = useState(() => new Date());
   const [punching, setPunching] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [feedback, setFeedback] = useState<{ label: string; time: string } | null>(null);
   const [online, setOnline] = useState(true);
   const [lastSync, setLastSync] = useState<Date | null>(null);
@@ -130,24 +131,33 @@ export const PontoView: React.FC<PontoViewProps> = ({
 
   const punchTime = (p?: TimePunch) => (p?.at ? fmtHM(new Date(p.at)) : '--');
 
+  // A permissão de GPS é solicitada APENAS aqui, no clique de bater ponto
+  // (nunca no carregamento do site).
   const handleBaterPonto = () => {
-    if (punching || !nextType) return;
-    setPunching(true);
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => registerPunch(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy),
-        (err) => {
-          console.warn('GPS indisponível:', err);
-          if (err.code === err.PERMISSION_DENIED) {
-            alert('Permissão de localização negada. Habilite o GPS/localização para registrar o ponto com precisão.');
-          }
-          registerPunch(); // registra sem GPS (não usa localização falsa)
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    } else {
+    if (punching || locating || !nextType) return;
+    if (!('geolocation' in navigator)) {
       registerPunch();
+      return;
     }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false);
+        registerPunch(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+      },
+      (err) => {
+        setLocating(false);
+        console.warn('GPS indisponível:', err);
+        if (err.code === err.PERMISSION_DENIED) {
+          const ok = window.confirm(
+            'Permissão de localização negada.\n\nPara registrar com GPS, permita a localização no navegador.\n\nDeseja registrar o ponto MESMO ASSIM (sem localização)?'
+          );
+          if (!ok) return;
+        }
+        registerPunch(); // registra sem GPS (não inventa localização)
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
   };
 
   const registerPunch = (lat?: number, lng?: number, accuracy?: number) => {
@@ -209,11 +219,37 @@ export const PontoView: React.FC<PontoViewProps> = ({
     })
     .sort((a, b) => (a.at || 0) - (b.at || 0));
 
-  const buildRows = (): string[][] => {
-    const rows: string[][] = [['Funcionário', 'Data', 'Dia', 'Tipo', 'Hora', 'Latitude', 'Longitude', 'Precisão (m)']];
+  // Horas trabalhadas de um conjunto de batidas de um mesmo dia
+  const dayWorkedMs = (dayPunches: TimePunch[]): number => {
+    const e = dayPunches.find((p) => p.type === 'ENTRADA');
+    const a = dayPunches.find((p) => p.type === 'PAUSA');
+    const r = dayPunches.find((p) => p.type === 'RETORNO');
+    const s = [...dayPunches].reverse().find((p) => p.type === 'SAIDA');
+    let ms = 0;
+    if (e?.at) {
+      const aEnd = a?.at ?? s?.at;
+      if (aEnd) ms += Math.max(0, aEnd - e.at);
+    }
+    if (r?.at && s?.at) ms += Math.max(0, s.at - r.at);
+    return ms;
+  };
+
+  // Agrupa por dia (para uma folha por funcionário; com "Todos", agrupa por funcionário+dia)
+  const buildData = () => {
+    const detail: string[][] = [
+      ['Funcionário', 'Data', 'Dia', 'Tipo', 'Hora', 'Latitude', 'Longitude', 'Precisão (m)'],
+    ];
+    const summary: string[][] = [
+      ['Funcionário', 'Data', 'Entrada', 'Almoço', 'Retorno', 'Saída', 'Horas trabalhadas'],
+    ];
+
+    const groups = new Map<string, TimePunch[]>();
     monthPunches.forEach((p) => {
       const d = new Date(p.at!);
-      rows.push([
+      const key = `${p.employeeName}||${d.toLocaleDateString('pt-BR')}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(p);
+      detail.push([
         p.employeeName,
         d.toLocaleDateString('pt-BR'),
         d.toLocaleDateString('pt-BR', { weekday: 'short' }),
@@ -224,12 +260,31 @@ export const PontoView: React.FC<PontoViewProps> = ({
         p.accuracy ? String(p.accuracy) : '',
       ]);
     });
-    return rows;
+
+    let totalMs = 0;
+    groups.forEach((dayPunches, key) => {
+      const [emp, date] = key.split('||');
+      const t = (type: PunchType) => {
+        const found =
+          type === 'SAIDA'
+            ? [...dayPunches].reverse().find((p) => p.type === type)
+            : dayPunches.find((p) => p.type === type);
+        return found?.at ? fmtHM(new Date(found.at)) : '--';
+      };
+      const ms = dayWorkedMs(dayPunches);
+      totalMs += ms;
+      summary.push([emp, date, t('ENTRADA'), t('PAUSA'), t('RETORNO'), t('SAIDA'), fmtDuration(ms)]);
+    });
+    summary.push(['', '', '', '', '', 'TOTAL', fmtDuration(totalMs)]);
+
+    return { detail, summary, totalMs };
   };
 
   const exportCSV = () => {
-    const rows = buildRows();
-    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\r\n');
+    const { detail, summary } = buildData();
+    const toCsv = (rows: string[][]) =>
+      rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\r\n');
+    const csv = `RESUMO POR DIA\r\n${toCsv(summary)}\r\n\r\nDETALHAMENTO DAS BATIDAS\r\n${toCsv(detail)}`;
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -240,28 +295,39 @@ export const PontoView: React.FC<PontoViewProps> = ({
   };
 
   const exportPDF = () => {
-    const rows = buildRows();
-    const head = rows[0];
-    const body = rows
-      .slice(1)
-      .map(
-        (r) =>
-          `<tr>${r
-            .map((c, i) => `<td style="padding:6px 8px;border:1px solid #ddd;${i >= 5 ? 'font-family:monospace' : ''}">${c}</td>`)
-            .join('')}</tr>`
-      )
-      .join('');
+    const { detail, summary } = buildData();
+    const renderTable = (rows: string[][], monoFrom = 99) => {
+      const head = rows[0];
+      const body = rows
+        .slice(1)
+        .map(
+          (r) =>
+            `<tr>${r
+              .map(
+                (c, i) =>
+                  `<td style="padding:6px 8px;border:1px solid #ddd;${i >= monoFrom ? 'font-family:monospace;' : ''}${
+                    r[0] === '' && i === 5 ? 'font-weight:bold;text-align:right;' : ''
+                  }">${c}</td>`
+              )
+              .join('')}</tr>`
+        )
+        .join('');
+      return `<table style="border-collapse:collapse;width:100%;font-size:12px;margin-bottom:20px">
+        <thead><tr>${head
+          .map((h) => `<th style="padding:6px 8px;border:1px solid #ddd;background:#1A1A72;color:#fff;text-align:left">${h}</th>`)
+          .join('')}</tr></thead>
+        <tbody>${body || `<tr><td colspan="${head.length}" style="padding:16px;text-align:center;color:#888">Sem registros</td></tr>`}</tbody>
+      </table>`;
+    };
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Folha de Ponto</title></head>
       <body style="font-family:Arial,sans-serif;color:#0f172a;padding:24px">
         <h2 style="margin:0 0 4px">Folha de Ponto — Fireowl Controls</h2>
-        <p style="margin:0 0 2px;font-size:13px">Funcionário: <strong>${expEmployee || 'Todos'}</strong></p>
-        <p style="margin:0 0 16px;font-size:13px">Período: <strong>${expMonth}</strong> · Registros: ${rows.length - 1}</p>
-        <table style="border-collapse:collapse;width:100%;font-size:12px">
-          <thead><tr>${head
-            .map((h) => `<th style="padding:6px 8px;border:1px solid #ddd;background:#1A1A72;color:#fff;text-align:left">${h}</th>`)
-            .join('')}</tr></thead>
-          <tbody>${body || `<tr><td colspan="8" style="padding:16px;text-align:center;color:#888">Sem registros no período</td></tr>`}</tbody>
-        </table>
+        <p style="margin:0 0 2px;font-size:13px">Funcionário: <strong>${expEmployee || 'Todos'}</strong> · Período: <strong>${expMonth}</strong></p>
+        <p style="margin:0 0 16px;font-size:13px">Registros: ${detail.length - 1}</p>
+        <h3 style="margin:0 0 8px;font-size:14px">Resumo por dia</h3>
+        ${renderTable(summary, 6)}
+        <h3 style="margin:0 0 8px;font-size:14px">Detalhamento das batidas</h3>
+        ${renderTable(detail, 5)}
       </body></html>`;
     const w = window.open('', '_blank');
     if (!w) {
@@ -395,20 +461,26 @@ export const PontoView: React.FC<PontoViewProps> = ({
           {/* Botão inteligente */}
           <button
             onClick={handleBaterPonto}
-            disabled={punching || !nextType}
+            disabled={punching || locating || !nextType}
             className={`mt-5 w-full rounded-2xl py-6 text-white font-bold uppercase tracking-wider text-sm transition-all shadow-md flex flex-col items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-70 ${
               nextType ? NEXT_INFO[nextType].classes : 'bg-slate-400'
             }`}
           >
-            <span className={`material-symbols-outlined text-4xl ${punching ? 'animate-spin' : ''}`}>
-              {punching ? 'progress_activity' : nextType ? NEXT_INFO[nextType].icon : 'task_alt'}
+            <span className={`material-symbols-outlined text-4xl ${punching || locating ? 'animate-spin' : ''}`}>
+              {locating ? 'my_location' : punching ? 'progress_activity' : nextType ? NEXT_INFO[nextType].icon : 'task_alt'}
             </span>
-            {punching ? 'Registrando...' : nextType ? NEXT_INFO[nextType].label : 'Jornada encerrada'}
+            {locating
+              ? 'Obtendo localização...'
+              : punching
+              ? 'Registrando...'
+              : nextType
+              ? NEXT_INFO[nextType].label
+              : 'Jornada encerrada'}
           </button>
 
           <p className="text-[10px] text-slate-400 mt-3 text-center flex items-center justify-center gap-1">
             <span className="material-symbols-outlined text-sm">location_on</span>
-            Localização e coordenadas GPS sincronizadas · MTP 671/2021
+            A localização é solicitada apenas ao registrar o ponto · MTP 671/2021
           </p>
         </div>
 
