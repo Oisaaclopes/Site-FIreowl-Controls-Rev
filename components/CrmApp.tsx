@@ -69,6 +69,7 @@ import { ContaView } from '@/components/views/ContaView';
 import { allowedTabs, isTabAllowed } from '@/lib/rbac';
 import { fetchPunches, insertPunch } from '@/lib/timepunch';
 import { fetchPedidos, upsertPedido, updatePedidoStatus } from '@/lib/pedidos';
+import { fetchQuotes, insertQuote } from '@/lib/quotes';
 
 let idSeq = 1000;
 function getNextSeq() {
@@ -114,7 +115,7 @@ export function CrmApp({
   );
   const [technicalReport, setTechnicalReport] = useState(INITIAL_TECHNICAL_REPORT);
   const [auditSdai] = useState(INITIAL_AUDIT_SDAI);
-  const [quotes, setQuotes] = useState<CustomQuote[]>(INITIAL_CUSTOM_QUOTES);
+  const [quotes, setQuotes] = useState<CustomQuote[]>(isSupabaseConfigured() ? [] : INITIAL_CUSTOM_QUOTES);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>(INITIAL_FINANCIAL_TRANSACTIONS);
   const [suppliers, setSuppliers] = useState<Supplier[]>(INITIAL_SUPPLIERS);
   const [services, setServices] = useState<ServiceCatalogItem[]>(INITIAL_SERVICES);
@@ -145,12 +146,15 @@ export function CrmApp({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Carrega as propostas comerciais (pedidos) do Supabase
+  // Carrega propostas (pedidos) e orçamentos de serviço do Supabase
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
     fetchPedidos()
       .then((rows) => setPedidos(rows))
       .catch((err) => console.warn('Propostas: falha ao carregar do Supabase.', err));
+    fetchQuotes()
+      .then((rows) => setQuotes(rows))
+      .catch((err) => console.warn('Orçamentos: falha ao carregar do Supabase.', err));
   }, []);
 
   const handleUpdatePdfPrefs = (p: PdfPrefs) => {
@@ -403,8 +407,19 @@ export function CrmApp({
     logAction('Batida de Ponto', 'Ponto Eletrônico', `Ponto registrado por ${newPunch.employeeName} (${newPunch.type})`);
   };
 
-  const handleAddQuote = (newQuote: CustomQuote) => {
-    setQuotes([newQuote, ...quotes]);
+  const handleAddQuote = async (newQuote: CustomQuote) => {
+    if (isSupabaseConfigured()) {
+      try {
+        const saved = await insertQuote(newQuote);
+        setQuotes((prev) => [saved, ...prev]);
+        logAction('Elaboração de Orçamento', 'Serviços', `Orçamento ${saved.id} criado para ${saved.clientName}`);
+        return;
+      } catch (err) {
+        console.error('Falha ao salvar orçamento no Supabase:', err);
+        alert('Não foi possível salvar o orçamento no banco. Salvo apenas nesta sessão.');
+      }
+    }
+    setQuotes((prev) => [newQuote, ...prev]);
     logAction('Elaboração de Orçamento', 'Serviços', `Orçamento ${newQuote.id} criado para ${newQuote.clientName}`);
   };
 
