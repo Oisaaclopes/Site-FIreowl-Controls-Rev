@@ -442,6 +442,8 @@ export function CrmApp({
               onGenerateOSFromPedido={handleGenerateOSFromPedido}
               onSelectClientForReport={handleSelectClientForReport}
               pdfPrefs={pdfPrefs}
+              userRole={userRole}
+              currentUserName={userName}
             />
           )}
 

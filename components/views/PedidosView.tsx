@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { PedidoOS, Client, Pedido, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs } from '@/lib/types';
+import { PedidoOS, Client, Pedido, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole } from '@/lib/types';
 import { CommercialProposalModal } from '@/components/proposta/CommercialProposalModal';
 import { CommercialProposalPDFView } from '@/components/proposta/CommercialProposalPDFView';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
@@ -37,6 +37,8 @@ interface PedidosViewProps {
   onGenerateOSFromPedido: (pedido: Pedido) => void;
   onSelectClientForReport?: (clientName: string) => void;
   pdfPrefs: PdfPrefs;
+  userRole: UserRole;
+  currentUserName?: string;
 }
 
 export const PedidosView: React.FC<PedidosViewProps> = ({
@@ -53,9 +55,15 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   onGenerateOSFromPedido,
   onSelectClientForReport,
   pdfPrefs,
+  userRole,
+  currentUserName = '',
 }) => {
-  // Main view tab: 'propostas' (CRM Pedidos) or 'ordens_servico' (OS de Campo)
-  const [viewTab, setViewTab] = useState<'propostas' | 'ordens_servico'>('propostas');
+  const isTecnico = userRole === 'TECNICO';
+
+  // Técnico só vê Ordens de Serviço; demais começam nas propostas
+  const [viewTab, setViewTab] = useState<'propostas' | 'ordens_servico'>(
+    isTecnico ? 'ordens_servico' : 'propostas'
+  );
 
   // Filters & Search
   const [filterStatus, setFilterStatus] = useState<string>('TODOS');
@@ -99,8 +107,13 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     return matchesStatus && matchesSearch;
   });
 
+  // Técnico só enxerga as OS onde ele é o responsável
+  const baseOS = isTecnico
+    ? pedidosOS.filter((p) => p.technicianName === currentUserName)
+    : pedidosOS;
+
   // Filtered Pedidos OS (Technical Orders)
-  const filteredOS = pedidosOS.filter((p) => {
+  const filteredOS = baseOS.filter((p) => {
     const matchesStatus = filterStatus === 'TODOS' || p.status === filterStatus;
     const matchesSearch =
       p.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -155,18 +168,20 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           </h1>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleOpenNewProposal}
-            className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
-          >
-            <Plus className="w-4 h-4" /> Nova Proposta Comercial
-          </button>
-        </div>
+        {!isTecnico && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleOpenNewProposal}
+              className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
+            >
+              <Plus className="w-4 h-4" /> Nova Proposta Comercial
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Main View Mode Selector (CRM Proposals vs Technical OS) */}
-      <div className="flex items-center gap-3 bg-slate-200 p-1.5 rounded-xl w-fit">
+      {/* Main View Mode Selector (CRM Proposals vs Technical OS) — oculto p/ técnico */}
+      <div className={`flex items-center gap-3 bg-slate-200 p-1.5 rounded-xl w-fit ${isTecnico ? 'hidden' : ''}`}>
         <button
           onClick={() => {
             setViewTab('propostas');
@@ -223,29 +238,33 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${isTecnico ? 'md:grid-cols-3' : 'md:grid-cols-4'}`}>
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-            <p className="text-[11px] font-semibold text-slate-500 uppercase">Ordens de Serviço</p>
-            <p className="font-data-mono text-2xl font-bold text-slate-900 mt-1">{pedidosOS.length}</p>
+            <p className="text-[11px] font-semibold text-slate-500 uppercase">
+              {isTecnico ? 'Minhas Ordens de Serviço' : 'Ordens de Serviço'}
+            </p>
+            <p className="font-data-mono text-2xl font-bold text-slate-900 mt-1">{baseOS.length}</p>
           </div>
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <p className="text-[11px] font-semibold text-slate-500 uppercase">Em Andamento</p>
             <p className="font-data-mono text-2xl font-bold text-amber-600 mt-1">
-              {pedidosOS.filter((p) => p.status === 'EM ANDAMENTO').length}
+              {baseOS.filter((p) => p.status === 'EM ANDAMENTO').length}
             </p>
           </div>
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <p className="text-[11px] font-semibold text-slate-500 uppercase">Concluídas</p>
             <p className="font-data-mono text-2xl font-bold text-emerald-600 mt-1">
-              {pedidosOS.filter((p) => p.status === 'CONCLUIDA').length}
+              {baseOS.filter((p) => p.status === 'CONCLUIDA').length}
             </p>
           </div>
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-            <p className="text-[11px] font-semibold text-slate-500 uppercase">Faturamento de OS</p>
-            <p className="font-data-mono text-2xl font-bold text-[#E63946] mt-1">
-              R$ {pedidosOS.reduce((acc, p) => acc + p.value, 0).toLocaleString('pt-BR')}
-            </p>
-          </div>
+          {!isTecnico && (
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+              <p className="text-[11px] font-semibold text-slate-500 uppercase">Faturamento de OS</p>
+              <p className="font-data-mono text-2xl font-bold text-[#E63946] mt-1">
+                R$ {pedidosOS.reduce((acc, p) => acc + p.value, 0).toLocaleString('pt-BR')}
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -299,8 +318,9 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
         )}
       </div>
 
-      {/* Lista: Propostas Comerciais (CRM) */}
+      {/* Lista: Propostas Comerciais (CRM) — nunca para técnico */}
       {viewTab === 'propostas' &&
+        !isTecnico &&
         (filteredPedidos.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm py-16 text-center text-slate-400">
             <FileText className="w-10 h-10 text-slate-300 mx-auto" />
@@ -442,9 +462,11 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                 }
                 right={
                   <>
-                    <span className="font-data-mono font-bold text-slate-900 text-base md:text-lg text-right">
-                      R$ {p.value.toLocaleString('pt-BR')}
-                    </span>
+                    {!isTecnico && (
+                      <span className="font-data-mono font-bold text-slate-900 text-base md:text-lg text-right">
+                        R$ {p.value.toLocaleString('pt-BR')}
+                      </span>
+                    )}
                     <Badge color={p.priority === 'CRITICA' ? 'red' : p.priority === 'ALTA' ? 'amber' : 'slate'} outline>
                       {p.priority}
                     </Badge>
