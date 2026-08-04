@@ -607,7 +607,7 @@ export function CrmApp({
           )}
 
           {currentTab === 'ponto' && (
-            <PontoView punches={punches} onAddPunch={handleAddPunch} currentUser={userName} />
+            <PontoView punches={punches} onAddPunch={handleAddPunch} currentUser={userName} userRole={userRole} />
           )}
 
           {currentTab === 'conta' && (

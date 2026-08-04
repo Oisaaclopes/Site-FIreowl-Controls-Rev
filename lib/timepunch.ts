@@ -17,9 +17,9 @@ function rowToPunch(r: any): TimePunch {
     timestamp: at ? fmtTimestamp(new Date(at)) : '',
     type: r.type,
     locationStr:
-      r.lat != null && r.lng != null
-        ? `Catuaí Shopping — Londrina/PR (${Number(r.lat).toFixed(4)}, ${Number(r.lng).toFixed(4)})`
-        : '—',
+      r.lat != null && r.lng != null && (Number(r.lat) || Number(r.lng))
+        ? `${Number(r.lat).toFixed(6)}, ${Number(r.lng).toFixed(6)}`
+        : 'Sem localização',
     lat: Number(r.lat ?? 0),
     lng: Number(r.lng ?? 0),
     status: r.status || 'APROVADO',

@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { TimePunch } from '@/lib/types';
+import { TimePunch, UserRole } from '@/lib/types';
 import { DataListRow, Badge } from '@/components/DataListRow';
 
 interface PontoViewProps {
   punches: TimePunch[];
   onAddPunch: (punch: TimePunch) => void;
   currentUser?: string;
+  userRole?: UserRole;
 }
 
 // Escala fixa (poderia vir do cadastro do funcionário)
@@ -40,13 +41,26 @@ const fmtDuration = (ms: number) => {
 const friendlyDate = (d: Date) =>
   d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
 
-export const PontoView: React.FC<PontoViewProps> = ({ punches, onAddPunch, currentUser = 'Operador Fireowl' }) => {
+export const PontoView: React.FC<PontoViewProps> = ({
+  punches,
+  onAddPunch,
+  currentUser = 'Operador Fireowl',
+  userRole = 'TECNICO',
+}) => {
+  const isManager = userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR';
   const [now, setNow] = useState(() => new Date());
   const [punching, setPunching] = useState(false);
   const [feedback, setFeedback] = useState<{ label: string; time: string } | null>(null);
   const [online, setOnline] = useState(true);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [showEspelho, setShowEspelho] = useState(false);
+
+  // Exportação da folha (admin/gestor)
+  const [expEmployee, setExpEmployee] = useState('');
+  const [expMonth, setExpMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+  });
 
   // Relógio em tempo real
   useEffect(() => {
@@ -122,31 +136,38 @@ export const PontoView: React.FC<PontoViewProps> = ({ punches, onAddPunch, curre
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => registerPunch(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy),
-        () => registerPunch(-23.2981, -51.1434, undefined),
-        { timeout: 3000, enableHighAccuracy: true }
+        (err) => {
+          console.warn('GPS indisponível:', err);
+          if (err.code === err.PERMISSION_DENIED) {
+            alert('Permissão de localização negada. Habilite o GPS/localização para registrar o ponto com precisão.');
+          }
+          registerPunch(); // registra sem GPS (não usa localização falsa)
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     } else {
-      registerPunch(-23.2981, -51.1434, undefined);
+      registerPunch();
     }
   };
 
-  const registerPunch = (lat: number, lng: number, accuracy?: number) => {
+  const registerPunch = (lat?: number, lng?: number, accuracy?: number) => {
     if (!nextType) {
       setPunching(false);
       return;
     }
+    const hasGps = typeof lat === 'number' && typeof lng === 'number';
     const d = new Date();
     const newPunch: TimePunch = {
       id: `p_${Date.now()}`,
       employeeName: currentUser,
       timestamp: `${d.getDate()} ${d.toLocaleDateString('pt-BR', { month: 'short' }).toUpperCase()} ${d.getFullYear()} | ${fmtClock(d)}`,
       type: nextType,
-      locationStr: `Catuaí Shopping — Londrina/PR (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
-      lat,
-      lng,
+      locationStr: hasGps ? `${lat!.toFixed(6)}, ${lng!.toFixed(6)}` : 'Sem localização (GPS indisponível)',
+      lat: hasGps ? lat! : 0,
+      lng: hasGps ? lng! : 0,
       status: 'APROVADO',
       at: d.getTime(),
-      accuracy: accuracy ? Math.round(accuracy) : undefined,
+      accuracy: hasGps && accuracy ? Math.round(accuracy) : undefined,
     };
     onAddPunch(newPunch);
     setLastSync(d);
@@ -155,6 +176,7 @@ export const PontoView: React.FC<PontoViewProps> = ({ punches, onAddPunch, curre
     setTimeout(() => setFeedback(null), 2000);
   };
 
+  const hasGps = (p: TimePunch) => !!(p.lat || p.lng);
   const mapsUrl = (p: TimePunch) => `https://www.google.com/maps?q=${p.lat},${p.lng}`;
 
   // Estimativas da semana (ilustrativas — dependem de histórico persistido)
@@ -164,6 +186,93 @@ export const PontoView: React.FC<PontoViewProps> = ({ punches, onAddPunch, curre
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const greeting = now.getHours() < 12 ? 'Bom dia' : now.getHours() < 18 ? 'Boa tarde' : 'Boa noite';
+
+  // ---- Exportação da folha de ponto (admin/gestor) ----
+  const TYPE_LABEL: Record<PunchType, string> = {
+    ENTRADA: 'Entrada',
+    PAUSA: 'Saída Almoço',
+    RETORNO: 'Retorno',
+    SAIDA: 'Saída',
+  };
+
+  const employees = useMemo(
+    () => Array.from(new Set(punches.map((p) => p.employeeName).filter(Boolean))).sort(),
+    [punches]
+  );
+
+  const monthPunches = punches
+    .filter((p) => {
+      if (!p.at) return false;
+      const d = new Date(p.at);
+      const key = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+      return key === expMonth && (!expEmployee || p.employeeName === expEmployee);
+    })
+    .sort((a, b) => (a.at || 0) - (b.at || 0));
+
+  const buildRows = (): string[][] => {
+    const rows: string[][] = [['Funcionário', 'Data', 'Dia', 'Tipo', 'Hora', 'Latitude', 'Longitude', 'Precisão (m)']];
+    monthPunches.forEach((p) => {
+      const d = new Date(p.at!);
+      rows.push([
+        p.employeeName,
+        d.toLocaleDateString('pt-BR'),
+        d.toLocaleDateString('pt-BR', { weekday: 'short' }),
+        TYPE_LABEL[p.type],
+        fmtClock(d),
+        hasGps(p) ? p.lat.toFixed(6) : '',
+        hasGps(p) ? p.lng.toFixed(6) : '',
+        p.accuracy ? String(p.accuracy) : '',
+      ]);
+    });
+    return rows;
+  };
+
+  const exportCSV = () => {
+    const rows = buildRows();
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\r\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `folha-ponto_${expEmployee || 'todos'}_${expMonth}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportPDF = () => {
+    const rows = buildRows();
+    const head = rows[0];
+    const body = rows
+      .slice(1)
+      .map(
+        (r) =>
+          `<tr>${r
+            .map((c, i) => `<td style="padding:6px 8px;border:1px solid #ddd;${i >= 5 ? 'font-family:monospace' : ''}">${c}</td>`)
+            .join('')}</tr>`
+      )
+      .join('');
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Folha de Ponto</title></head>
+      <body style="font-family:Arial,sans-serif;color:#0f172a;padding:24px">
+        <h2 style="margin:0 0 4px">Folha de Ponto — Fireowl Controls</h2>
+        <p style="margin:0 0 2px;font-size:13px">Funcionário: <strong>${expEmployee || 'Todos'}</strong></p>
+        <p style="margin:0 0 16px;font-size:13px">Período: <strong>${expMonth}</strong> · Registros: ${rows.length - 1}</p>
+        <table style="border-collapse:collapse;width:100%;font-size:12px">
+          <thead><tr>${head
+            .map((h) => `<th style="padding:6px 8px;border:1px solid #ddd;background:#1A1A72;color:#fff;text-align:left">${h}</th>`)
+            .join('')}</tr></thead>
+          <tbody>${body || `<tr><td colspan="8" style="padding:16px;text-align:center;color:#888">Sem registros no período</td></tr>`}</tbody>
+        </table>
+      </body></html>`;
+    const w = window.open('', '_blank');
+    if (!w) {
+      alert('Permita pop-ups para gerar o PDF.');
+      return;
+    }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 300);
+  };
 
   return (
     <div className="flex flex-col w-full p-8 gap-6">
@@ -369,20 +478,85 @@ export const PontoView: React.FC<PontoViewProps> = ({ punches, onAddPunch, curre
                         : 'Saída'}
                     </p>
                   </div>
-                  <a
-                    href={mapsUrl(p)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[10px] text-[#1A1A72] font-semibold hover:underline flex items-center gap-0.5"
-                  >
-                    <span className="material-symbols-outlined text-sm">map</span> ver no mapa
-                  </a>
+                  {hasGps(p) && (
+                    <a
+                      href={mapsUrl(p)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-[#1A1A72] font-semibold hover:underline flex items-center gap-0.5"
+                    >
+                      <span className="material-symbols-outlined text-sm">map</span> ver no mapa
+                    </a>
+                  )}
                 </div>
               </li>
             ))}
           </ol>
         )}
       </div>
+
+      {/* ===== Exportar folha de ponto (admin/gestor) ===== */}
+      {isManager && (
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="w-8 h-8 rounded-lg bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center">
+              <span className="material-symbols-outlined text-lg">download</span>
+            </span>
+            <div>
+              <h3 className="font-display text-sm font-bold uppercase tracking-wide text-[#1A1A72]">
+                Folha de ponto mensal
+              </h3>
+              <p className="text-[11px] text-slate-400">Exporte os registros por funcionário e mês.</p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+            <div className="flex-1">
+              <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Funcionário</label>
+              <select
+                value={expEmployee}
+                onChange={(e) => setExpEmployee(e.target.value)}
+                className="w-full border border-slate-200 rounded-lg p-2.5 text-xs text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+              >
+                <option value="">Todos os funcionários</option>
+                {employees.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Mês</label>
+              <input
+                type="month"
+                value={expMonth}
+                onChange={(e) => setExpMonth(e.target.value)}
+                className="w-full border border-slate-200 rounded-lg p-2.5 text-xs text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={exportCSV}
+                className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors"
+              >
+                <span className="material-symbols-outlined text-base">table_view</span> Excel
+              </button>
+              <button
+                type="button"
+                onClick={exportPDF}
+                className="flex items-center gap-1.5 bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors"
+              >
+                <span className="material-symbols-outlined text-base">picture_as_pdf</span> PDF
+              </button>
+            </div>
+          </div>
+          <p className="text-[11px] text-slate-500 mt-2">
+            {monthPunches.length} registro(s) no período selecionado.
+          </p>
+        </div>
+      )}
 
       {/* ===== Registros recentes ===== */}
       <div id="card-registros">
@@ -407,17 +581,19 @@ export const PontoView: React.FC<PontoViewProps> = ({ punches, onAddPunch, curre
                   <>
                     <span className="flex items-center gap-1">
                       <span className="material-symbols-outlined text-sm text-slate-400">location_on</span>
-                      Catuaí Shopping · Londrina/PR
+                      <span className="font-data-mono">{hasGps(p) ? `${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}` : 'Sem GPS'}</span>
                     </span>
                     {p.accuracy ? <span className="text-slate-400">Precisão ~{p.accuracy}m</span> : null}
-                    <a
-                      href={mapsUrl(p)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[#1A1A72] font-semibold hover:underline"
-                    >
-                      ver no mapa
-                    </a>
+                    {hasGps(p) && (
+                      <a
+                        href={mapsUrl(p)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#1A1A72] font-semibold hover:underline"
+                      >
+                        ver no mapa
+                      </a>
+                    )}
                   </>
                 }
                 center={
