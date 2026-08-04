@@ -3,8 +3,15 @@
 import React, { useEffect, useState } from 'react';
 import { SystemAuditLog, UserRole, CompanyProfile, PartnerBrand, PdfPrefs } from '@/lib/types';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
-import { Toggle } from '@/components/SidePanel';
-import { listUsers, createUser, updateUserRole, deleteUserProfile, ManagedUser } from '@/lib/users';
+import { Toggle, SidePanel } from '@/components/SidePanel';
+import {
+  listUsers,
+  createUser,
+  updateUserRole,
+  updateUserProfile,
+  deleteUserProfile,
+  ManagedUser,
+} from '@/lib/users';
 import { WorkSchedule, DEFAULT_SCHEDULE, WEEKDAY_SHORT } from '@/lib/schedule';
 
 interface ContaViewProps {
@@ -39,6 +46,50 @@ const SettingIcon: React.FC<{ icon: string }> = ({ icon }) => (
   </span>
 );
 
+// Editor de escala de trabalho (reutilizado no criar/editar funcionário)
+const ScheduleEditor: React.FC<{ value: WorkSchedule; onChange: (s: WorkSchedule) => void }> = ({ value, onChange }) => {
+  const setDay = (i: number, patch: Partial<WorkSchedule[number]>) =>
+    onChange(value.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
+  return (
+    <div className="space-y-1.5">
+      {value.map((d, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <label className="flex items-center gap-1.5 w-20 shrink-0 cursor-pointer">
+            <input type="checkbox" checked={d.works} onChange={(e) => setDay(i, { works: e.target.checked })} />
+            <span className="text-[11px] font-semibold text-slate-600">{WEEKDAY_SHORT[i]}</span>
+          </label>
+          <input
+            type="time"
+            value={d.start}
+            disabled={!d.works}
+            onChange={(e) => setDay(i, { start: e.target.value })}
+            className={`${inputCls} font-data-mono py-1.5 disabled:bg-slate-100 disabled:text-slate-300`}
+          />
+          <span className="text-slate-400 text-[11px]">às</span>
+          <input
+            type="time"
+            value={d.end}
+            disabled={!d.works}
+            onChange={(e) => setDay(i, { end: e.target.value })}
+            className={`${inputCls} font-data-mono py-1.5 disabled:bg-slate-100 disabled:text-slate-300`}
+          />
+          <div className="flex items-center gap-1 shrink-0">
+            <input
+              type="number"
+              min={0}
+              value={d.lunchMinutes}
+              disabled={!d.works}
+              onChange={(e) => setDay(i, { lunchMinutes: Number(e.target.value) })}
+              className={`${inputCls} font-data-mono py-1.5 w-16 text-center disabled:bg-slate-100 disabled:text-slate-300`}
+            />
+            <span className="text-slate-400 text-[10px]">min almoço</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 export const ContaView: React.FC<ContaViewProps> = ({
   logs,
   userRole,
@@ -69,6 +120,61 @@ export const ContaView: React.FC<ContaViewProps> = ({
   const [nuPhone, setNuPhone] = useState('');
   const [nuCourses, setNuCourses] = useState('');
   const [nuSchedule, setNuSchedule] = useState<WorkSchedule>(() => DEFAULT_SCHEDULE.map((d) => ({ ...d })));
+
+  // Edição de funcionário existente
+  const [editUser, setEditUser] = useState<ManagedUser | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [euForm, setEuForm] = useState({
+    name: '',
+    fullName: '',
+    cpf: '',
+    birthDate: '',
+    phone: '',
+    role: 'TECNICO' as UserRole,
+    courses: '',
+    schedule: DEFAULT_SCHEDULE.map((d) => ({ ...d })) as WorkSchedule,
+  });
+
+  const openEditUser = (u: ManagedUser) => {
+    setEuForm({
+      name: u.name || '',
+      fullName: u.fullName || '',
+      cpf: u.cpf || '',
+      birthDate: u.birthDate || '',
+      phone: u.phone || '',
+      role: u.role,
+      courses: (u.courses || []).join('\n'),
+      schedule: u.schedule ? u.schedule.map((d) => ({ ...d })) : DEFAULT_SCHEDULE.map((d) => ({ ...d })),
+    });
+    setEditUser(u);
+  };
+
+  const handleSaveUserEdit = async () => {
+    if (!editUser || savingEdit) return;
+    setSavingEdit(true);
+    try {
+      await updateUserProfile(editUser.id, {
+        name: euForm.name.trim() || undefined,
+        role: euForm.role,
+        fullName: euForm.fullName.trim() || undefined,
+        cpf: euForm.cpf.trim() || undefined,
+        birthDate: euForm.birthDate || undefined,
+        phone: euForm.phone.trim() || undefined,
+        schedule: euForm.schedule,
+        courses: euForm.courses
+          .split('\n')
+          .map((s) => s.trim())
+          .filter(Boolean),
+      });
+      setEditUser(null);
+      setTimeout(refreshUsers, 300);
+    } catch (err) {
+      console.error('Falha ao salvar edição do funcionário:', err);
+      alert('Não foi possível salvar as alterações.');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
   const [creating, setCreating] = useState(false);
   const [createMsg, setCreateMsg] = useState('');
 
@@ -612,56 +718,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
                   Escala de trabalho (usada nos alertas de ponto)
                 </p>
-                <div className="space-y-1.5">
-                  {nuSchedule.map((d, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <label className="flex items-center gap-1.5 w-20 shrink-0 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={d.works}
-                          onChange={(e) =>
-                            setNuSchedule((prev) => prev.map((x, idx) => (idx === i ? { ...x, works: e.target.checked } : x)))
-                          }
-                        />
-                        <span className="text-[11px] font-semibold text-slate-600">{WEEKDAY_SHORT[i]}</span>
-                      </label>
-                      <input
-                        type="time"
-                        value={d.start}
-                        disabled={!d.works}
-                        onChange={(e) =>
-                          setNuSchedule((prev) => prev.map((x, idx) => (idx === i ? { ...x, start: e.target.value } : x)))
-                        }
-                        className={`${inputCls} font-data-mono py-1.5 disabled:bg-slate-100 disabled:text-slate-300`}
-                      />
-                      <span className="text-slate-400 text-[11px]">às</span>
-                      <input
-                        type="time"
-                        value={d.end}
-                        disabled={!d.works}
-                        onChange={(e) =>
-                          setNuSchedule((prev) => prev.map((x, idx) => (idx === i ? { ...x, end: e.target.value } : x)))
-                        }
-                        className={`${inputCls} font-data-mono py-1.5 disabled:bg-slate-100 disabled:text-slate-300`}
-                      />
-                      <div className="flex items-center gap-1 shrink-0">
-                        <input
-                          type="number"
-                          min={0}
-                          value={d.lunchMinutes}
-                          disabled={!d.works}
-                          onChange={(e) =>
-                            setNuSchedule((prev) =>
-                              prev.map((x, idx) => (idx === i ? { ...x, lunchMinutes: Number(e.target.value) } : x))
-                            )
-                          }
-                          className={`${inputCls} font-data-mono py-1.5 w-16 text-center disabled:bg-slate-100 disabled:text-slate-300`}
-                        />
-                        <span className="text-slate-400 text-[10px]">min almoço</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <ScheduleEditor value={nuSchedule} onChange={setNuSchedule} />
               </div>
 
               {createMsg && (
@@ -728,6 +785,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
                             <option value="FINANCEIRO">Financeiro</option>
                             <option value="TECNICO">Técnico</option>
                           </select>
+                          <RowAction icon="edit" label="Editar dados" onClick={() => openEditUser(u)} />
                           {!isSelf && (
                             <RowAction icon="delete" label="Remover acesso" danger onClick={() => handleDeleteUser(u)} />
                           )}
@@ -745,6 +803,68 @@ export const ContaView: React.FC<ContaViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Drawer: Editar dados do funcionário */}
+      <SidePanel
+        open={!!editUser}
+        title="Editar funcionário"
+        subtitle={editUser?.email}
+        onClose={() => setEditUser(null)}
+        onSave={handleSaveUserEdit}
+        saving={savingEdit}
+      >
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3 text-xs font-medium">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Nome de exibição</label>
+              <input value={euForm.name} onChange={(e) => setEuForm({ ...euForm, name: e.target.value })} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Nível de acesso</label>
+              <select
+                value={euForm.role}
+                onChange={(e) => setEuForm({ ...euForm, role: e.target.value as UserRole })}
+                className={`${inputCls} font-semibold`}
+              >
+                <option value="ADMINISTRATIVO">Administrativo</option>
+                <option value="GESTOR">Gestor</option>
+                <option value="FINANCEIRO">Financeiro</option>
+                <option value="TECNICO">Técnico</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Nome completo</label>
+              <input value={euForm.fullName} onChange={(e) => setEuForm({ ...euForm, fullName: e.target.value })} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>CPF</label>
+              <input value={euForm.cpf} onChange={(e) => setEuForm({ ...euForm, cpf: e.target.value })} className={`${inputCls} font-data-mono`} />
+            </div>
+            <div>
+              <label className={labelCls}>Data de nascimento</label>
+              <input type="date" value={euForm.birthDate} onChange={(e) => setEuForm({ ...euForm, birthDate: e.target.value })} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Telefone</label>
+              <input value={euForm.phone} onChange={(e) => setEuForm({ ...euForm, phone: e.target.value })} className={`${inputCls} font-data-mono`} />
+            </div>
+          </div>
+          <div>
+            <label className={labelCls}>Cursos, NRs e diplomas (um por linha)</label>
+            <textarea
+              value={euForm.courses}
+              onChange={(e) => setEuForm({ ...euForm, courses: e.target.value })}
+              rows={3}
+              className={`${inputCls} resize-none`}
+            />
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Escala de trabalho</p>
+          <ScheduleEditor value={euForm.schedule} onChange={(s) => setEuForm({ ...euForm, schedule: s })} />
+        </div>
+      </SidePanel>
     </div>
   );
 };
