@@ -586,6 +586,7 @@ export function CrmApp({
           {currentTab === 'estoque' && (
             <EstoqueView
               inventory={inventory}
+              suppliers={suppliers}
               onAddInventoryItem={handleAddInventoryItem}
               onUpdateInventoryItem={handleUpdateInventoryItem}
               onDeleteInventoryItem={handleDeleteInventoryItem}

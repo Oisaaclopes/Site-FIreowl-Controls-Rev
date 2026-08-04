@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { InventoryItem, StockMovement } from '@/lib/types';
+import { InventoryItem, StockMovement, Supplier } from '@/lib/types';
 import { insertStockMovement, fetchStockMovements, isSupabaseConfigured } from '@/lib/inventory';
 
 interface EstoqueViewProps {
   inventory: InventoryItem[];
+  suppliers?: Supplier[];
   onAddInventoryItem: (item: InventoryItem) => void | Promise<void>;
   onUpdateInventoryItem?: (item: InventoryItem) => void | Promise<void>;
   onDeleteInventoryItem?: (id: string) => void | Promise<void>;
@@ -621,6 +622,7 @@ const StockItemCard: React.FC<{
 
 export const EstoqueView: React.FC<EstoqueViewProps> = ({
   inventory,
+  suppliers = [],
   onAddInventoryItem,
   onUpdateInventoryItem,
   onDeleteInventoryItem,
@@ -683,9 +685,12 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
 
   const supplierOptions = useMemo(() => {
     const set = new Set<string>();
+    // Fornecedores cadastrados no módulo Fornecedores
+    suppliers.forEach((s) => s.name && set.add(s.name));
+    // + fornecedores que já aparecem em produtos do estoque
     inventory.forEach((i) => i.supplier && set.add(i.supplier));
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-  }, [inventory]);
+  }, [suppliers, inventory]);
 
   // Marcas: padrão de mercado + as já cadastradas no estoque
   const brandOptions = useMemo(() => {
