@@ -70,6 +70,7 @@ import { allowedTabs, isTabAllowed } from '@/lib/rbac';
 import { fetchPunches, insertPunch } from '@/lib/timepunch';
 import { fetchPedidos, upsertPedido, updatePedidoStatus } from '@/lib/pedidos';
 import { fetchQuotes, insertQuote } from '@/lib/quotes';
+import { fetchSuppliers, upsertSupplier, deleteSupplier } from '@/lib/suppliers';
 import { WorkSchedule } from '@/lib/schedule';
 
 let idSeq = 1000;
@@ -120,7 +121,7 @@ export function CrmApp({
   const [auditSdai] = useState(INITIAL_AUDIT_SDAI);
   const [quotes, setQuotes] = useState<CustomQuote[]>(isSupabaseConfigured() ? [] : INITIAL_CUSTOM_QUOTES);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>(INITIAL_FINANCIAL_TRANSACTIONS);
-  const [suppliers, setSuppliers] = useState<Supplier[]>(INITIAL_SUPPLIERS);
+  const [suppliers, setSuppliers] = useState<Supplier[]>(isSupabaseConfigured() ? [] : INITIAL_SUPPLIERS);
   const [services, setServices] = useState<ServiceCatalogItem[]>(INITIAL_SERVICES);
   // Com Supabase configurado, inicia vazio e carrega do banco (evita
   // "flash" de dados de exemplo). Sem Supabase, usa os dados locais.
@@ -158,6 +159,9 @@ export function CrmApp({
     fetchQuotes()
       .then((rows) => setQuotes(rows))
       .catch((err) => console.warn('Orçamentos: falha ao carregar do Supabase.', err));
+    fetchSuppliers()
+      .then((rows) => setSuppliers(rows))
+      .catch((err) => console.warn('Fornecedores: falha ao carregar do Supabase.', err));
   }, []);
 
   const handleUpdatePdfPrefs = (p: PdfPrefs) => {
@@ -301,20 +305,42 @@ export function CrmApp({
     logAction(`Exclusão de ${tx?.type || 'Lançamento'}`, 'Finanças', `Removido ${tx?.id || id}`);
   };
 
-  const handleAddSupplier = (newSupplier: Supplier) => {
-    setSuppliers([newSupplier, ...suppliers]);
+  const handleAddSupplier = async (newSupplier: Supplier) => {
+    setSuppliers((prev) => [newSupplier, ...prev]);
     logAction('Homologação de Fornecedor', 'Fornecedores', `Homologado ${newSupplier.name}`);
+    if (isSupabaseConfigured()) {
+      try {
+        const saved = await upsertSupplier(newSupplier);
+        setSuppliers((prev) => prev.map((x) => (x.id === saved.id ? saved : x)));
+      } catch (err) {
+        console.error('Falha ao salvar fornecedor no Supabase:', err);
+      }
+    }
   };
 
-  const handleUpdateSupplier = (s: Supplier) => {
+  const handleUpdateSupplier = async (s: Supplier) => {
     setSuppliers((prev) => prev.map((x) => (x.id === s.id ? s : x)));
     logAction('Atualização de Fornecedor', 'Fornecedores', `Atualizado ${s.name}`);
+    if (isSupabaseConfigured()) {
+      try {
+        await upsertSupplier(s);
+      } catch (err) {
+        console.error('Falha ao atualizar fornecedor no Supabase:', err);
+      }
+    }
   };
 
-  const handleDeleteSupplier = (id: string) => {
+  const handleDeleteSupplier = async (id: string) => {
     const s = suppliers.find((x) => x.id === id);
     setSuppliers((prev) => prev.filter((x) => x.id !== id));
     logAction('Exclusão de Fornecedor', 'Fornecedores', `Removido ${s?.name || id}`);
+    if (isSupabaseConfigured()) {
+      try {
+        await deleteSupplier(id);
+      } catch (err) {
+        console.error('Falha ao excluir fornecedor no Supabase:', err);
+      }
+    }
   };
 
   const handleAddInventoryItem = async (newItem: InventoryItem) => {
