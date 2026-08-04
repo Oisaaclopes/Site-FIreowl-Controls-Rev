@@ -68,6 +68,7 @@ import { PontoView } from '@/components/views/PontoView';
 import { ContaView } from '@/components/views/ContaView';
 import { allowedTabs, isTabAllowed } from '@/lib/rbac';
 import { fetchPunches, insertPunch } from '@/lib/timepunch';
+import { fetchPedidos, upsertPedido, updatePedidoStatus } from '@/lib/pedidos';
 
 let idSeq = 1000;
 function getNextSeq() {
@@ -102,7 +103,7 @@ export function CrmApp({
   // System State Data
   const [clients, setClients] = useState<Client[]>(INITIAL_CLIENTS);
   const [pedidosOS, setPedidosOS] = useState<PedidoOS[]>(INITIAL_PEDIDOS_OS);
-  const [pedidos, setPedidos] = useState<Pedido[]>(INITIAL_PEDIDOS);
+  const [pedidos, setPedidos] = useState<Pedido[]>(isSupabaseConfigured() ? [] : INITIAL_PEDIDOS);
   const [partnerBrands, setPartnerBrands] = useState<PartnerBrand[]>(INITIAL_PARTNER_BRANDS);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(INITIAL_COMPANY_PROFILE);
   const [templates, setTemplates] = useState<PedidoTemplate[]>(INITIAL_TEMPLATES);
@@ -144,6 +145,14 @@ export function CrmApp({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Carrega as propostas comerciais (pedidos) do Supabase
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    fetchPedidos()
+      .then((rows) => setPedidos(rows))
+      .catch((err) => console.warn('Propostas: falha ao carregar do Supabase.', err));
+  }, []);
+
   const handleUpdatePdfPrefs = (p: PdfPrefs) => {
     setPdfPrefs(p);
     try {
@@ -175,24 +184,46 @@ export function CrmApp({
   }, []);
 
   // Handlers
-  const handleSavePedido = (savedPedido: Pedido) => {
+  const upsertPedidoLocal = (saved: Pedido) => {
     setPedidos((prev) => {
-      const idx = prev.findIndex((p) => p.id === savedPedido.id);
+      const idx = prev.findIndex((p) => p.id === saved.id);
       if (idx >= 0) {
         const copy = [...prev];
-        copy[idx] = savedPedido;
+        copy[idx] = saved;
         return copy;
       }
-      return [savedPedido, ...prev];
+      return [saved, ...prev];
     });
+  };
+
+  const handleSavePedido = async (savedPedido: Pedido) => {
+    if (isSupabaseConfigured()) {
+      try {
+        const persisted = await upsertPedido(savedPedido);
+        upsertPedidoLocal(persisted);
+        logAction('Proposta Comercial', 'Pedidos CRM', `Salvo pedido ${persisted.numeroPedido} (${persisted.status}) - R$ ${persisted.proposal.valorTotal}`);
+        return;
+      } catch (err) {
+        console.error('Falha ao salvar proposta no Supabase:', err);
+        alert('Não foi possível salvar a proposta no banco. Salva apenas nesta sessão.');
+      }
+    }
+    upsertPedidoLocal(savedPedido);
     logAction('Proposta Comercial', 'Pedidos CRM', `Salvo pedido ${savedPedido.numeroPedido} (${savedPedido.status}) - R$ ${savedPedido.proposal.valorTotal}`);
   };
 
-  const handleUpdatePedidoStatus = (pedidoId: string, newStatus: PedidoStatus) => {
+  const handleUpdatePedidoStatus = async (pedidoId: string, newStatus: PedidoStatus) => {
+    const ped = pedidos.find((p) => p.id === pedidoId);
     setPedidos((prev) =>
       prev.map((p) => (p.id === pedidoId ? { ...p, status: newStatus, updatedAt: new Date().toLocaleDateString('pt-BR') } : p))
     );
-    const ped = pedidos.find((p) => p.id === pedidoId);
+    if (isSupabaseConfigured()) {
+      try {
+        await updatePedidoStatus(pedidoId, newStatus);
+      } catch (err) {
+        console.error('Falha ao atualizar status da proposta:', err);
+      }
+    }
     logAction('Transição de Status', 'Pedidos CRM', `Pedido ${ped?.numeroPedido || pedidoId} alterado para ${newStatus}`);
   };
 
