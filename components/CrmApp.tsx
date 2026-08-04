@@ -325,8 +325,30 @@ export function CrmApp({
     }
   };
 
+  // Ponto NÃO usa banco de dados — persiste só localmente (localStorage),
+  // custo zero de DB. Mantém os últimos 300 registros.
+  const PUNCHES_KEY = 'fireowl_punches';
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(PUNCHES_KEY);
+      if (saved) setPunches(JSON.parse(saved));
+    } catch {
+      /* localStorage indisponível */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleAddPunch = (newPunch: TimePunch) => {
-    setPunches([newPunch, ...punches]);
+    setPunches((prev) => {
+      const next = [newPunch, ...prev].slice(0, 300);
+      try {
+        localStorage.setItem(PUNCHES_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
     logAction('Batida de Ponto', 'Ponto Eletrônico', `Ponto registrado por ${newPunch.employeeName} (${newPunch.type})`);
   };
 
