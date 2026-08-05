@@ -69,3 +69,9 @@ export async function updatePedidoStatus(id: string, status: PedidoStatus): Prom
     .eq('id', id);
   if (error) throw error;
 }
+
+export async function deletePedido(id: string): Promise<void> {
+  const supabase = getSupabaseClient() as any;
+  const { error } = await supabase.from(TABLE).delete().eq('id', id);
+  if (error) throw error;
+}

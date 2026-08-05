@@ -68,7 +68,7 @@ import { PontoView } from '@/components/views/PontoView';
 import { ContaView } from '@/components/views/ContaView';
 import { allowedTabs, isTabAllowed } from '@/lib/rbac';
 import { fetchPunches, insertPunch } from '@/lib/timepunch';
-import { fetchPedidos, upsertPedido, updatePedidoStatus } from '@/lib/pedidos';
+import { fetchPedidos, upsertPedido, updatePedidoStatus, deletePedido } from '@/lib/pedidos';
 import { fetchQuotes, insertQuote } from '@/lib/quotes';
 import { fetchSuppliers, upsertSupplier, deleteSupplier } from '@/lib/suppliers';
 import { fetchClients, upsertClient } from '@/lib/clients';
@@ -250,6 +250,20 @@ export function CrmApp({
       }
     }
     logAction('Transição de Status', 'Pedidos CRM', `Pedido ${ped?.numeroPedido || pedidoId} alterado para ${newStatus}`);
+  };
+
+  const handleDeletePedido = async (pedidoId: string) => {
+    const ped = pedidos.find((p) => p.id === pedidoId);
+    setPedidos((prev) => prev.filter((p) => p.id !== pedidoId));
+    if (isSupabaseConfigured()) {
+      try {
+        await deletePedido(pedidoId);
+      } catch (err) {
+        console.error('Falha ao excluir proposta:', err);
+        alert('Não foi possível excluir a proposta no banco.');
+      }
+    }
+    logAction('Exclusão de Proposta', 'Pedidos CRM', `Removida proposta ${ped?.numeroPedido || pedidoId}`);
   };
 
   const handleGenerateOSFromPedido = (pedido: Pedido) => {
@@ -633,6 +647,7 @@ export function CrmApp({
               onAddOS={handleAddOS}
               onSavePedido={handleSavePedido}
               onUpdatePedidoStatus={handleUpdatePedidoStatus}
+              onDeletePedido={handleDeletePedido}
               onGenerateOSFromPedido={handleGenerateOSFromPedido}
               onSelectClientForReport={handleSelectClientForReport}
               pdfPrefs={pdfPrefs}
