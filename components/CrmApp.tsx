@@ -447,6 +447,17 @@ export function CrmApp({
     logAction('Batida de Ponto', 'Ponto Eletrônico', `Ponto registrado por ${newPunch.employeeName} (${newPunch.type})`);
   };
 
+  // Recarrega as batidas do banco (usado após materializar um ajuste aprovado).
+  const reloadPunches = async () => {
+    if (!isSupabaseConfigured()) return;
+    try {
+      const rows = await fetchPunches();
+      setPunches(rows);
+    } catch (err) {
+      console.warn('Ponto: falha ao recarregar do Supabase.', err);
+    }
+  };
+
   const handleAddQuote = async (newQuote: CustomQuote) => {
     if (isSupabaseConfigured()) {
       try {
@@ -655,6 +666,7 @@ export function CrmApp({
             <PontoView
               punches={punches}
               onAddPunch={handleAddPunch}
+              onReloadPunches={reloadPunches}
               currentUser={userName}
               userRole={userRole}
               schedule={userSchedule}

@@ -56,3 +56,42 @@ export async function insertPunch(p: TimePunch): Promise<TimePunch> {
   if (error) throw error;
   return rowToPunch(data);
 }
+
+// Cria uma batida para OUTRO funcionário (uso admin/gestor ao aprovar ajuste).
+// Exige a política de insert 0017 (admin/gestor podem inserir para qualquer user_id).
+export async function insertPunchForUser(input: {
+  userId: string;
+  employeeName: string;
+  type: TimePunch['type'];
+  atMs: number;
+  status?: string;
+}): Promise<TimePunch> {
+  const supabase = getSupabaseClient() as any;
+  const row = {
+    user_id: input.userId,
+    employee_name: input.employeeName,
+    type: input.type,
+    punched_at: new Date(input.atMs).toISOString(),
+    lat: null,
+    lng: null,
+    accuracy: null,
+    status: input.status || 'AJUSTADO',
+  };
+  const { data, error } = await supabase.from(TABLE).insert(row).select().single();
+  if (error) throw error;
+  return rowToPunch(data);
+}
+
+// Edita o horário/status de uma batida existente (uso admin/gestor). Exige a
+// política de update 0017.
+export async function updatePunchTime(id: string, atMs: number, status = 'AJUSTADO'): Promise<TimePunch> {
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase
+    .from(TABLE)
+    .update({ punched_at: new Date(atMs).toISOString(), status })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return rowToPunch(data);
+}

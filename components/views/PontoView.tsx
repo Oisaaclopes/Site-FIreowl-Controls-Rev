@@ -5,6 +5,7 @@ import { TimePunch, UserRole } from '@/lib/types';
 import { DataListRow, Badge } from '@/components/DataListRow';
 import { WorkSchedule, DEFAULT_SCHEDULE, normalizeSchedule, hmToMinutes, WEEKDAY_SHORT } from '@/lib/schedule';
 import { fetchAdjustments, createAdjustment, updateAdjustmentStatus, PunchAdjustment } from '@/lib/adjustments';
+import { insertPunchForUser, updatePunchTime } from '@/lib/timepunch';
 import { isSupabaseConfigured } from '@/lib/inventory';
 import { fetchHolidays, Holiday } from '@/lib/holidays';
 import { fetchDayEntries, createDayEntry, deleteDayEntry, DayEntry, DayEntryKind } from '@/lib/dayentries';
@@ -13,6 +14,7 @@ import { uploadCertificate, signedDocUrl } from '@/lib/storage';
 interface PontoViewProps {
   punches: TimePunch[];
   onAddPunch: (punch: TimePunch) => void;
+  onReloadPunches?: () => void | Promise<void>;
   currentUser?: string;
   userRole?: UserRole;
   schedule?: WorkSchedule;
@@ -55,6 +57,7 @@ const friendlyDate = (d: Date) =>
 export const PontoView: React.FC<PontoViewProps> = ({
   punches,
   onAddPunch,
+  onReloadPunches,
   currentUser = 'Operador Fireowl',
   userRole = 'TECNICO',
   schedule,
@@ -321,13 +324,45 @@ export const PontoView: React.FC<PontoViewProps> = ({
       setAdjSaving(false);
     }
   };
-  const reviewAdj = async (id: string, status: 'APROVADO' | 'REJEITADO') => {
+  const [adjBusy, setAdjBusy] = useState<string | null>(null);
+  const reviewAdj = async (a: PunchAdjustment, status: 'APROVADO' | 'REJEITADO') => {
+    if (adjBusy) return;
+    setAdjBusy(a.id);
     try {
-      await updateAdjustmentStatus(id, status);
-      setAdjustments((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
+      // Ao APROVAR, materializa a batida corrigida no ponto do funcionário.
+      if (status === 'APROVADO' && a.requestedTime) {
+        const atMs = new Date(`${a.refDate}T${a.requestedTime}:00`).getTime();
+        if (!Number.isNaN(atMs)) {
+          const existing = punches.find(
+            (p) => p.employeeName === a.employeeName && p.type === a.type && p.at && sameDay(p.at, atMs)
+          );
+          if (existing) {
+            await updatePunchTime(existing.id, atMs);
+          } else if (a.userId) {
+            await insertPunchForUser({
+              userId: a.userId,
+              employeeName: a.employeeName,
+              type: a.type,
+              atMs,
+            });
+          } else {
+            alert(
+              'Solicitação aprovada, mas não foi possível criar a batida automaticamente (funcionário sem vínculo de usuário). Ajuste manualmente se necessário.'
+            );
+          }
+        }
+      } else if (status === 'APROVADO' && !a.requestedTime) {
+        alert('Aprovado. Como a solicitação não informou o horário, nenhuma batida foi criada automaticamente.');
+      }
+
+      await updateAdjustmentStatus(a.id, status);
+      setAdjustments((prev) => prev.map((x) => (x.id === a.id ? { ...x, status } : x)));
+      if (status === 'APROVADO') await onReloadPunches?.();
     } catch (err) {
       console.error('Falha ao revisar solicitação:', err);
-      alert('Não foi possível atualizar a solicitação.');
+      alert('Não foi possível atualizar a solicitação. Verifique se as migrações do ponto foram aplicadas.');
+    } finally {
+      setAdjBusy(null);
     }
   };
   const adjStatusColor = (s: PunchAdjustment['status']) =>
@@ -979,14 +1014,16 @@ export const PontoView: React.FC<PontoViewProps> = ({
                   {isManager && a.status === 'PENDENTE' && (
                     <>
                       <button
-                        onClick={() => reviewAdj(a.id, 'APROVADO')}
-                        className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold"
+                        onClick={() => reviewAdj(a, 'APROVADO')}
+                        disabled={adjBusy === a.id}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold disabled:opacity-60"
                       >
-                        Aprovar
+                        {adjBusy === a.id ? '...' : 'Aprovar'}
                       </button>
                       <button
-                        onClick={() => reviewAdj(a.id, 'REJEITADO')}
-                        className="px-2.5 py-1 rounded-lg bg-[#E63946] hover:bg-[#a51515] text-white text-[11px] font-semibold"
+                        onClick={() => reviewAdj(a, 'REJEITADO')}
+                        disabled={adjBusy === a.id}
+                        className="px-2.5 py-1 rounded-lg bg-[#E63946] hover:bg-[#a51515] text-white text-[11px] font-semibold disabled:opacity-60"
                       >
                         Rejeitar
                       </button>

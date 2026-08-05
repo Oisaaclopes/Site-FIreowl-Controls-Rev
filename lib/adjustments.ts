@@ -5,6 +5,7 @@ export type PunchType = 'ENTRADA' | 'PAUSA' | 'RETORNO' | 'SAIDA';
 
 export interface PunchAdjustment {
   id: string;
+  userId?: string; // dono da solicitação (funcionário) — usado ao materializar a batida
   employeeName: string;
   refDate: string; // YYYY-MM-DD
   type: PunchType;
@@ -20,6 +21,7 @@ const TABLE = 'punch_adjustments';
 function rowToAdj(r: any): PunchAdjustment {
   return {
     id: String(r.id),
+    userId: r.user_id ?? undefined,
     employeeName: r.employee_name || '',
     refDate: r.ref_date || '',
     type: r.type,
