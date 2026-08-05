@@ -88,7 +88,8 @@ export const ReceitasView: React.FC<ReceitasViewProps> = ({
         });
       }
     } else {
-      const seq = (recSeq++).toString();
+      // id único por timestamp (evita colisão/sobrescrita ao persistir no banco)
+      const seq = `${recSeq++}-${Date.now().toString(36)}`;
       onAddTransaction({
         id: `#FOWL-REC-${seq}`,
         type: 'RECEITA',

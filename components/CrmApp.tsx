@@ -71,6 +71,8 @@ import { fetchPunches, insertPunch } from '@/lib/timepunch';
 import { fetchPedidos, upsertPedido, updatePedidoStatus } from '@/lib/pedidos';
 import { fetchQuotes, insertQuote } from '@/lib/quotes';
 import { fetchSuppliers, upsertSupplier, deleteSupplier } from '@/lib/suppliers';
+import { fetchClients, upsertClient } from '@/lib/clients';
+import { fetchTransactions, upsertTransaction, deleteTransaction } from '@/lib/transactions';
 import { WorkSchedule } from '@/lib/schedule';
 
 let idSeq = 1000;
@@ -106,7 +108,7 @@ export function CrmApp({
   }, [userRole]);
 
   // System State Data
-  const [clients, setClients] = useState<Client[]>(INITIAL_CLIENTS);
+  const [clients, setClients] = useState<Client[]>(isSupabaseConfigured() ? [] : INITIAL_CLIENTS);
   const [pedidosOS, setPedidosOS] = useState<PedidoOS[]>(INITIAL_PEDIDOS_OS);
   const [pedidos, setPedidos] = useState<Pedido[]>(isSupabaseConfigured() ? [] : INITIAL_PEDIDOS);
   const [partnerBrands, setPartnerBrands] = useState<PartnerBrand[]>(INITIAL_PARTNER_BRANDS);
@@ -120,7 +122,9 @@ export function CrmApp({
   const [technicalReport, setTechnicalReport] = useState(INITIAL_TECHNICAL_REPORT);
   const [auditSdai] = useState(INITIAL_AUDIT_SDAI);
   const [quotes, setQuotes] = useState<CustomQuote[]>(isSupabaseConfigured() ? [] : INITIAL_CUSTOM_QUOTES);
-  const [transactions, setTransactions] = useState<FinancialTransaction[]>(INITIAL_FINANCIAL_TRANSACTIONS);
+  const [transactions, setTransactions] = useState<FinancialTransaction[]>(
+    isSupabaseConfigured() ? [] : INITIAL_FINANCIAL_TRANSACTIONS
+  );
   const [suppliers, setSuppliers] = useState<Supplier[]>(isSupabaseConfigured() ? [] : INITIAL_SUPPLIERS);
   const [services, setServices] = useState<ServiceCatalogItem[]>(INITIAL_SERVICES);
   // Com Supabase configurado, inicia vazio e carrega do banco (evita
@@ -162,6 +166,12 @@ export function CrmApp({
     fetchSuppliers()
       .then((rows) => setSuppliers(rows))
       .catch((err) => console.warn('Fornecedores: falha ao carregar do Supabase.', err));
+    fetchClients()
+      .then((rows) => setClients(rows))
+      .catch((err) => console.warn('Clientes: falha ao carregar do Supabase.', err));
+    fetchTransactions()
+      .then((rows) => setTransactions(rows))
+      .catch((err) => console.warn('Financeiro: falha ao carregar do Supabase.', err));
   }, []);
 
   const handleUpdatePdfPrefs = (p: PdfPrefs) => {
@@ -274,9 +284,18 @@ export function CrmApp({
   };
 
   // Handlers
-  const handleAddClient = (newClient: Client) => {
-    setClients([newClient, ...clients]);
+  const handleAddClient = async (newClient: Client) => {
+    setClients((prev) => [newClient, ...prev]);
     logAction('Cadastro de Cliente', 'Clientes', `Novo cliente cadastrado: ${newClient.name}`);
+    if (isSupabaseConfigured()) {
+      try {
+        const saved = await upsertClient(newClient);
+        setClients((prev) => prev.map((x) => (x.id === saved.id ? saved : x)));
+      } catch (err) {
+        console.error('Falha ao salvar cliente no Supabase:', err);
+        alert('Não foi possível salvar o cliente no banco. Salvo apenas nesta sessão.');
+      }
+    }
   };
 
   const handleAddOS = (newOS: PedidoOS) => {
@@ -289,20 +308,43 @@ export function CrmApp({
     logAction('Novo Contrato', 'Contratos', `Cadastrado contrato ${newContract.id} - ${newContract.clientName}`);
   };
 
-  const handleAddTransaction = (newTx: FinancialTransaction) => {
-    setTransactions([newTx, ...transactions]);
+  const handleAddTransaction = async (newTx: FinancialTransaction) => {
+    setTransactions((prev) => [newTx, ...prev]);
     logAction(`Lançamento de ${newTx.type}`, 'Finanças', `Lançado ${newTx.id} - ${newTx.clientOrVendor} (R$ ${newTx.amount})`);
+    if (isSupabaseConfigured()) {
+      try {
+        const saved = await upsertTransaction(newTx);
+        setTransactions((prev) => prev.map((t) => (t.id === saved.id ? saved : t)));
+      } catch (err) {
+        console.error('Falha ao salvar lançamento no Supabase:', err);
+        alert('Não foi possível salvar o lançamento no banco. Salvo apenas nesta sessão.');
+      }
+    }
   };
 
-  const handleUpdateTransaction = (tx: FinancialTransaction) => {
+  const handleUpdateTransaction = async (tx: FinancialTransaction) => {
     setTransactions((prev) => prev.map((t) => (t.id === tx.id ? tx : t)));
     logAction(`Edição de ${tx.type}`, 'Finanças', `Atualizado ${tx.id} - ${tx.clientOrVendor} (R$ ${tx.amount})`);
+    if (isSupabaseConfigured()) {
+      try {
+        await upsertTransaction(tx);
+      } catch (err) {
+        console.error('Falha ao atualizar lançamento no Supabase:', err);
+      }
+    }
   };
 
-  const handleDeleteTransaction = (id: string) => {
+  const handleDeleteTransaction = async (id: string) => {
     const tx = transactions.find((t) => t.id === id);
     setTransactions((prev) => prev.filter((t) => t.id !== id));
     logAction(`Exclusão de ${tx?.type || 'Lançamento'}`, 'Finanças', `Removido ${tx?.id || id}`);
+    if (isSupabaseConfigured()) {
+      try {
+        await deleteTransaction(id);
+      } catch (err) {
+        console.error('Falha ao excluir lançamento no Supabase:', err);
+      }
+    }
   };
 
   const handleAddSupplier = async (newSupplier: Supplier) => {

@@ -77,7 +77,8 @@ export const DespesasView: React.FC<DespesasViewProps> = ({
         onUpdateTransaction?.({ ...existing, clientOrVendor, description, amount: Number(amount), status });
       }
     } else {
-      const seq = (despSeq++).toString();
+      // id único por timestamp (evita colisão/sobrescrita ao persistir no banco)
+      const seq = `${despSeq++}-${Date.now().toString(36)}`;
       onAddTransaction({
         id: `#FOWL-DESP-${seq}`,
         type: 'DESPESA',
