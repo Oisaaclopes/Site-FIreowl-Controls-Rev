@@ -73,6 +73,7 @@ import { fetchQuotes, insertQuote } from '@/lib/quotes';
 import { fetchSuppliers, upsertSupplier, deleteSupplier } from '@/lib/suppliers';
 import { fetchClients, upsertClient } from '@/lib/clients';
 import { fetchTransactions, upsertTransaction, deleteTransaction } from '@/lib/transactions';
+import { fetchContracts, upsertContract } from '@/lib/contracts';
 import { WorkSchedule } from '@/lib/schedule';
 
 let idSeq = 1000;
@@ -114,7 +115,7 @@ export function CrmApp({
   const [partnerBrands, setPartnerBrands] = useState<PartnerBrand[]>(INITIAL_PARTNER_BRANDS);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(INITIAL_COMPANY_PROFILE);
   const [templates, setTemplates] = useState<PedidoTemplate[]>(INITIAL_TEMPLATES);
-  const [contracts, setContracts] = useState<Contract[]>(INITIAL_CONTRACTS);
+  const [contracts, setContracts] = useState<Contract[]>(isSupabaseConfigured() ? [] : INITIAL_CONTRACTS);
   const [equipmentList, setEquipmentList] = useState<ClientEquipment[]>(INITIAL_EQUIPMENT);
   const [punches, setPunches] = useState<TimePunch[]>(
     isSupabaseConfigured() ? [] : INITIAL_PUNCH_LOGS
@@ -172,6 +173,9 @@ export function CrmApp({
     fetchTransactions()
       .then((rows) => setTransactions(rows))
       .catch((err) => console.warn('Financeiro: falha ao carregar do Supabase.', err));
+    fetchContracts()
+      .then((rows) => setContracts(rows))
+      .catch((err) => console.warn('Contratos: falha ao carregar do Supabase.', err));
   }, []);
 
   const handleUpdatePdfPrefs = (p: PdfPrefs) => {
@@ -303,9 +307,18 @@ export function CrmApp({
     logAction('Abertura de Pedido / OS', 'Pedidos', `Aberto pedido ${newOS.id} para ${newOS.clientName}`);
   };
 
-  const handleAddContract = (newContract: Contract) => {
-    setContracts([newContract, ...contracts]);
+  const handleAddContract = async (newContract: Contract) => {
+    setContracts((prev) => [newContract, ...prev]);
     logAction('Novo Contrato', 'Contratos', `Cadastrado contrato ${newContract.id} - ${newContract.clientName}`);
+    if (isSupabaseConfigured()) {
+      try {
+        const saved = await upsertContract(newContract);
+        setContracts((prev) => prev.map((x) => (x.id === saved.id ? saved : x)));
+      } catch (err) {
+        console.error('Falha ao salvar contrato no Supabase:', err);
+        alert('Não foi possível salvar o contrato no banco. Salvo apenas nesta sessão.');
+      }
+    }
   };
 
   const handleAddTransaction = async (newTx: FinancialTransaction) => {

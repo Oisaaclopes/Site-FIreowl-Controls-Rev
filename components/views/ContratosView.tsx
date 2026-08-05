@@ -26,9 +26,9 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
     e.preventDefault();
     if (!clientName) return;
 
-    const timestamp = Date.now().toString().slice(-4);
+    // id único por timestamp (evita colisão/sobrescrita ao persistir no banco)
     onAddContract({
-      id: `CTR-FOWL-${timestamp.slice(-3)}`,
+      id: `CTR-FOWL-${Date.now().toString(36)}`,
       clientName,
       unit: 'Unidade Londrina',
       monthlyValue: Number(monthlyVal),
