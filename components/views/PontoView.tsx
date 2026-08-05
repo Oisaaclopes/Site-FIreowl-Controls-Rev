@@ -459,19 +459,36 @@ export const PontoView: React.FC<PontoViewProps> = ({
     return ms;
   };
 
-  // Agrupa por dia (para uma folha por funcionário; com "Todos", agrupa por funcionário+dia)
+  // dd/mm/aaaa a partir de uma chave YYYY-MM-DD
+  const dayKeyToBr = (dk: string) => dk.split('-').reverse().join('/');
+
+  // Ocorrência do dia (feriado tem prioridade; depois atestado/folga/observação)
+  const occurrenceFor = (emp: string, dayKey: string): string => {
+    if (holidays[dayKey]) return `Feriado: ${holidays[dayKey].name}`;
+    const entries = dayEntries.filter((e) => e.employeeName === emp && e.refDate === dayKey);
+    if (entries.some((e) => e.kind === 'ATESTADO')) return 'Atestado';
+    if (entries.some((e) => e.kind === 'FOLGA')) return 'Folga';
+    const fe = entries.find((e) => e.kind === 'FERIADO');
+    if (fe) return `Feriado: ${fe.note || 'manual'}`;
+    const ob = entries.find((e) => e.kind === 'OBSERVACAO');
+    if (ob) return ob.note ? `Obs.: ${ob.note}` : 'Observação';
+    return '';
+  };
+
+  // Agrupa por dia. Inclui feriados e ocorrências (atestado/folga) mesmo sem batidas.
   const buildData = () => {
     const detail: string[][] = [
       ['Funcionário', 'Data', 'Dia', 'Tipo', 'Hora', 'Latitude', 'Longitude', 'Precisão (m)'],
     ];
     const summary: string[][] = [
-      ['Funcionário', 'Data', 'Entrada', 'Almoço', 'Retorno', 'Saída', 'Horas trabalhadas'],
+      ['Funcionário', 'Data', 'Entrada', 'Almoço', 'Retorno', 'Saída', 'Horas trabalhadas', 'Ocorrência'],
     ];
 
+    // Agrupa batidas por funcionário + dia (chave YYYY-MM-DD)
     const groups = new Map<string, TimePunch[]>();
     monthPunches.forEach((p) => {
       const d = new Date(p.at!);
-      const key = `${p.employeeName}||${d.toLocaleDateString('pt-BR')}`;
+      const key = `${p.employeeName}||${fmtDateInput(d)}`;
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(p);
       detail.push([
@@ -486,30 +503,79 @@ export const PontoView: React.FC<PontoViewProps> = ({
       ]);
     });
 
-    let totalMs = 0;
-    groups.forEach((dayPunches, key) => {
-      const [emp, date] = key.split('||');
-      const t = (type: PunchType) => {
-        const found =
-          type === 'SAIDA'
-            ? [...dayPunches].reverse().find((p) => p.type === type)
-            : dayPunches.find((p) => p.type === type);
-        return found?.at ? fmtHM(new Date(found.at)) : '--';
-      };
-      const ms = dayWorkedMs(dayPunches);
-      totalMs += ms;
-      summary.push([emp, date, t('ENTRADA'), t('PAUSA'), t('RETORNO'), t('SAIDA'), fmtDuration(ms)]);
-    });
-    summary.push(['', '', '', '', '', 'TOTAL', fmtDuration(totalMs)]);
+    // Feriados e ocorrências (atestado/folga/obs) do período selecionado
+    const monthHolidayDates = Object.keys(holidays).filter((dt) => dt.startsWith(expMonth));
+    const monthEntries = dayEntries.filter(
+      (e) => e.refDate.startsWith(expMonth) && (!expEmployee || e.employeeName === expEmployee)
+    );
 
-    return { detail, summary, totalMs };
+    // Funcionários no escopo (selecionado, ou todos com batida/ocorrência no mês)
+    const empSet = new Set<string>();
+    if (expEmployee) empSet.add(expEmployee);
+    else {
+      monthPunches.forEach((p) => p.employeeName && empSet.add(p.employeeName));
+      monthEntries.forEach((e) => e.employeeName && empSet.add(e.employeeName));
+      if (empSet.size === 0 && monthHolidayDates.length) empSet.add('(empresa)'); // só feriados, sem funcionário
+    }
+
+    let totalMs = 0;
+    const rows: { emp: string; dk: string; line: string[] }[] = [];
+
+    empSet.forEach((emp) => {
+      const dayKeys = new Set<string>();
+      groups.forEach((_, key) => {
+        const [e, dk] = key.split('||');
+        if (e === emp) dayKeys.add(dk);
+      });
+      monthEntries.forEach((e) => {
+        if (e.employeeName === emp) dayKeys.add(e.refDate);
+      });
+      monthHolidayDates.forEach((dk) => dayKeys.add(dk));
+
+      dayKeys.forEach((dk) => {
+        const dayPunches = groups.get(`${emp}||${dk}`) || [];
+        const t = (type: PunchType) => {
+          const found =
+            type === 'SAIDA'
+              ? [...dayPunches].reverse().find((p) => p.type === type)
+              : dayPunches.find((p) => p.type === type);
+          return found?.at ? fmtHM(new Date(found.at)) : '--';
+        };
+        const ms = dayPunches.length ? dayWorkedMs(dayPunches) : 0;
+        totalMs += ms;
+        rows.push({
+          emp,
+          dk,
+          line: [
+            emp,
+            dayKeyToBr(dk),
+            t('ENTRADA'),
+            t('PAUSA'),
+            t('RETORNO'),
+            t('SAIDA'),
+            fmtDuration(ms),
+            occurrenceFor(emp, dk) || '—',
+          ],
+        });
+      });
+    });
+
+    rows.sort((a, b) => a.dk.localeCompare(b.dk) || a.emp.localeCompare(b.emp));
+    rows.forEach((r) => summary.push(r.line));
+
+    const feriados = monthHolidayDates.length;
+    const atestados = monthEntries.filter((e) => e.kind === 'ATESTADO').length;
+    summary.push(['', '', '', '', '', '', 'TOTAL', fmtDuration(totalMs)]);
+
+    return { detail, summary, totalMs, feriados, atestados };
   };
 
   const exportCSV = () => {
-    const { detail, summary } = buildData();
+    const { detail, summary, feriados, atestados } = buildData();
     const toCsv = (rows: string[][]) =>
       rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\r\n');
-    const csv = `RESUMO POR DIA\r\n${toCsv(summary)}\r\n\r\nDETALHAMENTO DAS BATIDAS\r\n${toCsv(detail)}`;
+    const header = `Feriados no período;${feriados}\r\nAtestados no período;${atestados}\r\n\r\n`;
+    const csv = `${header}RESUMO POR DIA\r\n${toCsv(summary)}\r\n\r\nDETALHAMENTO DAS BATIDAS\r\n${toCsv(detail)}`;
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -520,21 +586,23 @@ export const PontoView: React.FC<PontoViewProps> = ({
   };
 
   const exportPDF = () => {
-    const { detail, summary } = buildData();
+    const { detail, summary, feriados, atestados } = buildData();
     const renderTable = (rows: string[][], monoFrom = 99) => {
       const head = rows[0];
       const body = rows
         .slice(1)
         .map(
-          (r) =>
-            `<tr>${r
+          (r) => {
+            const isTotal = r[0] === '';
+            return `<tr>${r
               .map(
                 (c, i) =>
                   `<td style="padding:6px 8px;border:1px solid #ddd;${i >= monoFrom ? 'font-family:monospace;' : ''}${
-                    r[0] === '' && i === 5 ? 'font-weight:bold;text-align:right;' : ''
+                    isTotal && c !== '' ? 'font-weight:bold;text-align:right;' : ''
                   }">${c}</td>`
               )
-              .join('')}</tr>`
+              .join('')}</tr>`;
+          }
         )
         .join('');
       return `<table style="border-collapse:collapse;width:100%;font-size:12px;margin-bottom:20px">
@@ -548,9 +616,9 @@ export const PontoView: React.FC<PontoViewProps> = ({
       <body style="font-family:Arial,sans-serif;color:#0f172a;padding:24px">
         <h2 style="margin:0 0 4px">Folha de Ponto — Fireowl Controls</h2>
         <p style="margin:0 0 2px;font-size:13px">Funcionário: <strong>${expEmployee || 'Todos'}</strong> · Período: <strong>${expMonth}</strong></p>
-        <p style="margin:0 0 16px;font-size:13px">Registros: ${detail.length - 1}</p>
+        <p style="margin:0 0 16px;font-size:13px">Registros: ${detail.length - 1} · Feriados no período: <strong>${feriados}</strong> · Atestados: <strong>${atestados}</strong></p>
         <h3 style="margin:0 0 8px;font-size:14px">Resumo por dia</h3>
-        ${renderTable(summary, 6)}
+        ${renderTable(summary, 99)}
         <h3 style="margin:0 0 8px;font-size:14px">Detalhamento das batidas</h3>
         ${renderTable(detail, 5)}
       </body></html>`;
