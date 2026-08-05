@@ -28,6 +28,20 @@ export async function uploadEmployeeDoc(userId: string, file: File): Promise<voi
   if (error) throw error;
 }
 
+// Envia um atestado do próprio usuário (subpasta atestados) e retorna o caminho.
+// O id é derivado da sessão, garantindo a pasta correta para a RLS.
+export async function uploadCertificate(file: File): Promise<string> {
+  const s = getSupabaseClient() as any;
+  const { data } = await s.auth.getUser();
+  const uid = data?.user?.id;
+  if (!uid) throw new Error('Sessão não encontrada.');
+  const safe = file.name.replace(/[^\w.\-]+/g, '_');
+  const path = `${uid}/atestados/${Date.now()}_${safe}`;
+  const { error } = await s.storage.from(BUCKET).upload(path, file, { upsert: false });
+  if (error) throw error;
+  return path;
+}
+
 // URL assinada temporária (padrão 2 min) para abrir/baixar o documento
 export async function signedDocUrl(path: string, expiresSeconds = 120): Promise<string> {
   const s = getSupabaseClient() as any;

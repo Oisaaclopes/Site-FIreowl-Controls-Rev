@@ -6,6 +6,9 @@ import { DataListRow, Badge } from '@/components/DataListRow';
 import { WorkSchedule, DEFAULT_SCHEDULE, normalizeSchedule, hmToMinutes, WEEKDAY_SHORT } from '@/lib/schedule';
 import { fetchAdjustments, createAdjustment, updateAdjustmentStatus, PunchAdjustment } from '@/lib/adjustments';
 import { isSupabaseConfigured } from '@/lib/inventory';
+import { fetchHolidays, Holiday } from '@/lib/holidays';
+import { fetchDayEntries, createDayEntry, deleteDayEntry, DayEntry, DayEntryKind } from '@/lib/dayentries';
+import { uploadCertificate, signedDocUrl } from '@/lib/storage';
 
 interface PontoViewProps {
   punches: TimePunch[];
@@ -83,8 +86,36 @@ export const PontoView: React.FC<PontoViewProps> = ({
       .then(setAdjustments)
       .catch((err) => console.warn('Ajustes: falha ao carregar.', err));
   };
+
+  // Feriados e ocorrências do dia (observação/atestado/feriado)
+  const [holidays, setHolidays] = useState<Record<string, Holiday>>({});
+  const [dayEntries, setDayEntries] = useState<DayEntry[]>([]);
+  const [showDayModal, setShowDayModal] = useState(false);
+  const [daySaving, setDaySaving] = useState(false);
+  const [dayFile, setDayFile] = useState<File | null>(null);
+  const [dayForm, setDayForm] = useState<{ refDate: string; kind: DayEntryKind; note: string }>({
+    refDate: '',
+    kind: 'OBSERVACAO',
+    note: '',
+  });
+
+  const loadDayData = () => {
+    if (!isSupabaseConfigured()) return;
+    fetchHolidays()
+      .then((list) => {
+        const map: Record<string, Holiday> = {};
+        list.forEach((h) => (map[h.date] = h));
+        setHolidays(map);
+      })
+      .catch((err) => console.warn('Feriados: falha ao carregar.', err));
+    fetchDayEntries()
+      .then(setDayEntries)
+      .catch((err) => console.warn('Ocorrências: falha ao carregar.', err));
+  };
+
   useEffect(() => {
     loadAdjustments();
+    loadDayData();
   }, []);
 
   // Exportação da folha (admin/gestor)
@@ -302,6 +333,60 @@ export const PontoView: React.FC<PontoViewProps> = ({
   const adjStatusColor = (s: PunchAdjustment['status']) =>
     s === 'APROVADO' ? 'emerald' : s === 'REJEITADO' ? 'red' : 'amber';
 
+  const todayHoliday = holidays[fmtDateInput(now)];
+
+  const openDayModal = (prefill?: Date) => {
+    setDayForm({ refDate: prefill ? fmtDateInput(prefill) : fmtDateInput(new Date()), kind: 'OBSERVACAO', note: '' });
+    setDayFile(null);
+    setShowDayModal(true);
+  };
+  const submitDayEntry = async () => {
+    if (daySaving || !dayForm.refDate) return;
+    if (dayForm.kind === 'OBSERVACAO' && !dayForm.note.trim()) return;
+    setDaySaving(true);
+    try {
+      let certificatePath: string | undefined;
+      if (dayForm.kind === 'ATESTADO' && dayFile) certificatePath = await uploadCertificate(dayFile);
+      await createDayEntry({
+        employeeName: currentUser,
+        refDate: dayForm.refDate,
+        kind: dayForm.kind,
+        note: dayForm.note.trim(),
+        certificatePath,
+        authorName: currentUser,
+        authorRole: userRole,
+      });
+      setShowDayModal(false);
+      loadDayData();
+    } catch (err) {
+      console.error('Falha ao salvar ocorrência do dia:', err);
+      alert('Não foi possível salvar a ocorrência.');
+    } finally {
+      setDaySaving(false);
+    }
+  };
+  const removeDayEntry = async (id: string) => {
+    if (!window.confirm('Remover esta ocorrência?')) return;
+    try {
+      await deleteDayEntry(id);
+      setDayEntries((prev) => prev.filter((x) => x.id !== id));
+    } catch (err) {
+      console.error('Falha ao remover ocorrência:', err);
+      alert('Não foi possível remover.');
+    }
+  };
+  const openCertificate = async (path: string) => {
+    try {
+      window.open(await signedDocUrl(path), '_blank');
+    } catch {
+      alert('Não foi possível abrir o atestado.');
+    }
+  };
+  const dayKindColor = (k: DayEntryKind) =>
+    k === 'ATESTADO' ? 'amber' : k === 'FERIADO' ? 'blue' : k === 'FOLGA' ? 'slate' : 'emerald';
+  const dayKindLabel = (k: DayEntryKind) =>
+    k === 'ATESTADO' ? 'Atestado' : k === 'FERIADO' ? 'Feriado' : k === 'FOLGA' ? 'Folga' : 'Observação';
+
   // ---- Exportação da folha de ponto (admin/gestor) ----
   const TYPE_LABEL: Record<PunchType, string> = {
     ENTRADA: 'Entrada',
@@ -509,8 +594,14 @@ export const PontoView: React.FC<PontoViewProps> = ({
       </div>
 
       {/* ===== Alertas / lembretes ===== */}
-      {(entryDue || exitDue || missingDay) && (
+      {(entryDue || exitDue || missingDay || todayHoliday) && (
         <div className="flex flex-col gap-2">
+          {todayHoliday && (
+            <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl px-4 py-3 text-xs font-semibold">
+              <span className="material-symbols-outlined text-base">celebration</span>
+              Hoje é feriado: {todayHoliday.name} ({todayHoliday.type}).
+            </div>
+          )}
           {entryDue && (
             <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 text-xs font-semibold">
               <span className="material-symbols-outlined text-base">notifications_active</span>
@@ -779,6 +870,69 @@ export const PontoView: React.FC<PontoViewProps> = ({
         </div>
       )}
 
+      {/* ===== Ocorrências do dia (observação / atestado / feriado) ===== */}
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <span className="w-8 h-8 rounded-lg bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center">
+              <span className="material-symbols-outlined text-lg">event_note</span>
+            </span>
+            <div>
+              <h3 className="font-display text-sm font-bold uppercase tracking-wide text-[#1A1A72]">
+                Ocorrências do dia
+              </h3>
+              <p className="text-[11px] text-slate-400">Observação, atestado (com anexo) ou feriado.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => openDayModal()}
+            className="inline-flex items-center gap-1.5 bg-[#1A1A72] hover:bg-[#12124f] text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
+          >
+            <span className="material-symbols-outlined text-base">add</span> Registrar
+          </button>
+        </div>
+
+        {dayEntries.length === 0 ? (
+          <p className="text-xs text-slate-400">Nenhuma ocorrência registrada.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {dayEntries.map((d) => (
+              <div
+                key={d.id}
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border border-slate-100 rounded-lg p-3 text-xs"
+              >
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-800">
+                    {isManager && <span className="text-slate-500">{d.employeeName} · </span>}
+                    {d.refDate.split('-').reverse().join('/')}
+                    {d.authorName ? <span className="text-slate-400"> · por {d.authorName}</span> : null}
+                  </p>
+                  {d.note && <p className="text-slate-500 truncate">{d.note}</p>}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Badge color={dayKindColor(d.kind)}>{dayKindLabel(d.kind)}</Badge>
+                  {d.certificatePath && (
+                    <button
+                      onClick={() => openCertificate(d.certificatePath!)}
+                      className="text-[#1A1A72] font-semibold hover:underline"
+                    >
+                      ver atestado
+                    </button>
+                  )}
+                  <button
+                    onClick={() => removeDayEntry(d.id)}
+                    title="Remover"
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-[#E63946] hover:bg-red-50 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-base">delete</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* ===== Solicitações de ajuste ===== */}
       <div className="bg-white rounded-xl shadow-sm p-6">
         <div className="flex items-center justify-between mb-4">
@@ -904,6 +1058,103 @@ export const PontoView: React.FC<PontoViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Modal Nova ocorrência do dia */}
+      {showDayModal && (
+        <div className="fixed inset-0 z-50 bg-[#1A1A72]/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white max-w-md w-full rounded-xl border border-slate-200 shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <h3 className="font-display text-base font-bold text-[#1A1A72] uppercase tracking-wide">
+                Nova ocorrência do dia
+              </h3>
+              <button
+                onClick={() => setShowDayModal(false)}
+                className="text-slate-400 hover:text-slate-700 font-bold text-xl"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4 text-xs font-medium">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Data</label>
+                  <input
+                    type="date"
+                    value={dayForm.refDate}
+                    onChange={(e) => setDayForm({ ...dayForm, refDate: e.target.value })}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Tipo</label>
+                  <select
+                    value={dayForm.kind}
+                    onChange={(e) => setDayForm({ ...dayForm, kind: e.target.value as DayEntryKind })}
+                    className={inputCls}
+                  >
+                    <option value="OBSERVACAO">Observação</option>
+                    <option value="ATESTADO">Atestado</option>
+                    <option value="FERIADO">Feriado</option>
+                    <option value="FOLGA">Folga</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className={labelCls}>
+                  {dayForm.kind === 'OBSERVACAO' ? 'Observação *' : 'Observação'}
+                </label>
+                <textarea
+                  value={dayForm.note}
+                  onChange={(e) => setDayForm({ ...dayForm, note: e.target.value })}
+                  rows={3}
+                  placeholder={
+                    dayForm.kind === 'ATESTADO'
+                      ? 'Ex.: Atestado médico de 1 dia (consulta).'
+                      : dayForm.kind === 'FERIADO'
+                      ? 'Ex.: Feriado municipal.'
+                      : 'Ex.: Cliente remarcou a visita para a tarde.'
+                  }
+                  className={`${inputCls} resize-none`}
+                />
+              </div>
+
+              {dayForm.kind === 'ATESTADO' && (
+                <div>
+                  <label className={labelCls}>Anexar atestado (PDF ou imagem)</label>
+                  <input
+                    type="file"
+                    accept="application/pdf,image/*"
+                    onChange={(e) => setDayFile(e.target.files?.[0] ?? null)}
+                    className="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#1A1A72]/10 file:text-[#1A1A72] hover:file:bg-[#1A1A72]/20"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Arquivo enviado para armazenamento privado (visível só a você e à gestão).
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2">
+              <button
+                onClick={() => setShowDayModal(false)}
+                className="px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-slate-600 hover:bg-slate-100"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={submitDayEntry}
+                disabled={daySaving || (dayForm.kind === 'OBSERVACAO' && !dayForm.note.trim())}
+                className="bg-[#1A1A72] hover:bg-[#12124f] text-white px-5 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 disabled:opacity-60"
+              >
+                <span className={`material-symbols-outlined text-base ${daySaving ? 'animate-spin' : ''}`}>
+                  {daySaving ? 'progress_activity' : 'save'}
+                </span>
+                {daySaving ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Solicitar ajuste de ponto */}
       {showAdj && (
