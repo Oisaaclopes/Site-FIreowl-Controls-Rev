@@ -99,6 +99,7 @@ export function CrmApp({
   const [currentTab, setCurrentTab] = useState<TabPath>(allowedTabs(initialRole)[0]);
   const [userRole, setUserRole] = useState<UserRole>(initialRole);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // menu off-canvas (mobile)
 
   // RBAC: se a aba atual não é permitida ao perfil, volta para a primeira permitida
   useEffect(() => {
@@ -604,7 +605,7 @@ export function CrmApp({
 
   return (
     <div className="min-h-screen bg-slate-50 font-body-md text-[#131c28]">
-      {/* Sidebar Navigation */}
+      {/* Sidebar Navigation (off-canvas no mobile, fixa no desktop) */}
       <Sidebar
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
@@ -612,15 +613,18 @@ export function CrmApp({
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
         onLogout={onLogout}
         canSwitchRole={canSwitchRole}
+        mobileOpen={sidebarOpen}
+        onCloseMobile={() => setSidebarOpen(false)}
       />
 
-      {/* Main Content Workspace Offset by Sidebar 256px */}
-      <div className="pl-64">
+      {/* Main Content Workspace — deslocado pela sidebar apenas no desktop */}
+      <div className="lg:pl-64">
         {/* Fixed Header */}
         <Header
           userRole={userRole}
           onOpenAuthModal={() => setIsAuthModalOpen(true)}
           onNewOSClick={handleNewOSQuick}
+          onOpenMenu={() => setSidebarOpen(true)}
           canSwitchRole={canSwitchRole}
         />
 

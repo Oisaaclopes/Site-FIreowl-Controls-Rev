@@ -8,6 +8,7 @@ interface HeaderProps {
   onOpenAuthModal: () => void;
   onQuickSearchClick?: () => void;
   onNewOSClick?: () => void;
+  onOpenMenu?: () => void;
   canSwitchRole?: boolean;
 }
 
@@ -16,6 +17,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAuthModal,
   onQuickSearchClick,
   onNewOSClick,
+  onOpenMenu,
   canSwitchRole = false
 }) => {
   const [currentDateTime, setCurrentDateTime] = useState('24 Mai 2024 | 14:30');
@@ -38,11 +40,19 @@ export const Header: React.FC<HeaderProps> = ({
   }, []);
 
   return (
-    <header className="fixed top-0 left-64 right-0 h-16 bg-slate-50/70 backdrop-blur-md z-40 flex items-center justify-between px-8">
-      <div className="flex items-center gap-4">
+    <header className="fixed top-0 left-0 lg:left-64 right-0 h-16 bg-slate-50/70 backdrop-blur-md z-40 flex items-center justify-between px-4 md:px-8">
+      <div className="flex items-center gap-2 md:gap-4 min-w-0">
+        {/* Menu hambúrguer — apenas mobile/tablet */}
+        <button
+          onClick={onOpenMenu}
+          aria-label="Abrir menu"
+          className="lg:hidden w-10 h-10 -ml-1 rounded-lg flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors shrink-0"
+        >
+          <span className="material-symbols-outlined">menu</span>
+        </button>
         <div className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-md border border-slate-200">
           <span className="material-symbols-outlined text-slate-500 text-base">event</span>
-          <span className="font-data-mono text-slate-700 uppercase text-xs font-semibold">
+          <span className="font-data-mono text-slate-700 uppercase text-xs font-semibold whitespace-nowrap">
             {currentDateTime}
           </span>
         </div>

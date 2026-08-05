@@ -711,7 +711,7 @@ export const PontoView: React.FC<PontoViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col w-full p-8 gap-6">
+    <div className="flex flex-col w-full p-4 md:p-8 gap-5 md:gap-6">
       {/* Header */}
       <div className="flex flex-wrap justify-between items-center gap-4 border-b border-slate-200 pb-5">
         <div>

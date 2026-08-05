@@ -11,7 +11,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ pedidosOS }) => {
   const [viewMode, setViewMode] = useState<'calendar' | 'kanban' | 'map'>('calendar');
 
   return (
-    <div className="flex flex-col w-full p-8 gap-6">
+    <div className="flex flex-col w-full p-4 md:p-8 gap-5 md:gap-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 pb-5">
         <div>

@@ -12,6 +12,8 @@ interface SidebarProps {
   onOpenAuthModal: () => void;
   onLogout?: () => void;
   canSwitchRole?: boolean;
+  mobileOpen?: boolean;
+  onCloseMobile?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -20,7 +22,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   userRole,
   onOpenAuthModal,
   onLogout,
-  canSwitchRole = false
+  canSwitchRole = false,
+  mobileOpen = false,
+  onCloseMobile,
 }) => {
   const allNavItems: { path: TabPath; label: string; icon: string; count?: number }[] = [
     { path: 'painel', label: 'Painel', icon: 'dashboard' },
@@ -43,21 +47,43 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navItems = allNavItems.filter((item) => permitted.includes(item.path));
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-64 bg-[#1A1A72] z-50 flex flex-col border-r border-white/10 shadow-xl">
-      {/* Brand Header — logo oficial da Fireowl Controls */}
-      <div className="p-5 flex items-center gap-3 border-b border-white/10">
-        <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center shadow-md shrink-0">
-          <OfficialLogo className="w-8 h-8" />
+    <>
+      {/* Backdrop (apenas mobile, quando aberto) */}
+      {mobileOpen && (
+        <div
+          onClick={onCloseMobile}
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          aria-hidden="true"
+        />
+      )}
+
+      <aside
+        className={`fixed left-0 top-0 h-full w-64 max-w-[85%] bg-[#1A1A72] z-50 flex flex-col border-r border-white/10 shadow-xl transform transition-transform duration-200 ease-out lg:translate-x-0 ${
+          mobileOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        {/* Brand Header — logo oficial da Fireowl Controls */}
+        <div className="p-5 flex items-center gap-3 border-b border-white/10">
+          <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center shadow-md shrink-0">
+            <OfficialLogo className="w-8 h-8" />
+          </div>
+          <div className="flex flex-col">
+            <span className="font-display font-bold text-white tracking-wider uppercase text-lg leading-tight">
+              FIREOWL<span className="text-[#E63946]">.</span>
+            </span>
+            <span className="font-label-caps text-white/60 text-[10px] tracking-widest mt-0.5">
+              CONTROLS SYSTEMS
+            </span>
+          </div>
+          {/* Fechar (apenas mobile) */}
+          <button
+            onClick={onCloseMobile}
+            aria-label="Fechar menu"
+            className="ml-auto lg:hidden w-9 h-9 rounded-lg flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <span className="material-symbols-outlined">close</span>
+          </button>
         </div>
-        <div className="flex flex-col">
-          <span className="font-display font-bold text-white tracking-wider uppercase text-lg leading-tight">
-            FIREOWL<span className="text-[#E63946]">.</span>
-          </span>
-          <span className="font-label-caps text-white/60 text-[10px] tracking-widest mt-0.5">
-            CONTROLS SYSTEMS
-          </span>
-        </div>
-      </div>
 
       {/* Navigation items */}
       <nav className="flex-1 py-4 px-3 overflow-y-auto space-y-1">
@@ -66,7 +92,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           return (
             <button
               key={item.path}
-              onClick={() => onSelectTab(item.path)}
+              onClick={() => {
+                onSelectTab(item.path);
+                onCloseMobile?.();
+              }}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg transition-all duration-150 group text-left ${
                 isActive
                   ? 'bg-[#E63946] text-white font-semibold shadow-sm'
@@ -124,6 +153,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         )}
       </div>
-    </aside>
+      </aside>
+    </>
   );
 };

@@ -27,8 +27,9 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
     if (!clientName) return;
 
     // id único por timestamp (evita colisão/sobrescrita ao persistir no banco)
+    const stamp = Date.now().toString(36);
     onAddContract({
-      id: `CTR-FOWL-${Date.now().toString(36)}`,
+      id: `CTR-FOWL-${stamp}`,
       clientName,
       unit: 'Unidade Londrina',
       monthlyValue: Number(monthlyVal),
@@ -38,7 +39,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
       usedHours: 12,
       status: 'ATIVO',
       responsibleTech: 'Eng. Ricardo M.',
-      artDocumentRef: `ART-PR-2024-${timestamp}`
+      artDocumentRef: `ART-PR-2024-${stamp}`
     });
 
     setShowModal(false);
@@ -48,7 +49,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
   const totalMonthlyRec = contracts.reduce((acc, c) => acc + c.monthlyValue, 0);
 
   return (
-    <div className="flex flex-col w-full p-8 gap-6">
+    <div className="flex flex-col w-full p-4 md:p-8 gap-5 md:gap-6">
       {/* Header */}
       <div className="flex justify-between items-center border-b border-slate-200 pb-5">
         <div>

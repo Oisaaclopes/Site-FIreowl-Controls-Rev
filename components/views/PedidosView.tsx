@@ -367,7 +367,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col w-full p-8 gap-5">
+    <div className="flex flex-col w-full p-4 md:p-8 gap-5">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>

@@ -101,3 +101,25 @@ h1, h2, h3, h4, h5, h6 {
   animation: ledPulse 1s ease-in-out infinite alternate;
 }
 
+/* ===== Responsividade global (mobile-first) ===== */
+
+/* Alvos de toque amigáveis no celular: inputs, selects e textareas
+   ganham altura mínima de 44px (recomendação de acessibilidade).
+   Não afeta botões (muitos são ícones compactos) nem checkboxes/radios. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    min-height: 44px;
+    font-size: 16px; /* evita zoom automático do iOS ao focar o campo */
+  }
+}
+
+/* Nunca deixar a página rolar horizontalmente no mobile */
+@media (max-width: 767px) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
+}
+

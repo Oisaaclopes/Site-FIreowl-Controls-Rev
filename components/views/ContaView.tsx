@@ -372,7 +372,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
   ] as { key: 'conta' | 'preferencias' | 'pdf' | 'usuarios'; label: string; icon: string }[];
 
   return (
-    <div className="flex flex-col w-full p-8 gap-6">
+    <div className="flex flex-col w-full p-4 md:p-8 gap-5 md:gap-6">
       {/* Header */}
       <div className="border-b border-slate-200 pb-5">
         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
