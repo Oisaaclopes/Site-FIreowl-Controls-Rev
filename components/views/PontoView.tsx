@@ -286,9 +286,6 @@ export const PontoView: React.FC<PontoViewProps> = ({
   const hasGps = (p: TimePunch) => !!(p.lat || p.lng);
   const mapsUrl = (p: TimePunch) => `https://www.google.com/maps?q=${p.lat},${p.lng}`;
 
-  // Estimativas da semana (ilustrativas — dependem de histórico persistido)
-  const week = { previstas: '44h', realizadas: '31h', extras: '2h15', banco: '+1h48', atrasos: 0 };
-
   const shortcut = (id: string) =>
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
@@ -457,6 +454,86 @@ export const PontoView: React.FC<PontoViewProps> = ({
     }
     if (r?.at && s?.at) ms += Math.max(0, s.at - r.at);
     return ms;
+  };
+
+  // ---- Banco de horas real (a partir das batidas + escala + feriados) ----
+  // Jornada prevista para uma data: 0 em feriado, folga da escala ou dia
+  // justificado por atestado/folga.
+  const expectedMsForDate = (d: Date): number => {
+    const dk = fmtDateInput(d);
+    if (holidays[dk]) return 0;
+    const cfg = sched[d.getDay()];
+    if (!cfg.works) return 0;
+    const justified = dayEntries.some(
+      (e) => e.employeeName === currentUser && e.refDate === dk && (e.kind === 'ATESTADO' || e.kind === 'FOLGA')
+    );
+    if (justified) return 0;
+    const mins = hmToMinutes(cfg.end) - hmToMinutes(cfg.start) - (cfg.lunchMinutes || 0);
+    return Math.max(0, mins) * 60000;
+  };
+
+  const hoursStats = useMemo(() => {
+    // Agrupa batidas do usuário logado por dia (YYYY-MM-DD)
+    const byDay = new Map<string, TimePunch[]>();
+    punches
+      .filter((p) => p.employeeName === currentUser && p.at)
+      .forEach((p) => {
+        const dk = fmtDateInput(new Date(p.at!));
+        if (!byDay.has(dk)) byDay.set(dk, []);
+        byDay.get(dk)!.push(p);
+      });
+
+    // Banco acumulado: apenas sobre dias efetivamente trabalhados (com batida),
+    // para não penalizar dias anteriores à adoção do sistema.
+    let bankMs = 0;
+    byDay.forEach((list, dk) => {
+      const worked = dayWorkedMs(list);
+      if (worked <= 0) return;
+      const [y, m, d] = dk.split('-').map(Number);
+      bankMs += worked - expectedMsForDate(new Date(y, m - 1, d));
+    });
+
+    // Semana atual (segunda a domingo)
+    const base = new Date(nowMs);
+    const dow = (base.getDay() + 6) % 7; // 0 = segunda
+    const weekStart = new Date(base.getFullYear(), base.getMonth(), base.getDate() - dow);
+    let prevMs = 0;
+    let realMs = 0;
+    let extraMs = 0;
+    let atrasos = 0;
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i);
+      const dk = fmtDateInput(day);
+      const exp = expectedMsForDate(day);
+      prevMs += exp;
+      const list = byDay.get(dk);
+      if (list && list.length) {
+        const worked = dayWorkedMs(list);
+        realMs += worked;
+        if (worked > exp) extraMs += worked - exp;
+        const ent = list.find((p) => p.type === 'ENTRADA');
+        if (ent?.at && sched[day.getDay()].works && !holidays[dk]) {
+          const em = new Date(ent.at);
+          const entMin = em.getHours() * 60 + em.getMinutes();
+          if (entMin > hmToMinutes(sched[day.getDay()].start) + 5) atrasos++;
+        }
+      }
+    }
+    return { bankMs, prevMs, realMs, extraMs, atrasos };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [punches, currentUser, sched, holidays, dayEntries, new Date(nowMs).toDateString()]);
+
+  const fmtShort = (ms: number) => {
+    const sign = ms < 0 ? '-' : '';
+    const totalMin = Math.round(Math.abs(ms) / 60000);
+    return `${sign}${Math.floor(totalMin / 60)}h${pad2(totalMin % 60)}`;
+  };
+  const week = {
+    previstas: fmtShort(hoursStats.prevMs),
+    realizadas: fmtShort(hoursStats.realMs),
+    extras: fmtShort(hoursStats.extraMs),
+    banco: `${hoursStats.bankMs >= 0 ? '+' : ''}${fmtShort(hoursStats.bankMs)}`,
+    atrasos: hoursStats.atrasos,
   };
 
   // dd/mm/aaaa a partir de uma chave YYYY-MM-DD
@@ -858,14 +935,18 @@ export const PontoView: React.FC<PontoViewProps> = ({
                 </div>
               ))}
             </div>
-            <p className="text-[9px] text-slate-400 mt-2">* estimativa — requer histórico persistido</p>
+            <p className="text-[9px] text-slate-400 mt-2">
+              Calculado das batidas × escala (feriados e atestados abatidos do previsto).
+            </p>
           </div>
 
           {/* Banco de horas */}
           <div id="card-banco" className="bg-[#1A1A72] text-white rounded-xl shadow-sm p-5">
             <h4 className="text-[10px] font-bold text-white/60 uppercase tracking-wider">Banco de horas</h4>
-            <p className="font-data-mono text-3xl font-bold text-emerald-300 mt-1">{week.banco}</p>
-            <p className="text-[10px] text-white/60 mt-1">Último fechamento: 31/07</p>
+            <p className={`font-data-mono text-3xl font-bold mt-1 ${hoursStats.bankMs >= 0 ? 'text-emerald-300' : 'text-amber-300'}`}>
+              {week.banco}
+            </p>
+            <p className="text-[10px] text-white/60 mt-1">Saldo acumulado sobre dias trabalhados</p>
           </div>
         </div>
       </div>
