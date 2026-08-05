@@ -13,6 +13,7 @@ import {
   ManagedUser,
 } from '@/lib/users';
 import { WorkSchedule, DEFAULT_SCHEDULE, WEEKDAY_SHORT } from '@/lib/schedule';
+import { maskCpf } from '@/lib/utils';
 import { listEmployeeDocs, uploadEmployeeDoc, signedDocUrl, deleteEmployeeDoc, EmployeeDoc } from '@/lib/storage';
 
 interface ContaViewProps {
@@ -125,6 +126,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
   // Edição de funcionário existente
   const [editUser, setEditUser] = useState<ManagedUser | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [revealCpf, setRevealCpf] = useState(false); // LGPD: CPF oculto por padrão
   const [euForm, setEuForm] = useState({
     name: '',
     fullName: '',
@@ -192,6 +194,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
 
   const openEditUser = (u: ManagedUser) => {
     setDocs([]);
+    setRevealCpf(false);
     loadDocs(u.id);
     setEuForm({
       name: u.name || '',
@@ -894,8 +897,36 @@ export const ContaView: React.FC<ContaViewProps> = ({
               <input value={euForm.fullName} onChange={(e) => setEuForm({ ...euForm, fullName: e.target.value })} className={inputCls} />
             </div>
             <div>
-              <label className={labelCls}>CPF</label>
-              <input value={euForm.cpf} onChange={(e) => setEuForm({ ...euForm, cpf: e.target.value })} className={`${inputCls} font-data-mono`} />
+              <label className={labelCls}>
+                CPF
+                <span className="ml-1 text-[9px] font-normal text-slate-400 normal-case">(dado sensível — LGPD)</span>
+              </label>
+              {revealCpf ? (
+                <input
+                  value={euForm.cpf}
+                  onChange={(e) => setEuForm({ ...euForm, cpf: e.target.value })}
+                  className={`${inputCls} font-data-mono`}
+                  placeholder="000.000.000-00"
+                  autoFocus
+                />
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    value={euForm.cpf ? maskCpf(euForm.cpf) : ''}
+                    readOnly
+                    placeholder="Não informado"
+                    className={`${inputCls} font-data-mono bg-slate-50 text-slate-500 cursor-default`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setRevealCpf(true)}
+                    className="shrink-0 inline-flex items-center gap-1 px-2.5 py-2 rounded-lg border border-slate-200 text-[11px] font-semibold text-[#1A1A72] hover:bg-slate-50"
+                  >
+                    <span className="material-symbols-outlined text-sm">visibility</span>
+                    {euForm.cpf ? 'Revelar' : 'Informar'}
+                  </button>
+                </div>
+              )}
             </div>
             <div>
               <label className={labelCls}>Data de nascimento</label>
