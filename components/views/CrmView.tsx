@@ -1,36 +1,90 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Client, PedidoOS, InventoryItem } from '@/lib/types';
+import React, { useMemo, useState } from 'react';
+import {
+  Client,
+  PedidoOS,
+  InventoryItem,
+  Contract,
+  Pedido,
+  FinancialTransaction,
+  TabPath,
+} from '@/lib/types';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
+import { usePrivacy } from '@/lib/privacy';
 
 interface CrmViewProps {
   clients: Client[];
   pedidosOS: PedidoOS[];
+  pedidos: Pedido[];
+  contracts: Contract[];
+  transactions: FinancialTransaction[];
   inventory: InventoryItem[];
   onAddClient: (client: Client) => void;
   onAddOS: (os: PedidoOS) => void;
   onSelectClientForReport?: (clientName: string) => void;
+  onNavigateToTab?: (tab: TabPath) => void;
 }
+
+const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+const labelCls = 'block text-slate-600 mb-1 font-semibold uppercase text-[11px]';
+const inputCls =
+  'w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#E63946]/20 focus:border-[#E63946]/40';
+
+const norm = (s: string) => (s || '').trim().toLowerCase();
+
+interface ContactForm {
+  name: string;
+  role: string;
+  phone: string;
+  email: string;
+}
+
+const emptyContact = (): ContactForm => ({ name: '', role: '', phone: '', email: '' });
+
+// Agrupamento de status de propostas
+const PROPOSAL_ACEITO: Pedido['status'][] = ['aceito'];
+const PROPOSAL_ABERTO: Pedido['status'][] = ['rascunho', 'em_revisao', 'aprovado_interno', 'enviado_ao_cliente'];
+const PROPOSAL_CANCELADO: Pedido['status'][] = ['recusado', 'expirado'];
+
+const proposalStatusLabel: Record<Pedido['status'], string> = {
+  rascunho: 'Rascunho',
+  em_revisao: 'Em revisão',
+  aprovado_interno: 'Aprovado interno',
+  enviado_ao_cliente: 'Enviado ao cliente',
+  aceito: 'Aceito',
+  recusado: 'Recusado',
+  expirado: 'Expirado',
+};
 
 export const CrmView: React.FC<CrmViewProps> = ({
   clients,
   pedidosOS,
+  pedidos,
+  contracts,
+  transactions,
   inventory,
   onAddClient,
-  onAddOS,
   onSelectClientForReport,
+  onNavigateToTab,
 }) => {
+  const { maskMoney } = usePrivacy();
   const [crmSubTab, setCrmSubTab] = useState<'clientes' | 'pedidos_os' | 'estoque' | 'servicos'>('clientes');
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddClientModal, setShowAddClientModal] = useState(false);
   const [selectedClientDetail, setSelectedClientDetail] = useState<Client | null>(null);
 
-  // New client state
-  const [newClientName, setNewClientName] = useState('');
-  const [newClientCNPJ, setNewClientCNPJ] = useState('');
-  const [newClientSegment, setNewClientSegment] = useState('Shopping Center');
-  const [newClientAddress, setNewClientAddress] = useState('');
+  // Formulário de novo cliente (cadastro completo)
+  const [nName, setNName] = useState('');
+  const [nFantasia, setNFantasia] = useState('');
+  const [nCNPJ, setNCNPJ] = useState('');
+  const [nIE, setNIE] = useState('');
+  const [nSegment, setNSegment] = useState('Shopping Center');
+  const [nStatus, setNStatus] = useState<Client['contractStatus']>('EM DIA');
+  const [nAddress, setNAddress] = useState('');
+  const [nCity, setNCity] = useState('Londrina/PR');
+  const [nAnnual, setNAnnual] = useState(0);
+  const [nContacts, setNContacts] = useState<ContactForm[]>([emptyContact()]);
 
   const filteredClients = clients.filter(
     (c) =>
@@ -39,33 +93,61 @@ export const CrmView: React.FC<CrmViewProps> = ({
       c.cnpj.includes(searchTerm)
   );
 
+  const resetClientForm = () => {
+    setNName('');
+    setNFantasia('');
+    setNCNPJ('');
+    setNIE('');
+    setNSegment('Shopping Center');
+    setNStatus('EM DIA');
+    setNAddress('');
+    setNCity('Londrina/PR');
+    setNAnnual(0);
+    setNContacts([emptyContact()]);
+  };
+
+  const updateContact = (idx: number, field: keyof ContactForm, value: string) => {
+    setNContacts((prev) => prev.map((c, i) => (i === idx ? { ...c, [field]: value } : c)));
+  };
+  const addContactRow = () => setNContacts((prev) => [...prev, emptyContact()]);
+  const removeContactRow = (idx: number) => setNContacts((prev) => prev.filter((_, i) => i !== idx));
+
   const handleCreateClientSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newClientName) return;
+    if (!nName) return;
+
+    const cleanContacts = nContacts
+      .filter((c) => c.name.trim() || c.email.trim() || c.phone.trim())
+      .map((c) => ({
+        name: c.name || 'Contato',
+        role: c.role || 'Responsável',
+        phone: c.phone || '',
+        email: c.email || '',
+      }));
+
+    const fullAddress = [nAddress, nCity].filter(Boolean).join(' — ');
 
     const created: Client = {
       id: `c_${Date.now()}`,
       code: `#F0-${Date.now().toString().slice(-4)}`,
-      name: newClientName,
-      cnpj: newClientCNPJ || '00.000.000/0001-00',
-      segment: newClientSegment,
-      contractStatus: 'EM DIA',
+      name: nFantasia ? `${nName} (${nFantasia})` : nName,
+      cnpj: nCNPJ || '00.000.000/0001-00',
+      segment: nSegment,
+      contractStatus: nStatus,
       lastOSDate: new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase(),
       lastOSType: 'CADASTRO RECENTE',
-      address: newClientAddress || 'Londrina / PR',
-      contacts: [{ name: 'Responsável', role: 'Gerente', phone: '(43) 3300-0000', email: 'contato@cliente.com' }],
-      totalContractsValue: 12000,
+      address: fullAddress || 'Londrina / PR',
+      contacts: cleanContacts.length ? cleanContacts : [{ name: 'Responsável', role: 'Gerente', phone: '', email: '' }],
+      totalContractsValue: Number(nAnnual) || 0,
     };
 
     onAddClient(created);
     setShowAddClientModal(false);
-    setNewClientName('');
-    setNewClientCNPJ('');
-    setNewClientAddress('');
+    resetClientForm();
   };
 
   return (
-    <div className="flex flex-col w-full min-h-screen relative p-8 gap-6">
+    <div className="flex flex-col w-full min-h-screen relative p-4 md:p-8 gap-6">
       {/* Header & Search */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
@@ -94,7 +176,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
 
       {/* Sub Navigation Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-2">
-        <div className="flex gap-2">
+        <div className="flex gap-2 overflow-x-auto">
           {[
             { id: 'clientes', label: 'Clientes', icon: 'domain' },
             { id: 'pedidos_os', label: 'Pedidos & OS', icon: 'engineering' },
@@ -104,7 +186,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
             <button
               key={tab.id}
               onClick={() => setCrmSubTab(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
                 crmSubTab === tab.id
                   ? 'bg-slate-900 text-white shadow-sm'
                   : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -136,24 +218,28 @@ export const CrmView: React.FC<CrmViewProps> = ({
             </div>
 
             <div className="bg-white p-6 rounded-xl shadow-sm">
-              <p className="text-xs font-semibold text-slate-500 uppercase">Inadimplência</p>
-              <h3 className="text-3xl font-bold text-[#E63946] mt-2">4.2%</h3>
-              <p className="text-xs text-[#E63946] mt-2 font-medium">Revisão contratual</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase">Contratos Ativos</p>
+              <h3 className="text-3xl font-bold text-slate-900 mt-2">
+                {contracts.filter((c) => c.status === 'ATIVO').length}
+              </h3>
+              <p className="text-xs text-slate-500 mt-2 font-medium">de {contracts.length} no total</p>
             </div>
 
             <div className="md:col-span-2 bg-white p-6 rounded-xl shadow-sm flex justify-between items-center gap-4">
               <div>
                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full uppercase">
-                  Capacidade de Atendimento
+                  Receita Recorrente (MRR)
                 </span>
-                <h3 className="text-base font-bold text-slate-900 mt-2">Unidade Londrina &amp; Região</h3>
-                <p className="text-xs text-slate-500 mt-1">Saturação operacional atual: 92%</p>
+                <h3 className="font-data-mono text-2xl font-bold text-slate-900 mt-2">
+                  {maskMoney(brl(contracts.reduce((acc, c) => acc + c.monthlyValue, 0)))}
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">Somatório dos contratos vigentes</p>
               </div>
               <button
-                onClick={() => alert('Relatório técnico de saturação operacional exportado.')}
+                onClick={() => onNavigateToTab?.('contratos')}
                 className="shrink-0 border border-[#1A1A72] text-[#1A1A72] hover:bg-[#1A1A72] hover:text-white font-semibold text-xs px-4 py-2 rounded-lg transition-colors"
               >
-                Exportar Laudo
+                Ver Contratos
               </button>
             </div>
           </div>
@@ -178,6 +264,13 @@ export const CrmView: React.FC<CrmViewProps> = ({
                     : client.contractStatus === 'PENDENTE'
                     ? 'amber'
                     : 'red';
+                const nContracts = contracts.filter((c) => norm(c.clientName) === norm(client.name)).length;
+                const nProposals = pedidos.filter(
+                  (p) => p.clienteId === client.id || norm(p.clienteNome) === norm(client.name)
+                ).length;
+                const nOS = pedidosOS.filter(
+                  (o) => o.clientId === client.id || norm(o.clientName) === norm(client.name)
+                ).length;
                 return (
                   <DataListRow
                     key={client.id}
@@ -196,10 +289,19 @@ export const CrmView: React.FC<CrmViewProps> = ({
                       </>
                     }
                     center={
-                      <div className="text-left md:text-center">
-                        <p className="text-[10px] text-slate-400 uppercase tracking-wider">Última OS</p>
-                        <p className="font-data-mono text-slate-900 font-bold">{client.lastOSDate}</p>
-                        <p className="text-[10px] text-slate-500 uppercase">{client.lastOSType}</p>
+                      <div className="flex items-center gap-4 md:gap-3 text-center">
+                        <div>
+                          <p className="font-data-mono text-slate-900 font-bold text-sm">{nContracts}</p>
+                          <p className="text-[10px] text-slate-400 uppercase tracking-wider">Contratos</p>
+                        </div>
+                        <div>
+                          <p className="font-data-mono text-slate-900 font-bold text-sm">{nProposals}</p>
+                          <p className="text-[10px] text-slate-400 uppercase tracking-wider">Propostas</p>
+                        </div>
+                        <div>
+                          <p className="font-data-mono text-slate-900 font-bold text-sm">{nOS}</p>
+                          <p className="text-[10px] text-slate-400 uppercase tracking-wider">OS</p>
+                        </div>
                       </div>
                     }
                     right={
@@ -208,7 +310,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
                         <div className="flex items-center gap-1">
                           <RowAction
                             icon="visibility"
-                            label="Ver detalhes do cliente"
+                            label="Ver ficha completa do cliente"
                             onClick={() => setSelectedClientDetail(client)}
                           />
                           <RowAction
@@ -259,7 +361,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
                 </div>
                 <div className="flex justify-between items-center font-data-mono text-xs text-slate-500 pt-3 border-t border-slate-200">
                   <span>Técnico: {os.technicianName}</span>
-                  <span className="font-bold text-slate-900">R$ {os.value.toLocaleString('pt-BR')}</span>
+                  <span className="font-bold text-slate-900">{maskMoney(`R$ ${os.value.toLocaleString('pt-BR')}`)}</span>
                 </div>
               </div>
             ))}
@@ -331,63 +433,122 @@ export const CrmView: React.FC<CrmViewProps> = ({
         </div>
       )}
 
-      {/* Modal Add Client */}
+      {/* Modal Add Client — cadastro completo */}
       {showAddClientModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-xl p-6 shadow-2xl relative border border-slate-200">
-            <button
-              onClick={() => setShowAddClientModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 font-bold"
-            >
-              ✕
-            </button>
-            <h3 className="text-lg font-bold text-slate-900 uppercase mb-4">Novo Cadastro de Cliente</h3>
-            <form onSubmit={handleCreateClientSubmit} className="space-y-4 text-xs font-medium">
+          <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl relative border border-slate-200 max-h-[92vh] flex flex-col">
+            <div className="flex items-start justify-between p-6 border-b border-slate-100">
               <div>
-                <label className="block text-slate-600 mb-1 font-semibold uppercase">Razão Social / Nome Fantasia</label>
-                <input
-                  required
-                  type="text"
-                  value={newClientName}
-                  onChange={(e) => setNewClientName(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
-                  placeholder="Ex: Londrina Norte Shopping"
-                />
+                <h3 className="text-lg font-bold text-slate-900 uppercase">Novo Cadastro de Cliente</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Dados cadastrais completos + contatos. Tudo fica vinculado a contratos, pedidos e OS.</p>
               </div>
+              <button
+                onClick={() => setShowAddClientModal(false)}
+                className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateClientSubmit} className="p-6 space-y-4 text-xs font-medium overflow-y-auto">
+              {/* Identificação */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Razão Social *</label>
+                  <input required type="text" value={nName} onChange={(e) => setNName(e.target.value)} className={inputCls} placeholder="Ex: Londrina Norte Shopping Ltda" />
+                </div>
+                <div>
+                  <label className={labelCls}>Nome Fantasia</label>
+                  <input type="text" value={nFantasia} onChange={(e) => setNFantasia(e.target.value)} className={inputCls} placeholder="Ex: Norte Shopping" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className={labelCls}>CNPJ / CPF</label>
+                  <input type="text" value={nCNPJ} onChange={(e) => setNCNPJ(e.target.value)} className={`${inputCls} font-data-mono`} placeholder="00.000.000/0001-00" />
+                </div>
+                <div>
+                  <label className={labelCls}>Inscrição Estadual</label>
+                  <input type="text" value={nIE} onChange={(e) => setNIE(e.target.value)} className={`${inputCls} font-data-mono`} placeholder="Isento / número" />
+                </div>
+                <div>
+                  <label className={labelCls}>Segmento</label>
+                  <select value={nSegment} onChange={(e) => setNSegment(e.target.value)} className={inputCls}>
+                    <option value="Shopping Center">Shopping Center</option>
+                    <option value="Indústria">Indústria</option>
+                    <option value="Condomínio Residencial">Condomínio Residencial</option>
+                    <option value="Condomínio Comercial">Condomínio Comercial</option>
+                    <option value="Logística & Galpões">Logística &amp; Galpões</option>
+                    <option value="Varejo / Supermercado">Varejo / Supermercado</option>
+                    <option value="Hospitalar">Hospitalar</option>
+                    <option value="Educacional">Educacional</option>
+                    <option value="Órgão Público">Órgão Público</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Localização */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="md:col-span-2">
+                  <label className={labelCls}>Endereço (logradouro, nº, bairro)</label>
+                  <input type="text" value={nAddress} onChange={(e) => setNAddress(e.target.value)} className={inputCls} placeholder="Av. Higienópolis, 1200 — Centro" />
+                </div>
+                <div>
+                  <label className={labelCls}>Cidade / UF</label>
+                  <input type="text" value={nCity} onChange={(e) => setNCity(e.target.value)} className={inputCls} placeholder="Londrina/PR" />
+                </div>
+              </div>
+
+              {/* Comercial */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Status Cadastral</label>
+                  <select value={nStatus} onChange={(e) => setNStatus(e.target.value as Client['contractStatus'])} className={inputCls}>
+                    <option value="EM DIA">EM DIA</option>
+                    <option value="PENDENTE">PENDENTE</option>
+                    <option value="ATRASADO">ATRASADO</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Valor Anual Estimado em Contratos (R$)</label>
+                  <input type="number" min={0} step="0.01" value={nAnnual} onChange={(e) => setNAnnual(Number(e.target.value))} className={`${inputCls} font-data-mono`} />
+                </div>
+              </div>
+
+              {/* Contatos dinâmicos */}
               <div>
-                <label className="block text-slate-600 mb-1 font-semibold uppercase">CNPJ / CPF</label>
-                <input
-                  type="text"
-                  value={newClientCNPJ}
-                  onChange={(e) => setNewClientCNPJ(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
-                  placeholder="00.000.000/0001-00"
-                />
+                <div className="flex items-center justify-between mb-2">
+                  <label className="font-semibold uppercase text-[11px] text-slate-600">Contatos</label>
+                  <button
+                    type="button"
+                    onClick={addContactRow}
+                    className="text-[11px] font-semibold text-[#1A1A72] hover:text-[#E63946] flex items-center gap-1 uppercase"
+                  >
+                    <span className="material-symbols-outlined text-sm">add</span> Adicionar contato
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {nContacts.map((c, idx) => (
+                    <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center bg-slate-50 border border-slate-200 rounded-lg p-2">
+                      <input type="text" value={c.name} onChange={(e) => updateContact(idx, 'name', e.target.value)} className={`${inputCls} md:col-span-3`} placeholder="Nome" />
+                      <input type="text" value={c.role} onChange={(e) => updateContact(idx, 'role', e.target.value)} className={`${inputCls} md:col-span-3`} placeholder="Cargo/Função" />
+                      <input type="text" value={c.phone} onChange={(e) => updateContact(idx, 'phone', e.target.value)} className={`${inputCls} md:col-span-2 font-data-mono`} placeholder="(43) 90000-0000" />
+                      <input type="email" value={c.email} onChange={(e) => updateContact(idx, 'email', e.target.value)} className={`${inputCls} md:col-span-3`} placeholder="email@cliente.com" />
+                      <button
+                        type="button"
+                        onClick={() => removeContactRow(idx)}
+                        disabled={nContacts.length === 1}
+                        className="md:col-span-1 flex items-center justify-center text-slate-400 hover:text-[#E63946] disabled:opacity-30 disabled:hover:text-slate-400"
+                        title="Remover contato"
+                      >
+                        <span className="material-symbols-outlined text-lg">delete</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div>
-                <label className="block text-slate-600 mb-1 font-semibold uppercase">Segmento</label>
-                <select
-                  value={newClientSegment}
-                  onChange={(e) => setNewClientSegment(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
-                >
-                  <option value="Shopping Center">Shopping Center</option>
-                  <option value="Indústria">Indústria</option>
-                  <option value="Condomínio Residencial">Condomínio Residencial</option>
-                  <option value="Logística & Galpões">Logística &amp; Galpões</option>
-                  <option value="Varejo / Supermercado">Varejo / Supermercado</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-slate-600 mb-1 font-semibold uppercase">Endereço / Cidade</label>
-                <input
-                  type="text"
-                  value={newClientAddress}
-                  onChange={(e) => setNewClientAddress(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
-                  placeholder="Londrina/PR"
-                />
-              </div>
+
               <button
                 type="submit"
                 className="w-full bg-[#E63946] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
@@ -399,48 +560,322 @@ export const CrmView: React.FC<CrmViewProps> = ({
         </div>
       )}
 
-      {/* Client Detail Modal */}
+      {/* Client Detail Modal — ficha interligada */}
       {selectedClientDetail && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-xl p-6 shadow-2xl relative border border-slate-200">
-            <button
-              onClick={() => setSelectedClientDetail(null)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 font-bold"
-            >
-              ✕
-            </button>
-            <span className="font-data-mono text-xs text-[#E63946] font-bold">{selectedClientDetail.code}</span>
-            <h3 className="text-xl font-bold text-slate-900 uppercase mt-0.5">{selectedClientDetail.name}</h3>
-            <p className="text-xs text-slate-500 mb-4">{selectedClientDetail.cnpj} | {selectedClientDetail.segment}</p>
+        <ClientDetail
+          client={selectedClientDetail}
+          contracts={contracts}
+          pedidos={pedidos}
+          pedidosOS={pedidosOS}
+          transactions={transactions}
+          maskMoney={maskMoney}
+          onClose={() => setSelectedClientDetail(null)}
+          onOpenReport={(name) => {
+            setSelectedClientDetail(null);
+            onSelectClientForReport?.(name);
+          }}
+          onNavigateToTab={(tab) => {
+            setSelectedClientDetail(null);
+            onNavigateToTab?.(tab);
+          }}
+        />
+      )}
+    </div>
+  );
+};
 
-            <div className="space-y-2 bg-slate-50 p-4 rounded-lg text-xs font-data-mono border border-slate-200 mb-5">
-              <div><strong className="text-slate-900">Endereço:</strong> {selectedClientDetail.address}</div>
-              <div><strong className="text-slate-900">Status do Contrato:</strong> {selectedClientDetail.contractStatus}</div>
-              <div><strong className="text-slate-900">Última OS:</strong> {selectedClientDetail.lastOSDate} ({selectedClientDetail.lastOSType})</div>
-              <div><strong className="text-slate-900">Valor Anual:</strong> R$ {selectedClientDetail.totalContractsValue.toLocaleString('pt-BR')}</div>
+/* ============================ Ficha do cliente ============================ */
+
+interface ClientDetailProps {
+  client: Client;
+  contracts: Contract[];
+  pedidos: Pedido[];
+  pedidosOS: PedidoOS[];
+  transactions: FinancialTransaction[];
+  maskMoney: (v: string) => string;
+  onClose: () => void;
+  onOpenReport: (name: string) => void;
+  onNavigateToTab: (tab: TabPath) => void;
+}
+
+const ClientDetail: React.FC<ClientDetailProps> = ({
+  client,
+  contracts,
+  pedidos,
+  pedidosOS,
+  transactions,
+  maskMoney,
+  onClose,
+  onOpenReport,
+  onNavigateToTab,
+}) => {
+  const data = useMemo(() => {
+    const belongsPedido = (p: Pedido) => p.clienteId === client.id || norm(p.clienteNome) === norm(client.name);
+    const belongsOS = (o: PedidoOS) => o.clientId === client.id || norm(o.clientName) === norm(client.name);
+
+    const clientContracts = contracts.filter((c) => norm(c.clientName) === norm(client.name));
+    const clientPedidos = pedidos.filter(belongsPedido);
+    const clientOS = pedidosOS.filter(belongsOS);
+    const clientReceitas = transactions.filter(
+      (t) => t.type === 'RECEITA' && norm(t.clientOrVendor) === norm(client.name)
+    );
+
+    const propostasAceitas = clientPedidos.filter((p) => PROPOSAL_ACEITO.includes(p.status));
+    const propostasAbertas = clientPedidos.filter((p) => PROPOSAL_ABERTO.includes(p.status));
+    const propostasCanceladas = clientPedidos.filter((p) => PROPOSAL_CANCELADO.includes(p.status));
+
+    const osRealizadas = clientOS.filter((o) => o.status === 'CONCLUIDA');
+    const osAndamento = clientOS.filter((o) => o.status === 'EM ANDAMENTO' || o.status === 'ABERTA');
+    const osCanceladas = clientOS.filter((o) => o.status === 'ATRASADA');
+
+    const mrr = clientContracts.reduce((acc, c) => acc + c.monthlyValue, 0);
+    const totalRecebido = clientReceitas
+      .filter((t) => t.status === 'CONFIRMADO')
+      .reduce((acc, t) => acc + t.amount, 0);
+    const volumeAberto = propostasAbertas.reduce((acc, p) => acc + (p.proposal?.valorTotal || 0), 0);
+
+    return {
+      clientContracts,
+      clientReceitas,
+      propostasAceitas,
+      propostasAbertas,
+      propostasCanceladas,
+      osRealizadas,
+      osAndamento,
+      osCanceladas,
+      mrr,
+      totalRecebido,
+      volumeAberto,
+    };
+  }, [client, contracts, pedidos, pedidosOS, transactions]);
+
+  const brlM = (n: number) => maskMoney(brl(n));
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white w-full max-w-3xl rounded-xl shadow-2xl relative border border-slate-200 max-h-[92vh] flex flex-col">
+        {/* Cabeçalho */}
+        <div className="flex items-start justify-between p-6 border-b border-slate-100">
+          <div className="min-w-0">
+            <span className="font-data-mono text-xs text-[#E63946] font-bold">{client.code}</span>
+            <h3 className="text-xl font-bold text-slate-900 uppercase mt-0.5 truncate">{client.name}</h3>
+            <p className="text-xs text-slate-500">
+              {client.cnpj} · {client.segment} ·{' '}
+              <span
+                className={
+                  client.contractStatus === 'EM DIA'
+                    ? 'text-emerald-600 font-semibold'
+                    : client.contractStatus === 'PENDENTE'
+                    ? 'text-amber-600 font-semibold'
+                    : 'text-red-600 font-semibold'
+                }
+              >
+                {client.contractStatus}
+              </span>
+            </p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none shrink-0">
+            ✕
+          </button>
+        </div>
+
+        <div className="p-6 space-y-5 overflow-y-auto text-xs">
+          {/* Resumo financeiro */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <SummaryTile label="MRR (contratos)" value={brlM(data.mrr)} tone="brand" />
+            <SummaryTile label="Recebido (confirmado)" value={brlM(data.totalRecebido)} tone="emerald" />
+            <SummaryTile label="Propostas em aberto" value={brlM(data.volumeAberto)} tone="amber" />
+            <SummaryTile label="OS realizadas" value={String(data.osRealizadas.length)} tone="slate" />
+          </div>
+
+          {/* Dados cadastrais + contatos */}
+          <Section title="Dados cadastrais" icon="badge">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 bg-slate-50 border border-slate-200 rounded-lg p-3 font-data-mono">
+              <div><strong className="text-slate-900">Endereço:</strong> {client.address}</div>
+              <div><strong className="text-slate-900">Última OS:</strong> {client.lastOSDate} ({client.lastOSType})</div>
             </div>
+            {client.contacts && client.contacts.length > 0 && (
+              <div className="mt-2 space-y-1.5">
+                {client.contacts.map((ct, i) => (
+                  <div key={i} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 border border-slate-100 rounded-lg px-3 py-2">
+                    <span className="font-semibold text-slate-900">{ct.name}</span>
+                    <span className="text-slate-400">·</span>
+                    <span className="text-slate-500">{ct.role}</span>
+                    {ct.phone && <><span className="text-slate-300">|</span><span className="font-data-mono text-slate-600">{ct.phone}</span></>}
+                    {ct.email && <><span className="text-slate-300">|</span><span className="font-data-mono text-slate-600">{ct.email}</span></>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
 
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  const clientName = selectedClientDetail.name;
-                  setSelectedClientDetail(null);
-                  if (onSelectClientForReport) onSelectClientForReport(clientName);
-                }}
-                className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 rounded-lg text-xs uppercase transition-colors"
-              >
-                Abrir Relatório Técnico SDAI
-              </button>
-              <button
-                onClick={() => setSelectedClientDetail(null)}
-                className="px-4 border border-slate-200 text-slate-700 font-semibold rounded-lg text-xs hover:bg-slate-50 transition-colors"
-              >
-                Fechar
-              </button>
+          {/* Contratos */}
+          <Section title={`Contratos (${data.clientContracts.length})`} icon="description" onAction={() => onNavigateToTab('contratos')} actionLabel="Ir para Contratos">
+            {data.clientContracts.length === 0 ? (
+              <EmptyLine text="Nenhum contrato vinculado a este cliente." />
+            ) : (
+              <div className="flex flex-col gap-2">
+                {data.clientContracts.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between border border-slate-100 rounded-lg px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="font-data-mono text-[11px] text-slate-400">{c.id}</p>
+                      <p className="font-semibold text-slate-800 truncate">{c.unit}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="font-data-mono font-bold text-emerald-600">{brlM(c.monthlyValue)}<span className="text-[10px] text-slate-400">/mês</span></p>
+                      <Badge color={c.status === 'ATIVO' ? 'emerald' : c.status === 'A VENCER' ? 'amber' : 'red'}>{c.status}</Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+
+          {/* Propostas / Pedidos */}
+          <Section title={`Propostas & Pedidos (${data.propostasAceitas.length + data.propostasAbertas.length + data.propostasCanceladas.length})`} icon="receipt_long" onAction={() => onNavigateToTab('pedidos')} actionLabel="Ir para Pedidos">
+            <ProposalGroup title="Aceitos / Realizados" color="emerald" list={data.propostasAceitas} brlM={brlM} />
+            <ProposalGroup title="Em aberto" color="amber" list={data.propostasAbertas} brlM={brlM} />
+            <ProposalGroup title="Recusados / Cancelados" color="red" list={data.propostasCanceladas} brlM={brlM} />
+            {data.propostasAceitas.length + data.propostasAbertas.length + data.propostasCanceladas.length === 0 && (
+              <EmptyLine text="Nenhuma proposta registrada para este cliente." />
+            )}
+          </Section>
+
+          {/* Ordens de Serviço */}
+          <Section title={`Ordens de Serviço (${data.osRealizadas.length + data.osAndamento.length + data.osCanceladas.length})`} icon="engineering">
+            <OSGroup title="Realizadas" color="emerald" list={data.osRealizadas} brlM={brlM} />
+            <OSGroup title="Em andamento / abertas" color="amber" list={data.osAndamento} brlM={brlM} />
+            <OSGroup title="Atrasadas / canceladas" color="red" list={data.osCanceladas} brlM={brlM} />
+            {data.osRealizadas.length + data.osAndamento.length + data.osCanceladas.length === 0 && (
+              <EmptyLine text="Nenhuma ordem de serviço para este cliente." />
+            )}
+          </Section>
+
+          {/* Receitas */}
+          <Section title={`Receitas (${data.clientReceitas.length})`} icon="trending_up" onAction={() => onNavigateToTab('receitas')} actionLabel="Ir para Receitas">
+            {data.clientReceitas.length === 0 ? (
+              <EmptyLine text="Nenhum lançamento de receita para este cliente." />
+            ) : (
+              <div className="flex flex-col gap-2">
+                {data.clientReceitas.map((t) => (
+                  <div key={t.id} className="flex items-center justify-between border border-slate-100 rounded-lg px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="font-data-mono text-[11px] text-slate-400">{t.id} · {t.date}</p>
+                      <p className="font-semibold text-slate-800 truncate">{t.description}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="font-data-mono font-bold text-emerald-600">{brlM(t.amount)}</p>
+                      <Badge color={t.status === 'CONFIRMADO' ? 'emerald' : t.status === 'PENDENTE' ? 'amber' : 'red'}>{t.status}</Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+        </div>
+
+        {/* Rodapé de ações */}
+        <div className="flex gap-2 p-4 border-t border-slate-100">
+          <button
+            onClick={() => onOpenReport(client.name)}
+            className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 rounded-lg text-xs uppercase transition-colors"
+          >
+            Abrir Relatório Técnico SDAI
+          </button>
+          <button
+            onClick={onClose}
+            className="px-4 border border-slate-200 text-slate-700 font-semibold rounded-lg text-xs hover:bg-slate-50 transition-colors uppercase"
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ============================ Subcomponentes ============================ */
+
+const SummaryTile: React.FC<{ label: string; value: string; tone: 'brand' | 'emerald' | 'amber' | 'slate' }> = ({ label, value, tone }) => {
+  const toneCls =
+    tone === 'brand' ? 'text-[#1A1A72]' : tone === 'emerald' ? 'text-emerald-600' : tone === 'amber' ? 'text-amber-600' : 'text-slate-900';
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg p-3">
+      <p className="text-[10px] text-slate-400 uppercase tracking-wider">{label}</p>
+      <p className={`font-data-mono text-base font-bold mt-1 ${toneCls}`}>{value}</p>
+    </div>
+  );
+};
+
+const Section: React.FC<{
+  title: string;
+  icon: string;
+  children: React.ReactNode;
+  onAction?: () => void;
+  actionLabel?: string;
+}> = ({ title, icon, children, onAction, actionLabel }) => (
+  <div>
+    <div className="flex items-center justify-between mb-2">
+      <h4 className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+        <span className="material-symbols-outlined text-base text-slate-400">{icon}</span>
+        {title}
+      </h4>
+      {onAction && actionLabel && (
+        <button onClick={onAction} className="text-[10px] font-semibold text-[#1A1A72] hover:text-[#E63946] uppercase tracking-wider">
+          {actionLabel} →
+        </button>
+      )}
+    </div>
+    {children}
+  </div>
+);
+
+const EmptyLine: React.FC<{ text: string }> = ({ text }) => (
+  <p className="text-[11px] text-slate-400 italic px-1 py-2">{text}</p>
+);
+
+const ProposalGroup: React.FC<{ title: string; color: 'emerald' | 'amber' | 'red'; list: Pedido[]; brlM: (n: number) => string }> = ({ title, color, list, brlM }) => {
+  if (list.length === 0) return null;
+  return (
+    <div className="mb-2">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">{title} · {list.length}</p>
+      <div className="flex flex-col gap-1.5">
+        {list.map((p) => (
+          <div key={p.id} className="flex items-center justify-between border border-slate-100 rounded-lg px-3 py-2">
+            <div className="min-w-0">
+              <p className="font-data-mono text-[11px] text-slate-400">{p.numeroPedido}</p>
+              <p className="font-semibold text-slate-800 truncate">{p.referencia || 'Proposta comercial'}</p>
+            </div>
+            <div className="text-right shrink-0">
+              <p className="font-data-mono font-bold text-slate-900">{brlM(p.proposal?.valorTotal || 0)}</p>
+              <Badge color={color}>{proposalStatusLabel[p.status]}</Badge>
             </div>
           </div>
-        </div>
-      )}
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const OSGroup: React.FC<{ title: string; color: 'emerald' | 'amber' | 'red'; list: PedidoOS[]; brlM: (n: number) => string }> = ({ title, color, list, brlM }) => {
+  if (list.length === 0) return null;
+  return (
+    <div className="mb-2">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">{title} · {list.length}</p>
+      <div className="flex flex-col gap-1.5">
+        {list.map((o) => (
+          <div key={o.id} className="flex items-center justify-between border border-slate-100 rounded-lg px-3 py-2">
+            <div className="min-w-0">
+              <p className="font-data-mono text-[11px] text-slate-400">{o.id} · {o.scheduledDate}</p>
+              <p className="font-semibold text-slate-800 truncate">{o.title}</p>
+            </div>
+            <div className="text-right shrink-0">
+              <p className="font-data-mono font-bold text-slate-900">{brlM(o.value)}</p>
+              <Badge color={color}>{o.status}</Badge>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Contract } from '@/lib/types';
+import { Contract, Client } from '@/lib/types';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
 import { usePrivacy } from '@/lib/privacy';
 
 interface ContratosViewProps {
   contracts: Contract[];
+  clients: Client[];
   onAddContract: (contract: Contract) => void;
 }
 
@@ -14,38 +15,83 @@ const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigi
 const contractStatusColor = (status: Contract['status']) =>
   status === 'ATIVO' ? 'emerald' : status === 'A VENCER' ? 'amber' : 'red';
 
+const labelCls = 'block text-slate-600 mb-1 font-semibold uppercase text-[11px]';
+const inputCls =
+  'w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#E63946]/20 focus:border-[#E63946]/40';
+
+/** Converte "2026-12-30" (input date) para "30 DEZ 2026" (padrão exibido no sistema). */
+const formatDateBR = (iso: string): string => {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return iso;
+  const meses = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+  return `${String(d).padStart(2, '0')} ${meses[m - 1]} ${y}`;
+};
+
 export const ContratosView: React.FC<ContratosViewProps> = ({
   contracts,
+  clients,
   onAddContract,
 }) => {
   const { maskMoney } = usePrivacy();
   const [showModal, setShowModal] = useState(false);
   const [selectedPdfContract, setSelectedPdfContract] = useState<Contract | null>(null);
-  const [clientName, setClientName] = useState('');
-  const [monthlyVal, setMonthlyVal] = useState(15000);
+
+  // Formulário de novo contrato (vinculado à base de clientes)
+  const [fClientId, setFClientId] = useState('');
+  const [fUnit, setFUnit] = useState('');
+  const [fScope, setFScope] = useState('Manutenção Preventiva + Corretiva SDAI');
+  const [fMonthly, setFMonthly] = useState(15000);
+  const [fStatus, setFStatus] = useState<Contract['status']>('ATIVO');
+  const [fRenewalDate, setFRenewalDate] = useState('');
+  const [fIndex, setFIndex] = useState('IPCA (+4.5%)');
+  const [fHours, setFHours] = useState(100);
+  const [fResponsible, setFResponsible] = useState('Eng. Ricardo M.');
+
+  const selectedClient = clients.find((c) => c.id === fClientId) || null;
+
+  const openCreate = () => {
+    setFClientId(clients[0]?.id || '');
+    setFUnit(clients[0]?.address || '');
+    setFScope('Manutenção Preventiva + Corretiva SDAI');
+    setFMonthly(15000);
+    setFStatus('ATIVO');
+    setFRenewalDate('');
+    setFIndex('IPCA (+4.5%)');
+    setFHours(100);
+    setFResponsible('Eng. Ricardo M.');
+    setShowModal(true);
+  };
+
+  const handleSelectClient = (id: string) => {
+    setFClientId(id);
+    const c = clients.find((x) => x.id === id);
+    if (c) setFUnit(c.address);
+  };
 
   const handleCreateContract = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clientName) return;
+    const client = clients.find((c) => c.id === fClientId);
+    if (!client) return;
 
     // id único por timestamp (evita colisão/sobrescrita ao persistir no banco)
     const stamp = Date.now().toString(36);
     onAddContract({
       id: `CTR-FOWL-${stamp}`,
-      clientName,
-      unit: 'Unidade Londrina',
-      monthlyValue: Number(monthlyVal),
-      renewalDate: '30 DEZ 2026',
-      readjustmentIndex: 'IPCA (+4.5%)',
-      contractedHours: 100,
-      usedHours: 12,
-      status: 'ATIVO',
-      responsibleTech: 'Eng. Ricardo M.',
-      artDocumentRef: `ART-PR-2024-${stamp}`
+      clientName: client.name,
+      // "unit" guarda a unidade/escopo do contrato (coluna existente).
+      unit: fUnit ? `${fUnit} — ${fScope}` : fScope,
+      monthlyValue: Number(fMonthly),
+      renewalDate: formatDateBR(fRenewalDate) || '30 DEZ 2026',
+      readjustmentIndex: fIndex,
+      contractedHours: Number(fHours),
+      usedHours: 0,
+      status: fStatus,
+      responsibleTech: fResponsible,
+      artDocumentRef: `ART-PR-2026-${stamp}`,
     });
 
     setShowModal(false);
-    setClientName('');
   };
 
   const totalMonthlyRec = contracts.reduce((acc, c) => acc + c.monthlyValue, 0);
@@ -63,7 +109,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
           </h1>
         </div>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={openCreate}
           className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
         >
           <span className="material-symbols-outlined text-base">add</span> Novo Contrato
@@ -156,40 +202,171 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
       {/* Modal Add Contract */}
       {showModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white max-w-md w-full rounded-xl border border-slate-200 p-6 shadow-2xl relative">
-            <button onClick={() => setShowModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 font-bold">
-              ✕
-            </button>
-            <h3 className="text-lg font-bold text-slate-900 uppercase mb-4">Novo Contrato Recorrente</h3>
-            <form onSubmit={handleCreateContract} className="space-y-4 text-xs font-medium">
+          <div className="bg-white max-w-2xl w-full rounded-xl border border-slate-200 shadow-2xl relative max-h-[92vh] flex flex-col">
+            <div className="flex items-start justify-between p-6 border-b border-slate-100">
               <div>
-                <label className="block text-slate-600 mb-1 font-semibold uppercase">Razão Social do Cliente</label>
-                <input
-                  type="text"
-                  required
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
-                  placeholder="Ex: Londrina Norte Shopping"
-                />
+                <h3 className="text-lg font-bold text-slate-900 uppercase">Novo Contrato Recorrente</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Vincule o contrato a um cliente da base e defina as condições comerciais.</p>
               </div>
-              <div>
-                <label className="block text-slate-600 mb-1 font-semibold uppercase">Valor Mensal Recorrente (R$)</label>
-                <input
-                  type="number"
-                  required
-                  value={monthlyVal}
-                  onChange={(e) => setMonthlyVal(Number(e.target.value))}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full bg-[#E63946] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
-              >
-                Salvar e Ativar Contrato
+              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none">
+                ✕
               </button>
-            </form>
+            </div>
+
+            {clients.length === 0 ? (
+              <div className="p-8 text-center">
+                <span className="material-symbols-outlined text-4xl text-slate-300">group_off</span>
+                <p className="mt-2 text-sm font-bold text-slate-600 uppercase">Nenhum cliente cadastrado</p>
+                <p className="text-xs text-slate-400 mt-1">Cadastre um cliente na aba <strong>Clientes</strong> antes de criar um contrato.</p>
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="mt-4 px-4 py-2 border border-slate-200 text-slate-700 font-semibold rounded-lg text-xs uppercase hover:bg-slate-50"
+                >
+                  Fechar
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleCreateContract} className="p-6 space-y-4 text-xs font-medium overflow-y-auto">
+                {/* Cliente vinculado */}
+                <div>
+                  <label className={labelCls}>Cliente (base cadastral)</label>
+                  <select value={fClientId} onChange={(e) => handleSelectClient(e.target.value)} className={inputCls} required>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} — {c.cnpj}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Dados do cliente selecionado (somente leitura) */}
+                {selectedClient && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 border border-slate-200 rounded-lg p-3 text-[11px]">
+                    <div>
+                      <p className="text-slate-400 uppercase tracking-wider">Código</p>
+                      <p className="font-data-mono text-slate-800 font-semibold">{selectedClient.code}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400 uppercase tracking-wider">Segmento</p>
+                      <p className="text-slate-800 font-semibold">{selectedClient.segment}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400 uppercase tracking-wider">Status cadastral</p>
+                      <p className="text-slate-800 font-semibold">{selectedClient.contractStatus}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400 uppercase tracking-wider">Contato</p>
+                      <p className="text-slate-800 font-semibold truncate">{selectedClient.contacts?.[0]?.name || '—'}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Unidade / local */}
+                <div>
+                  <label className={labelCls}>Unidade / Local de Atendimento</label>
+                  <input
+                    type="text"
+                    value={fUnit}
+                    onChange={(e) => setFUnit(e.target.value)}
+                    className={inputCls}
+                    placeholder="Ex.: Unidade Londrina — Torre A"
+                  />
+                </div>
+
+                {/* Escopo do contrato */}
+                <div>
+                  <label className={labelCls}>Escopo do Contrato</label>
+                  <select value={fScope} onChange={(e) => setFScope(e.target.value)} className={inputCls}>
+                    <option>Manutenção Preventiva SDAI</option>
+                    <option>Manutenção Preventiva + Corretiva SDAI</option>
+                    <option>CFTV &amp; Monitoramento</option>
+                    <option>Controle de Acesso</option>
+                    <option>Automação Predial (BMS)</option>
+                    <option>Full (Multissistemas)</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Valor mensal */}
+                  <div>
+                    <label className={labelCls}>Valor Mensal Recorrente (R$)</label>
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      step="0.01"
+                      value={fMonthly}
+                      onChange={(e) => setFMonthly(Number(e.target.value))}
+                      className={`${inputCls} font-data-mono`}
+                    />
+                  </div>
+                  {/* Horas contratadas */}
+                  <div>
+                    <label className={labelCls}>Bolsa de Horas / mês</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={fHours}
+                      onChange={(e) => setFHours(Number(e.target.value))}
+                      className={`${inputCls} font-data-mono`}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Renovação */}
+                  <div>
+                    <label className={labelCls}>Data de Renovação</label>
+                    <input
+                      type="date"
+                      value={fRenewalDate}
+                      onChange={(e) => setFRenewalDate(e.target.value)}
+                      className={`${inputCls} font-data-mono`}
+                    />
+                  </div>
+                  {/* Índice de reajuste */}
+                  <div>
+                    <label className={labelCls}>Índice de Reajuste</label>
+                    <select value={fIndex} onChange={(e) => setFIndex(e.target.value)} className={inputCls}>
+                      <option>IPCA (+4.5%)</option>
+                      <option>IGP-M (+5.0%)</option>
+                      <option>INPC (+4.2%)</option>
+                      <option>Sem reajuste</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Responsável técnico */}
+                  <div>
+                    <label className={labelCls}>Responsável Técnico (ART)</label>
+                    <input
+                      type="text"
+                      value={fResponsible}
+                      onChange={(e) => setFResponsible(e.target.value)}
+                      className={inputCls}
+                      placeholder="Eng. Ricardo M."
+                    />
+                  </div>
+                  {/* Status */}
+                  <div>
+                    <label className={labelCls}>Status do Contrato</label>
+                    <select value={fStatus} onChange={(e) => setFStatus(e.target.value as Contract['status'])} className={inputCls}>
+                      <option value="ATIVO">ATIVO</option>
+                      <option value="A VENCER">A VENCER</option>
+                      <option value="SUSPENSO">SUSPENSO</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-[#E63946] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
+                >
+                  Salvar e Ativar Contrato
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}

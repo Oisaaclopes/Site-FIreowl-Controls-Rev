@@ -667,7 +667,7 @@ export function CrmApp({
           )}
 
           {currentTab === 'contratos' && (
-            <ContratosView contracts={contracts} onAddContract={handleAddContract} />
+            <ContratosView contracts={contracts} clients={clients} onAddContract={handleAddContract} />
           )}
 
           {currentTab === 'receitas' && (
@@ -703,10 +703,14 @@ export function CrmApp({
             <CrmView
               clients={clients}
               pedidosOS={pedidosOS}
+              pedidos={pedidos}
+              contracts={contracts}
+              transactions={transactions}
               inventory={inventory}
               onAddClient={handleAddClient}
               onAddOS={handleAddOS}
               onSelectClientForReport={handleSelectClientForReport}
+              onNavigateToTab={setCurrentTab}
             />
           )}
 
