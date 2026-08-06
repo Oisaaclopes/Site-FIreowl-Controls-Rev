@@ -640,6 +640,7 @@ export function CrmApp({
             <DashboardView
               transactions={transactions}
               pedidosOS={pedidosOS}
+              contracts={contracts}
               onNewOSClick={handleNewOSQuick}
               onNavigateToTab={setCurrentTab}
             />

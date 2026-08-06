@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { FinancialTransaction, PedidoOS } from '@/lib/types';
+import { FinancialTransaction, PedidoOS, Contract, TabPath } from '@/lib/types';
 import { usePrivacy } from '@/lib/privacy';
 
 /** Máscara curta para os números dos cards (o prefixo "R$" já é exibido à parte). */
@@ -10,35 +10,50 @@ const MASK_DIGITS = '•••••••';
 interface DashboardViewProps {
   transactions: FinancialTransaction[];
   pedidosOS: PedidoOS[];
+  contracts: Contract[];
   onNewOSClick: () => void;
-  onNavigateToTab: (tab: any) => void;
+  onNavigateToTab: (tab: TabPath) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   transactions,
   pedidosOS,
+  contracts,
   onNewOSClick,
   onNavigateToTab,
 }) => {
   const { isPrivacyModeActive, maskMoney } = usePrivacy();
-  const [revenueValue, setRevenueValue] = useState(428000);
 
+  // Indicadores reais derivados dos dados do sistema
+  const receitaTotal = transactions
+    .filter((t) => t.type === 'RECEITA')
+    .reduce((acc, t) => acc + t.amount, 0);
+  const despesaTotal = transactions
+    .filter((t) => t.type === 'DESPESA')
+    .reduce((acc, t) => acc + t.amount, 0);
+  const contratosAtivos = contracts.filter((c) => c.status === 'ATIVO').length;
+  const osAtrasadas = pedidosOS.filter((p) => p.status === 'ATRASADA').length;
+
+  const [revenueValue, setRevenueValue] = useState(0);
+
+  // Anima o contador de receita até o total real sempre que ele muda.
   useEffect(() => {
-    const endValue = 428940;
-    const duration = 1500;
+    const endValue = receitaTotal;
+    const duration = 1200;
+    const startValue = 0;
     const startTime = performance.now();
 
     const updateCounter = (currentTime: number) => {
       const elapsed = currentTime - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      const current = Math.floor(progress * (endValue - 428000) + 428000);
+      const current = Math.floor(progress * (endValue - startValue) + startValue);
       setRevenueValue(current);
       if (progress < 1) {
         requestAnimationFrame(updateCounter);
       }
     };
     requestAnimationFrame(updateCounter);
-  }, []);
+  }, [receitaTotal]);
 
   return (
     <div className="flex flex-col w-full p-4 md:p-8 gap-5 md:gap-6">
@@ -106,7 +121,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="mt-3 flex items-baseline gap-1">
             <span className="text-sm font-medium text-slate-500">R$</span>
             <span className="font-data-mono text-3xl font-bold text-slate-900 tabular-nums">
-              {isPrivacyModeActive ? MASK_DIGITS : '184.212'}
+              {isPrivacyModeActive ? MASK_DIGITS : despesaTotal.toLocaleString('pt-BR')}
             </span>
           </div>
           <div className="mt-4 flex items-center gap-1 text-xs font-semibold text-[#E63946]">
@@ -130,20 +145,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline gap-1">
             <span className="font-data-mono text-3xl font-bold text-slate-900 tabular-nums">
-              1.248
+              {contratosAtivos.toLocaleString('pt-BR')}
             </span>
           </div>
-          <div className="mt-4 flex items-center gap-2">
-            <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div className="bg-[#1A1A72] h-full w-[85%] rounded-full"></div>
-            </div>
-            <span className="font-data-mono text-xs text-slate-500 font-semibold">85% META</span>
+          <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-slate-500">
+            <span className="material-symbols-outlined text-sm text-[#1A1A72]">verified</span>
+            <span>{contracts.length} contratos no total</span>
           </div>
         </div>
 
         {/* Card: OS Atrasadas (Critical) */}
         <div
-          onClick={() => onNavigateToTab('crm')}
+          onClick={() => onNavigateToTab('pedidos')}
           className="bg-red-50/60 p-5 rounded-xl border border-red-200 shadow-sm relative overflow-hidden group cursor-pointer hover:bg-red-100/50 transition-all"
         >
           <div className="flex justify-between items-start">
@@ -156,7 +169,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline gap-1">
             <span className="font-data-mono text-3xl font-bold text-[#E63946] tabular-nums">
-              24
+              {osAtrasadas}
             </span>
           </div>
           <div className="mt-4 flex items-center gap-1 text-xs font-semibold text-[#E63946] group-hover:underline">
@@ -243,7 +256,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
 
             <button
-              onClick={() => onNavigateToTab('auditoria')}
+              onClick={() => onNavigateToTab('clientes')}
               className="mt-6 w-full py-2.5 bg-[#E63946] hover:bg-[#a51515] text-white rounded-lg font-semibold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-md"
             >
               <span>Executar Auditoria NBR 17240</span>
@@ -283,7 +296,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             Últimos Lançamentos Financeiros &amp; Contratos
           </h3>
           <button
-            onClick={() => onNavigateToTab('financeiro')}
+            onClick={() => onNavigateToTab('financas')}
             className="text-xs text-slate-300 hover:text-white underline font-medium"
           >
             Ver Histórico Completo

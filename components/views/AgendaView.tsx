@@ -115,7 +115,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ pedidosOS }) => {
                       <p className="text-xs text-slate-500 mt-1">{os.title}</p>
                       <div className="mt-3 font-data-mono text-[10px] text-slate-400 border-t border-slate-100 pt-2 flex justify-between items-center">
                         <span>Técnico: {os.technicianName}</span>
-                        <span className="font-bold text-slate-800">R$ {os.value}</span>
+                        <span className="font-bold text-slate-800">R$ {os.value.toLocaleString('pt-BR')}</span>
                       </div>
                     </div>
                   ))}
