@@ -8,7 +8,6 @@ interface HeaderProps {
   userRole: UserRole;
   onOpenAuthModal: () => void;
   onQuickSearchClick?: () => void;
-  onNewOSClick?: () => void;
   onOpenMenu?: () => void;
   canSwitchRole?: boolean;
   /** Recolhe o offset esquerdo do header quando a sidebar está minimizada. */
@@ -19,7 +18,6 @@ export const Header: React.FC<HeaderProps> = ({
   userRole,
   onOpenAuthModal,
   onQuickSearchClick,
-  onNewOSClick,
   onOpenMenu,
   canSwitchRole = false,
   sidebarCollapsed = false,
@@ -68,16 +66,6 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       <div className="flex items-center gap-4">
-        {onNewOSClick && (
-          <button
-            onClick={onNewOSClick}
-            className="hidden sm:flex items-center gap-1.5 bg-[#E63946] hover:bg-[#a51515] text-white font-semibold text-xs px-4 py-2 rounded-md transition-colors shadow-sm uppercase tracking-wide"
-          >
-            <span className="material-symbols-outlined text-base">add</span>
-            Nova Ordem
-          </button>
-        )}
-
         {/* Notifications Icon with Popup */}
         <div className="relative">
           <button

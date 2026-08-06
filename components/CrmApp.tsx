@@ -620,6 +620,7 @@ export function CrmApp({
         onCloseMobile={() => setSidebarOpen(false)}
         collapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed((v) => !v)}
+        onExpand={() => setIsSidebarCollapsed(false)}
       />
 
       {/* Main Content Workspace — deslocado pela sidebar apenas no desktop */}
@@ -628,7 +629,6 @@ export function CrmApp({
         <Header
           userRole={userRole}
           onOpenAuthModal={() => setIsAuthModalOpen(true)}
-          onNewOSClick={handleNewOSQuick}
           onOpenMenu={() => setSidebarOpen(true)}
           canSwitchRole={canSwitchRole}
           sidebarCollapsed={isSidebarCollapsed}

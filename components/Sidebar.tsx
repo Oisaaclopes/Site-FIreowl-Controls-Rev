@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { PanelLeft } from 'lucide-react';
 import { TabPath, UserRole } from '@/lib/types';
 import { OfficialLogo } from '@/components/OfficialLogo';
 import { allowedTabs } from '@/lib/rbac';
@@ -17,6 +18,8 @@ interface SidebarProps {
   /** Modo mini-sidebar (apenas ícones) no desktop. */
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  /** Força a expansão do menu (usado ao clicar na logo). */
+  onExpand?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -30,6 +33,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile,
   collapsed = false,
   onToggleCollapse,
+  onExpand,
 }) => {
   const allNavItems: { path: TabPath; label: string; icon: string; count?: number }[] = [
     { path: 'painel', label: 'Painel', icon: 'dashboard' },
@@ -72,18 +76,43 @@ export const Sidebar: React.FC<SidebarProps> = ({
         } ${isCollapsed ? 'lg:w-20' : 'lg:w-64'}`}
       >
         {/* Brand Header — logo oficial da Fireowl Controls */}
-        <div className={`p-5 flex items-center gap-3 border-b border-white/10 ${isCollapsed ? 'lg:justify-center lg:px-0' : ''}`}>
-          <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center shadow-md shrink-0">
-            <OfficialLogo className="w-8 h-8" />
-          </div>
-          <div className={`flex flex-col ${isCollapsed ? 'lg:hidden' : ''}`}>
-            <span className="font-display font-bold text-white tracking-wider uppercase text-lg leading-tight">
-              FIREOWL<span className="text-[#E63946]">.</span>
-            </span>
-            <span className="font-label-caps text-white/60 text-[10px] tracking-widest mt-0.5">
-              CONTROLS SYSTEMS
-            </span>
-          </div>
+        <div className={`p-5 flex items-center gap-3 border-b border-white/10 ${isCollapsed ? 'lg:justify-center lg:px-2' : ''}`}>
+          {/* Logo (clicável → força a expansão do menu). Some no modo recolhido (desktop). */}
+          <button
+            type="button"
+            onClick={() => onExpand?.()}
+            aria-label="Fireowl Controls — expandir menu"
+            className={`flex items-center gap-3 min-w-0 text-left rounded-lg cursor-pointer transition-opacity hover:opacity-90 ${isCollapsed ? 'lg:hidden' : ''}`}
+          >
+            <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center shadow-md shrink-0">
+              <OfficialLogo className="w-8 h-8" />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-display font-bold text-white tracking-wider uppercase text-lg leading-tight">
+                FIREOWL<span className="text-[#E63946]">.</span>
+              </span>
+              <span className="font-label-caps text-white/60 text-[10px] tracking-widest mt-0.5">
+                CONTROLS SYSTEMS
+              </span>
+            </div>
+          </button>
+
+          {/* Toggle de painel (padrão ML) — recolhe/expande. Só desktop. */}
+          {onToggleCollapse && (
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              aria-label={isCollapsed ? 'Expandir menu' : 'Recolher menu'}
+              aria-expanded={!isCollapsed}
+              title={isCollapsed ? 'Expandir menu' : 'Recolher menu'}
+              className={`hidden lg:flex w-9 h-9 rounded-lg items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-colors shrink-0 ${
+                isCollapsed ? '' : 'ml-auto'
+              }`}
+            >
+              <PanelLeft className="w-5 h-5" />
+            </button>
+          )}
+
           {/* Fechar (apenas mobile) */}
           <button
             onClick={onCloseMobile}
@@ -146,28 +175,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           );
         })}
       </nav>
-
-      {/* Botão de recolher/expandir (apenas desktop) */}
-      {onToggleCollapse && (
-        <div className={`hidden lg:block px-3 pb-2 ${isCollapsed ? 'lg:px-0' : ''}`}>
-          <button
-            onClick={onToggleCollapse}
-            title={isCollapsed ? 'Expandir menu' : 'Recolher menu'}
-            aria-label={isCollapsed ? 'Expandir menu' : 'Recolher menu'}
-            aria-expanded={!isCollapsed}
-            className={`w-full flex items-center gap-2 rounded-lg py-2 text-white/60 hover:text-white hover:bg-white/10 transition-colors ${
-              isCollapsed ? 'justify-center px-0' : 'px-3.5 justify-start'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[20px]">
-              {isCollapsed ? 'chevron_right' : 'chevron_left'}
-            </span>
-            {!isCollapsed && (
-              <span className="font-label-caps text-[10px] uppercase tracking-wider">Recolher menu</span>
-            )}
-          </button>
-        </div>
-      )}
 
       {/* Footer System Status / Operator Info */}
       <div className={`p-4 border-t border-white/10 bg-black/15 flex flex-col gap-2.5 ${isCollapsed ? 'lg:items-center lg:px-2' : ''}`}>
