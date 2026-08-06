@@ -16,11 +16,15 @@ function rowToContract(r: any): Contract {
     status: (r.status || 'ATIVO') as Contract['status'],
     responsibleTech: r.responsible_tech || '',
     artDocumentRef: r.art_document_ref || '',
+    clientId: r.client_id ?? undefined,
+    startDate: r.start_date ?? undefined,
+    contractType: r.contract_type ?? undefined,
+    paymentDay: r.payment_day ?? undefined,
   };
 }
 
 function contractToRow(c: Contract): Record<string, unknown> {
-  return {
+  const row: Record<string, unknown> = {
     id: c.id,
     client_name: c.clientName,
     unit: c.unit,
@@ -34,6 +38,13 @@ function contractToRow(c: Contract): Record<string, unknown> {
     art_document_ref: c.artDocumentRef,
     updated_at: new Date().toISOString(),
   };
+  // Campos estendidos: só enviados quando presentes (compatível com bancos
+  // sem a migração 0022 aplicada).
+  if (c.clientId !== undefined) row.client_id = c.clientId;
+  if (c.startDate !== undefined) row.start_date = c.startDate;
+  if (c.contractType !== undefined) row.contract_type = c.contractType;
+  if (c.paymentDay !== undefined) row.payment_day = c.paymentDay;
+  return row;
 }
 
 export async function fetchContracts(): Promise<Contract[]> {

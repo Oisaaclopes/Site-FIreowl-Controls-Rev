@@ -20,6 +20,19 @@ const inputCls =
   'w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#E63946]/20 focus:border-[#E63946]/40';
 const labelCls = 'block text-slate-600 mb-1 font-semibold uppercase text-[11px]';
 
+const DESPESA_CATEGORIES = [
+  'Compra de Materiais / Insumos',
+  'Folha & Encargos',
+  'Impostos & Taxas',
+  'Serviços de Terceiros',
+  'Frota & Logística',
+  'Infraestrutura / Aluguel',
+  'Ferramentas & EPI',
+  'Outros',
+];
+const PAYMENT_METHODS = ['PIX', 'Boleto', 'Transferência (TED)', 'Cartão', 'Dinheiro', 'A combinar'];
+const COST_CENTERS = ['Operação de Campo', 'Comercial', 'Administrativo', 'Almoxarifado', 'Frota', 'Diretoria'];
+
 const statusBadge = (status: FinancialTransaction['status']) =>
   status === 'CONFIRMADO' ? 'emerald' : status === 'PENDENTE' ? 'amber' : 'red';
 
@@ -39,6 +52,12 @@ export const DespesasView: React.FC<DespesasViewProps> = ({
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState(0);
   const [status, setStatus] = useState<FinancialTransaction['status']>('CONFIRMADO');
+  const [category, setCategory] = useState(DESPESA_CATEGORIES[0]);
+  const [emissao, setEmissao] = useState('');
+  const [vencimento, setVencimento] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[0]);
+  const [costCenter, setCostCenter] = useState(COST_CENTERS[0]);
+  const [documentRef, setDocumentRef] = useState('');
 
   const despesas = transactions.filter((t) => t.type === 'DESPESA');
   const filteredDespesas = despesas.filter((t) => (filterStatus === 'ALL' ? true : t.status === filterStatus));
@@ -52,6 +71,12 @@ export const DespesasView: React.FC<DespesasViewProps> = ({
     setDescription('');
     setAmount(0);
     setStatus('CONFIRMADO');
+    setCategory(DESPESA_CATEGORIES[0]);
+    setEmissao(new Date().toISOString().slice(0, 10));
+    setVencimento('');
+    setPaymentMethod(PAYMENT_METHODS[0]);
+    setCostCenter(COST_CENTERS[0]);
+    setDocumentRef('');
     setShowModal(true);
   };
 
@@ -61,6 +86,12 @@ export const DespesasView: React.FC<DespesasViewProps> = ({
     setDescription(t.description);
     setAmount(t.amount);
     setStatus(t.status);
+    setCategory(t.category || DESPESA_CATEGORIES[0]);
+    setEmissao('');
+    setVencimento(t.dueDate || '');
+    setPaymentMethod(t.paymentMethod || PAYMENT_METHODS[0]);
+    setCostCenter(t.costCenter || COST_CENTERS[0]);
+    setDocumentRef(t.documentRef || '');
     setShowModal(true);
   };
 
@@ -71,12 +102,26 @@ export const DespesasView: React.FC<DespesasViewProps> = ({
     onDeleteTransaction(t.id);
   };
 
+  const formatEmissao = (iso: string) => {
+    if (!iso) return new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
+    const [y, m, d] = iso.split('-').map(Number);
+    const meses = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+    return `${String(d).padStart(2, '0')} ${meses[m - 1]} ${y}`;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const extra = {
+      category,
+      dueDate: vencimento || undefined,
+      paymentMethod,
+      costCenter,
+      documentRef: documentRef || undefined,
+    };
     if (editingId) {
       const existing = despesas.find((r) => r.id === editingId);
       if (existing) {
-        onUpdateTransaction?.({ ...existing, clientOrVendor, description, amount: Number(amount), status });
+        onUpdateTransaction?.({ ...existing, clientOrVendor, description, amount: Number(amount), status, ...extra });
       }
     } else {
       // id único por timestamp (evita colisão/sobrescrita ao persistir no banco)
@@ -86,9 +131,10 @@ export const DespesasView: React.FC<DespesasViewProps> = ({
         type: 'DESPESA',
         clientOrVendor,
         description,
-        date: new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase(),
+        date: formatEmissao(emissao),
         status,
         amount: Number(amount),
+        ...extra,
       });
     }
     setShowModal(false);
@@ -171,6 +217,8 @@ export const DespesasView: React.FC<DespesasViewProps> = ({
                 <>
                   <span className="text-slate-500">{t.description}</span>
                   <RowMeta label="Cód" value={<span className="font-data-mono">{t.id}</span>} />
+                  {t.category && <Badge color="slate">{t.category}</Badge>}
+                  {t.costCenter && <RowMeta label="C. Custo" value={t.costCenter} />}
                 </>
               }
               center={
@@ -199,30 +247,46 @@ export const DespesasView: React.FC<DespesasViewProps> = ({
       {/* Modal Nova/Editar Despesa */}
       {showModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white max-w-md w-full rounded-xl border border-slate-200 p-6 shadow-2xl relative">
-            <button
-              onClick={() => setShowModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 font-bold"
-            >
-              ✕
-            </button>
-            <h3 className="text-lg font-bold text-slate-900 uppercase mb-4">
-              {editingId ? 'Editar Despesa' : 'Lançar Nova Despesa'}
-            </h3>
-            <form onSubmit={handleSubmit} className="space-y-4 text-xs font-medium">
+          <div className="bg-white max-w-2xl w-full rounded-xl border border-slate-200 shadow-2xl relative max-h-[92vh] flex flex-col">
+            <div className="flex items-start justify-between p-6 border-b border-slate-100">
               <div>
-                <label className={labelCls}>Fornecedor / Beneficiário</label>
-                <select value={clientOrVendor} onChange={(e) => setClientOrVendor(e.target.value)} className={inputCls}>
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.name}>
-                      {s.name}
-                    </option>
-                  ))}
-                  <option value="Outros Fornecedores">Outros Fornecedores</option>
-                  {clientOrVendor && !suppliers.some((s) => s.name === clientOrVendor) && clientOrVendor !== 'Outros Fornecedores' && (
-                    <option value={clientOrVendor}>{clientOrVendor}</option>
-                  )}
-                </select>
+                <h3 className="text-lg font-bold text-slate-900 uppercase">
+                  {editingId ? 'Editar Despesa' : 'Lançar Nova Despesa'}
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">Classifique o custo por categoria e centro de custo para o DRE.</p>
+              </div>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs font-medium overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Fornecedor / Beneficiário</label>
+                  <select value={clientOrVendor} onChange={(e) => setClientOrVendor(e.target.value)} className={inputCls}>
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.name}>
+                        {s.name}
+                      </option>
+                    ))}
+                    <option value="Outros Fornecedores">Outros Fornecedores</option>
+                    {clientOrVendor && !suppliers.some((s) => s.name === clientOrVendor) && clientOrVendor !== 'Outros Fornecedores' && (
+                      <option value={clientOrVendor}>{clientOrVendor}</option>
+                    )}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Categoria de Custo</label>
+                  <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
+                    {DESPESA_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div>
@@ -233,10 +297,11 @@ export const DespesasView: React.FC<DespesasViewProps> = ({
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   className={inputCls}
+                  placeholder="Ex.: Compra de sirenes bitonal 24V — OS-2026-91"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                   <label className={labelCls}>Valor (R$)</label>
                   <input
@@ -248,6 +313,40 @@ export const DespesasView: React.FC<DespesasViewProps> = ({
                     onChange={(e) => setAmount(Number(e.target.value))}
                     className={`${inputCls} font-data-mono`}
                   />
+                </div>
+                <div>
+                  <label className={labelCls}>Emissão</label>
+                  <input type="date" value={emissao} onChange={(e) => setEmissao(e.target.value)} className={`${inputCls} font-data-mono`} />
+                </div>
+                <div>
+                  <label className={labelCls}>Vencimento</label>
+                  <input type="date" value={vencimento} onChange={(e) => setVencimento(e.target.value)} className={`${inputCls} font-data-mono`} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Forma de Pagamento</label>
+                  <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className={inputCls}>
+                    {PAYMENT_METHODS.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Centro de Custo</label>
+                  <select value={costCenter} onChange={(e) => setCostCenter(e.target.value)} className={inputCls}>
+                    {COST_CENTERS.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Nota Fiscal / Documento</label>
+                  <input type="text" value={documentRef} onChange={(e) => setDocumentRef(e.target.value)} className={`${inputCls} font-data-mono`} placeholder="NF-e 12345" />
                 </div>
                 <div>
                   <label className={labelCls}>Status</label>

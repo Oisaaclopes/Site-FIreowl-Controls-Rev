@@ -43,9 +43,11 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
   const [fScope, setFScope] = useState('Manutenção Preventiva + Corretiva SDAI');
   const [fMonthly, setFMonthly] = useState(15000);
   const [fStatus, setFStatus] = useState<Contract['status']>('ATIVO');
+  const [fStartDate, setFStartDate] = useState('');
   const [fRenewalDate, setFRenewalDate] = useState('');
   const [fIndex, setFIndex] = useState('IPCA (+4.5%)');
   const [fHours, setFHours] = useState(100);
+  const [fPaymentDay, setFPaymentDay] = useState(10);
   const [fResponsible, setFResponsible] = useState('Eng. Ricardo M.');
 
   const selectedClient = clients.find((c) => c.id === fClientId) || null;
@@ -56,9 +58,11 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
     setFScope('Manutenção Preventiva + Corretiva SDAI');
     setFMonthly(15000);
     setFStatus('ATIVO');
+    setFStartDate('');
     setFRenewalDate('');
     setFIndex('IPCA (+4.5%)');
     setFHours(100);
+    setFPaymentDay(10);
     setFResponsible('Eng. Ricardo M.');
     setShowModal(true);
   };
@@ -79,13 +83,16 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
     onAddContract({
       id: `CTR-FOWL-${stamp}`,
       clientName: client.name,
-      // "unit" guarda a unidade/escopo do contrato (coluna existente).
-      unit: fUnit ? `${fUnit} — ${fScope}` : fScope,
+      clientId: client.id,
+      unit: fUnit || client.address || 'Unidade Londrina',
+      contractType: fScope,
       monthlyValue: Number(fMonthly),
+      startDate: formatDateBR(fStartDate),
       renewalDate: formatDateBR(fRenewalDate) || '30 DEZ 2026',
       readjustmentIndex: fIndex,
       contractedHours: Number(fHours),
       usedHours: 0,
+      paymentDay: Number(fPaymentDay),
       status: fStatus,
       responsibleTech: fResponsible,
       artDocumentRef: `ART-PR-2026-${stamp}`,
@@ -157,6 +164,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                 meta={
                   <>
                     <RowMeta label="Ref" value={<span className="font-data-mono">{ctr.id}</span>} />
+                    {ctr.contractType && <RowMeta label="Escopo" value={ctr.contractType} />}
                     <RowMeta label="Unidade" value={ctr.unit} />
                     <RowMeta label="Resp" value={ctr.responsibleTech} />
                     <RowMeta label="ART" value={<span className="font-data-mono">{ctr.artDocumentRef}</span>} />
@@ -313,7 +321,17 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {/* Início da vigência */}
+                  <div>
+                    <label className={labelCls}>Início da Vigência</label>
+                    <input
+                      type="date"
+                      value={fStartDate}
+                      onChange={(e) => setFStartDate(e.target.value)}
+                      className={`${inputCls} font-data-mono`}
+                    />
+                  </div>
                   {/* Renovação */}
                   <div>
                     <label className={labelCls}>Data de Renovação</label>
@@ -324,6 +342,21 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                       className={`${inputCls} font-data-mono`}
                     />
                   </div>
+                  {/* Dia de vencimento */}
+                  <div>
+                    <label className={labelCls}>Dia de Vencimento</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={28}
+                      value={fPaymentDay}
+                      onChange={(e) => setFPaymentDay(Number(e.target.value))}
+                      className={`${inputCls} font-data-mono`}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {/* Índice de reajuste */}
                   <div>
                     <label className={labelCls}>Índice de Reajuste</label>
@@ -334,10 +367,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                       <option>Sem reajuste</option>
                     </select>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {/* Responsável técnico */}
+                  {/* Responsável técnico (movido) */}
                   <div>
                     <label className={labelCls}>Responsável Técnico (ART)</label>
                     <input
@@ -348,15 +378,16 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                       placeholder="Eng. Ricardo M."
                     />
                   </div>
+                </div>
+
+                <div>
                   {/* Status */}
-                  <div>
-                    <label className={labelCls}>Status do Contrato</label>
-                    <select value={fStatus} onChange={(e) => setFStatus(e.target.value as Contract['status'])} className={inputCls}>
-                      <option value="ATIVO">ATIVO</option>
-                      <option value="A VENCER">A VENCER</option>
-                      <option value="SUSPENSO">SUSPENSO</option>
-                    </select>
-                  </div>
+                  <label className={labelCls}>Status do Contrato</label>
+                  <select value={fStatus} onChange={(e) => setFStatus(e.target.value as Contract['status'])} className={inputCls}>
+                    <option value="ATIVO">ATIVO</option>
+                    <option value="A VENCER">A VENCER</option>
+                    <option value="SUSPENSO">SUSPENSO</option>
+                  </select>
                 </div>
 
                 <button

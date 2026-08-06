@@ -719,7 +719,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
                   <div key={c.id} className="flex items-center justify-between border border-slate-100 rounded-lg px-3 py-2">
                     <div className="min-w-0">
                       <p className="font-data-mono text-[11px] text-slate-400">{c.id}</p>
-                      <p className="font-semibold text-slate-800 truncate">{c.unit}</p>
+                      <p className="font-semibold text-slate-800 truncate">{c.contractType || c.unit}</p>
                     </div>
                     <div className="text-right shrink-0">
                       <p className="font-data-mono font-bold text-emerald-600">{brlM(c.monthlyValue)}<span className="text-[10px] text-slate-400">/mês</span></p>

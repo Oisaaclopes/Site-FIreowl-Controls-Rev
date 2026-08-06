@@ -674,6 +674,7 @@ export function CrmApp({
             <ReceitasView
               transactions={transactions}
               clients={clients}
+              contracts={contracts}
               onAddTransaction={handleAddTransaction}
               onUpdateTransaction={handleUpdateTransaction}
               onDeleteTransaction={handleDeleteTransaction}

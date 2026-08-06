@@ -192,6 +192,11 @@ export interface Contract {
   status: 'ATIVO' | 'A VENCER' | 'SUSPENSO';
   responsibleTech: string;
   artDocumentRef: string;
+  // Campos estendidos (opcionais) — requerem migração 0022_contracts_details.sql
+  clientId?: string; // vínculo com a base de clientes
+  startDate?: string; // início da vigência
+  contractType?: string; // escopo (Preventiva SDAI, CFTV, Full...)
+  paymentDay?: number; // dia de vencimento da mensalidade
 }
 
 export interface ClientEquipment {
@@ -294,6 +299,15 @@ export interface FinancialTransaction {
   date: string;
   status: 'CONFIRMADO' | 'PENDENTE' | 'ATRASADO';
   amount: number;
+  // Campos estendidos (opcionais) — requerem migração 0021_transactions_details.sql
+  category?: string;
+  dueDate?: string; // vencimento
+  paymentMethod?: string; // PIX, Boleto, TED, Cartão...
+  documentRef?: string; // NF / documento
+  costCenter?: string; // centro de custo (despesas)
+  clientId?: string; // vínculo com a base de clientes
+  contractId?: string; // vínculo com um contrato
+  osId?: string; // vínculo com uma OS
 }
 
 export interface InventoryItem {
