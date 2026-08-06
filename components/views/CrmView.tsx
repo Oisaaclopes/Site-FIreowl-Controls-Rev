@@ -8,6 +8,7 @@ import {
   Contract,
   Pedido,
   FinancialTransaction,
+  ServiceCatalogItem,
   TabPath,
 } from '@/lib/types';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
@@ -20,6 +21,7 @@ interface CrmViewProps {
   contracts: Contract[];
   transactions: FinancialTransaction[];
   inventory: InventoryItem[];
+  services: ServiceCatalogItem[];
   onAddClient: (client: Client) => void;
   onAddOS: (os: PedidoOS) => void;
   onSelectClientForReport?: (clientName: string) => void;
@@ -64,6 +66,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
   contracts,
   transactions,
   inventory,
+  services,
   onAddClient,
   onSelectClientForReport,
   onNavigateToTab,
@@ -409,27 +412,50 @@ export const CrmView: React.FC<CrmViewProps> = ({
         </div>
       )}
 
-      {/* Subtab Content: SERVIÇOS */}
+      {/* Subtab Content: SERVIÇOS (catálogo real) */}
       {crmSubTab === 'servicos' && (
         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <h3 className="text-base font-bold text-slate-900 uppercase tracking-wide mb-4 border-b border-slate-100 pb-3">
-            Catálogo de Serviços Especializados SDAI
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {[
-              { title: 'Manutenção Preventiva SDAI NBR 17240', desc: 'Inspeção mensal detalhada de laços, baterias 24V, sensores e central.', price: 'R$ 1.800/visita' },
-              { title: 'Manutenção Corretiva & Programação', desc: 'Substituição rápida e repassagem de endereçamento em campo.', price: 'R$ 350/hora técnica' },
-              { title: 'Laudo Pericial & Plano de Ação', desc: 'Vistoria fotográfica com emissão de ART registrada e matriz de risco.', price: 'R$ 4.500/unidade' },
-            ].map((serv, i) => (
-              <div key={i} className="border border-slate-200 rounded-lg p-5 bg-slate-50/50 flex flex-col justify-between">
-                <div>
-                  <h4 className="font-bold uppercase text-slate-900 text-sm">{serv.title}</h4>
-                  <p className="text-xs text-slate-500 mt-2 leading-relaxed">{serv.desc}</p>
-                </div>
-                <p className="font-data-mono text-sm font-bold text-[#E63946] mt-4">{serv.price}</p>
-              </div>
-            ))}
+          <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+            <h3 className="text-base font-bold text-slate-900 uppercase tracking-wide">
+              Catálogo de Serviços Especializados SDAI
+            </h3>
+            <button
+              onClick={() => onNavigateToTab?.('servicos')}
+              className="text-[11px] font-semibold text-[#1A1A72] hover:text-[#E63946] uppercase tracking-wider"
+            >
+              Gerenciar catálogo →
+            </button>
           </div>
+
+          {services.length === 0 ? (
+            <div className="py-12 text-center text-slate-400">
+              <span className="material-symbols-outlined text-4xl text-slate-300">handyman</span>
+              <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">Catálogo vazio</p>
+              <p className="text-xs text-slate-400 mt-1">Cadastre serviços na aba <strong>Serviços</strong>.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {services.map((svc) => (
+                <div key={svc.id} className="border border-slate-200 rounded-lg p-5 bg-slate-50/50 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-data-mono text-[10px] font-bold text-[#E63946]">{svc.code}</span>
+                      <Badge color={svc.active ? 'emerald' : 'slate'}>{svc.active ? 'ATIVO' : 'INATIVO'}</Badge>
+                    </div>
+                    <h4 className="font-bold uppercase text-slate-900 text-sm mt-1.5">{svc.title}</h4>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-500">
+                      <RowMeta label="Categoria" value={svc.category} />
+                      <RowMeta label="Norma" value={<span className="font-data-mono">{svc.nbrNormRef}</span>} />
+                      <RowMeta label="Horas" value={`${svc.estimatedHours}h`} />
+                    </div>
+                  </div>
+                  <p className="font-data-mono text-sm font-bold text-[#E63946] mt-4">
+                    {maskMoney(brl(svc.standardValue))}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
