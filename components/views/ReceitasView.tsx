@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { FinancialTransaction, Client } from '@/lib/types';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
+import { usePrivacy } from '@/lib/privacy';
 
 interface ReceitasViewProps {
   transactions: FinancialTransaction[];
@@ -29,6 +30,7 @@ export const ReceitasView: React.FC<ReceitasViewProps> = ({
   onUpdateTransaction,
   onDeleteTransaction,
 }) => {
+  const { maskMoney } = usePrivacy();
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
@@ -128,18 +130,18 @@ export const ReceitasView: React.FC<ReceitasViewProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         <div className="bg-white p-6 rounded-xl shadow-sm">
           <p className="text-xs font-semibold text-slate-500 uppercase">Receitas Confirmadas (Pagas)</p>
-          <h2 className="font-data-mono text-3xl font-bold text-emerald-600 mt-2">{brl(totalConfirmed)}</h2>
+          <h2 className="font-data-mono text-3xl font-bold text-emerald-600 mt-2">{maskMoney(brl(totalConfirmed))}</h2>
         </div>
 
         <div className="bg-white p-6 rounded-xl shadow-sm">
           <p className="text-xs font-semibold text-slate-500 uppercase">A Receber / Pendente</p>
-          <h2 className="font-data-mono text-3xl font-bold text-amber-600 mt-2">{brl(totalPending)}</h2>
+          <h2 className="font-data-mono text-3xl font-bold text-amber-600 mt-2">{maskMoney(brl(totalPending))}</h2>
         </div>
 
         <div className="bg-white p-6 rounded-xl shadow-sm">
           <p className="text-xs font-semibold text-slate-500 uppercase">Faturamento Bruto Total</p>
           <h2 className="font-data-mono text-3xl font-bold text-emerald-600 mt-2">
-            {brl(totalConfirmed + totalPending)}
+            {maskMoney(brl(totalConfirmed + totalPending))}
           </h2>
         </div>
       </div>
@@ -195,7 +197,7 @@ export const ReceitasView: React.FC<ReceitasViewProps> = ({
               right={
                 <>
                   <span className="font-data-mono font-bold text-emerald-600 text-base md:text-lg text-right">
-                    {brl(t.amount)}
+                    {maskMoney(brl(t.amount))}
                   </span>
                   <Badge color={statusBadge(t.status)}>{t.status}</Badge>
                   <div className="flex items-center gap-1">

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { UserRole } from '@/lib/types';
+import { usePrivacy } from '@/lib/privacy';
 
 interface HeaderProps {
   userRole: UserRole;
@@ -10,6 +11,8 @@ interface HeaderProps {
   onNewOSClick?: () => void;
   onOpenMenu?: () => void;
   canSwitchRole?: boolean;
+  /** Recolhe o offset esquerdo do header quando a sidebar está minimizada. */
+  sidebarCollapsed?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -18,8 +21,10 @@ export const Header: React.FC<HeaderProps> = ({
   onQuickSearchClick,
   onNewOSClick,
   onOpenMenu,
-  canSwitchRole = false
+  canSwitchRole = false,
+  sidebarCollapsed = false,
 }) => {
+  const { isPrivacyModeActive, togglePrivacy } = usePrivacy();
   const [currentDateTime, setCurrentDateTime] = useState('24 Mai 2024 | 14:30');
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -40,7 +45,7 @@ export const Header: React.FC<HeaderProps> = ({
   }, []);
 
   return (
-    <header className="fixed top-0 left-0 lg:left-64 right-0 h-16 bg-slate-50/70 backdrop-blur-md z-40 flex items-center justify-between px-4 md:px-8">
+    <header className={`fixed top-0 left-0 right-0 h-16 bg-slate-50/70 backdrop-blur-md z-40 flex items-center justify-between px-4 md:px-8 transition-[left] duration-300 ease-out ${sidebarCollapsed ? 'lg:left-20' : 'lg:left-64'}`}>
       <div className="flex items-center gap-2 md:gap-4 min-w-0">
         {/* Menu hambúrguer — apenas mobile/tablet */}
         <button
@@ -113,6 +118,22 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           )}
         </div>
+
+        {/* Modo Privacidade — oculta valores financeiros */}
+        <button
+          onClick={togglePrivacy}
+          aria-pressed={isPrivacyModeActive}
+          title={isPrivacyModeActive ? 'Modo Privacidade ativo — mostrar valores' : 'Ocultar valores financeiros'}
+          className={`relative p-2 rounded-full transition-colors flex items-center justify-center ${
+            isPrivacyModeActive
+              ? 'bg-[#1A1A72] text-white hover:bg-[#13135A]'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <span className="material-symbols-outlined">
+            {isPrivacyModeActive ? 'visibility_off' : 'visibility'}
+          </span>
+        </button>
 
         {/* User Profile Info */}
         <div className="flex items-center gap-3 border-l border-slate-200 pl-4">

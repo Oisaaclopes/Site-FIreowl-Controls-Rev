@@ -6,6 +6,7 @@ import { CommercialProposalModal } from '@/components/proposta/CommercialProposa
 import { CommercialProposalPDFView } from '@/components/proposta/CommercialProposalPDFView';
 import { DataListRow, RowMeta, Badge } from '@/components/DataListRow';
 import { Toggle } from '@/components/SidePanel';
+import { usePrivacy } from '@/lib/privacy';
 import {
   FileText,
   Plus,
@@ -78,6 +79,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   userRole,
   currentUserName = '',
 }) => {
+  const { maskMoney } = usePrivacy();
   const isTecnico = userRole === 'TECNICO';
 
   // Técnico só vê Ordens de Serviço; demais começam nas propostas
@@ -309,7 +311,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
         {/* Bloco direito */}
         <div className="flex items-center gap-2 md:gap-3 shrink-0 flex-wrap justify-end">
           <span className="font-data-mono font-bold text-emerald-600 text-base md:text-lg">
-            {brl(ped.proposal.valorTotal || 0)}
+            {maskMoney(brl(ped.proposal.valorTotal || 0))}
           </span>
 
           {/* Status interativo (dropdown com aparência de botão na cor do status) */}
@@ -574,7 +576,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
             ))}
             <div className="ml-auto shrink-0 flex flex-col justify-center px-4 py-2 rounded-xl bg-white border border-slate-200 shadow-sm">
               <p className="text-[10px] font-semibold text-slate-500 uppercase">Volume filtrado</p>
-              <p className="font-data-mono text-lg font-bold text-emerald-600">{brl(volumeFiltrado)}</p>
+              <p className="font-data-mono text-lg font-bold text-emerald-600">{maskMoney(brl(volumeFiltrado))}</p>
             </div>
           </div>
 
@@ -639,7 +641,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                 <p className="text-[11px] font-semibold text-slate-500 uppercase">Faturamento de OS</p>
                 <p className="font-data-mono text-2xl font-bold text-[#E63946] mt-1">
-                  R$ {pedidosOS.reduce((acc, p) => acc + p.value, 0).toLocaleString('pt-BR')}
+                  {maskMoney(`R$ ${pedidosOS.reduce((acc, p) => acc + p.value, 0).toLocaleString('pt-BR')}`)}
                 </p>
               </div>
             )}
@@ -706,7 +708,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                     <>
                       {!isTecnico && (
                         <span className="font-data-mono font-bold text-slate-900 text-base md:text-lg text-right">
-                          R$ {p.value.toLocaleString('pt-BR')}
+                          {maskMoney(`R$ ${p.value.toLocaleString('pt-BR')}`)}
                         </span>
                       )}
                       <Badge color={p.priority === 'CRITICA' ? 'red' : p.priority === 'ALTA' ? 'amber' : 'slate'} outline>

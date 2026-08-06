@@ -2,13 +2,17 @@
 
 import React, { useState } from 'react';
 import { FinancialTransaction } from '@/lib/types';
+import { usePrivacy } from '@/lib/privacy';
 
 interface FinancasViewProps {
   transactions: FinancialTransaction[];
   onAddTransaction?: (t: FinancialTransaction) => void;
 }
 
+const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+
 export const FinancasView: React.FC<FinancasViewProps> = ({ transactions }) => {
+  const { maskMoney } = usePrivacy();
   const [filter, setFilter] = useState<'TODOS' | 'RECEITA' | 'DESPESA'>('TODOS');
 
   const totalReceitas = transactions
@@ -53,7 +57,7 @@ export const FinancasView: React.FC<FinancasViewProps> = ({ transactions }) => {
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
           <p className="text-xs font-semibold text-slate-500 uppercase">Receita Bruta Acumulada</p>
           <h2 className="font-data-mono text-2xl font-bold text-emerald-600 mt-2">
-            R$ {totalReceitas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            {maskMoney(brl(totalReceitas))}
           </h2>
           <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded mt-1 inline-block">
             ▲ +14.2% em relação ao mês anterior
@@ -63,7 +67,7 @@ export const FinancasView: React.FC<FinancasViewProps> = ({ transactions }) => {
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
           <p className="text-xs font-semibold text-slate-500 uppercase">Despesas &amp; Custos Totais</p>
           <h2 className="font-data-mono text-2xl font-bold text-[#E63946] mt-2">
-            R$ {totalDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            {maskMoney(brl(totalDespesas))}
           </h2>
           <span className="text-[10px] text-slate-500 font-semibold bg-slate-100 px-2 py-0.5 rounded mt-1 inline-block">
             Insumos, Folha &amp; Impostos
@@ -73,7 +77,7 @@ export const FinancasView: React.FC<FinancasViewProps> = ({ transactions }) => {
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
           <p className="text-xs font-semibold text-slate-500 uppercase">Resultado Líquido (EBITDA)</p>
           <h2 className="font-data-mono text-2xl font-bold text-slate-900 mt-2">
-            R$ {lucroLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            {maskMoney(brl(lucroLiquido))}
           </h2>
           <span className="text-[10px] text-blue-700 font-semibold bg-blue-50 px-2 py-0.5 rounded mt-1 inline-block">
             Margem Operacional: {margemLucro}%
@@ -83,7 +87,7 @@ export const FinancasView: React.FC<FinancasViewProps> = ({ transactions }) => {
         <div className="bg-white p-5 rounded-xl shadow-sm">
           <p className="text-xs font-semibold text-slate-500 uppercase">Caixa Disponível em Conta</p>
           <h2 className="font-data-mono text-2xl font-bold text-emerald-600 mt-2">
-            R$ {(lucroLiquido + 85000).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            {maskMoney(brl(lucroLiquido + 85000))}
           </h2>
           <span className="text-[10px] text-slate-600 font-semibold bg-slate-100 px-2 py-0.5 rounded mt-1 inline-block">
             Banco Bradesco (Sede)
@@ -99,23 +103,23 @@ export const FinancasView: React.FC<FinancasViewProps> = ({ transactions }) => {
         <div className="space-y-3 text-xs font-data-mono">
           <div className="flex justify-between p-2 bg-slate-50 rounded">
             <span className="font-bold text-slate-900">(+) RECEITA BRUTA DE SERVIÇOS</span>
-            <span className="font-bold text-emerald-700">R$ {totalReceitas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            <span className="font-bold text-emerald-700">{maskMoney(brl(totalReceitas))}</span>
           </div>
           <div className="flex justify-between p-2 pl-6 text-slate-600">
             <span>(-) Impostos Simples Nacional Anexo III (6%)</span>
-            <span className="text-red-600">- R$ {(totalReceitas * 0.06).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            <span className="text-red-600">- {maskMoney(brl(totalReceitas * 0.06))}</span>
           </div>
           <div className="flex justify-between p-2 bg-slate-100 rounded font-semibold text-slate-900">
             <span>(=) RECEITA LÍQUIDA</span>
-            <span>R$ {(totalReceitas * 0.94).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            <span>{maskMoney(brl(totalReceitas * 0.94))}</span>
           </div>
           <div className="flex justify-between p-2 pl-6 text-slate-600">
             <span>(-) Custos Operacionais de Campo &amp; Materiais</span>
-            <span className="text-red-600">- R$ {totalDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            <span className="text-red-600">- {maskMoney(brl(totalDespesas))}</span>
           </div>
           <div className="flex justify-between p-3 bg-[#1A1A72] text-white rounded-lg font-bold text-sm">
             <span>(=) RESULTADO OPERACIONAL LÍQUIDO FINAL</span>
-            <span className="text-emerald-300">R$ {(totalReceitas * 0.94 - totalDespesas).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            <span className="text-emerald-300">{maskMoney(brl(totalReceitas * 0.94 - totalDespesas))}</span>
           </div>
         </div>
       </div>
@@ -168,7 +172,7 @@ export const FinancasView: React.FC<FinancasViewProps> = ({ transactions }) => {
                   <td className="p-4 text-slate-600">{t.description}</td>
                   <td className="p-4 font-data-mono text-slate-500">{t.date}</td>
                   <td className={`p-4 text-right font-data-mono font-bold ${t.type === 'RECEITA' ? 'text-emerald-600' : 'text-[#E63946]'}`}>
-                    {t.type === 'RECEITA' ? '+' : '-'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    {t.type === 'RECEITA' ? '+' : '-'} {maskMoney(brl(t.amount))}
                   </td>
                 </tr>
               ))}

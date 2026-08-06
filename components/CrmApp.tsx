@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { Header } from '@/components/Header';
 import { AuthModal } from '@/components/AuthModal';
+import { PrivacyProvider } from '@/lib/privacy';
 import {
   fetchInventory,
   insertInventoryItem,
@@ -100,6 +101,7 @@ export function CrmApp({
   const [userRole, setUserRole] = useState<UserRole>(initialRole);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // menu off-canvas (mobile)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // mini-sidebar (desktop)
 
   // RBAC: se a aba atual não é permitida ao perfil, volta para a primeira permitida
   useEffect(() => {
@@ -604,6 +606,7 @@ export function CrmApp({
   const canSwitchRole = initialRole === 'ADMINISTRATIVO';
 
   return (
+    <PrivacyProvider>
     <div className="min-h-screen bg-slate-50 font-body-md text-[#131c28]">
       {/* Sidebar Navigation (off-canvas no mobile, fixa no desktop) */}
       <Sidebar
@@ -615,10 +618,12 @@ export function CrmApp({
         canSwitchRole={canSwitchRole}
         mobileOpen={sidebarOpen}
         onCloseMobile={() => setSidebarOpen(false)}
+        collapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed((v) => !v)}
       />
 
       {/* Main Content Workspace — deslocado pela sidebar apenas no desktop */}
-      <div className="lg:pl-64">
+      <div className={`transition-[padding] duration-300 ease-out ${isSidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'}`}>
         {/* Fixed Header */}
         <Header
           userRole={userRole}
@@ -626,6 +631,7 @@ export function CrmApp({
           onNewOSClick={handleNewOSQuick}
           onOpenMenu={() => setSidebarOpen(true)}
           canSwitchRole={canSwitchRole}
+          sidebarCollapsed={isSidebarCollapsed}
         />
 
         {/* View Switcher */}
@@ -774,5 +780,6 @@ export function CrmApp({
         onSelectRole={setUserRole}
       />
     </div>
+    </PrivacyProvider>
   );
 }

@@ -2,6 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { FinancialTransaction, PedidoOS } from '@/lib/types';
+import { usePrivacy } from '@/lib/privacy';
+
+/** Máscara curta para os números dos cards (o prefixo "R$" já é exibido à parte). */
+const MASK_DIGITS = '•••••••';
 
 interface DashboardViewProps {
   transactions: FinancialTransaction[];
@@ -16,6 +20,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onNewOSClick,
   onNavigateToTab,
 }) => {
+  const { isPrivacyModeActive, maskMoney } = usePrivacy();
   const [revenueValue, setRevenueValue] = useState(428000);
 
   useEffect(() => {
@@ -79,7 +84,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="mt-3 flex items-baseline gap-1">
             <span className="text-sm font-medium text-slate-500">R$</span>
             <span className="font-data-mono text-3xl font-bold text-slate-900 tabular-nums">
-              {revenueValue.toLocaleString('pt-BR')}
+              {isPrivacyModeActive ? MASK_DIGITS : revenueValue.toLocaleString('pt-BR')}
             </span>
           </div>
           <div className="mt-4 flex items-center gap-1 text-xs font-semibold text-emerald-600">
@@ -101,7 +106,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="mt-3 flex items-baseline gap-1">
             <span className="text-sm font-medium text-slate-500">R$</span>
             <span className="font-data-mono text-3xl font-bold text-slate-900 tabular-nums">
-              184.212
+              {isPrivacyModeActive ? MASK_DIGITS : '184.212'}
             </span>
           </div>
           <div className="mt-4 flex items-center gap-1 text-xs font-semibold text-[#E63946]">
@@ -206,12 +211,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div
                   className="w-full bg-emerald-600 hover:bg-emerald-500 transition-all rounded-t-md shadow-sm"
                   style={{ height: bar.rec }}
-                  title={`Receita ${bar.week}: R$ ${(parseInt(bar.rec) * 1200).toLocaleString()}`}
+                  title={`Receita ${bar.week}: ${maskMoney(`R$ ${(parseInt(bar.rec) * 1200).toLocaleString()}`)}`}
                 ></div>
                 <div
                   className="w-full bg-[#E63946] hover:bg-[#a51515] transition-all rounded-t-md shadow-sm"
                   style={{ height: bar.desp }}
-                  title={`Despesa ${bar.week}: R$ ${(parseInt(bar.desp) * 1000).toLocaleString()}`}
+                  title={`Despesa ${bar.week}: ${maskMoney(`R$ ${(parseInt(bar.desp) * 1000).toLocaleString()}`)}`}
                 ></div>
                 <span className="text-center font-data-mono text-xs text-slate-500 mt-2 font-medium">
                   {bar.week}
@@ -321,7 +326,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </span>
                   </td>
                   <td className="py-3.5 px-6 text-right font-data-mono font-bold text-slate-900">
-                    R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    {maskMoney(`R$ ${t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`)}
                   </td>
                 </tr>
               ))}

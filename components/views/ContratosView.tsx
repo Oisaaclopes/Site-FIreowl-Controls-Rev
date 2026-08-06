@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Contract } from '@/lib/types';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
+import { usePrivacy } from '@/lib/privacy';
 
 interface ContratosViewProps {
   contracts: Contract[];
@@ -17,6 +18,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
   contracts,
   onAddContract,
 }) => {
+  const { maskMoney } = usePrivacy();
   const [showModal, setShowModal] = useState(false);
   const [selectedPdfContract, setSelectedPdfContract] = useState<Contract | null>(null);
   const [clientName, setClientName] = useState('');
@@ -73,7 +75,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
           <p className="text-xs font-semibold text-slate-500 uppercase">Receita Mensal Recorrente (MRR)</p>
           <h2 className="font-data-mono text-3xl font-bold text-slate-900 mt-2">
-            R$ {totalMonthlyRec.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            {maskMoney(brl(totalMonthlyRec))}
           </h2>
         </div>
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
@@ -137,7 +139,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                   <>
                     <div className="text-right">
                       <span className="font-data-mono font-bold text-emerald-600 text-base md:text-lg block">
-                        {brl(ctr.monthlyValue)}
+                        {maskMoney(brl(ctr.monthlyValue))}
                       </span>
                       <span className="text-[10px] text-slate-400 uppercase">por mês</span>
                     </div>
