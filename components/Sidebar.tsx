@@ -124,7 +124,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
       {/* Navigation items */}
-      <nav className={`flex-1 py-4 px-3 space-y-1 overflow-y-auto ${isCollapsed ? 'lg:overflow-visible' : ''}`}>
+      <nav className={`flex-1 py-4 px-3 space-y-1 overflow-y-auto scrollbar-hide ${isCollapsed ? 'lg:overflow-visible' : ''}`}>
         {navItems.map((item) => {
           const isActive = currentTab === item.path;
           return (

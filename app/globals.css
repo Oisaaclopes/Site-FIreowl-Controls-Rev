@@ -123,3 +123,13 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+/* Oculta a scrollbar nativa mantendo a rolagem funcional.
+   Usado no menu de navegação da Sidebar para um visual limpo. */
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE e Edge legado */
+  scrollbar-width: none; /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Edge e Opera */
+}
+
