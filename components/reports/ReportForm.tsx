@@ -87,6 +87,8 @@ function buildPendencias(
   return out;
 }
 
+import { TriagemFotos, UnclassifiedPhoto } from '@/components/reports/TriagemFotos';
+
 export const ReportForm: React.FC<ReportFormProps> = ({
   template,
   cliente,
@@ -107,12 +109,62 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   const [persistErr, setPersistErr] = useState<string | null>(null);
   const [savedInfo, setSavedInfo] = useState<{ reportId: string; count: number } | null>(null);
 
+  // Estado da bandeja de fotos não classificadas (Seção 3.1)
+  const [unclassifiedPhotos, setUnclassifiedPhotos] = useState<UnclassifiedPhoto[]>([]);
+  const [isTriagemOpen, setIsTriagemOpen] = useState(false);
+
   const handleChange = (key: string, value: unknown) => {
     setValues((prev) => ({ ...prev, [key]: value }));
     setIssues(null);
     setFinalized(false);
     setSavedInfo(null);
     setPersistErr(null);
+  };
+
+  const handleFastPhotoCaptured = (url: string) => {
+    const newPhoto: UnclassifiedPhoto = {
+      id: `photo_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      url,
+      timestamp: new Date().toLocaleTimeString('pt-BR', { hour12: false }),
+    };
+    setUnclassifiedPhotos((prev) => [newPhoto, ...prev]);
+  };
+
+  const handleUpdatePhotoNota = (id: string, nota: string) => {
+    setUnclassifiedPhotos((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, notaRapida: nota } : p))
+    );
+  };
+
+  const handleDeletePhoto = (id: string) => {
+    setUnclassifiedPhotos((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const handleAssignPhotosToApontamento = (
+    photoIds: string[],
+    grupo?: string,
+    local?: string,
+    descricao?: string
+  ) => {
+    const selected = unclassifiedPhotos.filter((p) => photoIds.includes(p.id));
+    if (selected.length === 0) return;
+
+    const urls = selected.map((s) => s.url);
+    const notas = selected.map((s) => s.notaRapida).filter(Boolean).join('; ');
+    const descFinal = descricao || notas || 'Apontamento capturado em campo';
+
+    const currentCards = (values['apontamentos'] as RepeaterCard[]) || [];
+    const newCard: RepeaterCard = {
+      grupo: grupo || 'Geral',
+      local: local || 'Não especificado',
+      quantidade: 1,
+      descricao: descFinal,
+      acao_recomendada: 'investigar',
+      foto: urls,
+    };
+
+    handleChange('apontamentos', [...currentCards, newCard]);
+    setUnclassifiedPhotos((prev) => prev.filter((p) => !photoIds.includes(p.id)));
   };
 
   const pendenciasPreview = useMemo<PendenciaPreview[]>(() => {
@@ -145,11 +197,16 @@ export const ReportForm: React.FC<ReportFormProps> = ({
     return list;
   }, [template, values]);
 
-  const hasPhoto = (fieldKey: string, cardIndex: number): boolean => {
-    const cards = Array.isArray(values[fieldKey]) ? (values[fieldKey] as RepeaterCard[]) : [];
-    const foto = cards[cardIndex]?.foto;
-    return Array.isArray(foto) && foto.length > 0;
+  const hasPhoto = (fieldKey: string, cardIndex?: number): boolean => {
+    if (cardIndex !== undefined) {
+      const cards = Array.isArray(values[fieldKey]) ? (values[fieldKey] as RepeaterCard[]) : [];
+      const foto = cards[cardIndex]?.foto;
+      return Array.isArray(foto) ? foto.length > 0 : !!foto;
+    }
+    const val = values[fieldKey];
+    return Array.isArray(val) ? val.length > 0 : !!val;
   };
+
 
   const handleFinalize = async () => {
     const found = validateFinalize(template, values, hasPhoto);
@@ -228,8 +285,28 @@ export const ReportForm: React.FC<ReportFormProps> = ({
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         <div className="xl:col-span-2">
-          <FormEngine template={template} values={values} onChange={handleChange} catalog={catalog} role={roleForEngine} />
+          <FormEngine
+            template={template}
+            values={values}
+            onChange={handleChange}
+            catalog={catalog}
+            role={roleForEngine}
+            unclassifiedCount={unclassifiedPhotos.length}
+            onOpenTriagem={() => setIsTriagemOpen(true)}
+            onFastPhotoCaptured={handleFastPhotoCaptured}
+          />
         </div>
+
+        <TriagemFotos
+          isOpen={isTriagemOpen}
+          onClose={() => setIsTriagemOpen(false)}
+          photos={unclassifiedPhotos}
+          onUpdatePhotoNota={handleUpdatePhotoNota}
+          onAssignPhotosToApontamento={handleAssignPhotosToApontamento}
+          onDeletePhoto={handleDeletePhoto}
+          categoriasGrupos={catalog.categorias}
+        />
+
 
         <div className="flex flex-col gap-4">
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 xl:sticky xl:top-20">

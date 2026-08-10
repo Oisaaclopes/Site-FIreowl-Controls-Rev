@@ -123,14 +123,26 @@ export interface FinalizeIssue {
 export function validateFinalize(
   template: TemplateSchema,
   values: FormValues,
-  hasPhoto: (fieldKey: string, cardIndex: number) => boolean
+  hasPhoto: (fieldKey: string, cardIndex?: number) => boolean
 ): FinalizeIssue[] {
   const issues: FinalizeIssue[] = [];
   for (const secao of template.secoes) {
+    if (secao.pula_se && String(values[secao.pula_se.campo]) === secao.pula_se.igual) {
+      continue;
+    }
     for (const field of secao.campos) {
       const v = values[field.key];
       if (field.obrigatorio && (v === undefined || v === null || v === '')) {
         issues.push({ secao: secao.titulo, campo: field.label || field.key, motivo: 'Campo obrigatório não preenchido.' });
+      }
+      if (field.tipo === 'foto' && field.obrigatorio) {
+        if (!hasPhoto(field.key)) {
+          issues.push({
+            secao: secao.titulo,
+            campo: field.label || field.key,
+            motivo: 'Foto obrigatória não anexada.',
+          });
+        }
       }
       if (field.tipo === 'repeater' && field.gera_pendencia) {
         const cards = Array.isArray(v) ? (v as RepeaterCard[]) : [];
@@ -139,7 +151,7 @@ export function validateFinalize(
             issues.push({
               secao: secao.titulo,
               campo: `${field.label || field.key} #${i + 1}`,
-              motivo: 'Apontamento sem foto — foto é obrigatória para finalizar.',
+              motivo: 'Apontamento sem foto — foto é obrigatória para sustentar a pendência.',
             });
           }
         });
@@ -148,3 +160,4 @@ export function validateFinalize(
   }
   return issues;
 }
+

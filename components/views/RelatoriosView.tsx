@@ -26,6 +26,7 @@ interface RelatoriosViewProps {
   brands: { name: string }[];
   userRole: UserRole;
   currentUserName?: string;
+  onAddClient?: (newClient: Client) => void;
 }
 
 const uniq = (arr: string[]) => Array.from(new Set(arr.filter(Boolean)));
@@ -52,6 +53,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   brands,
   userRole,
   currentUserName = '',
+  onAddClient,
 }) => {
   const isTecnico = userRole === 'TECNICO';
   const isFinanceiro = userRole === 'FINANCEIRO';
@@ -74,12 +76,60 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const [wContratoId, setWContratoId] = useState<string>('');
   const [wOsId, setWOsId] = useState<string>('');
 
+  // Estado do cadastro provisório em campo (§6.3 / §9.1)
+  const [provNome, setProvNome] = useState('');
+  const [provCnpj, setProvCnpj] = useState('');
+  const [provCnpjErr, setProvCnpjErr] = useState('');
+
+  const handleCreateProvisionalClient = () => {
+    const nome = provNome.trim();
+    const cnpj = provCnpj.trim();
+    if (!nome) {
+      setProvCnpjErr('Nome do cliente é obrigatório.');
+      return;
+    }
+    if (cnpj) {
+      const cleanCnpj = cnpj.replace(/\D/g, '');
+      const existing = clients.find((c) => (c.cnpj || '').replace(/\D/g, '') === cleanCnpj);
+      if (existing) {
+        setProvCnpjErr(`CNPJ já cadastrado para: "${existing.name}". Selecione-o na lista acima.`);
+        return;
+      }
+    }
+    const newClient: Client = {
+      id: `c_prov_${Date.now()}`,
+      code: `#PROV-${Math.floor(1000 + Math.random() * 9000)}`,
+      name: nome,
+      cnpj: cnpj || '00.000.000/0000-00',
+      segment: 'Campo (Provisório)',
+      contractStatus: 'EM DIA',
+      lastOSDate: new Date().toLocaleDateString('pt-BR'),
+      lastOSType: 'Levantamento',
+      address: 'Endereço registrado em campo',
+      contacts: [{ name: 'Contato Local', role: 'Representante', phone: '', email: '' }],
+      totalContractsValue: 0,
+      pendenteValidacao: true,
+      createdByRole: userRole,
+    };
+    if (onAddClient) {
+      onAddClient(newClient);
+    } else {
+      clients.unshift(newClient);
+    }
+    setWClienteId(newClient.id);
+    setProvNome('');
+    setProvCnpj('');
+    setProvCnpjErr('');
+    alert(`Cliente provisório "${nome}" cadastrado com sucesso! Selecionado para este relatório.`);
+  };
+
   // Config do formulário aberto
   const [formTemplate, setFormTemplate] = useState<TemplateSchema | null>(null);
   const [formCliente, setFormCliente] = useState<Client | undefined>(undefined);
   const [formContext, setFormContext] = useState<{ osId?: string; contratoId?: string }>({});
 
   const clientName = (id?: string) => clients.find((c) => c.id === id)?.name || '—';
+
 
   const refresh = () => {
     if (!isSupabaseConfigured()) return;
@@ -384,26 +434,68 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 
               {/* Passo 2 — Cliente */}
               {wizardStep === 2 && (
-                <div>
-                  <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Cliente</label>
-                  <select
-                    value={wClienteId}
-                    onChange={(e) => setWClienteId(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
-                  >
-                    {clients.length === 0 && <option value="">Nenhum cliente</option>}
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                        {c.pendenteValidacao ? ' (provisório)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[10px] text-slate-400 mt-2">
-                    Cadastro provisório de cliente em campo entra na próxima fatia (§6.3).
-                  </p>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Selecione um cliente existente</label>
+                    <select
+                      value={wClienteId}
+                      onChange={(e) => setWClienteId(e.target.value)}
+                      className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                    >
+                      {clients.length === 0 && <option value="">Nenhum cliente</option>}
+                      {clients.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} {c.cnpj ? `(${c.cnpj})` : ''}
+                          {c.pendenteValidacao ? ' [PROVISÓRIO]' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Cadastro provisório em campo (§6.3 / §9.1) */}
+                  <div className="border border-amber-200 bg-amber-50/60 rounded-xl p-3.5 space-y-3">
+                    <p className="text-[11px] font-bold text-amber-900 uppercase flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-base text-amber-600">person_add</span>
+                      Cliente não encontrado? Cadastre em campo (Provisório)
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        placeholder="Nome / Razão Social"
+                        value={provNome}
+                        onChange={(e) => setProvNome(e.target.value)}
+                        className="bg-white border border-amber-200 rounded p-2 text-xs text-slate-800"
+                      />
+                      <input
+                        type="text"
+                        placeholder="CNPJ (00.000.000/0000-00)"
+                        value={provCnpj}
+                        onChange={(e) => {
+                          setProvCnpj(e.target.value);
+                          setProvCnpjErr('');
+                        }}
+                        className="bg-white border border-amber-200 rounded p-2 text-xs font-data-mono text-slate-800"
+                      />
+                    </div>
+                    {provCnpjErr && (
+                      <p className="text-[10px] font-bold text-red-600 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-xs">error</span> {provCnpjErr}
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleCreateProvisionalClient}
+                      className="w-full py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold uppercase tracking-wider transition-colors shadow-xs"
+                    >
+                      Cadastrar Cliente Provisório em Campo
+                    </button>
+                    <p className="text-[10px] text-amber-700 leading-relaxed">
+                      O cadastro nasce com <code>pendente_validacao = true</code>. Permite emitir o relatório imediatamente em campo, mas exige homologação do administrativo antes da proposta.
+                    </p>
+                  </div>
                 </div>
               )}
+
 
               {/* Passo 3 — Contexto */}
               {wizardStep === 3 && (

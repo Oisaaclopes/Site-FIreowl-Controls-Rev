@@ -759,6 +759,7 @@ export function CrmApp({
               brands={partnerBrands}
               userRole={userRole}
               currentUserName={userName}
+              onAddClient={handleAddClient}
             />
           )}
 

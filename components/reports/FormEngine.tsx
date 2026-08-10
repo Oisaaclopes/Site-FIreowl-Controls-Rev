@@ -322,12 +322,70 @@ const Section: React.FC<{
   );
 };
 
-export const FormEngine: React.FC<FormEngineProps> = ({ template, values, onChange, catalog, role }) => {
+export const FormEngine: React.FC<FormEngineProps & {
+  unclassifiedCount?: number;
+  onOpenTriagem?: () => void;
+  onFastPhotoCaptured?: (url: string) => void;
+}> = ({ template, values, onChange, catalog, role, unclassifiedCount = 0, onOpenTriagem, onFastPhotoCaptured }) => {
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleCameraClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    Array.from(files).forEach((file) => {
+      const url = URL.createObjectURL(file);
+      if (onFastPhotoCaptured) {
+        onFastPhotoCaptured(url);
+      }
+    });
+  };
+
   return (
-    <div className="flex flex-col gap-5">
+    <div className="relative flex flex-col gap-5">
+      {/* Input oculto para disparo direto da câmera */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        multiple
+        className="hidden"
+        onChange={handleFileChange}
+      />
+
+      {/* Botão flutuante de Câmera Rápida em campo (Seção 3.1) */}
+      <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2">
+        {unclassifiedCount > 0 && onOpenTriagem && (
+          <button
+            type="button"
+            onClick={onOpenTriagem}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 text-white text-xs font-bold shadow-lg border border-slate-700 animate-bounce"
+          >
+            <span className="material-symbols-outlined text-sm text-[#E63946]">collections</span>
+            {unclassifiedCount} foto(s) na triagem
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={handleCameraClick}
+          className="w-14 h-14 rounded-full bg-[#E63946] hover:bg-[#a51515] text-white shadow-2xl flex items-center justify-center transition-all active:scale-95 border-2 border-white"
+          title="Captura rápida por câmera (sem formulário)"
+        >
+          <span className="material-symbols-outlined text-2xl">photo_camera</span>
+        </button>
+      </div>
+
       {template.secoes.map((section) => (
         <Section key={section.key} section={section} values={values} onChange={onChange} catalog={catalog} role={role} />
       ))}
     </div>
   );
 };
+

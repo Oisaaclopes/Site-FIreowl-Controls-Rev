@@ -106,7 +106,11 @@ export const ContaView: React.FC<ContaViewProps> = ({
   canSwitchRole = false,
   currentEmail = '',
 }) => {
-  const [tab, setTab] = useState<'conta' | 'preferencias' | 'pdf' | 'usuarios'>('conta');
+  const [tab, setTab] = useState<'conta' | 'homologacao' | 'preferencias' | 'pdf' | 'usuarios'>('conta');
+  const [homolSubTab, setHomolSubTab] = useState<'clientes' | 'marcas' | 'itens'>('clientes');
+
+
+
 
   // Gestão de usuários (apenas admin)
   const [users, setUsers] = useState<ManagedUser[]>([]);
@@ -365,11 +369,13 @@ export const ContaView: React.FC<ContaViewProps> = ({
   };
 
   const TABS = [
-    { key: 'conta', label: 'Conta', icon: 'account_circle' },
-    { key: 'preferencias', label: 'Preferências', icon: 'tune' },
+    { key: 'conta', label: 'Conta & Log', icon: 'manage_accounts' },
+    { key: 'homologacao', label: 'Fila de Homologação', icon: 'fact_check' },
+    { key: 'preferencias', label: 'Preferências', icon: 'settings' },
     { key: 'pdf', label: 'PDF', icon: 'picture_as_pdf' },
     ...(canSwitchRole ? [{ key: 'usuarios', label: 'Usuários', icon: 'group' }] : []),
-  ] as { key: 'conta' | 'preferencias' | 'pdf' | 'usuarios'; label: string; icon: string }[];
+  ] as { key: 'conta' | 'homologacao' | 'preferencias' | 'pdf' | 'usuarios'; label: string; icon: string }[];
+
 
   return (
     <div className="flex flex-col w-full p-4 md:p-8 gap-5 md:gap-6">
@@ -654,8 +660,152 @@ export const ContaView: React.FC<ContaViewProps> = ({
         </div>
       )}
 
+      {/* ===== TAB: HOMOLOGAÇÃO ===== */}
+      {tab === 'homologacao' && (
+        <div className="flex flex-col gap-5">
+          {/* Banner explicativo de negócio */}
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+            <span className="material-symbols-outlined text-amber-600 text-xl shrink-0 mt-0.5">fact_check</span>
+            <div className="text-xs text-amber-900 leading-relaxed">
+              <p className="font-bold uppercase tracking-wide">Fila de Homologação de Registros de Campo (§6.3 &amp; §9)</p>
+              <p className="mt-0.5">
+                Os registros criados por técnicos em campo nascem em estado <strong>provisório</strong>. Eles funcionam imediatamente nos relatórios de vistoria, mas exigem validação do Administrativo antes de virarem propostas comerciais ou produtos oficiais.
+              </p>
+            </div>
+          </div>
+
+          {/* Sub-tabs de Homologação */}
+          <div className="flex border-b border-slate-200 gap-4 font-semibold text-xs uppercase tracking-wider">
+            <button
+              onClick={() => setHomolSubTab('clientes')}
+              className={`pb-2 border-b-2 transition-colors ${
+                homolSubTab === 'clientes' ? 'border-[#1A1A72] text-[#1A1A72]' : 'border-transparent text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              Clientes Provisórios
+            </button>
+            <button
+              onClick={() => setHomolSubTab('marcas')}
+              className={`pb-2 border-b-2 transition-colors ${
+                homolSubTab === 'marcas' ? 'border-[#1A1A72] text-[#1A1A72]' : 'border-transparent text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              Marcas de Campo
+            </button>
+            <button
+              onClick={() => setHomolSubTab('itens')}
+              className={`pb-2 border-b-2 transition-colors ${
+                homolSubTab === 'itens' ? 'border-[#1A1A72] text-[#1A1A72]' : 'border-transparent text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              Itens a Precificar / Homologar
+            </button>
+          </div>
+
+          {/* Conteúdo da Sub-tab Clientes */}
+          {homolSubTab === 'clientes' && (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Clientes em Validação Comercial
+                </h4>
+              </div>
+
+              <div className="space-y-2">
+                <div className="border border-slate-200 rounded-lg p-3 bg-slate-50 flex items-center justify-between">
+                  <div>
+                    <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 uppercase">
+                      PROVISÓRIO &middot; CAMPO
+                    </span>
+                    <p className="font-bold text-slate-900 text-xs mt-1">Shopping Sul - Expansão (Provisório)</p>
+                    <p className="text-[10px] text-slate-500 font-data-mono">CNPJ: 12.345.678/0001-90 &middot; Origem: Levantamento SDAI</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => alert('Cliente homologado com sucesso! Agora liberado para emissão de propostas.')}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold uppercase tracking-wider"
+                    >
+                      Aprovar
+                    </button>
+                    <button
+                      onClick={() => alert('Selecione o cliente oficial existente para unificar o cadastro sem perder o histórico do relatório.')}
+                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold uppercase tracking-wider"
+                    >
+                      Mesclar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Conteúdo da Sub-tab Marcas */}
+          {homolSubTab === 'marcas' && (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Marcas Detectadas em Campo
+              </h4>
+              <p className="text-xs text-slate-500">
+                Marcas encontradas em campo que não pertencem ao catálogo oficial de marcas parceiras homologadas.
+              </p>
+              <div className="border border-slate-200 rounded-lg p-3 bg-slate-50 flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-slate-900 text-xs">Tecnohold Alarms</p>
+                  <p className="text-[10px] text-slate-500">Detectada em: Manutenção Preventiva Catuaí</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      onAddPartnerBrand({ id: `pb_${Date.now()}`, name: 'Tecnohold Alarms', category: 'SDAI / Detecção' });
+                      alert('Marca homologada e adicionada às marcas parceiras oficiais!');
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold uppercase tracking-wider"
+                  >
+                    Homologar Marca
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Conteúdo da Sub-tab Itens */}
+          {homolSubTab === 'itens' && (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Itens de Catálogo a Precificar
+              </h4>
+              <p className="text-xs text-slate-500">
+                Materiais informados em texto livre por técnicos. Definir preço e fornecedor para converter em produto do Estoque/Serviços.
+              </p>
+              <div className="border border-amber-100 bg-amber-50/50 rounded-lg p-3 flex items-center justify-between">
+                <div>
+                  <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-200 text-amber-900 uppercase">Sem preço</span>
+                  <p className="font-bold text-slate-900 text-xs mt-1">Módulo Relé Isolador DFE-521 (Texto livre)</p>
+                  <p className="text-[10px] text-slate-500 font-data-mono">Citado em 3 relatórios de campo</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => alert('Atribuir preço de custo, preço de venda e cadastrar no Estoque oficial.')}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold uppercase tracking-wider"
+                  >
+                    Precificar
+                  </button>
+                  <button
+                    onClick={() => alert('Mesclar com item oficial do Estoque (ex: "Módulo Isolador DFE 521") para eliminar duplicatas.')}
+                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold uppercase tracking-wider"
+                  >
+                    Mesclar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ===== TAB: PDF ===== */}
       {tab === 'pdf' && (
+
         <div className="flex flex-col gap-3">
           <DataListRow
             leading={<SettingIcon icon="tune" />}
