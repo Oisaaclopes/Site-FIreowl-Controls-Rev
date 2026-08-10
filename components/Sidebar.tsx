@@ -47,6 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { path: 'fornecedores', label: 'Fornecedores', icon: 'local_shipping' },
     { path: 'estoque', label: 'Estoque', icon: 'inventory_2' },
     { path: 'servicos', label: 'Serviço', icon: 'construction' },
+    { path: 'relatorios', label: 'Relatórios', icon: 'assignment' },
     { path: 'ponto', label: 'Ponto', icon: 'schedule' },
     { path: 'conta', label: 'Conta & Log', icon: 'settings' },
   ];

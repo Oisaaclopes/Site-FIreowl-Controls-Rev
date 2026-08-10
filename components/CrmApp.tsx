@@ -65,6 +65,7 @@ import { CrmView } from '@/components/views/CrmView';
 import { FornecedoresView } from '@/components/views/FornecedoresView';
 import { EstoqueView } from '@/components/views/EstoqueView';
 import { ServicosView } from '@/components/views/ServicosView';
+import { RelatoriosView } from '@/components/views/RelatoriosView';
 import { PontoView } from '@/components/views/PontoView';
 import { ContaView } from '@/components/views/ContaView';
 import { allowedTabs, isTabAllowed } from '@/lib/rbac';
@@ -746,6 +747,18 @@ export function CrmApp({
               onUpdateService={handleUpdateService}
               onDeleteService={handleDeleteService}
               onSelectClientForReport={handleSelectClientForReport}
+            />
+          )}
+
+          {currentTab === 'relatorios' && (
+            <RelatoriosView
+              clients={clients}
+              inventory={inventory}
+              services={services}
+              contracts={contracts}
+              brands={partnerBrands}
+              userRole={userRole}
+              currentUserName={userName}
             />
           )}
 

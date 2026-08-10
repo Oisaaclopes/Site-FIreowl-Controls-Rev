@@ -1,15 +1,16 @@
-export type TabPath = 
-  | 'painel' 
+export type TabPath =
+  | 'painel'
   | 'pedidos'
-  | 'contratos' 
+  | 'contratos'
   | 'receitas'
   | 'despesas'
   | 'financas'
-  | 'agenda' 
+  | 'agenda'
   | 'clientes'
   | 'fornecedores'
   | 'estoque'
   | 'servicos'
+  | 'relatorios'
   | 'ponto'
   | 'conta';
 
