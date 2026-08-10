@@ -164,6 +164,9 @@ export interface Client {
   address: string;
   contacts: { name: string; role: string; phone: string; email: string }[];
   totalContractsValue: number;
+  // Cliente provisório criado em campo — requer migração 0028_clients_provisional
+  pendenteValidacao?: boolean;
+  createdByRole?: string;
 }
 
 export interface PedidoOS {
@@ -357,4 +360,124 @@ export interface SystemAuditLog {
   module: string;
   details: string;
   ip: string;
+}
+
+/* =====================================================================
+ * Subsistema de Relatórios Técnicos (Levantamento / Corretiva / Preventiva)
+ * Requer migrações 0023–0028. Fase 1: fundação de dados.
+ * ===================================================================== */
+
+export type ReportTipo = 'LEVANTAMENTO' | 'CORRETIVA' | 'PREVENTIVA';
+export type ReportStatus = 'rascunho' | 'finalizado' | 'cancelado';
+
+export type AcaoRecomendada =
+  | 'substituir'
+  | 'instalar'
+  | 'reposicionar'
+  | 'reparar'
+  | 'limpar'
+  | 'desobstruir'
+  | 'reprogramar'
+  | 'investigar';
+
+export type PendenciaStatus =
+  | 'aberta'
+  | 'orcada'
+  | 'aprovada'
+  | 'em_execucao'
+  | 'corrigida'
+  | 'cancelada'
+  | 'recusada_cliente';
+
+/** Dispositivo do parque instalado do cliente (inventário SDAI/CFTV/...). */
+export interface Device {
+  id: string;
+  clienteId: string;
+  grupo?: string;
+  tipo?: string;
+  fabricante?: string;
+  modelo?: string;
+  enderecoCentral?: string;
+  local?: string;
+  serial?: string;
+  itemCatalogoId?: string;
+  status: 'OPERACIONAL' | 'ALERTA' | 'DEFEITO' | 'INATIVO';
+}
+
+/** Template de relatório (schema JSON consumido pelo motor de formulários). */
+export interface ReportTemplate {
+  id: string;
+  codigo: string; // LEVANTAMENTO_SDAI, CORRETIVA_SDAI, PREVENTIVA_SDAI
+  nome: string;
+  tipo: ReportTipo;
+  schema: any; // seções + campos (inclui repeater)
+  ativo: boolean;
+  versao: number;
+}
+
+/** Instância de relatório preenchido. */
+export interface ReportInstance {
+  id: string;
+  templateCodigo: string;
+  tipo: ReportTipo;
+  clienteId?: string;
+  contratoId?: string;
+  osId?: string;
+  tecnicoNome?: string;
+  titulo?: string;
+  local?: string;
+  status: ReportStatus;
+  iniciadoEm?: string;
+  finalizadoEm?: string;
+}
+
+/** Resposta de um campo do relatório (repeater usa repeaterIdx). */
+export interface ReportAnswer {
+  id: string;
+  reportId: string;
+  secao?: string;
+  fieldKey: string;
+  valor: any;
+  repeaterIdx?: number;
+}
+
+/** Mídia (foto) do relatório. answerId nulo = bandeja de não classificadas. */
+export interface ReportMedia {
+  id: string;
+  reportId: string;
+  answerId?: string;
+  pendenciaId?: string;
+  deviceId?: string;
+  storagePath: string;
+  rotulo?: 'antes' | 'depois';
+  notaRapida?: string;
+  grupo?: string;
+  lat?: number;
+  lng?: number;
+  accuracy?: number;
+  capturedAt?: string;
+}
+
+/** Pendência — objeto central (vira linha de orçamento / registro de execução). */
+export interface Pendencia {
+  id: string;
+  clienteId?: string;
+  deviceId?: string;
+  reportOrigemId?: string;
+  grupo?: string;
+  descricao?: string;
+  acaoRecomendada?: AcaoRecomendada;
+  normaReferencia?: string;
+  local?: string;
+  quantidade?: number;
+  itemCatalogoId?: string;
+  itemTextoLivre?: string;
+  precisaCadastroCatalogo?: boolean;
+  /** INTERNO (1–3). Ausente quando lido pelo perfil Técnico. */
+  criticidadeOperacional?: number;
+  status: PendenciaStatus;
+  propostaId?: string;
+  reportExecucaoId?: string;
+  criadaEm?: string;
+  resolvidaEm?: string;
 }

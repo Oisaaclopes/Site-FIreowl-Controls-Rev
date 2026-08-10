@@ -16,11 +16,13 @@ function rowToClient(r: any): Client {
     address: r.address || '',
     contacts: Array.isArray(r.contacts) ? r.contacts : [],
     totalContractsValue: Number(r.total_contracts_value ?? 0),
+    pendenteValidacao: r.pendente_validacao ?? undefined,
+    createdByRole: r.created_by_role ?? undefined,
   };
 }
 
 function clientToRow(c: Client): Record<string, unknown> {
-  return {
+  const row: Record<string, unknown> = {
     id: c.id,
     code: c.code,
     name: c.name,
@@ -34,6 +36,26 @@ function clientToRow(c: Client): Record<string, unknown> {
     total_contracts_value: c.totalContractsValue ?? 0,
     updated_at: new Date().toISOString(),
   };
+  // Campos de cliente provisório: só enviados quando presentes (compatível
+  // com bancos sem a migração 0028_clients_provisional aplicada).
+  if (c.pendenteValidacao !== undefined) row.pendente_validacao = c.pendenteValidacao;
+  if (c.createdByRole !== undefined) row.created_by_role = c.createdByRole;
+  return row;
+}
+
+/**
+ * Verifica se já existe cliente com o mesmo CNPJ (checagem de duplicata em
+ * campo, antes de criar cliente provisório). Ignora pontuação do CNPJ.
+ */
+export async function findClientsByCnpj(cnpj: string): Promise<Client[]> {
+  const digits = (cnpj || '').replace(/\D/g, '');
+  if (!digits) return [];
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase.from(TABLE).select('*');
+  if (error) throw error;
+  return (data || [])
+    .map(rowToClient)
+    .filter((c: Client) => (c.cnpj || '').replace(/\D/g, '') === digits);
 }
 
 export async function fetchClients(): Promise<Client[]> {
