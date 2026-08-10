@@ -54,6 +54,120 @@ const labelCls = 'block text-slate-600 mb-1 font-semibold uppercase text-[11px]'
 const friendlyDate = (d: Date) =>
   d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
 
+const MONTH_NAMES_PT = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+];
+
+/** Mini-calendário do mês com feriados em evidência e marcação de batidas. */
+const MiniCalendar: React.FC<{
+  holidays: Record<string, Holiday>;
+  punchDays: Set<string>;
+  today: Date;
+}> = ({ holidays, punchDays, today }) => {
+  const [ref, setRef] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
+  const y = ref.getFullYear();
+  const m = ref.getMonth();
+
+  const firstWeekday = new Date(y, m, 1).getDay();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const key = (d: number) => `${y}-${pad2(m + 1)}-${pad2(d)}`;
+  const isToday = (d: number) =>
+    today.getFullYear() === y && today.getMonth() === m && today.getDate() === d;
+
+  const monthHolidays = Object.entries(holidays)
+    .filter(([k]) => k.startsWith(`${y}-${pad2(m + 1)}`))
+    .map(([k, v]) => ({ day: parseInt(k.slice(-2), 10), name: v.name }))
+    .sort((a, b) => a.day - b.day);
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-5">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Calendário</h4>
+        <div className="flex items-center gap-0.5">
+          <button
+            onClick={() => setRef(new Date(y, m - 1, 1))}
+            aria-label="Mês anterior"
+            className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          >
+            <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+          </button>
+          <span className="text-[11px] font-bold text-slate-700 min-w-[92px] text-center">
+            {MONTH_NAMES_PT[m]} {y}
+          </span>
+          <button
+            onClick={() => setRef(new Date(y, m + 1, 1))}
+            aria-label="Próximo mês"
+            className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          >
+            <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 text-center text-[9px] font-bold text-slate-400 mb-1">
+        {WEEKDAY_SHORT.map((d, i) => (
+          <div key={i}>{d.slice(0, 3)}</div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map((d, idx) => {
+          if (d === null) return <div key={`e${idx}`} className="h-7" />;
+          const holiday = holidays[key(d)];
+          const punched = punchDays.has(key(d));
+          const todayFlag = isToday(d);
+          return (
+            <div
+              key={d}
+              title={holiday ? `Feriado: ${holiday.name}` : undefined}
+              className={`h-7 rounded-md flex items-center justify-center text-[11px] font-data-mono relative ${
+                holiday
+                  ? 'bg-red-100 text-[#E63946] font-bold ring-1 ring-[#E63946]/40'
+                  : 'text-slate-600'
+              } ${todayFlag ? 'ring-2 ring-[#1A1A72] font-bold text-[#1A1A72]' : ''}`}
+            >
+              {pad2(d)}
+              {punched && !holiday && (
+                <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-emerald-500" />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[9px] text-slate-500">
+        <span className="flex items-center gap-1">
+          <span className="w-2.5 h-2.5 rounded bg-red-100 ring-1 ring-[#E63946]/40" /> Feriado
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2.5 h-2.5 rounded ring-2 ring-[#1A1A72]" /> Hoje
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Batida
+        </span>
+      </div>
+
+      {monthHolidays.length > 0 && (
+        <div className="mt-2 space-y-1 border-t border-slate-100 pt-2">
+          {monthHolidays.map((h) => (
+            <div key={h.day} className="flex items-center gap-1.5 text-[10px] text-[#E63946] font-semibold">
+              <span className="material-symbols-outlined text-[13px]">flag</span>
+              <span className="font-data-mono">{pad2(h.day)}</span>
+              <span className="truncate">{h.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const PontoView: React.FC<PontoViewProps> = ({
   punches,
   onAddPunch,
@@ -292,6 +406,18 @@ export const PontoView: React.FC<PontoViewProps> = ({
   const greeting = now.getHours() < 12 ? 'Bom dia' : now.getHours() < 18 ? 'Boa tarde' : 'Boa noite';
 
   const fmtDateInput = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+  // Dias (YYYY-MM-DD) com batida do usuário atual — para marcar no mini-calendário.
+  const punchDaySet = useMemo(() => {
+    const s = new Set<string>();
+    punches.forEach((p) => {
+      if (p.at && p.employeeName === currentUser) {
+        s.add(`${new Date(p.at).getFullYear()}-${pad2(new Date(p.at).getMonth() + 1)}-${pad2(new Date(p.at).getDate())}`);
+      }
+    });
+    return s;
+  }, [punches, currentUser]);
+
   const openAdj = (prefill?: Date) => {
     setAdjForm({
       refDate: prefill ? fmtDateInput(prefill) : fmtDateInput(new Date()),
@@ -899,8 +1025,11 @@ export const PontoView: React.FC<PontoViewProps> = ({
           </p>
         </div>
 
-        {/* ===== Coluna lateral: Escala + Semana + Banco ===== */}
+        {/* ===== Coluna lateral: Calendário + Escala + Semana + Banco ===== */}
         <div className="flex flex-col gap-6">
+          {/* Mini-calendário com feriados em evidência */}
+          <MiniCalendar holidays={holidays} punchDays={punchDaySet} today={now} />
+
           {/* Escala */}
           <div className="bg-white rounded-xl shadow-sm p-5">
             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Sua escala</h4>
