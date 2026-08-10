@@ -351,7 +351,11 @@ export const PREVENTIVA_SDAI: TemplateSchema = {
       key: 'encerramento',
       titulo: 'Encerramento',
       campos: [
-        { key: 'percentual_testado', tipo: 'numero', label: 'Percentual de dispositivos testados (calculado)' },
+        // Decisão 10: cobertura transparente — três números. O percentual principal
+        // considera testados sobre o total; o impedimento aparece destacado ao lado.
+        { key: 'disp_testados', tipo: 'numero', label: 'Dispositivos testados', help: 'Numerador do percentual de cobertura.' },
+        { key: 'disp_nao_testados_impedimento', tipo: 'numero', label: 'Não testados por impedimento', help: 'Operação em andamento, autorização negada, área inacessível — motivo alheio à Fireowl. Registrar o motivo em cada dispositivo.' },
+        { key: 'disp_nao_testados_falha', tipo: 'numero', label: 'Não testados por falha de execução' },
         { key: 'operacao_normal', tipo: 'select', label: 'Sistema entregue em operação normal', opcoes: ['Sim', 'Não'], obrigatorio: true },
         { key: 'disjuntor_rearmado', tipo: 'select', label: 'Disjuntor rearmado após teste de bateria', opcoes: ['Sim', 'Não', 'Não se aplica'] },
         { key: 'foto_disjuntor', tipo: 'foto', label: 'Foto do disjuntor (obrigatória em Sim e Não)', obrigatorio: true },
