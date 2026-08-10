@@ -1,7 +1,15 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { Client, InventoryItem, ServiceCatalogItem, Contract, UserRole } from '@/lib/types';
+import {
+  Client,
+  InventoryItem,
+  ServiceCatalogItem,
+  Contract,
+  UserRole,
+  Pendencia,
+  AcaoRecomendada,
+} from '@/lib/types';
 import { ALL_TEMPLATES } from '@/lib/reportTemplatesData';
 import {
   TemplateSchema,
@@ -12,6 +20,9 @@ import {
   FinalizeIssue,
 } from '@/lib/reportSchema';
 import { FormEngine, CatalogSources } from '@/components/reports/FormEngine';
+import { isSupabaseConfigured } from '@/lib/inventory';
+import { createReport, upsertAnswer } from '@/lib/reports';
+import { insertPendencia } from '@/lib/pendencias';
 
 interface RelatoriosViewProps {
   clients: Client[];
@@ -32,6 +43,61 @@ interface PendenciaPreview {
 
 const uniq = (arr: string[]) => Array.from(new Set(arr.filter(Boolean)));
 
+const firstDigit = (s: unknown): number | undefined => {
+  const m = /(\d)/.exec(String(s ?? ''));
+  return m ? Number(m[1]) : undefined;
+};
+
+/** Constrói as pendências a serem gravadas (itens negativos + apontamentos). */
+function buildPendencias(
+  template: TemplateSchema,
+  values: FormValues,
+  clienteId: string,
+  itensCatalogo: string[]
+): Pendencia[] {
+  const out: Pendencia[] = [];
+  for (const secao of template.secoes) {
+    if (secao.pula_se && String(values[secao.pula_se.campo]) === secao.pula_se.igual) continue;
+    for (const field of secao.campos) {
+      if (field.abre_pendencia_se && isNegativeAnswer(field, values[field.key] as never)) {
+        const sug = field.pendencia_sugerida;
+        out.push({
+          id: '',
+          status: 'aberta',
+          clienteId: clienteId || undefined,
+          grupo: sug?.grupo,
+          descricao: sug?.descricao || `${field.label}: ${String(values[field.key])}`,
+          acaoRecomendada: sug?.acao,
+          normaReferencia: sug?.norma,
+        });
+      }
+      if (field.tipo === 'repeater' && field.gera_pendencia) {
+        const cards = Array.isArray(values[field.key]) ? (values[field.key] as RepeaterCard[]) : [];
+        cards.forEach((c) => {
+          if (!(c.descricao || c.grupo)) return;
+          const item = (c.item as string) || '';
+          const foraCatalogo = !!item && !itensCatalogo.includes(item);
+          out.push({
+            id: '',
+            status: 'aberta',
+            clienteId: clienteId || undefined,
+            grupo: c.grupo as string | undefined,
+            descricao: (c.descricao as string) || 'Apontamento',
+            local: c.local as string | undefined,
+            quantidade: typeof c.quantidade === 'number' ? c.quantidade : Number(c.quantidade) || 1,
+            acaoRecomendada: c.acao_recomendada as AcaoRecomendada | undefined,
+            itemCatalogoId: !foraCatalogo && item ? item : undefined,
+            itemTextoLivre: foraCatalogo ? item : undefined,
+            precisaCadastroCatalogo: foraCatalogo,
+            criticidadeOperacional: firstDigit(c.criticidade_operacional),
+          });
+        });
+      }
+    }
+  }
+  return out;
+}
+
 export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   clients,
   inventory,
@@ -46,6 +112,9 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const [values, setValues] = useState<FormValues>({});
   const [issues, setIssues] = useState<FinalizeIssue[] | null>(null);
   const [finalized, setFinalized] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [persistErr, setPersistErr] = useState<string | null>(null);
+  const [savedInfo, setSavedInfo] = useState<{ reportId: string; count: number } | null>(null);
 
   const template = ALL_TEMPLATES.find((t) => t.codigo === templateCodigo) as TemplateSchema;
   const roleForEngine = userRole.toLowerCase();
@@ -63,17 +132,22 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     [inventory, services, brands, contracts]
   );
 
+  const resetOutcome = () => {
+    setIssues(null);
+    setFinalized(false);
+    setSavedInfo(null);
+    setPersistErr(null);
+  };
+
   const changeTemplate = (codigo: string) => {
     setTemplateCodigo(codigo);
     setValues({});
-    setIssues(null);
-    setFinalized(false);
+    resetOutcome();
   };
 
   const handleChange = (key: string, value: unknown) => {
     setValues((prev) => ({ ...prev, [key]: value }));
-    setIssues(null);
-    setFinalized(false);
+    resetOutcome();
   };
 
   // Pré-visualização das pendências que serão abertas (regra "item negativo").
@@ -115,14 +189,64 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     return Array.isArray(foto) && foto.length > 0;
   };
 
-  const handleFinalize = () => {
-    const found = validateFinalize(template, values, hasPhoto);
-    setIssues(found);
-    setFinalized(found.length === 0);
-  };
-
   const cliente = clients.find((c) => c.id === clienteId);
   const isTecnico = userRole === 'TECNICO';
+
+  const handleFinalize = async () => {
+    const found = validateFinalize(template, values, hasPhoto);
+    setIssues(found);
+    setPersistErr(null);
+    setSavedInfo(null);
+    if (found.length > 0) {
+      setFinalized(false);
+      return;
+    }
+
+    // Sem Supabase: apenas valida localmente (protótipo).
+    if (!isSupabaseConfigured()) {
+      setFinalized(true);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // 1) cria o relatório já finalizado
+      const report = await createReport({
+        id: '',
+        templateCodigo: template.codigo,
+        tipo: template.tipo,
+        clienteId: clienteId || undefined,
+        tecnicoNome: currentUserName || undefined,
+        titulo: `${template.nome} — ${cliente?.name || ''}`.trim(),
+        status: 'finalizado',
+        finalizadoEm: new Date().toISOString(),
+      });
+
+      // 2) grava as respostas (uma linha por campo de topo; repeater vai como jsonb)
+      for (const secao of template.secoes) {
+        for (const field of secao.campos) {
+          const v = values[field.key];
+          if (v === undefined) continue;
+          await upsertAnswer({ id: '', reportId: report.id, secao: secao.key, fieldKey: field.key, valor: v });
+        }
+      }
+
+      // 3) abre as pendências detectadas, vinculadas ao relatório de origem
+      const pends = buildPendencias(template, values, clienteId, catalog.itens);
+      for (const p of pends) {
+        await insertPendencia({ ...p, reportOrigemId: report.id });
+      }
+
+      setSavedInfo({ reportId: report.id, count: pends.length });
+      setFinalized(true);
+    } catch (err) {
+      console.error('Falha ao gravar relatório:', err);
+      setPersistErr(err instanceof Error ? err.message : 'Falha ao gravar no banco.');
+      setFinalized(false);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="flex flex-col w-full p-4 md:p-8 gap-5 md:gap-6">
@@ -208,9 +332,11 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 
             <button
               onClick={handleFinalize}
-              className="w-full mt-4 py-2.5 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] text-white text-xs font-semibold uppercase tracking-wider transition-colors"
+              disabled={saving}
+              className="w-full mt-4 py-2.5 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] disabled:opacity-60 text-white text-xs font-semibold uppercase tracking-wider transition-colors flex items-center justify-center gap-2"
             >
-              Validar &amp; finalizar
+              {saving && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
+              {saving ? 'Gravando…' : 'Finalizar e gravar'}
             </button>
 
             {issues !== null && issues.length > 0 && (
@@ -226,16 +352,33 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
               </div>
             )}
 
-            {finalized && (
+            {persistErr && (
+              <div className="mt-3 border border-red-200 bg-red-50 rounded-lg p-3 text-[11px] text-red-700">
+                <p className="font-bold uppercase mb-0.5">Falha ao gravar</p>
+                {persistErr}
+              </div>
+            )}
+
+            {finalized && savedInfo && (
+              <div className="mt-3 border border-emerald-200 bg-emerald-50 rounded-lg p-3 text-[11px] text-emerald-800 font-semibold flex items-start gap-1.5">
+                <span className="material-symbols-outlined text-base">task_alt</span>
+                <span>
+                  Relatório gravado ({savedInfo.count} pendência{savedInfo.count === 1 ? '' : 's'} aberta{savedInfo.count === 1 ? '' : 's'}) para {cliente?.name || 'o cliente'}.
+                  <span className="block font-data-mono text-[9px] text-emerald-600 mt-0.5">ref {savedInfo.reportId}</span>
+                </span>
+              </div>
+            )}
+
+            {finalized && !savedInfo && (
               <div className="mt-3 border border-emerald-200 bg-emerald-50 rounded-lg p-3 text-[11px] text-emerald-800 font-semibold flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-base">task_alt</span>
-                Relatório válido — {pendenciasPreview.length} pendência(s) seriam abertas para {cliente?.name || 'o cliente'}.
+                Relatório válido — {pendenciasPreview.length} pendência(s) seriam abertas (Supabase não configurado; sem gravação).
               </div>
             )}
 
             <p className="text-[9px] text-slate-400 mt-3 leading-relaxed">
-              Protótipo interativo do motor (dados locais). Persistência no banco, captura rápida por
-              câmera e geração de PDF entram nas próximas fases. Autor: {currentUserName || 'Técnico'}.
+              Grava relatório, respostas e pendências no banco. Captura rápida por câmera, triagem de
+              fotos e geração de PDF entram nas próximas fatias da Fase 3/4. Autor: {currentUserName || 'Técnico'}.
             </p>
           </div>
         </div>
