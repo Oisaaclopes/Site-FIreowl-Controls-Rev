@@ -369,7 +369,14 @@ export interface SystemAuditLog {
  * ===================================================================== */
 
 export type ReportTipo = 'LEVANTAMENTO' | 'CORRETIVA' | 'PREVENTIVA';
-export type ReportStatus = 'rascunho' | 'finalizado' | 'cancelado';
+export type ReportStatus =
+  | 'rascunho'
+  | 'em_execucao'
+  | 'aguardando_assinatura'
+  | 'finalizado'
+  | 'cancelado';
+export type SyncStatus = 'local' | 'sincronizado' | 'conflito';
+export type GeoPoint = { lat?: number; lng?: number; accuracy?: number; timestamp?: string };
 
 export type AcaoRecomendada =
   | 'substituir'
@@ -390,19 +397,25 @@ export type PendenciaStatus =
   | 'cancelada'
   | 'recusada_cliente';
 
-/** Dispositivo do parque instalado do cliente (inventário SDAI/CFTV/...). */
+/** Dispositivo do parque instalado do cliente (inventário as-built, v2.0). */
 export interface Device {
   id: string;
   clienteId: string;
-  grupo?: string;
-  tipo?: string;
+  sistema: 'SDAI' | 'CFTV' | 'CONTROLE_ACESSO' | 'BMS';
+  central?: string;
+  laco?: string;
+  endereco?: string;
+  tipoDispositivo?: string;
   fabricante?: string;
   modelo?: string;
-  enderecoCentral?: string;
-  local?: string;
-  serial?: string;
+  localizacao?: string;
+  pavimento?: string;
+  dataInstalacao?: string;
+  status: 'ativo' | 'inativo' | 'substituido' | 'removido';
+  ultimaManutencao?: string;
+  ultimoTesteFuncional?: string;
+  cicloAmostragemId?: string;
   itemCatalogoId?: string;
-  status: 'OPERACIONAL' | 'ALERTA' | 'DEFEITO' | 'INATIVO';
 }
 
 /** Template de relatório (schema JSON consumido pelo motor de formulários). */
@@ -416,29 +429,41 @@ export interface ReportTemplate {
   versao: number;
 }
 
-/** Instância de relatório preenchido. */
+/** Instância de relatório preenchido (v2.0). */
 export interface ReportInstance {
   id: string;
+  templateId?: string;
   templateCodigo: string;
+  numero?: string; // LEV-2026-0142
   tipo: ReportTipo;
   clienteId?: string;
-  contratoId?: string;
   osId?: string;
+  contratoId?: string;
+  tecnicoId?: string;
   tecnicoNome?: string;
   titulo?: string;
   local?: string;
   status: ReportStatus;
+  // iniciadoEm/finalizadoEm mapeiam para data_inicio/data_fim no banco.
   iniciadoEm?: string;
   finalizadoEm?: string;
+  geoInicio?: GeoPoint | null;
+  geoFim?: GeoPoint | null;
+  resumoExecucao?: Record<string, unknown> | null;
+  observacoesGerais?: string;
+  syncStatus?: SyncStatus;
+  clientUuid?: string;
 }
 
-/** Resposta de um campo do relatório (repeater usa repeaterIdx). */
+/** Resposta de um campo do relatório (campo_key = texto, não FK). */
 export interface ReportAnswer {
   id: string;
   reportId: string;
   secao?: string;
-  fieldKey: string;
+  fieldKey: string; // -> coluna campo_key
   valor: any;
+  deviceId?: string;
+  observacao?: string;
   repeaterIdx?: number;
 }
 
@@ -449,14 +474,27 @@ export interface ReportMedia {
   answerId?: string;
   pendenciaId?: string;
   deviceId?: string;
-  storagePath: string;
-  rotulo?: 'antes' | 'depois';
+  tipo: 'antes' | 'depois' | 'evidencia' | 'geral';
+  storagePathOriginal: string; // nunca sobrescrito
+  storagePathMarcado?: string; // versão com markup
   notaRapida?: string;
-  grupo?: string;
-  lat?: number;
-  lng?: number;
-  accuracy?: number;
-  capturedAt?: string;
+  legenda?: string;
+  geo?: GeoPoint | null;
+  ordem?: number;
+  capturadoEm?: string;
+}
+
+/** Assinatura coletada no relatório. */
+export interface ReportSignature {
+  id: string;
+  reportId: string;
+  papel: 'cliente' | 'tecnico' | 'responsavel_tecnico';
+  nome: string;
+  documento?: string; // mascarado na exibição (LGPD)
+  cargo?: string;
+  storagePath?: string; // PNG
+  assinadoEm?: string;
+  geo?: GeoPoint | null;
 }
 
 /** Pendência — objeto central (vira linha de orçamento / registro de execução). */
@@ -471,6 +509,7 @@ export interface Pendencia {
   normaReferencia?: string;
   local?: string;
   quantidade?: number;
+  unidade?: string; // pç, m, vb, pt, h
   itemCatalogoId?: string;
   itemTextoLivre?: string;
   precisaCadastroCatalogo?: boolean;
@@ -481,4 +520,63 @@ export interface Pendencia {
   reportExecucaoId?: string;
   criadaEm?: string;
   resolvidaEm?: string;
+}
+
+/** Custos de logística versionados por vigência. */
+export interface CustoLogistica {
+  id: string;
+  vigenciaInicio: string;
+  vigenciaFim?: string;
+  custoKm?: number;
+  diariaAlimentacao?: number;
+  diariaHospedagem?: number;
+  horaTecnicaDeslocamento?: number;
+  pedagioRota?: Record<string, number> | null;
+}
+
+/** Registro provisório criado em campo (cliente/marca/item), aguardando homologação. */
+export interface CatalogoProvisorio {
+  id: string;
+  tipo: 'cliente' | 'marca' | 'item';
+  dados: Record<string, unknown>;
+  reportOrigemId?: string;
+  criadoPor?: string;
+  status: 'pendente' | 'aprovado' | 'mesclado' | 'rejeitado';
+  registroFinalId?: string;
+}
+
+/** Ciclo de amostragem rotativa da preventiva. */
+export interface CicloAmostragem {
+  id: string;
+  clienteId?: string;
+  contratoId?: string;
+  periodoInicio?: string;
+  periodoFim?: string;
+  percentualPorVisita?: number;
+  dispositivosTotais?: number;
+  dispositivosTestados?: number;
+}
+
+/** Serviço do catálogo (persistido). */
+export interface Service {
+  id: string;
+  code?: string;
+  title: string;
+  category?: string;
+  standardValue?: number;
+  estimatedHours?: number;
+  nbrNormRef?: string;
+  active?: boolean;
+}
+
+/** Entrada persistida da trilha de auditoria. */
+export interface AuditLogEntry {
+  id: string;
+  ts?: string;
+  userName?: string;
+  userRole?: string;
+  action: string;
+  module?: string;
+  details?: string;
+  ip?: string;
 }

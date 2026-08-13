@@ -12,7 +12,7 @@ import {
 } from '@/lib/reportSchema';
 import { FormEngine, CatalogSources } from '@/components/reports/FormEngine';
 import { isSupabaseConfigured } from '@/lib/inventory';
-import { createReport, upsertAnswer } from '@/lib/reports';
+import { createReport, updateReport, upsertAnswer } from '@/lib/reports';
 import { insertPendencia } from '@/lib/pendencias';
 
 interface ReportFormProps {
@@ -223,18 +223,24 @@ export const ReportForm: React.FC<ReportFormProps> = ({
     }
     setSaving(true);
     try {
+      const prefix = template.tipo === 'LEVANTAMENTO' ? 'LEV' : template.tipo === 'CORRETIVA' ? 'COR' : 'PRE';
+      const numero = `${prefix}-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
+
+      // 1) cria em rascunho (respostas só podem ser gravadas enquanto editável)
       const report = await createReport({
         id: '',
         templateCodigo: template.codigo,
+        numero,
         tipo: template.tipo,
         clienteId: cliente?.id || undefined,
         osId: contexto?.osId,
         contratoId: contexto?.contratoId,
         tecnicoNome: currentUserName || undefined,
         titulo: `${template.nome} — ${cliente?.name || ''}`.trim(),
-        status: 'finalizado',
-        finalizadoEm: new Date().toISOString(),
+        status: 'rascunho',
       });
+
+      // 2) respostas (uma por campo de topo; repeater como jsonb)
       for (const secao of template.secoes) {
         for (const field of secao.campos) {
           const v = values[field.key];
@@ -242,10 +248,16 @@ export const ReportForm: React.FC<ReportFormProps> = ({
           await upsertAnswer({ id: '', reportId: report.id, secao: secao.key, fieldKey: field.key, valor: v });
         }
       }
+
+      // 3) pendências detectadas
       const pends = buildPendencias(template, values, cliente?.id || '', catalog.itens);
       for (const p of pends) {
         await insertPendencia({ ...p, reportOrigemId: report.id });
       }
+
+      // 4) finaliza por último (torna o relatório imutável)
+      await updateReport({ ...report, status: 'finalizado', finalizadoEm: new Date().toISOString() });
+
       setSavedInfo({ reportId: report.id, count: pends.length });
       setFinalized(true);
       onSaved();

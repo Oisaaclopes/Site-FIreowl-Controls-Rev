@@ -1,22 +1,31 @@
 import { getSupabaseClient } from './supabaseClient';
 import { ReportInstance, ReportAnswer, ReportMedia } from './types';
 
-/* ----------------------------- reports ----------------------------- */
+/* ----------------------------- reports (v2.0) ----------------------------- */
 
 function rowToReport(r: any): ReportInstance {
   return {
     id: String(r.id),
+    templateId: r.template_id ?? undefined,
     templateCodigo: r.template_codigo || '',
+    numero: r.numero ?? undefined,
     tipo: (r.tipo || 'LEVANTAMENTO') as ReportInstance['tipo'],
     clienteId: r.cliente_id ?? undefined,
-    contratoId: r.contrato_id ?? undefined,
     osId: r.os_id ?? undefined,
+    contratoId: r.contrato_id ?? undefined,
+    tecnicoId: r.tecnico_id ?? undefined,
     tecnicoNome: r.tecnico_nome ?? undefined,
     titulo: r.titulo ?? undefined,
     local: r.local ?? undefined,
     status: (r.status || 'rascunho') as ReportInstance['status'],
-    iniciadoEm: r.iniciado_em ?? undefined,
-    finalizadoEm: r.finalizado_em ?? undefined,
+    iniciadoEm: r.data_inicio ?? undefined,
+    finalizadoEm: r.data_fim ?? undefined,
+    geoInicio: r.geo_inicio ?? undefined,
+    geoFim: r.geo_fim ?? undefined,
+    resumoExecucao: r.resumo_execucao ?? undefined,
+    observacoesGerais: r.observacoes_gerais ?? undefined,
+    syncStatus: r.sync_status ?? undefined,
+    clientUuid: r.client_uuid ?? undefined,
   };
 }
 
@@ -25,16 +34,25 @@ function reportToRow(r: ReportInstance): Record<string, unknown> {
     template_codigo: r.templateCodigo,
     tipo: r.tipo,
     cliente_id: r.clienteId ?? null,
-    contrato_id: r.contratoId ?? null,
     os_id: r.osId ?? null,
+    contrato_id: r.contratoId ?? null,
     tecnico_nome: r.tecnicoNome ?? null,
     titulo: r.titulo ?? null,
     local: r.local ?? null,
     status: r.status,
-    finalizado_em: r.finalizadoEm ?? null,
+    data_fim: r.finalizadoEm ?? null,
     updated_at: new Date().toISOString(),
   };
   if (r.id) row.id = r.id;
+  if (r.templateId !== undefined) row.template_id = r.templateId;
+  if (r.numero !== undefined) row.numero = r.numero;
+  if (r.iniciadoEm !== undefined) row.data_inicio = r.iniciadoEm;
+  if (r.geoInicio !== undefined) row.geo_inicio = r.geoInicio;
+  if (r.geoFim !== undefined) row.geo_fim = r.geoFim;
+  if (r.resumoExecucao !== undefined) row.resumo_execucao = r.resumoExecucao;
+  if (r.observacoesGerais !== undefined) row.observacoes_gerais = r.observacoesGerais;
+  if (r.syncStatus !== undefined) row.sync_status = r.syncStatus;
+  if (r.clientUuid !== undefined) row.client_uuid = r.clientUuid;
   return row;
 }
 
@@ -70,15 +88,17 @@ export async function deleteReport(id: string): Promise<void> {
   if (error) throw error;
 }
 
-/* --------------------------- report_answers --------------------------- */
+/* --------------------------- report_answers (v2.0) --------------------------- */
 
 function rowToAnswer(r: any): ReportAnswer {
   return {
     id: String(r.id),
     reportId: String(r.report_id),
     secao: r.secao ?? undefined,
-    fieldKey: r.field_key || '',
+    fieldKey: r.campo_key || '',
     valor: r.valor ?? null,
+    deviceId: r.device_id ?? undefined,
+    observacao: r.observacao ?? undefined,
     repeaterIdx: r.repeater_idx ?? undefined,
   };
 }
@@ -87,8 +107,10 @@ function answerToRow(a: ReportAnswer): Record<string, unknown> {
   const row: Record<string, unknown> = {
     report_id: a.reportId,
     secao: a.secao ?? null,
-    field_key: a.fieldKey,
+    campo_key: a.fieldKey,
     valor: a.valor ?? null,
+    device_id: a.deviceId ?? null,
+    observacao: a.observacao ?? null,
     repeater_idx: a.repeaterIdx ?? null,
   };
   if (a.id) row.id = a.id;
@@ -115,7 +137,7 @@ export async function deleteAnswer(id: string): Promise<void> {
   if (error) throw error;
 }
 
-/* ---------------------------- report_media ---------------------------- */
+/* ---------------------------- report_media (v2.0) ---------------------------- */
 
 function rowToMedia(r: any): ReportMedia {
   return {
@@ -124,14 +146,14 @@ function rowToMedia(r: any): ReportMedia {
     answerId: r.answer_id ?? undefined,
     pendenciaId: r.pendencia_id ?? undefined,
     deviceId: r.device_id ?? undefined,
-    storagePath: r.storage_path || '',
-    rotulo: r.rotulo ?? undefined,
+    tipo: (r.tipo || 'evidencia') as ReportMedia['tipo'],
+    storagePathOriginal: r.storage_path_original || '',
+    storagePathMarcado: r.storage_path_marcado ?? undefined,
     notaRapida: r.nota_rapida ?? undefined,
-    grupo: r.grupo ?? undefined,
-    lat: r.lat ?? undefined,
-    lng: r.lng ?? undefined,
-    accuracy: r.accuracy ?? undefined,
-    capturedAt: r.captured_at ?? undefined,
+    legenda: r.legenda ?? undefined,
+    geo: r.geo ?? undefined,
+    ordem: r.ordem ?? undefined,
+    capturadoEm: r.capturado_em ?? undefined,
   };
 }
 
@@ -141,15 +163,15 @@ function mediaToRow(m: ReportMedia): Record<string, unknown> {
     answer_id: m.answerId ?? null,
     pendencia_id: m.pendenciaId ?? null,
     device_id: m.deviceId ?? null,
-    storage_path: m.storagePath,
-    rotulo: m.rotulo ?? null,
+    tipo: m.tipo,
+    storage_path_original: m.storagePathOriginal,
+    storage_path_marcado: m.storagePathMarcado ?? null,
     nota_rapida: m.notaRapida ?? null,
-    grupo: m.grupo ?? null,
-    lat: m.lat ?? null,
-    lng: m.lng ?? null,
-    accuracy: m.accuracy ?? null,
+    legenda: m.legenda ?? null,
+    geo: m.geo ?? null,
+    ordem: m.ordem ?? 0,
   };
-  if (m.capturedAt) row.captured_at = m.capturedAt;
+  if (m.capturadoEm) row.capturado_em = m.capturadoEm;
   if (m.id) row.id = m.id;
   return row;
 }
@@ -160,7 +182,7 @@ export async function fetchMedia(reportId: string): Promise<ReportMedia[]> {
     .from('report_media')
     .select('*')
     .eq('report_id', reportId)
-    .order('captured_at', { ascending: true });
+    .order('capturado_em', { ascending: true });
   if (error) throw error;
   return (data || []).map(rowToMedia);
 }
@@ -173,7 +195,7 @@ export async function fetchBandeja(reportId: string): Promise<ReportMedia[]> {
     .select('*')
     .eq('report_id', reportId)
     .is('answer_id', null)
-    .order('captured_at', { ascending: true });
+    .order('capturado_em', { ascending: true });
   if (error) throw error;
   return (data || []).map(rowToMedia);
 }

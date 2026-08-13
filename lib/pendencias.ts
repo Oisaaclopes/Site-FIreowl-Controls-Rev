@@ -7,7 +7,7 @@ const TABLE = 'pendencias';
 // (RLS do Postgres é por linha; a ocultação da coluna é feita aqui.)
 const TECNICO_COLUMNS =
   'id,cliente_id,device_id,report_origem_id,grupo,descricao,acao_recomendada,' +
-  'norma_referencia,local,quantidade,item_catalogo_id,item_texto_livre,' +
+  'norma_referencia,local,quantidade,unidade,item_catalogo_id,item_texto_livre,' +
   'precisa_cadastro_catalogo,status,proposta_id,report_execucao_id,criada_em,resolvida_em';
 
 function rowToPendencia(r: any): Pendencia {
@@ -22,6 +22,7 @@ function rowToPendencia(r: any): Pendencia {
     normaReferencia: r.norma_referencia ?? undefined,
     local: r.local ?? undefined,
     quantidade: r.quantidade ?? undefined,
+    unidade: r.unidade ?? undefined,
     itemCatalogoId: r.item_catalogo_id ?? undefined,
     itemTextoLivre: r.item_texto_livre ?? undefined,
     precisaCadastroCatalogo: r.precisa_cadastro_catalogo ?? false,
@@ -46,6 +47,7 @@ function pendenciaToRow(p: Pendencia): Record<string, unknown> {
     norma_referencia: p.normaReferencia ?? null,
     local: p.local ?? null,
     quantidade: p.quantidade ?? 1,
+    unidade: p.unidade ?? null,
     item_catalogo_id: p.itemCatalogoId ?? null,
     item_texto_livre: p.itemTextoLivre ?? null,
     precisa_cadastro_catalogo: p.precisaCadastroCatalogo ?? false,

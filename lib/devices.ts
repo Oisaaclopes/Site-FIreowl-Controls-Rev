@@ -7,33 +7,44 @@ function rowToDevice(r: any): Device {
   return {
     id: String(r.id),
     clienteId: r.cliente_id || '',
-    grupo: r.grupo ?? undefined,
-    tipo: r.tipo ?? undefined,
+    sistema: (r.sistema || 'SDAI') as Device['sistema'],
+    central: r.central ?? undefined,
+    laco: r.laco ?? undefined,
+    endereco: r.endereco ?? undefined,
+    tipoDispositivo: r.tipo_dispositivo ?? undefined,
     fabricante: r.fabricante ?? undefined,
     modelo: r.modelo ?? undefined,
-    enderecoCentral: r.endereco_central ?? undefined,
-    local: r.local ?? undefined,
-    serial: r.serial ?? undefined,
+    localizacao: r.localizacao ?? undefined,
+    pavimento: r.pavimento ?? undefined,
+    dataInstalacao: r.data_instalacao ?? undefined,
+    status: (r.status || 'ativo') as Device['status'],
+    ultimaManutencao: r.ultima_manutencao ?? undefined,
+    ultimoTesteFuncional: r.ultimo_teste_funcional ?? undefined,
+    cicloAmostragemId: r.ciclo_amostragem_id ?? undefined,
     itemCatalogoId: r.item_catalogo_id ?? undefined,
-    status: (r.status || 'OPERACIONAL') as Device['status'],
   };
 }
 
 function deviceToRow(d: Device): Record<string, unknown> {
   const row: Record<string, unknown> = {
     cliente_id: d.clienteId,
-    grupo: d.grupo ?? null,
-    tipo: d.tipo ?? null,
+    sistema: d.sistema,
+    central: d.central ?? null,
+    laco: d.laco ?? null,
+    endereco: d.endereco ?? null,
+    tipo_dispositivo: d.tipoDispositivo ?? null,
     fabricante: d.fabricante ?? null,
     modelo: d.modelo ?? null,
-    endereco_central: d.enderecoCentral ?? null,
-    local: d.local ?? null,
-    serial: d.serial ?? null,
-    item_catalogo_id: d.itemCatalogoId ?? null,
+    localizacao: d.localizacao ?? null,
+    pavimento: d.pavimento ?? null,
+    data_instalacao: d.dataInstalacao ?? null,
     status: d.status,
+    ultima_manutencao: d.ultimaManutencao ?? null,
+    ultimo_teste_funcional: d.ultimoTesteFuncional ?? null,
+    ciclo_amostragem_id: d.cicloAmostragemId ?? null,
+    item_catalogo_id: d.itemCatalogoId ?? null,
     updated_at: new Date().toISOString(),
   };
-  // Só envia id em updates (insert deixa o banco gerar o uuid).
   if (d.id) row.id = d.id;
   return row;
 }
