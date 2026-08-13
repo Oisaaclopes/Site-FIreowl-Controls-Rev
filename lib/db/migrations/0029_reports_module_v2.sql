@@ -6,7 +6,38 @@
 --
 -- ATENÇÃO: só rode este arquivo JUNTO com a fatia de código que casa com ele
 -- (tipos/persistência atualizados). Rodar antes quebra o app atual.
+--
+-- CONVENÇÃO text × uuid (ponto 2): as PKs do legado são TEXT
+-- (clients.id, contracts.id). Portanto as FKs de LIGAÇÃO AO LEGADO são text:
+--   reports.cliente_id  -> clients(id)   [text, FK]
+--   reports.contrato_id -> contracts(id) [text, FK]
+--   reports.os_id       -> text SOLTO (não há tabela de OS ainda; ver ponto 4)
+--   pendencias.cliente_id, devices.cliente_id, catalogo_provisorio: text p/ clients
+-- As PKs e FKs INTERNAS do módulo (reports, answers, media, devices, pendencias,
+-- signatures, ciclos) são todas UUID. tecnico_id/criado_por -> auth.users(id) [uuid].
 -- =====================================================================
+
+-- GUARDA DE SEGURANÇA (ponto 1): aborta se qualquer tabela do módulo tiver
+-- linhas. Assim o destrutivo nunca apaga dados por engano — se não estiver
+-- vazio, a migration falha e nada é derrubado.
+do $$
+declare n bigint;
+begin
+  if to_regclass('public.reports') is null then
+    return; -- primeira instalação: nada a proteger
+  end if;
+  select
+    (select count(*) from public.reports)        +
+    (select count(*) from public.report_answers) +
+    (select count(*) from public.report_media)   +
+    (select count(*) from public.pendencias)      +
+    (select count(*) from public.devices)
+  into n;
+  if n > 0 then
+    raise exception
+      'ABORTADO: tabelas do modulo de relatorios nao estao vazias (% linhas no total). Reveja antes de recriar (destrutivo).', n;
+  end if;
+end $$;
 
 -- 0) Derruba as tabelas do módulo (vazias) para recriar no formato novo.
 drop table if exists public.report_signatures cascade;
@@ -67,8 +98,8 @@ create table if not exists public.reports (
   tipo               text not null
                      check (tipo in ('LEVANTAMENTO','CORRETIVA','PREVENTIVA')),
   cliente_id         text references public.clients(id) on delete set null,
-  os_id              text,
-  contrato_id        text,
+  os_id              text,                          -- SOLTO: não há tabela de OS ainda (ponto 4)
+  contrato_id        text references public.contracts(id) on delete set null,
   tecnico_id         uuid default auth.uid(),
   tecnico_nome       text,
   titulo             text,
