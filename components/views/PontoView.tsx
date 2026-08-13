@@ -836,6 +836,40 @@ export const PontoView: React.FC<PontoViewProps> = ({
     setTimeout(() => w.print(), 300);
   };
 
+  // Imprime "Meu Espelho de Ponto" numa janela nova (imprimir → salvar como PDF).
+  const printEspelho = () => {
+    const esc = (s: unknown) =>
+      String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+    const row = (label: string, valor: string) =>
+      `<tr>
+        <td style="padding:8px 10px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:bold;width:40%">${esc(label)}</td>
+        <td style="padding:8px 10px;border:1px solid #e2e8f0;font-family:monospace">${esc(valor)}</td>
+      </tr>`;
+    const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+      <title>Espelho de Ponto — ${esc(currentUser)}</title></head>
+      <body style="font-family:Arial,sans-serif;color:#0f172a;padding:24px;max-width:760px;margin:0 auto">
+        <div style="border-bottom:3px solid #1A1A72;padding-bottom:10px;margin-bottom:18px">
+          <h2 style="margin:0;text-transform:uppercase;color:#1A1A72">Espelho de Ponto</h2>
+          <p style="margin:2px 0 0;font-size:12px;color:#64748b">Fireowl Controls · Portaria MTP 671/2021 · Emitido em ${new Date().toLocaleDateString('pt-BR')}</p>
+        </div>
+        <table style="border-collapse:collapse;width:100%;font-size:13px">
+          ${row('Nome', currentUser)}
+          ${row('Período', '01 a 31 (mês atual)')}
+          ${row('Jornada', `${SCALE.start} às ${SCALE.end} (almoço ${SCALE.lunchStart}–${SCALE.lunchEnd})`)}
+          ${row('Banco de horas', week.banco)}
+        </table>
+      </body></html>`;
+    const w = window.open('', '_blank');
+    if (!w) {
+      alert('Permita pop-ups para gerar o PDF.');
+      return;
+    }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 300);
+  };
+
   return (
     <div className="flex flex-col w-full p-4 md:p-8 gap-5 md:gap-6">
       {/* Header */}
@@ -1566,10 +1600,7 @@ export const PontoView: React.FC<PontoViewProps> = ({
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => {
-                  window.print();
-                  setShowEspelho(false);
-                }}
+                onClick={printEspelho}
                 className="flex-1 bg-[#E63946] hover:bg-[#a51515] text-white font-semibold py-2.5 rounded-lg text-xs uppercase"
               >
                 Imprimir / PDF

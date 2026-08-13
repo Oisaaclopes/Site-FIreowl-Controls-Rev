@@ -103,6 +103,48 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
 
   const totalMonthlyRec = contracts.reduce((acc, c) => acc + c.monthlyValue, 0);
 
+  // Imprime o resumo do contrato numa janela nova (imprimir → salvar como PDF).
+  const printContract = (ctr: Contract) => {
+    const esc = (s: unknown) =>
+      String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+    const row = (label: string, valor: string) =>
+      `<tr>
+        <td style="padding:8px 10px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:bold;width:40%">${esc(label)}</td>
+        <td style="padding:8px 10px;border:1px solid #e2e8f0;font-family:monospace">${valor}</td>
+      </tr>`;
+    const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+      <title>Contrato ${esc(ctr.id)} — Fireowl Controls</title></head>
+      <body style="font-family:Arial,sans-serif;color:#0f172a;padding:24px;max-width:800px;margin:0 auto">
+        <div style="border-bottom:3px solid #E63946;padding-bottom:10px;margin-bottom:18px">
+          <p style="margin:0;font-family:monospace;color:#E63946;font-weight:bold;font-size:12px">${esc(ctr.id)}</p>
+          <h2 style="margin:2px 0 0;text-transform:uppercase">${esc(ctr.clientName)}</h2>
+          <p style="margin:2px 0 0;font-size:13px;color:#64748b">Contrato de Manutenção de Sistemas SDAI &amp; Hidráulicos</p>
+        </div>
+        <table style="border-collapse:collapse;width:100%;font-size:13px">
+          ${ctr.contractType ? row('Escopo', esc(ctr.contractType)) : ''}
+          ${row('Unidade / Local', esc(ctr.unit))}
+          ${row('Valor mensal', brl(ctr.monthlyValue))}
+          ${row('Início da vigência', esc(ctr.startDate || '—'))}
+          ${row('Renovação', esc(ctr.renewalDate))}
+          ${row('Índice de reajuste', esc(ctr.readjustmentIndex))}
+          ${row('Bolsa de horas de campo', `${ctr.usedHours}h / ${ctr.contractedHours}h`)}
+          ${row('Responsável técnico', esc(ctr.responsibleTech))}
+          ${row('Registro ART CREA', esc(ctr.artDocumentRef))}
+          ${row('Status', esc(ctr.status))}
+        </table>
+        <p style="margin-top:24px;font-size:11px;color:#94a3b8">Emitido em ${new Date().toLocaleDateString('pt-BR')} · Fireowl Controls</p>
+      </body></html>`;
+    const w = window.open('', '_blank');
+    if (!w) {
+      alert('Permita pop-ups para gerar o documento.');
+      return;
+    }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 300);
+  };
+
   return (
     <div className="flex flex-col w-full p-4 md:p-8 gap-5 md:gap-6">
       {/* Header */}
@@ -426,10 +468,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
 
             <div className="flex justify-end gap-2">
               <button
-                onClick={() => {
-                  window.print();
-                  setSelectedPdfContract(null);
-                }}
+                onClick={() => printContract(selectedPdfContract)}
                 className="bg-[#E63946] hover:bg-[#a51515] text-white font-semibold px-5 py-2 rounded-lg text-xs uppercase"
               >
                 Imprimir Documento

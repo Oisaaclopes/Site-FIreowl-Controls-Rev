@@ -31,6 +31,69 @@ export const FinancasView: React.FC<FinancasViewProps> = ({ transactions }) => {
     return t.type === filter;
   });
 
+  // Exporta o DRE + lançamentos numa janela nova (imprimir → salvar como PDF).
+  const exportDRE = () => {
+    const esc = (s: unknown) =>
+      String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+    const impostos = totalReceitas * 0.06;
+    const receitaLiquida = totalReceitas * 0.94;
+    const resultado = receitaLiquida - totalDespesas;
+    const hoje = new Date().toLocaleDateString('pt-BR');
+
+    const linhas = transactions
+      .map(
+        (t) => `<tr>
+          <td style="padding:5px 8px;border:1px solid #ddd;font-family:monospace">${esc(t.id)}</td>
+          <td style="padding:5px 8px;border:1px solid #ddd">${esc(t.type)}</td>
+          <td style="padding:5px 8px;border:1px solid #ddd">${esc(t.clientOrVendor)}</td>
+          <td style="padding:5px 8px;border:1px solid #ddd">${esc(t.description)}</td>
+          <td style="padding:5px 8px;border:1px solid #ddd;font-family:monospace">${esc(t.date)}</td>
+          <td style="padding:5px 8px;border:1px solid #ddd;text-align:right;font-family:monospace;color:${t.type === 'RECEITA' ? '#059669' : '#E63946'}">${t.type === 'RECEITA' ? '+' : '-'} ${brl(t.amount)}</td>
+        </tr>`
+      )
+      .join('');
+
+    const dreRow = (label: string, valor: string, bold = false, color = '#0f172a') =>
+      `<tr>
+        <td style="padding:6px 8px;${bold ? 'font-weight:bold;' : ''}">${esc(label)}</td>
+        <td style="padding:6px 8px;text-align:right;font-family:monospace;${bold ? 'font-weight:bold;' : ''}color:${color}">${valor}</td>
+      </tr>`;
+
+    const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+      <title>DRE — Fireowl Controls</title></head>
+      <body style="font-family:Arial,sans-serif;color:#0f172a;padding:24px;max-width:900px;margin:0 auto">
+        <h2 style="margin:0 0 4px">Demonstrativo do Resultado do Exercício (DRE Simplificado)</h2>
+        <p style="margin:0 0 2px;font-size:13px">Fireowl Controls — Simples Nacional · Emitido em ${hoje}</p>
+        <p style="margin:0 0 16px;font-size:13px">Margem operacional: <strong>${margemLucro}%</strong></p>
+
+        <table style="border-collapse:collapse;width:100%;font-size:13px;margin-bottom:24px">
+          ${dreRow('(+) Receita bruta de serviços', brl(totalReceitas), true, '#059669')}
+          ${dreRow('(-) Impostos Simples Nacional Anexo III (6%)', '- ' + brl(impostos), false, '#E63946')}
+          ${dreRow('(=) Receita líquida', brl(receitaLiquida), true)}
+          ${dreRow('(-) Custos operacionais de campo & materiais', '- ' + brl(totalDespesas), false, '#E63946')}
+          ${dreRow('(=) Resultado operacional líquido final', brl(resultado), true, resultado >= 0 ? '#059669' : '#E63946')}
+        </table>
+
+        <h3 style="margin:0 0 8px;font-size:14px">Lançamentos consolidados (${transactions.length})</h3>
+        <table style="border-collapse:collapse;width:100%;font-size:12px">
+          <thead><tr>${['Cód', 'Tipo', 'Cliente/Fornecedor', 'Descrição', 'Data', 'Valor']
+            .map((h) => `<th style="padding:6px 8px;border:1px solid #ddd;background:#1A1A72;color:#fff;text-align:left">${h}</th>`)
+            .join('')}</tr></thead>
+          <tbody>${linhas || `<tr><td colspan="6" style="padding:16px;text-align:center;color:#888">Sem lançamentos</td></tr>`}</tbody>
+        </table>
+      </body></html>`;
+
+    const w = window.open('', '_blank');
+    if (!w) {
+      alert('Permita pop-ups para gerar o DRE.');
+      return;
+    }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 300);
+  };
+
   return (
     <div className="flex flex-col w-full p-4 md:p-8 gap-5 md:gap-6">
       {/* Header */}
@@ -45,7 +108,7 @@ export const FinancasView: React.FC<FinancasViewProps> = ({ transactions }) => {
         </div>
 
         <button
-          onClick={() => alert('DRE & Relatório Financeiro exportados com sucesso!')}
+          onClick={exportDRE}
           className="border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5 uppercase"
         >
           <span className="material-symbols-outlined text-base">file_download</span> Baixar DRE Completo
