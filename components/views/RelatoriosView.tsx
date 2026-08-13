@@ -10,13 +10,20 @@ import {
   ReportInstance,
   Pendencia,
 } from '@/lib/types';
-import { ALL_TEMPLATES } from '@/lib/reportTemplatesData';
+import { ALL_TEMPLATES, seedReportTemplates } from '@/lib/reportTemplatesData';
 import { TemplateSchema } from '@/lib/reportSchema';
 import { CatalogSources } from '@/components/reports/FormEngine';
 import { ReportForm } from '@/components/reports/ReportForm';
 import { isSupabaseConfigured } from '@/lib/inventory';
 import { fetchReports } from '@/lib/reports';
 import { fetchPendencias } from '@/lib/pendencias';
+import { fetchTemplates } from '@/lib/reportTemplates';
+
+/** Template disponível ao motor: o schema + o id no banco (quando veio do DB). */
+interface LoadedTemplate {
+  id?: string;
+  schema: TemplateSchema;
+}
 
 interface RelatoriosViewProps {
   clients: Client[];
@@ -63,6 +70,9 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const [reports, setReports] = useState<ReportInstance[]>([]);
   const [pendencias, setPendencias] = useState<Pendencia[]>([]);
   const [loading, setLoading] = useState(false);
+  // Templates: "template é dado, não código" — carregados do banco, com
+  // fallback aos empacotados e seed automático (admin) na primeira vez.
+  const [templates, setTemplates] = useState<LoadedTemplate[]>(ALL_TEMPLATES.map((s) => ({ schema: s })));
 
   // Filtros da lista
   const [fTipo, setFTipo] = useState<string>('TODOS');
@@ -125,11 +135,11 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 
   // Config do formulário aberto
   const [formTemplate, setFormTemplate] = useState<TemplateSchema | null>(null);
+  const [formTemplateId, setFormTemplateId] = useState<string | undefined>(undefined);
   const [formCliente, setFormCliente] = useState<Client | undefined>(undefined);
   const [formContext, setFormContext] = useState<{ osId?: string; contratoId?: string }>({});
 
   const clientName = (id?: string) => clients.find((c) => c.id === id)?.name || '—';
-
 
   const refresh = () => {
     if (!isSupabaseConfigured()) return;
@@ -143,8 +153,26 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       .finally(() => setLoading(false));
   };
 
+  // Carrega templates do banco; se vazio e admin, semeia os empacotados.
+  const loadTemplates = async () => {
+    if (!isSupabaseConfigured()) return;
+    try {
+      let rows = await fetchTemplates();
+      if (rows.length === 0 && userRole === 'ADMINISTRATIVO') {
+        await seedReportTemplates();
+        rows = await fetchTemplates();
+      }
+      if (rows.length > 0) {
+        setTemplates(rows.map((r) => ({ id: r.id, schema: r.schema as TemplateSchema })));
+      }
+    } catch (err) {
+      console.warn('Templates: falha ao carregar do banco (usando empacotados).', err);
+    }
+  };
+
   useEffect(() => {
     refresh();
+    loadTemplates();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -230,15 +258,16 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const closeWizard = () => setWizardStep(0);
 
   const startForm = () => {
-    const template = ALL_TEMPLATES.find((t) => t.tipo === wTipo) || null;
-    if (!template) return;
+    const loaded = templates.find((t) => t.schema.tipo === wTipo) || null;
+    if (!loaded) return;
     const cliente = clients.find((c) => c.id === wClienteId);
     // Pendências aprovadas do cliente (para a Corretiva)
     const aprovadas = pendencias
       .filter((p) => p.status === 'aprovada' && p.clienteId === wClienteId)
       .map((p) => ({ id: p.id, label: `${p.grupo || 'Pendência'} — ${p.descricao || ''}`.slice(0, 60) }));
     catalog.pendenciasAprovadas = aprovadas;
-    setFormTemplate(template);
+    setFormTemplate(loaded.schema);
+    setFormTemplateId(loaded.id);
     setFormCliente(cliente);
     setFormContext({ osId: wOsId || undefined, contratoId: wContratoId || undefined });
     setWizardStep(0);
@@ -253,6 +282,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     return (
       <ReportForm
         template={formTemplate}
+        templateId={formTemplateId}
         cliente={formCliente}
         catalog={catalog}
         userRole={userRole}
@@ -413,7 +443,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
               {/* Passo 1 — Tipo */}
               {wizardStep === 1 && (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {ALL_TEMPLATES.map((t) => (
+                  {templates.map(({ schema: t }) => (
                     <button
                       key={t.codigo}
                       onClick={() => {

@@ -17,6 +17,7 @@ import { insertPendencia } from '@/lib/pendencias';
 
 interface ReportFormProps {
   template: TemplateSchema;
+  templateId?: string; // id no banco (report_templates) quando veio do DB
   cliente?: Client;
   catalog: CatalogSources;
   userRole: UserRole;
@@ -91,6 +92,7 @@ import { TriagemFotos, UnclassifiedPhoto } from '@/components/reports/TriagemFot
 
 export const ReportForm: React.FC<ReportFormProps> = ({
   template,
+  templateId,
   cliente,
   catalog,
   userRole,
@@ -229,6 +231,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       // 1) cria em rascunho (respostas só podem ser gravadas enquanto editável)
       const report = await createReport({
         id: '',
+        templateId,
         templateCodigo: template.codigo,
         numero,
         tipo: template.tipo,
