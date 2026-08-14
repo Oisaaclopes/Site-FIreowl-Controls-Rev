@@ -15,7 +15,7 @@ import { FormEngine, CatalogSources } from '@/components/reports/FormEngine';
 import { isSupabaseConfigured } from '@/lib/inventory';
 import { createReport, updateReport, upsertAnswer, insertMedia } from '@/lib/reports';
 import { insertPendencia } from '@/lib/pendencias';
-import { uploadReportPhoto, getCapturedPhoto, getPhotoPreview, isPhotoId } from '@/lib/reportMedia';
+import { uploadReportPhoto, getCapturedPhoto, getPhotoPreview, isPhotoId, registerPhoto } from '@/lib/reportMedia';
 import { getSignature, isSignatureId, uploadSignaturePng, insertSignature } from '@/lib/signatures';
 
 interface ReportFormProps {
@@ -123,6 +123,49 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   useEffect(() => {
     getGeoPoint().then(setGeoInicio);
   }, []);
+
+  // Navegação em passos (uma seção por tela — modo campo, Partes 4.7/8)
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [showPend, setShowPend] = useState(false);
+  const [sectionErr, setSectionErr] = useState<string | null>(null);
+  const camInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Seções visíveis (respeita salto condicional pula_se)
+  const visibleSections = useMemo(
+    () => template.secoes.filter((s) => !(s.pula_se && String(values[s.pula_se.campo]) === s.pula_se.igual)),
+    [template, values]
+  );
+  const idx = Math.min(currentIdx, Math.max(0, visibleSections.length - 1));
+  const currentSection = visibleSections[idx];
+  const stepTemplate = { ...template, secoes: currentSection ? [currentSection] : [] };
+  const isLast = idx >= visibleSections.length - 1;
+
+  const goPrev = () => {
+    setSectionErr(null);
+    setCurrentIdx(Math.max(0, idx - 1));
+  };
+  const goNext = () => {
+    // Bloqueia avanço com obrigatório faltando na seção atual (sem modal)
+    const faltando = (currentSection?.campos || []).find((f) => {
+      if (!f.obrigatorio) return false;
+      const v = values[f.key];
+      if (f.tipo === 'foto') return !hasPhoto(f.key);
+      return v === undefined || v === null || v === '';
+    });
+    if (faltando) {
+      setSectionErr(`Preencha: ${faltando.label || faltando.key}`);
+      return;
+    }
+    setSectionErr(null);
+    setCurrentIdx(Math.min(visibleSections.length - 1, idx + 1));
+  };
+
+  const onCamFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    Array.from(files).forEach((file) => handleFastPhotoCaptured(registerPhoto(file)));
+    e.target.value = '';
+  };
 
   const handleChange = (key: string, value: unknown) => {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -387,142 +430,184 @@ export const ReportForm: React.FC<ReportFormProps> = ({
     }
   };
 
+  const progresso = visibleSections.length > 0 ? ((idx + 1) / visibleSections.length) * 100 : 0;
+
   return (
-    <div className="flex flex-col w-full p-4 md:p-8 gap-5 md:gap-6">
-      {/* Cabeçalho do formulário */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-5">
-        <div className="flex items-center gap-3 min-w-0">
-          <button
-            onClick={onBack}
-            className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors shrink-0"
-            title="Voltar à lista"
-          >
-            <span className="material-symbols-outlined">arrow_back</span>
-          </button>
-          <div className="min-w-0">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{template.nome}</span>
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight truncate">{cliente?.name || 'Novo relatório'}</h1>
+    <div className="flex flex-col w-full min-h-[calc(100vh-64px)] relative">
+      {/* Sucesso — overlay */}
+      {finalized && savedInfo && (
+        <div className="fixed inset-0 z-[70] bg-white/95 flex items-center justify-center p-6">
+          <div className="text-center max-w-sm">
+            <span className="material-symbols-outlined text-6xl text-emerald-500">task_alt</span>
+            <h2 className="text-lg font-bold text-slate-900 mt-2">Relatório gravado</h2>
+            <p className="text-xs text-slate-500 mt-1">
+              {savedInfo.count} pendência{savedInfo.count === 1 ? '' : 's'} aberta{savedInfo.count === 1 ? '' : 's'} · {cliente?.name || 'cliente'}
+            </p>
+            <p className="font-data-mono text-[10px] text-slate-400 mt-1">ref {savedInfo.reportId}</p>
+            <button onClick={onBack} className="mt-4 px-6 py-2.5 rounded-lg bg-[#1A1A72] text-white text-xs font-semibold uppercase tracking-wide">
+              Voltar à lista
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span
-            title={geoInicio ? `${geoInicio.lat?.toFixed(5)}, ${geoInicio.lng?.toFixed(5)} (±${Math.round(geoInicio.accuracy || 0)} m)` : 'GPS indisponível / permissão negada'}
-            className={`text-[11px] inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-semibold ${
-              geoInicio ? 'text-[#1A1A72] bg-[#1A1A72]/5' : 'text-slate-400 bg-slate-100'
-            }`}
-          >
-            <span className="material-symbols-outlined text-sm">{geoInicio ? 'location_on' : 'location_off'}</span>
-            {geoInicio ? `±${Math.round(geoInicio.accuracy || 0)} m` : 'sem GPS'}
-          </span>
-          {isTecnico && (
-            <p className="text-[11px] text-emerald-700 bg-emerald-50 inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-semibold">
-              <span className="material-symbols-outlined text-sm">visibility_off</span>
-              Técnico: sem valores/criticidade.
-            </p>
-          )}
+      )}
+
+      {/* Topo fixo: sair, bloco, progresso, geo */}
+      <div className="sticky top-16 z-20 bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
+        <button onClick={onBack} title="Sair" className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 shrink-0">
+          <span className="material-symbols-outlined">arrow_back</span>
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] text-slate-500 uppercase tracking-wider truncate">{template.nome} · {cliente?.name || ''}</p>
+          <p className="text-sm font-bold text-slate-900 truncate">{currentSection?.titulo || 'Relatório'}</p>
         </div>
+        <span
+          title={geoInicio ? `${geoInicio.lat?.toFixed(5)}, ${geoInicio.lng?.toFixed(5)} (±${Math.round(geoInicio.accuracy || 0)} m)` : 'GPS indisponível'}
+          className={`text-[10px] inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full font-semibold shrink-0 ${geoInicio ? 'text-[#1A1A72] bg-[#1A1A72]/5' : 'text-slate-400 bg-slate-100'}`}
+        >
+          <span className="material-symbols-outlined text-sm">{geoInicio ? 'location_on' : 'location_off'}</span>
+          {geoInicio ? `±${Math.round(geoInicio.accuracy || 0)}` : '—'}
+        </span>
+        <span className="text-[11px] font-data-mono text-slate-500 shrink-0">{idx + 1}/{visibleSections.length}</span>
+      </div>
+      <div className="h-1 bg-slate-100 sticky top-[calc(4rem+57px)] z-20">
+        <div className="h-full bg-[#1A1A72] transition-all" style={{ width: `${progresso}%` }} />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        <div className="xl:col-span-2">
-          <FormEngine
-            template={template}
-            values={values}
-            onChange={handleChange}
-            catalog={catalog}
-            role={roleForEngine}
-            unclassifiedCount={unclassifiedPhotos.length}
-            onOpenTriagem={() => setIsTriagemOpen(true)}
-            onFastPhotoCaptured={handleFastPhotoCaptured}
-          />
-        </div>
-
-        <TriagemFotos
-          isOpen={isTriagemOpen}
-          onClose={() => setIsTriagemOpen(false)}
-          photos={unclassifiedPhotos}
-          onUpdatePhotoNota={handleUpdatePhotoNota}
-          onAssignPhotosToApontamento={handleAssignPhotosToApontamento}
-          onDeletePhoto={handleDeletePhoto}
-          categoriasGrupos={catalog.categorias}
+      {/* Conteúdo: uma seção por vez */}
+      <div className="flex-1 p-4 md:p-8 pb-28">
+        {currentSection?.descricao && <p className="text-[11px] text-slate-500 mb-3">{currentSection.descricao}</p>}
+        <FormEngine
+          template={stepTemplate}
+          values={values}
+          onChange={handleChange}
+          catalog={catalog}
+          role={roleForEngine}
+          unclassifiedCount={unclassifiedPhotos.length}
+          onOpenTriagem={() => setIsTriagemOpen(true)}
+          onFastPhotoCaptured={handleFastPhotoCaptured}
+          hideFloatingCamera
         />
 
+        {sectionErr && (
+          <div className="mt-4 border border-amber-200 bg-amber-50 rounded-lg p-3 text-[11px] font-semibold text-amber-800">
+            {sectionErr}
+          </div>
+        )}
+        {issues !== null && issues.length > 0 && (
+          <div className="mt-4 border border-amber-200 bg-amber-50 rounded-lg p-3">
+            <p className="text-[11px] font-bold text-amber-800 uppercase mb-1.5">Não é possível finalizar</p>
+            <ul className="space-y-1">
+              {issues.map((iss, i) => (
+                <li key={i} className="text-[10px] text-amber-800">• <strong>{iss.campo}</strong> — {iss.motivo}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {persistErr && (
+          <div className="mt-4 border border-red-200 bg-red-50 rounded-lg p-3 text-[11px] text-red-700">
+            <p className="font-bold uppercase mb-0.5">Falha ao gravar</p>
+            {persistErr}
+          </div>
+        )}
+        {finalized && !savedInfo && (
+          <div className="mt-4 border border-emerald-200 bg-emerald-50 rounded-lg p-3 text-[11px] text-emerald-800 font-semibold">
+            Relatório válido — {pendenciasPreview.length} pendência(s) (Supabase não configurado; sem gravação).
+          </div>
+        )}
+      </div>
 
-        <div className="flex flex-col gap-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 xl:sticky xl:top-20">
-            <h4 className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">
-              <span className="material-symbols-outlined text-base text-[#E63946]">assignment_late</span>
-              Pendências a abrir
-              <span className="ml-auto font-data-mono text-[#E63946]">{pendenciasPreview.length}</span>
-            </h4>
+      {/* FABs: câmera + contador de triagem (acima do rodapé) */}
+      <input ref={camInputRef} type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={onCamFiles} />
+      <button
+        onClick={() => camInputRef.current?.click()}
+        title="Captura rápida"
+        className="fixed bottom-24 right-4 z-40 w-14 h-14 rounded-full bg-[#E63946] hover:bg-[#a51515] text-white shadow-2xl flex items-center justify-center active:scale-95 border-2 border-white"
+      >
+        <span className="material-symbols-outlined text-2xl">photo_camera</span>
+      </button>
+      {unclassifiedPhotos.length > 0 && (
+        <button
+          onClick={() => setIsTriagemOpen(true)}
+          className="fixed bottom-[10.5rem] right-4 z-40 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 text-white text-xs font-bold shadow-lg animate-bounce"
+        >
+          <span className="material-symbols-outlined text-sm text-[#E63946]">collections</span>
+          {unclassifiedPhotos.length}
+        </button>
+      )}
+
+      {/* Rodapé fixo — zona do polegar */}
+      <div className="sticky bottom-0 z-30 bg-white border-t border-slate-200 px-4 py-3 flex items-center gap-2">
+        <button
+          onClick={goPrev}
+          disabled={idx === 0}
+          className="px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wide text-slate-600 disabled:opacity-40 hover:bg-slate-100"
+        >
+          Anterior
+        </button>
+        <button
+          onClick={() => setShowPend(true)}
+          className="relative px-3 py-2.5 rounded-lg text-xs font-semibold text-[#E63946] hover:bg-red-50 flex items-center gap-1"
+          title="Pendências a abrir"
+        >
+          <span className="material-symbols-outlined text-base">assignment_late</span>
+          {pendenciasPreview.length}
+        </button>
+        {isLast ? (
+          <button
+            onClick={handleFinalize}
+            disabled={saving}
+            className="flex-1 py-2.5 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] disabled:opacity-60 text-white text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2"
+          >
+            {saving && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
+            {saving ? 'Gravando…' : 'Finalizar e gravar'}
+          </button>
+        ) : (
+          <button
+            onClick={goNext}
+            className="flex-1 py-2.5 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] text-white text-xs font-semibold uppercase tracking-wider"
+          >
+            Próximo
+          </button>
+        )}
+      </div>
+
+      {/* Bottom sheet: pendências a abrir */}
+      {showPend && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 flex items-end sm:items-center justify-center" onClick={() => setShowPend(false)}>
+          <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl max-h-[70vh] overflow-y-auto p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-base text-[#E63946]">assignment_late</span>
+                Pendências a abrir ({pendenciasPreview.length})
+              </h4>
+              <button onClick={() => setShowPend(false)} className="text-slate-400 hover:text-slate-700 font-bold">✕</button>
+            </div>
             {pendenciasPreview.length === 0 ? (
               <p className="text-[11px] text-slate-400 italic">Nenhuma pendência detectada até agora.</p>
             ) : (
-              <div className="space-y-2 max-h-[320px] overflow-y-auto">
+              <div className="space-y-2">
                 {pendenciasPreview.map((p, i) => (
                   <div key={i} className="border border-red-100 bg-red-50/50 rounded-lg p-2.5">
                     {p.grupo && <p className="text-[10px] font-bold text-[#E63946] uppercase">{p.grupo}</p>}
                     <p className="text-[11px] text-slate-700">{p.descricao}</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">
-                      {p.local ? `${p.local} · ` : ''}
-                      {p.origem}
-                    </p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{p.local ? `${p.local} · ` : ''}{p.origem}</p>
                   </div>
                 ))}
               </div>
             )}
-
-            <button
-              onClick={handleFinalize}
-              disabled={saving}
-              className="w-full mt-4 py-2.5 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] disabled:opacity-60 text-white text-xs font-semibold uppercase tracking-wider transition-colors flex items-center justify-center gap-2"
-            >
-              {saving && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
-              {saving ? 'Gravando…' : 'Finalizar e gravar'}
-            </button>
-
-            {issues !== null && issues.length > 0 && (
-              <div className="mt-3 border border-amber-200 bg-amber-50 rounded-lg p-3">
-                <p className="text-[11px] font-bold text-amber-800 uppercase mb-1.5">Não é possível finalizar</p>
-                <ul className="space-y-1">
-                  {issues.map((iss, i) => (
-                    <li key={i} className="text-[10px] text-amber-800">
-                      • <strong>{iss.campo}</strong> — {iss.motivo}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {persistErr && (
-              <div className="mt-3 border border-red-200 bg-red-50 rounded-lg p-3 text-[11px] text-red-700">
-                <p className="font-bold uppercase mb-0.5">Falha ao gravar</p>
-                {persistErr}
-              </div>
-            )}
-
-            {finalized && savedInfo && (
-              <div className="mt-3 border border-emerald-200 bg-emerald-50 rounded-lg p-3 text-[11px] text-emerald-800">
-                <p className="font-semibold flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-base">task_alt</span>
-                  Relatório gravado ({savedInfo.count} pendência{savedInfo.count === 1 ? '' : 's'}).
-                </p>
-                <p className="font-data-mono text-[9px] text-emerald-600 mt-0.5">ref {savedInfo.reportId}</p>
-                <button onClick={onBack} className="mt-2 w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold uppercase tracking-wide">
-                  Voltar à lista
-                </button>
-              </div>
-            )}
-
-            {finalized && !savedInfo && (
-              <div className="mt-3 border border-emerald-200 bg-emerald-50 rounded-lg p-3 text-[11px] text-emerald-800 font-semibold flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-base">task_alt</span>
-                Relatório válido — {pendenciasPreview.length} pendência(s) (Supabase não configurado; sem gravação).
-              </div>
-            )}
           </div>
         </div>
-      </div>
+      )}
+
+      <TriagemFotos
+        isOpen={isTriagemOpen}
+        onClose={() => setIsTriagemOpen(false)}
+        photos={unclassifiedPhotos}
+        onUpdatePhotoNota={handleUpdatePhotoNota}
+        onAssignPhotosToApontamento={handleAssignPhotosToApontamento}
+        onDeletePhoto={handleDeletePhoto}
+        categoriasGrupos={catalog.categorias}
+      />
     </div>
   );
 };

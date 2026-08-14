@@ -363,7 +363,8 @@ export const FormEngine: React.FC<FormEngineProps & {
   unclassifiedCount?: number;
   onOpenTriagem?: () => void;
   onFastPhotoCaptured?: (url: string) => void;
-}> = ({ template, values, onChange, catalog, role, unclassifiedCount = 0, onOpenTriagem, onFastPhotoCaptured }) => {
+  hideFloatingCamera?: boolean;
+}> = ({ template, values, onChange, catalog, role, unclassifiedCount = 0, onOpenTriagem, onFastPhotoCaptured, hideFloatingCamera = false }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleCameraClick = () => {
@@ -397,7 +398,7 @@ export const FormEngine: React.FC<FormEngineProps & {
       />
 
       {/* Botão flutuante de Câmera Rápida em campo (Seção 3.1) */}
-      <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2">
+      <div className={`fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2 ${hideFloatingCamera ? 'hidden' : ''}`}>
         {unclassifiedCount > 0 && onOpenTriagem && (
           <button
             type="button"
