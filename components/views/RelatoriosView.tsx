@@ -18,6 +18,7 @@ import { isSupabaseConfigured } from '@/lib/inventory';
 import { fetchReports } from '@/lib/reports';
 import { fetchPendencias } from '@/lib/pendencias';
 import { fetchTemplates } from '@/lib/reportTemplates';
+import { gerarPdfExecucao } from '@/lib/reportPdf';
 
 /** Template disponível ao motor: o schema + o id no banco (quando veio do DB). */
 interface LoadedTemplate {
@@ -400,12 +401,13 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                 <th className="py-3 px-4">Data</th>
                 <th className="py-3 px-4">Status</th>
                 <th className="py-3 px-4 text-center">Pend.</th>
+                <th className="py-3 px-4 text-center">PDF</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
               {filtered.map((r) => (
                 <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="py-3 px-4 font-data-mono font-bold text-slate-500">{shortId(r.id)}</td>
+                  <td className="py-3 px-4 font-data-mono font-bold text-slate-500">{r.numero || shortId(r.id)}</td>
                   <td className="py-3 px-4">{TIPO_LABEL[r.tipo] || r.tipo}</td>
                   <td className="py-3 px-4 font-bold text-slate-900 uppercase">{clientName(r.clienteId)}</td>
                   {!isTecnico && <td className="py-3 px-4 text-slate-500">{r.tecnicoNome || '—'}</td>}
@@ -416,6 +418,24 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                     </span>
                   </td>
                   <td className="py-3 px-4 text-center font-data-mono font-bold text-[#E63946]">{pendCountByReport[r.id] || 0}</td>
+                  <td className="py-3 px-4 text-center">
+                    {r.status === 'finalizado' ? (
+                      <button
+                        onClick={() =>
+                          gerarPdfExecucao(r, clientName(r.clienteId), userRole).catch((e) => {
+                            console.error(e);
+                            alert('Falha ao gerar o PDF.');
+                          })
+                        }
+                        title="Gerar PDF de execução"
+                        className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#E63946] hover:bg-red-50 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-lg">picture_as_pdf</span>
+                      </button>
+                    ) : (
+                      <span className="text-slate-300">—</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

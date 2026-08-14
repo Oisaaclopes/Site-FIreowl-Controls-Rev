@@ -111,6 +111,25 @@ export async function signedReportUrl(path: string, seconds = 3600): Promise<str
   return data.signedUrl as string;
 }
 
+/** URLs assinadas em lote: retorna mapa { storage_path: signedUrl }. */
+export async function signedReportUrls(paths: string[], seconds = 3600): Promise<Record<string, string>> {
+  const unique = Array.from(new Set(paths.filter(Boolean)));
+  if (unique.length === 0) return {};
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrls(unique, seconds);
+  if (error) throw error;
+  const map: Record<string, string> = {};
+  (data || []).forEach((d: any) => {
+    if (d.path && d.signedUrl) map[d.path] = d.signedUrl;
+  });
+  return map;
+}
+
+/** É um caminho do Storage de relatórios (não um id transitório)? */
+export function isStoragePath(v: unknown): v is string {
+  return typeof v === 'string' && (v.startsWith('reports/') || v.startsWith('signatures/'));
+}
+
 /** Remove um arquivo do bucket (usado ao descartar rascunho). */
 export async function removeReportPhoto(path: string): Promise<void> {
   const supabase = getSupabaseClient() as any;
