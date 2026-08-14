@@ -11,6 +11,7 @@ import {
   Pendencia,
   Device,
   OrdemServico,
+  CicloAmostragem,
 } from '@/lib/types';
 import { ALL_TEMPLATES, seedReportTemplates } from '@/lib/reportTemplatesData';
 import { TemplateSchema } from '@/lib/reportSchema';
@@ -21,6 +22,7 @@ import { fetchReports } from '@/lib/reports';
 import { fetchPendencias } from '@/lib/pendencias';
 import { fetchDevices } from '@/lib/devices';
 import { fetchOrdensServico } from '@/lib/ordensServico';
+import { ensureCicloAtivo, quotaPorVisita } from '@/lib/ciclos';
 import { fetchTemplates } from '@/lib/reportTemplates';
 import { gerarPdfExecucao } from '@/lib/reportPdf';
 import { NovaProposta } from '@/components/reports/NovaProposta';
@@ -149,6 +151,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const [formCliente, setFormCliente] = useState<Client | undefined>(undefined);
   const [formContext, setFormContext] = useState<{ osId?: string; contratoId?: string }>({});
   const [formDevices, setFormDevices] = useState<Device[] | undefined>(undefined);
+  const [formCiclo, setFormCiclo] = useState<CicloAmostragem | undefined>(undefined);
 
   const clientName = (id?: string) => clients.find((c) => c.id === id)?.name || '—';
 
@@ -276,13 +279,34 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     setFormTemplateId(loaded.id);
     setFormCliente(clients.find((c) => c.id === wClienteId));
     setFormContext({ osId: wOsId || undefined, contratoId: wContratoId || undefined });
-    // Preventiva: carrega o inventário do cliente para semear o checklist de
-    // dispositivos (amostragem). Outros tipos não usam devices.
+    // Preventiva: carrega o inventário do cliente, garante o ciclo de amostragem
+    // vigente e semeia apenas a fatia da visita (dispositivos há mais tempo sem
+    // teste). Outros tipos não usam devices/ciclo.
     setFormDevices(undefined);
+    setFormCiclo(undefined);
     if (loaded.schema.tipo === 'PREVENTIVA' && wClienteId) {
-      fetchDevices(wClienteId)
-        .then((ds) => setFormDevices(ds.filter((d) => d.status === 'ativo')))
-        .catch(() => setFormDevices(undefined));
+      (async () => {
+        try {
+          const ativos = (await fetchDevices(wClienteId)).filter((d) => d.status === 'ativo');
+          if (ativos.length === 0) return;
+          const ciclo = await ensureCicloAtivo(wClienteId, ativos.length, { contratoId: wContratoId || undefined });
+          const quota = quotaPorVisita(ciclo);
+          const amostra = [...ativos]
+            .sort((a, b) => (a.ultimoTesteFuncional || '').localeCompare(b.ultimoTesteFuncional || ''))
+            .slice(0, quota);
+          setFormCiclo(ciclo);
+          setFormDevices(amostra);
+        } catch (e) {
+          console.warn('Amostragem: falha ao preparar o ciclo.', e);
+          // Fallback: sem ciclo, semeia todos os ativos.
+          try {
+            const ativos = (await fetchDevices(wClienteId)).filter((d) => d.status === 'ativo');
+            setFormDevices(ativos);
+          } catch {
+            setFormDevices(undefined);
+          }
+        }
+      })();
     }
     setWizardStep(0);
     setMode('form');
@@ -315,6 +339,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         currentUserName={currentUserName}
         contexto={formContext}
         devices={formDevices}
+        ciclo={formCiclo}
         onBack={() => setMode('index')}
         onSaved={refresh}
       />

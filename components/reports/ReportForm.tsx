@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Client, UserRole, Pendencia, AcaoRecomendada, GeoPoint, Device } from '@/lib/types';
+import { Client, UserRole, Pendencia, AcaoRecomendada, GeoPoint, Device, CicloAmostragem } from '@/lib/types';
+import { marcarTesteFuncional } from '@/lib/devices';
+import { registrarTestesNoCiclo } from '@/lib/ciclos';
 import { getGeoPoint } from '@/lib/geo';
 import {
   TemplateSchema,
@@ -29,6 +31,8 @@ interface ReportFormProps {
   contexto?: { osId?: string; contratoId?: string };
   /** Inventário do cliente — semeia o checklist_dispositivos (Preventiva). */
   devices?: Device[];
+  /** Ciclo de amostragem vigente (Preventiva) — atualiza cobertura ao finalizar. */
+  ciclo?: CicloAmostragem;
   onBack: () => void;
   onSaved: () => void;
 }
@@ -128,6 +132,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   currentUserName = '',
   contexto,
   devices,
+  ciclo,
   onBack,
   onSaved,
 }) => {
@@ -167,6 +172,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         (a.ultimoTesteFuncional || '').localeCompare(b.ultimoTesteFuncional || '')
       );
       const cards: RepeaterCard[] = ordenados.map((d) => ({
+        device_id: d.id, // vínculo oculto p/ registrar o teste funcional no fecho
         dispositivo: `${d.tipoDispositivo || 'Dispositivo'} · ${[d.central, d.laco, d.endereco]
           .filter(Boolean)
           .join('/')}`,
@@ -510,6 +516,28 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         }
       }
 
+      // Amostragem rotativa (Preventiva): registra o teste funcional dos
+      // dispositivos efetivamente testados e atualiza a cobertura do ciclo.
+      try {
+        const checklist = template.secoes
+          .flatMap((s) => s.campos)
+          .find((f) => f.tipo === 'checklist_dispositivos');
+        if (checklist) {
+          const cards = Array.isArray(values[checklist.key]) ? (values[checklist.key] as RepeaterCard[]) : [];
+          const testadosIds = cards
+            .filter((c) => ['Aprovado', 'Reprovado'].includes(String(c.teste_funcional)))
+            .map((c) => String(c.device_id || ''))
+            .filter(Boolean);
+          if (testadosIds.length > 0) {
+            const hoje = new Date().toISOString().slice(0, 10);
+            await marcarTesteFuncional(testadosIds, hoje, ciclo?.id);
+            if (ciclo) await registrarTestesNoCiclo(ciclo, testadosIds.length);
+          }
+        }
+      } catch (e) {
+        console.warn('Não foi possível atualizar a amostragem/ciclo:', e);
+      }
+
       // fotos/assinaturas já subiram ao Storage — libera a memória da sessão
       clearPhotoRegistry();
       clearSignatureRegistry();
@@ -568,6 +596,16 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       <div className="h-1 bg-slate-100 sticky top-[calc(4rem+57px)] z-20">
         <div className="h-full bg-[#1A1A72] transition-all" style={{ width: `${progresso}%` }} />
       </div>
+
+      {/* Amostragem: mostrado na seção de dispositivos quando há ciclo vigente */}
+      {ciclo && (currentSection?.campos || []).some((f) => f.tipo === 'checklist_dispositivos') && (
+        <div className="mx-4 mt-3 rounded-lg bg-indigo-50 border border-indigo-100 px-3 py-2 text-[11px] text-indigo-900 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="font-bold uppercase tracking-wide">Amostragem do ciclo</span>
+          <span>Nesta visita: <strong>{devices?.length ?? 0}</strong> de {ciclo.dispositivosTotais || 0} dispositivos</span>
+          <span className="text-indigo-400">·</span>
+          <span>Cobertura acumulada: <strong>{ciclo.dispositivosTestados || 0}/{ciclo.dispositivosTotais || 0}</strong></span>
+        </div>
+      )}
 
       {/* Conteúdo: uma seção por vez */}
       <div className="flex-1 p-4 md:p-8 pb-28">

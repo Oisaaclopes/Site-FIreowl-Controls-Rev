@@ -70,3 +70,24 @@ export async function deleteDevice(id: string): Promise<void> {
   const { error } = await supabase.from(TABLE).delete().eq('id', id);
   if (error) throw error;
 }
+
+/**
+ * Registra o teste funcional de um lote de dispositivos (amostragem da
+ * preventiva): grava ultimo_teste_funcional e, opcionalmente, vincula ao ciclo.
+ */
+export async function marcarTesteFuncional(
+  deviceIds: string[],
+  dataISO: string,
+  cicloAmostragemId?: string
+): Promise<void> {
+  const ids = deviceIds.filter(Boolean);
+  if (ids.length === 0) return;
+  const supabase = getSupabaseClient() as any;
+  const patch: Record<string, unknown> = {
+    ultimo_teste_funcional: dataISO,
+    updated_at: new Date().toISOString(),
+  };
+  if (cicloAmostragemId) patch.ciclo_amostragem_id = cicloAmostragemId;
+  const { error } = await supabase.from(TABLE).update(patch).in('id', ids);
+  if (error) throw error;
+}
