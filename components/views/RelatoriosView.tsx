@@ -9,6 +9,7 @@ import {
   UserRole,
   ReportInstance,
   Pendencia,
+  Device,
 } from '@/lib/types';
 import { ALL_TEMPLATES, seedReportTemplates } from '@/lib/reportTemplatesData';
 import { TemplateSchema } from '@/lib/reportSchema';
@@ -17,6 +18,7 @@ import { ReportForm } from '@/components/reports/ReportForm';
 import { isSupabaseConfigured } from '@/lib/inventory';
 import { fetchReports } from '@/lib/reports';
 import { fetchPendencias } from '@/lib/pendencias';
+import { fetchDevices } from '@/lib/devices';
 import { fetchTemplates } from '@/lib/reportTemplates';
 import { gerarPdfExecucao } from '@/lib/reportPdf';
 import { NovaProposta } from '@/components/reports/NovaProposta';
@@ -143,6 +145,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const [formTemplateId, setFormTemplateId] = useState<string | undefined>(undefined);
   const [formCliente, setFormCliente] = useState<Client | undefined>(undefined);
   const [formContext, setFormContext] = useState<{ osId?: string; contratoId?: string }>({});
+  const [formDevices, setFormDevices] = useState<Device[] | undefined>(undefined);
 
   const clientName = (id?: string) => clients.find((c) => c.id === id)?.name || '—';
 
@@ -269,6 +272,14 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     setFormTemplateId(loaded.id);
     setFormCliente(clients.find((c) => c.id === wClienteId));
     setFormContext({ osId: wOsId || undefined, contratoId: wContratoId || undefined });
+    // Preventiva: carrega o inventário do cliente para semear o checklist de
+    // dispositivos (amostragem). Outros tipos não usam devices.
+    setFormDevices(undefined);
+    if (loaded.schema.tipo === 'PREVENTIVA' && wClienteId) {
+      fetchDevices(wClienteId)
+        .then((ds) => setFormDevices(ds.filter((d) => d.status === 'ativo')))
+        .catch(() => setFormDevices(undefined));
+    }
     setWizardStep(0);
     setMode('form');
   };
@@ -296,6 +307,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         userRole={userRole}
         currentUserName={currentUserName}
         contexto={formContext}
+        devices={formDevices}
         onBack={() => setMode('index')}
         onSaved={refresh}
       />

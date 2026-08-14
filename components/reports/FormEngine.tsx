@@ -333,14 +333,15 @@ const Section: React.FC<{
         {section.campos
           .filter((f) => isFieldVisibleForRole(f, role))
           .map((field) => {
-            const isWide = field.tipo === 'repeater' || field.multilinha || field.tipo === 'multiselect';
+            const isRepeater = field.tipo === 'repeater' || field.tipo === 'checklist_dispositivos';
+            const isWide = isRepeater || field.multilinha || field.tipo === 'multiselect';
             return (
               <div key={field.key} className={isWide ? 'md:col-span-2' : ''}>
                 <label className={labelCls}>
                   {field.label || field.key} {field.obrigatorio && <span className="text-[#E63946]">*</span>}
                 </label>
                 {field.help && <p className="text-[10px] text-slate-400 mb-1">{field.help}</p>}
-                {field.tipo === 'repeater' ? (
+                {isRepeater ? (
                   <Repeater
                     field={field}
                     cards={Array.isArray(values[field.key]) ? (values[field.key] as RepeaterCard[]) : []}

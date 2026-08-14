@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Client, UserRole, Pendencia, AcaoRecomendada, GeoPoint } from '@/lib/types';
+import { Client, UserRole, Pendencia, AcaoRecomendada, GeoPoint, Device } from '@/lib/types';
 import { getGeoPoint } from '@/lib/geo';
 import {
   TemplateSchema,
@@ -26,6 +26,8 @@ interface ReportFormProps {
   userRole: UserRole;
   currentUserName?: string;
   contexto?: { osId?: string; contratoId?: string };
+  /** Inventário do cliente — semeia o checklist_dispositivos (Preventiva). */
+  devices?: Device[];
   onBack: () => void;
   onSaved: () => void;
 }
@@ -86,6 +88,27 @@ function buildPendencias(
           });
         });
       }
+      // Checklist de dispositivos: respostas negativas por card (reprovado, fora
+      // de norma, obstruído...) abrem pendência.
+      if (field.tipo === 'checklist_dispositivos') {
+        const cards = Array.isArray(values[field.key]) ? (values[field.key] as RepeaterCard[]) : [];
+        const schema = field.card_schema || [];
+        cards.forEach((c) => {
+          schema.forEach((cf) => {
+            if (cf.abre_pendencia_se && isNegativeAnswer(cf, c[cf.key] as never)) {
+              out.push({
+                id: '',
+                status: 'aberta',
+                clienteId: clienteId || undefined,
+                grupo: 'SDAI > Dispositivo',
+                descricao: `${(c.dispositivo as string) || 'Dispositivo'} — ${cf.label}: ${String(c[cf.key])}`,
+                local: c.dispositivo as string | undefined,
+                acaoRecomendada: 'investigar',
+              });
+            }
+          });
+        });
+      }
     }
   }
   return out;
@@ -101,6 +124,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   userRole,
   currentUserName = '',
   contexto,
+  devices,
   onBack,
   onSaved,
 }) => {
@@ -123,6 +147,30 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   useEffect(() => {
     getGeoPoint().then(setGeoInicio);
   }, []);
+
+  // Semeadura do checklist_dispositivos a partir do inventário do cliente.
+  // Um card por dispositivo; ordenados pelo maior tempo sem teste funcional
+  // (ultimoTesteFuncional ascendente) — prioridade de amostragem do ciclo.
+  useEffect(() => {
+    if (!devices || devices.length === 0) return;
+    const field = template.secoes
+      .flatMap((s) => s.campos)
+      .find((f) => f.tipo === 'checklist_dispositivos');
+    if (!field) return;
+    setValues((prev) => {
+      const atual = prev[field.key];
+      if (Array.isArray(atual) && atual.length > 0) return prev; // já semeado
+      const ordenados = [...devices].sort((a, b) =>
+        (a.ultimoTesteFuncional || '').localeCompare(b.ultimoTesteFuncional || '')
+      );
+      const cards: RepeaterCard[] = ordenados.map((d) => ({
+        dispositivo: `${d.tipoDispositivo || 'Dispositivo'} · ${[d.central, d.laco, d.endereco]
+          .filter(Boolean)
+          .join('/')}`,
+      }));
+      return { ...prev, [field.key]: cards };
+    });
+  }, [devices, template]);
 
   // Navegação em passos (uma seção por tela — modo campo, Partes 4.7/8)
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -243,6 +291,22 @@ export const ReportForm: React.FC<ReportFormProps> = ({
                 origem: secao.titulo,
               });
             }
+          });
+        }
+        if (field.tipo === 'checklist_dispositivos') {
+          const cards = Array.isArray(values[field.key]) ? (values[field.key] as RepeaterCard[]) : [];
+          const schema = field.card_schema || [];
+          cards.forEach((c) => {
+            schema.forEach((cf) => {
+              if (cf.abre_pendencia_se && isNegativeAnswer(cf, c[cf.key] as never)) {
+                list.push({
+                  grupo: 'SDAI > Dispositivo',
+                  descricao: `${(c.dispositivo as string) || 'Dispositivo'} — ${cf.label}: ${String(c[cf.key])}`,
+                  local: c.dispositivo as string | undefined,
+                  origem: secao.titulo,
+                });
+              }
+            });
           });
         }
       }

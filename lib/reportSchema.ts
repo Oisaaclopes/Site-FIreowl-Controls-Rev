@@ -19,7 +19,8 @@ export type FieldType =
   | 'passfail' // Aprovado/Reprovado (ou OK/Falha)
   | 'foto'
   | 'assinatura'
-  | 'repeater';
+  | 'repeater'
+  | 'checklist_dispositivos'; // repeater gerado a partir do inventário devices
 
 /** Sugestão para pré-abertura automática de pendência a partir da resposta. */
 export interface PendenciaSugerida {

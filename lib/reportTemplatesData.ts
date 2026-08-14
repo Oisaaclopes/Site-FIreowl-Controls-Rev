@@ -303,12 +303,12 @@ export const PREVENTIVA_SDAI: TemplateSchema = {
       descricao: 'Uma linha por dispositivo (gerada a partir do inventário) ou adicionada manualmente. Teste reprovado/não realizado abre pendência.',
       campos: [
         {
-          key: 'dispositivos', tipo: 'repeater', label: 'Dispositivos', botao_adicionar: '+ Adicionar dispositivo', gera_pendencia: true,
+          key: 'dispositivos', tipo: 'checklist_dispositivos', label: 'Dispositivos', botao_adicionar: '+ Adicionar dispositivo', gera_pendencia: true,
           card_schema: [
-            { key: 'device_id', tipo: 'select_catalogo', origem: 'devices', label: 'Dispositivo' },
+            { key: 'dispositivo', tipo: 'texto', label: 'Dispositivo' },
             { key: 'limpeza', tipo: 'select', label: 'Limpeza executada', opcoes: ['Sim', 'Não'] },
             { key: 'teste_funcional', tipo: 'select', label: 'Teste funcional', opcoes: ['Aprovado', 'Reprovado', 'Não testado'], abre_pendencia_se: ['Reprovado', 'Não testado'] },
-            { key: 'motivo_nao_testado', tipo: 'select', label: 'Motivo se não testado', opcoes: ['Área inacessível', 'Operação em andamento', 'Autorização negada', 'Dispositivo obstruído'] },
+            { key: 'motivo_nao_testado', tipo: 'select', label: 'Motivo se não testado', opcoes: ['Área inacessível', 'Operação em andamento', 'Autorização negada', 'Dispositivo obstruído', 'Fora da amostra do ciclo'] },
             { key: 'endereco_reconhecido', tipo: 'select', label: 'Endereço reconhecido na central', opcoes: ['Sim', 'Não', 'Convencional'] },
             { key: 'fixacao', tipo: 'passfail', label: 'Fixação e integridade física', opcoes: ['Aprovado', 'Reprovado'], abre_pendencia_se: ['Reprovado'] },
             { key: 'obstruido', tipo: 'select', label: 'Obstruído por mercadoria/mobiliário', opcoes: ['Sim', 'Não'], abre_pendencia_se: ['Sim'] },
