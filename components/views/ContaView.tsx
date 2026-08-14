@@ -1,7 +1,14 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { SystemAuditLog, UserRole, CompanyProfile, PartnerBrand, PdfPrefs } from '@/lib/types';
+import { SystemAuditLog, UserRole, CompanyProfile, PartnerBrand, PdfPrefs, Client, CatalogoProvisorio } from '@/lib/types';
+import { fetchClients } from '@/lib/clients';
+import {
+  aprovarClienteProvisorio,
+  mesclarClienteProvisorio,
+  fetchCatalogoProvisorio,
+  atualizarCatalogoProvisorio,
+} from '@/lib/homologacao';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
 import { Toggle, SidePanel } from '@/components/SidePanel';
 import {
@@ -108,6 +115,110 @@ export const ContaView: React.FC<ContaViewProps> = ({
 }) => {
   const [tab, setTab] = useState<'conta' | 'homologacao' | 'preferencias' | 'pdf' | 'usuarios'>('conta');
   const [homolSubTab, setHomolSubTab] = useState<'clientes' | 'marcas' | 'itens'>('clientes');
+
+  // ---- Homologação (dados reais) ----
+  const [provClients, setProvClients] = useState<Client[]>([]);
+  const [officialClients, setOfficialClients] = useState<Client[]>([]);
+  const [catMarcas, setCatMarcas] = useState<CatalogoProvisorio[]>([]);
+  const [catItens, setCatItens] = useState<CatalogoProvisorio[]>([]);
+  const [homolBusy, setHomolBusy] = useState<string | null>(null);
+  const [mergeTarget, setMergeTarget] = useState<Client | null>(null);
+  const [mergeOficialId, setMergeOficialId] = useState('');
+
+  const loadHomologacao = async () => {
+    try {
+      const [cls, marcas, itens] = await Promise.all([
+        fetchClients(),
+        fetchCatalogoProvisorio({ tipo: 'marca', status: 'pendente' }),
+        fetchCatalogoProvisorio({ tipo: 'item', status: 'pendente' }),
+      ]);
+      setProvClients(cls.filter((c) => c.pendenteValidacao));
+      setOfficialClients(cls.filter((c) => !c.pendenteValidacao));
+      setCatMarcas(marcas);
+      setCatItens(itens);
+    } catch (e) {
+      console.warn('Homologação: falha ao carregar.', e);
+    }
+  };
+
+  useEffect(() => {
+    if (tab === 'homologacao') loadHomologacao();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  const aprovarCliente = async (c: Client) => {
+    setHomolBusy(c.id);
+    try {
+      await aprovarClienteProvisorio(c.id);
+      await loadHomologacao();
+    } catch {
+      alert('Falha ao aprovar cliente.');
+    } finally {
+      setHomolBusy(null);
+    }
+  };
+
+  const confirmarMerge = async () => {
+    if (!mergeTarget || !mergeOficialId) return;
+    setHomolBusy(mergeTarget.id);
+    try {
+      await mesclarClienteProvisorio(mergeTarget.id, mergeOficialId);
+      setMergeTarget(null);
+      setMergeOficialId('');
+      await loadHomologacao();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Falha ao mesclar cliente.');
+    } finally {
+      setHomolBusy(null);
+    }
+  };
+
+  const homologarMarca = async (m: CatalogoProvisorio) => {
+    setHomolBusy(m.id);
+    try {
+      const nome = String(m.dados.nome || m.dados.name || 'Marca de campo');
+      onAddPartnerBrand({ id: `pb_${Date.now()}`, name: nome, category: String(m.dados.categoria || m.dados.category || 'SDAI') });
+      await atualizarCatalogoProvisorio(m.id, { status: 'aprovado' });
+      await loadHomologacao();
+    } catch {
+      alert('Falha ao homologar marca.');
+    } finally {
+      setHomolBusy(null);
+    }
+  };
+
+  const precificarItem = async (it: CatalogoProvisorio) => {
+    const entrada = prompt('Preço de venda do item (R$):');
+    if (entrada == null) return;
+    const val = Number(entrada.replace(',', '.'));
+    if (!isFinite(val) || val < 0) {
+      alert('Preço inválido.');
+      return;
+    }
+    setHomolBusy(it.id);
+    try {
+      await atualizarCatalogoProvisorio(it.id, { status: 'aprovado', dados: { ...it.dados, preco_venda: val } });
+      await loadHomologacao();
+    } catch {
+      alert('Falha ao precificar item.');
+    } finally {
+      setHomolBusy(null);
+    }
+  };
+
+  const mesclarItem = async (it: CatalogoProvisorio) => {
+    const alvo = prompt('Item oficial do Estoque/Serviços para mesclar (código ou nome):');
+    if (!alvo) return;
+    setHomolBusy(it.id);
+    try {
+      await atualizarCatalogoProvisorio(it.id, { status: 'mesclado', registroFinalId: alvo.trim() });
+      await loadHomologacao();
+    } catch {
+      alert('Falha ao mesclar item.');
+    } finally {
+      setHomolBusy(null);
+    }
+  };
 
 
 
@@ -709,33 +820,44 @@ export const ContaView: React.FC<ContaViewProps> = ({
                 <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                   Clientes em Validação Comercial
                 </h4>
+                <span className="text-[10px] text-slate-400">{provClients.length} pendente(s)</span>
               </div>
 
-              <div className="space-y-2">
-                <div className="border border-slate-200 rounded-lg p-3 bg-slate-50 flex items-center justify-between">
-                  <div>
-                    <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 uppercase">
-                      PROVISÓRIO &middot; CAMPO
-                    </span>
-                    <p className="font-bold text-slate-900 text-xs mt-1">Shopping Sul - Expansão (Provisório)</p>
-                    <p className="text-[10px] text-slate-500 font-data-mono">CNPJ: 12.345.678/0001-90 &middot; Origem: Levantamento SDAI</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => alert('Cliente homologado com sucesso! Agora liberado para emissão de propostas.')}
-                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold uppercase tracking-wider"
-                    >
-                      Aprovar
-                    </button>
-                    <button
-                      onClick={() => alert('Selecione o cliente oficial existente para unificar o cadastro sem perder o histórico do relatório.')}
-                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold uppercase tracking-wider"
-                    >
-                      Mesclar
-                    </button>
-                  </div>
+              {provClients.length === 0 ? (
+                <p className="text-[11px] text-slate-400 italic py-6 text-center">Nenhum cliente provisório aguardando homologação.</p>
+              ) : (
+                <div className="space-y-2">
+                  {provClients.map((c) => (
+                    <div key={c.id} className="border border-slate-200 rounded-lg p-3 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 uppercase">
+                          PROVISÓRIO &middot; {c.createdByRole || 'CAMPO'}
+                        </span>
+                        <p className="font-bold text-slate-900 text-xs mt-1">{c.name || 'Sem nome'}</p>
+                        <p className="text-[10px] text-slate-500 font-data-mono">
+                          {c.cnpj ? `CNPJ: ${c.cnpj}` : 'Sem CNPJ'}{c.segment ? ` · ${c.segment}` : ''}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => aprovarCliente(c)}
+                          disabled={homolBusy === c.id}
+                          className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold uppercase tracking-wider disabled:opacity-40"
+                        >
+                          Aprovar
+                        </button>
+                        <button
+                          onClick={() => { setMergeTarget(c); setMergeOficialId(''); }}
+                          disabled={homolBusy === c.id}
+                          className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold uppercase tracking-wider disabled:opacity-40"
+                        >
+                          Mesclar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
+              )}
             </div>
           )}
 
@@ -748,23 +870,31 @@ export const ContaView: React.FC<ContaViewProps> = ({
               <p className="text-xs text-slate-500">
                 Marcas encontradas em campo que não pertencem ao catálogo oficial de marcas parceiras homologadas.
               </p>
-              <div className="border border-slate-200 rounded-lg p-3 bg-slate-50 flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-slate-900 text-xs">Tecnohold Alarms</p>
-                  <p className="text-[10px] text-slate-500">Detectada em: Manutenção Preventiva Catuaí</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      onAddPartnerBrand({ id: `pb_${Date.now()}`, name: 'Tecnohold Alarms', category: 'SDAI / Detecção' });
-                      alert('Marca homologada e adicionada às marcas parceiras oficiais!');
-                    }}
-                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold uppercase tracking-wider"
-                  >
-                    Homologar Marca
-                  </button>
-                </div>
-              </div>
+              {catMarcas.length === 0 ? (
+                <p className="text-[11px] text-slate-400 italic py-6 text-center">Nenhuma marca de campo pendente.</p>
+              ) : (
+                catMarcas.map((m) => {
+                  const nome = String(m.dados.nome || m.dados.name || 'Marca de campo');
+                  const origem = String(m.dados.origem || m.dados.detectada_em || '');
+                  return (
+                    <div key={m.id} className="border border-slate-200 rounded-lg p-3 bg-slate-50 flex items-center justify-between gap-2">
+                      <div>
+                        <p className="font-bold text-slate-900 text-xs">{nome}</p>
+                        {origem && <p className="text-[10px] text-slate-500">Detectada em: {origem}</p>}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => homologarMarca(m)}
+                          disabled={homolBusy === m.id}
+                          className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold uppercase tracking-wider disabled:opacity-40"
+                        >
+                          Homologar Marca
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           )}
 
@@ -777,24 +907,75 @@ export const ContaView: React.FC<ContaViewProps> = ({
               <p className="text-xs text-slate-500">
                 Materiais informados em texto livre por técnicos. Definir preço e fornecedor para converter em produto do Estoque/Serviços.
               </p>
-              <div className="border border-amber-100 bg-amber-50/50 rounded-lg p-3 flex items-center justify-between">
-                <div>
-                  <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-200 text-amber-900 uppercase">Sem preço</span>
-                  <p className="font-bold text-slate-900 text-xs mt-1">Módulo Relé Isolador DFE-521 (Texto livre)</p>
-                  <p className="text-[10px] text-slate-500 font-data-mono">Citado em 3 relatórios de campo</p>
+              {catItens.length === 0 ? (
+                <p className="text-[11px] text-slate-400 italic py-6 text-center">Nenhum item de campo pendente de precificação.</p>
+              ) : (
+                catItens.map((it) => {
+                  const nome = String(it.dados.nome || it.dados.descricao || it.dados.item || 'Item de campo');
+                  const obs = String(it.dados.origem || it.dados.observacao || '');
+                  return (
+                    <div key={it.id} className="border border-amber-100 bg-amber-50/50 rounded-lg p-3 flex items-center justify-between gap-2">
+                      <div>
+                        <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-200 text-amber-900 uppercase">Sem preço</span>
+                        <p className="font-bold text-slate-900 text-xs mt-1">{nome}</p>
+                        {obs && <p className="text-[10px] text-slate-500 font-data-mono">{obs}</p>}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => precificarItem(it)}
+                          disabled={homolBusy === it.id}
+                          className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold uppercase tracking-wider disabled:opacity-40"
+                        >
+                          Precificar
+                        </button>
+                        <button
+                          onClick={() => mesclarItem(it)}
+                          disabled={homolBusy === it.id}
+                          className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold uppercase tracking-wider disabled:opacity-40"
+                        >
+                          Mesclar
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* Modal: mesclar cliente provisório com um oficial */}
+          {mergeTarget && (
+            <div className="fixed inset-0 z-[60] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white w-full max-w-md rounded-xl shadow-2xl border border-slate-200 flex flex-col">
+                <div className="flex items-center justify-between p-4 border-b border-slate-100">
+                  <h3 className="text-sm font-bold text-slate-900 uppercase">Mesclar cliente provisório</h3>
+                  <button onClick={() => setMergeTarget(null)} className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none">✕</button>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="p-4 space-y-3">
+                  <p className="text-[11px] text-slate-500">
+                    O provisório <strong>{mergeTarget.name}</strong> será unificado ao cliente oficial escolhido.
+                    Relatórios, pendências, dispositivos, OS, ciclos, contratos e lançamentos são reatribuídos e o provisório é removido.
+                  </p>
+                  <div>
+                    <label className={labelCls}>Cliente oficial de destino</label>
+                    <select className={inputCls} value={mergeOficialId} onChange={(e) => setMergeOficialId(e.target.value)}>
+                      <option value="">Selecione…</option>
+                      {officialClients.map((oc) => (
+                        <option key={oc.id} value={oc.id}>
+                          {oc.name}{oc.cnpj ? ` — ${oc.cnpj}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-2 p-4 border-t border-slate-100">
+                  <button onClick={() => setMergeTarget(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg uppercase">Cancelar</button>
                   <button
-                    onClick={() => alert('Atribuir preço de custo, preço de venda e cadastrar no Estoque oficial.')}
-                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold uppercase tracking-wider"
+                    onClick={confirmarMerge}
+                    disabled={!mergeOficialId || homolBusy === mergeTarget.id}
+                    className="px-5 py-2 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] text-white text-xs font-semibold uppercase tracking-wide disabled:opacity-40"
                   >
-                    Precificar
-                  </button>
-                  <button
-                    onClick={() => alert('Mesclar com item oficial do Estoque (ex: "Módulo Isolador DFE 521") para eliminar duplicatas.')}
-                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold uppercase tracking-wider"
-                  >
-                    Mesclar
+                    {homolBusy === mergeTarget.id ? 'Mesclando…' : 'Confirmar mesclagem'}
                   </button>
                 </div>
               </div>
