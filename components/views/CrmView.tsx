@@ -13,6 +13,7 @@ import {
 } from '@/lib/types';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
 import { usePrivacy } from '@/lib/privacy';
+import { DevicesManager } from '@/components/reports/DevicesManager';
 
 interface CrmViewProps {
   clients: Client[];
@@ -635,6 +636,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
   onOpenReport,
   onNavigateToTab,
 }) => {
+  const [showDevices, setShowDevices] = useState(false);
   const data = useMemo(() => {
     const belongsPedido = (p: Pedido) => p.clienteId === client.id || norm(p.clienteNome) === norm(client.name);
     const belongsOS = (o: PedidoOS) => o.clientId === client.id || norm(o.clientName) === norm(client.name);
@@ -809,6 +811,12 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
             Abrir Relatório Técnico SDAI
           </button>
           <button
+            onClick={() => setShowDevices(true)}
+            className="px-4 border border-[#1A1A72] text-[#1A1A72] hover:bg-[#1A1A72] hover:text-white font-semibold rounded-lg text-xs uppercase transition-colors flex items-center gap-1"
+          >
+            <span className="material-symbols-outlined text-base">memory</span> Dispositivos
+          </button>
+          <button
             onClick={onClose}
             className="px-4 border border-slate-200 text-slate-700 font-semibold rounded-lg text-xs hover:bg-slate-50 transition-colors uppercase"
           >
@@ -816,6 +824,13 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
           </button>
         </div>
       </div>
+
+      <DevicesManager
+        open={showDevices}
+        onClose={() => setShowDevices(false)}
+        clienteId={client.id}
+        clienteNome={client.name}
+      />
     </div>
   );
 };
