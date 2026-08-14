@@ -19,6 +19,7 @@ import { fetchReports } from '@/lib/reports';
 import { fetchPendencias } from '@/lib/pendencias';
 import { fetchTemplates } from '@/lib/reportTemplates';
 import { gerarPdfExecucao } from '@/lib/reportPdf';
+import { NovaProposta } from '@/components/reports/NovaProposta';
 
 /** Template disponível ao motor: o schema + o id no banco (quando veio do DB). */
 interface LoadedTemplate {
@@ -68,6 +69,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const canCreate = !isFinanceiro; // §6.1 RBAC: criar relatório — admin/gestor/técnico
 
   const [mode, setMode] = useState<'index' | 'form'>('index');
+  const [showProposta, setShowProposta] = useState(false);
   const [reports, setReports] = useState<ReportInstance[]>([]);
   const [pendencias, setPendencias] = useState<Pendencia[]>([]);
   const [loading, setLoading] = useState(false);
@@ -309,15 +311,35 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
             {isTecnico ? 'Meu trabalho pendente' : 'Acompanhamento de Relatórios'}
           </h1>
         </div>
-        {canCreate && (
-          <button
-            onClick={openWizard}
-            className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
-          >
-            <span className="material-symbols-outlined text-base">add</span> Novo relatório
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Proposta: comercial (admin/gestor/financeiro), nunca técnico (§3 RBAC) */}
+          {!isTecnico && (
+            <button
+              onClick={() => setShowProposta(true)}
+              className="border border-[#1A1A72] text-[#1A1A72] hover:bg-[#1A1A72] hover:text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5 uppercase tracking-wide"
+            >
+              <span className="material-symbols-outlined text-base">request_quote</span> Nova proposta
+            </button>
+          )}
+          {canCreate && (
+            <button
+              onClick={openWizard}
+              className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
+            >
+              <span className="material-symbols-outlined text-base">add</span> Novo relatório
+            </button>
+          )}
+        </div>
       </div>
+
+      <NovaProposta
+        open={showProposta}
+        onClose={() => setShowProposta(false)}
+        clients={clients}
+        inventory={inventory}
+        services={services}
+        pendencias={pendencias}
+      />
 
       {/* Bloco A — Ação necessária (chips clicáveis) */}
       <div className="flex gap-3 overflow-x-auto pb-1">
