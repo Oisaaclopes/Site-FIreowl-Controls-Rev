@@ -20,6 +20,7 @@ import { fetchPendencias } from '@/lib/pendencias';
 import { fetchTemplates } from '@/lib/reportTemplates';
 import { gerarPdfExecucao } from '@/lib/reportPdf';
 import { NovaProposta } from '@/components/reports/NovaProposta';
+import { PendenciasBoard } from '@/components/reports/PendenciasBoard';
 
 /** Template disponível ao motor: o schema + o id no banco (quando veio do DB). */
 interface LoadedTemplate {
@@ -69,6 +70,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const canCreate = !isFinanceiro; // §6.1 RBAC: criar relatório — admin/gestor/técnico
 
   const [mode, setMode] = useState<'index' | 'form'>('index');
+  const [board, setBoard] = useState<'relatorios' | 'pendencias'>('relatorios');
   const [showProposta, setShowProposta] = useState(false);
   const [reports, setReports] = useState<ReportInstance[]>([]);
   const [pendencias, setPendencias] = useState<Pendencia[]>([]);
@@ -339,8 +341,30 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         inventory={inventory}
         services={services}
         pendencias={pendencias}
+        onGenerated={refresh}
       />
 
+      {/* Alternância Relatórios / Pendências */}
+      <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 w-fit">
+        {(['relatorios', 'pendencias'] as const).map((b) => (
+          <button
+            key={b}
+            onClick={() => setBoard(b)}
+            className={`px-4 py-1.5 rounded-md text-xs font-semibold uppercase transition-colors ${
+              board === b ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            {b === 'relatorios' ? 'Relatórios' : 'Pendências'}
+          </button>
+        ))}
+      </div>
+
+      {board === 'pendencias' && (
+        <PendenciasBoard pendencias={pendencias} clients={clients} userRole={userRole} onChanged={refresh} />
+      )}
+
+      {board === 'relatorios' && (
+      <>
       {/* Bloco A — Ação necessária (chips clicáveis) */}
       <div className="flex gap-3 overflow-x-auto pb-1">
         <IndChip label="Rascunhos" value={indA.rascunhos} tone="slate" onClick={() => setFStatus('rascunho')} />
@@ -470,6 +494,8 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 
       {!isSupabaseConfigured() && (
         <p className="text-[10px] text-slate-400">Supabase não configurado: a lista fica vazia; o formulário funciona em modo protótipo.</p>
+      )}
+      </>
       )}
 
       {/* ===== Wizard "+ Novo relatório" (3 passos) ===== */}

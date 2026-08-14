@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { Client, InventoryItem, ServiceCatalogItem, Pendencia } from '@/lib/types';
 import { montarProposta, RegimePrecificacao } from '@/lib/proposta';
 import { gerarPdfProposta } from '@/lib/propostaPdf';
+import { updatePendenciaStatus } from '@/lib/pendencias';
 import { usePrivacy } from '@/lib/privacy';
 
 interface NovaPropostaProps {
@@ -13,12 +14,13 @@ interface NovaPropostaProps {
   inventory: InventoryItem[];
   services: ServiceCatalogItem[];
   pendencias: Pendencia[];
+  onGenerated?: () => void;
 }
 
 const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 const inputCls = 'w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20';
 
-export const NovaProposta: React.FC<NovaPropostaProps> = ({ open, onClose, clients, inventory, services, pendencias }) => {
+export const NovaProposta: React.FC<NovaPropostaProps> = ({ open, onClose, clients, inventory, services, pendencias, onGenerated }) => {
   const { maskMoney } = usePrivacy();
   const [clienteId, setClienteId] = useState(clients[0]?.id || '');
   const [regime, setRegime] = useState<RegimePrecificacao>('unitario');
@@ -71,9 +73,18 @@ export const NovaProposta: React.FC<NovaPropostaProps> = ({ open, onClose, clien
 
   const semPreco = escolhidas.some((p) => precoItem(p) === 0);
 
-  const gerar = () => {
-    if (provisorio) return;
+  const gerar = async () => {
+    if (provisorio || escolhidas.length === 0) return;
     gerarPdfProposta(publica);
+    // Move as pendências para "orçada" (best-effort; requer admin/gestor na RLS).
+    try {
+      await Promise.all(
+        escolhidas.map((p) => updatePendenciaStatus(p.id, 'orcada', { propostaId: publica.numero }))
+      );
+      onGenerated?.();
+    } catch (err) {
+      console.warn('Proposta gerada, mas não foi possível marcar as pendências como orçadas.', err);
+    }
   };
 
   const CompRow: React.FC<{ label: string; valor: number; bold?: boolean }> = ({ label, valor, bold }) => (
