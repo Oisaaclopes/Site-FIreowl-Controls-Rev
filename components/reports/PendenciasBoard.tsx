@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { Client, Pendencia, PendenciaStatus, UserRole } from '@/lib/types';
 import { updatePendenciaStatus } from '@/lib/pendencias';
+import { createOrdemServico, nextOsNumero } from '@/lib/ordensServico';
 
 interface PendenciasBoardProps {
   pendencias: Pendencia[];
@@ -37,8 +38,18 @@ export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, cl
   const [fStatus, setFStatus] = useState<string>('TODOS');
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [gerandoOs, setGerandoOs] = useState(false);
 
   const clientName = (id?: string) => clients.find((c) => c.id === id)?.name || '—';
+
+  const toggleSelected = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();
@@ -69,8 +80,78 @@ export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, cl
     }
   };
 
+  // Pendências selecionadas (só faz sentido agrupar 'aprovada' do mesmo cliente).
+  const selecionadas = pendencias.filter((p) => selected.has(p.id));
+  const clientesSelecionados = new Set(selecionadas.map((p) => p.clienteId || ''));
+  const podeGerarOs =
+    podeEditar &&
+    selecionadas.length > 0 &&
+    clientesSelecionados.size === 1 &&
+    selecionadas.every((p) => p.status === 'aprovada');
+
+  const gerarOs = async () => {
+    if (!podeGerarOs || gerandoOs) return;
+    const clienteId = selecionadas[0].clienteId;
+    setGerandoOs(true);
+    try {
+      const numero = await nextOsNumero();
+      await createOrdemServico({
+        id: '',
+        numero,
+        clienteId,
+        tipo: 'corretiva',
+        titulo: `${selecionadas.length} pendência(s) — ${clientName(clienteId)}`,
+        status: 'aberta',
+        prioridade: 'media',
+        pendenciaIds: selecionadas.map((p) => p.id),
+      });
+      // As pendências entram em execução (vinculadas à OS aberta).
+      for (const p of selecionadas) {
+        await updatePendenciaStatus(p.id, 'em_execucao');
+      }
+      setSelected(new Set());
+      onChanged();
+      alert(`Ordem de Serviço ${numero} gerada com ${selecionadas.length} pendência(s).`);
+    } catch (err) {
+      console.error('Falha ao gerar OS:', err);
+      alert('Não foi possível gerar a Ordem de Serviço.');
+    } finally {
+      setGerandoOs(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4">
+      {/* Barra de ação da seleção (gerar OS a partir de pendências aprovadas) */}
+      {podeEditar && selecionadas.length > 0 && (
+        <div className="sticky top-2 z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-[#1A1A72] text-white p-3 rounded-xl shadow-lg">
+          <div className="text-xs">
+            <strong>{selecionadas.length}</strong> selecionada(s)
+            {clientesSelecionados.size > 1 && (
+              <span className="ml-2 text-amber-200">· selecione pendências de um único cliente</span>
+            )}
+            {clientesSelecionados.size === 1 && !selecionadas.every((p) => p.status === 'aprovada') && (
+              <span className="ml-2 text-amber-200">· só pendências aprovadas viram OS</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSelected(new Set())}
+              className="px-3 py-1.5 rounded-lg text-[11px] font-semibold uppercase bg-white/15 hover:bg-white/25"
+            >
+              Limpar
+            </button>
+            <button
+              onClick={gerarOs}
+              disabled={!podeGerarOs || gerandoOs}
+              className="px-4 py-1.5 rounded-lg text-[11px] font-bold uppercase bg-white text-[#1A1A72] hover:bg-slate-100 disabled:opacity-40"
+            >
+              {gerandoOs ? 'Gerando…' : 'Gerar OS'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Filtros */}
       <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
         <div className="relative w-full sm:w-72">
@@ -107,6 +188,15 @@ export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, cl
         <div className="flex flex-col gap-2">
           {filtered.map((p) => (
             <div key={p.id} className="bg-white rounded-xl border border-slate-100 shadow-sm p-3 flex flex-col md:flex-row md:items-center gap-3">
+              {podeEditar && p.status === 'aprovada' && (
+                <input
+                  type="checkbox"
+                  checked={selected.has(p.id)}
+                  onChange={() => toggleSelected(p.id)}
+                  className="mt-1 md:mt-0 h-4 w-4 shrink-0 accent-[#1A1A72] cursor-pointer"
+                  title="Selecionar para gerar Ordem de Serviço"
+                />
+              )}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   {p.grupo && <span className="text-[10px] font-bold text-[#E63946] uppercase">{p.grupo}</span>}

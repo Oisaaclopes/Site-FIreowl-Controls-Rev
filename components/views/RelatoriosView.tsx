@@ -10,6 +10,7 @@ import {
   ReportInstance,
   Pendencia,
   Device,
+  OrdemServico,
 } from '@/lib/types';
 import { ALL_TEMPLATES, seedReportTemplates } from '@/lib/reportTemplatesData';
 import { TemplateSchema } from '@/lib/reportSchema';
@@ -19,6 +20,7 @@ import { isSupabaseConfigured } from '@/lib/inventory';
 import { fetchReports } from '@/lib/reports';
 import { fetchPendencias } from '@/lib/pendencias';
 import { fetchDevices } from '@/lib/devices';
+import { fetchOrdensServico } from '@/lib/ordensServico';
 import { fetchTemplates } from '@/lib/reportTemplates';
 import { gerarPdfExecucao } from '@/lib/reportPdf';
 import { NovaProposta } from '@/components/reports/NovaProposta';
@@ -76,6 +78,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const [showProposta, setShowProposta] = useState(false);
   const [reports, setReports] = useState<ReportInstance[]>([]);
   const [pendencias, setPendencias] = useState<Pendencia[]>([]);
+  const [ordens, setOrdens] = useState<OrdemServico[]>([]);
   const [loading, setLoading] = useState(false);
   // Templates: "template é dado, não código" — carregados do banco, com
   // fallback aos empacotados e seed automático (admin) na primeira vez.
@@ -152,10 +155,11 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const refresh = () => {
     if (!isSupabaseConfigured()) return;
     setLoading(true);
-    Promise.all([fetchReports(), fetchPendencias(userRole)])
-      .then(([rs, ps]) => {
+    Promise.all([fetchReports(), fetchPendencias(userRole), fetchOrdensServico()])
+      .then(([rs, ps, os]) => {
         setReports(rs);
         setPendencias(ps);
+        setOrdens(os);
       })
       .catch((err) => console.warn('Relatórios: falha ao carregar.', err))
       .finally(() => setLoading(false));
@@ -295,6 +299,9 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 
   const clienteContratos = contracts.filter((c) => clientName(wClienteId) === c.clientName);
   const clientePendAprovadas = pendencias.filter((p) => p.status === 'aprovada' && p.clienteId === wClienteId);
+  const clienteOrdensAbertas = ordens.filter(
+    (o) => o.clienteId === wClienteId && ['aberta', 'agendada', 'em_execucao'].includes(o.status)
+  );
 
   // ===== Formulário aberto =====
   if (mode === 'form' && formTemplate) {
@@ -630,13 +637,24 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                   </div>
                   <div>
                     <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">OS vinculada (opcional)</label>
-                    <input
-                      type="text"
-                      value={wOsId}
-                      onChange={(e) => setWOsId(e.target.value)}
-                      placeholder="Ex.: OS-2026-091"
-                      className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs font-data-mono focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
-                    />
+                    {clienteOrdensAbertas.length > 0 ? (
+                      <select
+                        value={wOsId}
+                        onChange={(e) => setWOsId(e.target.value)}
+                        className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                      >
+                        <option value="">Sem OS — abrir avulso</option>
+                        {clienteOrdensAbertas.map((os) => (
+                          <option key={os.id} value={os.id}>
+                            {os.numero || os.id.slice(0, 8)} — {os.titulo || `${os.pendenciaIds.length} pendência(s)`} ({os.status})
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="w-full border border-dashed border-slate-200 rounded-lg p-2.5 text-[11px] text-slate-400 italic">
+                        Nenhuma OS aberta para este cliente. Gere uma no quadro de pendências.
+                      </div>
+                    )}
                   </div>
                   {wTipo === 'CORRETIVA' && (
                     <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/50">

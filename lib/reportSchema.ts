@@ -166,6 +166,22 @@ export function validateFinalize(
           });
         }
       }
+      if (field.tipo === 'checklist_dispositivos') {
+        // No checklist a foto só é exigida no card que reprovou (qualquer campo
+        // com abre_pendencia_se disparado) — evita travar a preventiva inteira.
+        const cards = Array.isArray(v) ? (v as RepeaterCard[]) : [];
+        const schema = field.card_schema || [];
+        cards.forEach((c, i) => {
+          const reprovou = schema.some((cf) => isNegativeAnswer(cf, c[cf.key]));
+          if (reprovou && !hasPhoto(field.key, i)) {
+            issues.push({
+              secao: secao.titulo,
+              campo: `${(c.dispositivo as string) || field.label || field.key} #${i + 1}`,
+              motivo: 'Dispositivo reprovado sem foto — foto é obrigatória para sustentar a pendência.',
+            });
+          }
+        });
+      }
     }
   }
   return issues;

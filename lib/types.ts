@@ -522,6 +522,27 @@ export interface Pendencia {
   resolvidaEm?: string;
 }
 
+export type OrdemServicoStatus = 'aberta' | 'agendada' | 'em_execucao' | 'concluida' | 'cancelada';
+
+/** Ordem de Serviço — agrega pendências aprovadas e liga à corretiva de execução. */
+export interface OrdemServico {
+  id: string;
+  numero?: string; // OS-2026-0091
+  clienteId?: string;
+  contratoId?: string;
+  tipo: 'corretiva' | 'preventiva' | 'instalacao' | 'outro';
+  titulo?: string;
+  descricao?: string;
+  status: OrdemServicoStatus;
+  prioridade: 'baixa' | 'media' | 'alta' | 'critica';
+  pendenciaIds: string[];
+  reportId?: string; // relatório de execução vinculado
+  dataAbertura?: string;
+  dataPrevista?: string;
+  dataConclusao?: string;
+  criadoPor?: string;
+}
+
 /** Custos de logística versionados por vigência. */
 export interface CustoLogistica {
   id: string;

@@ -14,6 +14,7 @@ import {
 import { FormEngine, CatalogSources } from '@/components/reports/FormEngine';
 import { isSupabaseConfigured } from '@/lib/inventory';
 import { createReport, updateReport, upsertAnswer, insertMedia } from '@/lib/reports';
+import { updateOrdemServicoStatus } from '@/lib/ordensServico';
 import { insertPendencia } from '@/lib/pendencias';
 import { uploadReportPhoto, getCapturedPhoto, getPhotoPreview, isPhotoId, registerPhoto, clearPhotoRegistry } from '@/lib/reportMedia';
 import { getSignature, isSignatureId, uploadSignaturePng, insertSignature, clearSignatureRegistry } from '@/lib/signatures';
@@ -38,6 +39,8 @@ interface PendenciaPreview {
   local?: string;
   origem: string;
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const firstDigit = (s: unknown): number | undefined => {
   const m = /(\d)/.exec(String(s ?? ''));
@@ -481,6 +484,19 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         finalizadoEm: new Date().toISOString(),
         geoFim: geoFim || undefined,
       });
+
+      // Vínculo com a Ordem de Serviço (corretiva): registra este relatório como
+      // execução e conclui a OS. Só quando osId é uma OS real (uuid), não texto.
+      if (contexto?.osId && UUID_RE.test(contexto.osId)) {
+        try {
+          await updateOrdemServicoStatus(contexto.osId, 'concluida', {
+            reportId: report.id,
+            dataConclusao: new Date().toISOString().slice(0, 10),
+          });
+        } catch (e) {
+          console.warn('Não foi possível vincular a Ordem de Serviço:', e);
+        }
+      }
 
       // fotos/assinaturas já subiram ao Storage — libera a memória da sessão
       clearPhotoRegistry();
