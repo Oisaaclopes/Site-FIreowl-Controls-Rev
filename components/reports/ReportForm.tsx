@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
-import { Client, UserRole, Pendencia, AcaoRecomendada } from '@/lib/types';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Client, UserRole, Pendencia, AcaoRecomendada, GeoPoint } from '@/lib/types';
+import { getGeoPoint } from '@/lib/geo';
 import {
   TemplateSchema,
   FormValues,
@@ -115,6 +116,12 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   // Estado da bandeja de fotos não classificadas (Seção 3.1)
   const [unclassifiedPhotos, setUnclassifiedPhotos] = useState<UnclassifiedPhoto[]>([]);
   const [isTriagemOpen, setIsTriagemOpen] = useState(false);
+
+  // Geolocalização de abertura (capturada ao montar; não bloqueia se negada)
+  const [geoInicio, setGeoInicio] = useState<GeoPoint | null>(null);
+  useEffect(() => {
+    getGeoPoint().then(setGeoInicio);
+  }, []);
 
   const handleChange = (key: string, value: unknown) => {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -250,6 +257,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         storagePathOriginal: path,
         answerId: undefined, // vínculo fino a apontamento fica para uma fatia futura
         notaRapida: unclassifiedPhotos.find((p) => p.id === id)?.notaRapida,
+        geo: geoInicio || undefined,
       });
     }
     return pathById;
@@ -286,6 +294,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         tecnicoNome: currentUserName || undefined,
         titulo: `${template.nome} — ${cliente?.name || ''}`.trim(),
         status: 'rascunho',
+        geoInicio: geoInicio || undefined,
       });
 
       // 2) sobe as fotos ao Storage e cria report_media; devolve id->storage_path
@@ -323,8 +332,14 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         await insertPendencia({ ...p, reportOrigemId: report.id });
       }
 
-      // 4) finaliza por último (torna o relatório imutável)
-      await updateReport({ ...report, status: 'finalizado', finalizadoEm: new Date().toISOString() });
+      // 4) finaliza por último (torna o relatório imutável) — captura geo de fecho
+      const geoFim = await getGeoPoint();
+      await updateReport({
+        ...report,
+        status: 'finalizado',
+        finalizadoEm: new Date().toISOString(),
+        geoFim: geoFim || undefined,
+      });
 
       setSavedInfo({ reportId: report.id, count: pends.length });
       setFinalized(true);
@@ -355,12 +370,23 @@ export const ReportForm: React.FC<ReportFormProps> = ({
             <h1 className="text-xl font-bold text-slate-900 tracking-tight truncate">{cliente?.name || 'Novo relatório'}</h1>
           </div>
         </div>
-        {isTecnico && (
-          <p className="text-[11px] text-emerald-700 bg-emerald-50 inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-semibold shrink-0">
-            <span className="material-symbols-outlined text-sm">visibility_off</span>
-            Perfil Técnico: sem valores e sem criticidade.
-          </p>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          <span
+            title={geoInicio ? `${geoInicio.lat?.toFixed(5)}, ${geoInicio.lng?.toFixed(5)} (±${Math.round(geoInicio.accuracy || 0)} m)` : 'GPS indisponível / permissão negada'}
+            className={`text-[11px] inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-semibold ${
+              geoInicio ? 'text-[#1A1A72] bg-[#1A1A72]/5' : 'text-slate-400 bg-slate-100'
+            }`}
+          >
+            <span className="material-symbols-outlined text-sm">{geoInicio ? 'location_on' : 'location_off'}</span>
+            {geoInicio ? `±${Math.round(geoInicio.accuracy || 0)} m` : 'sem GPS'}
+          </span>
+          {isTecnico && (
+            <p className="text-[11px] text-emerald-700 bg-emerald-50 inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-semibold">
+              <span className="material-symbols-outlined text-sm">visibility_off</span>
+              Técnico: sem valores/criticidade.
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
