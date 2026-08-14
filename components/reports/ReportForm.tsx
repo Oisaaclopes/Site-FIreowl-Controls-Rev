@@ -361,11 +361,23 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         seq: `${Date.now()}_${seq++}`,
       });
       pathById[id] = path;
+      // Versão marcada (setas/círculos), quando o técnico anotou a foto.
+      let markedPath: string | undefined;
+      if (cap.markedBlob) {
+        markedPath = await uploadReportPhoto({
+          file: cap.markedBlob,
+          reportId,
+          clienteId: cliente?.id,
+          tipo: `${tipo}_marcado`,
+          seq: `${Date.now()}_${seq++}`,
+        });
+      }
       await insertMedia({
         id: '',
         reportId,
         tipo,
         storagePathOriginal: path,
+        storagePathMarcado: markedPath,
         answerId: undefined, // vínculo fino a apontamento fica para uma fatia futura
         notaRapida: unclassifiedPhotos.find((p) => p.id === id)?.notaRapida,
         geo: geoInicio || undefined,

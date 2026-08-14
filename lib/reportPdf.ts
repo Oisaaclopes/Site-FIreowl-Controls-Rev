@@ -91,10 +91,19 @@ export async function gerarPdfExecucao(
 
   const paths: string[] = [];
   answers.forEach((a) => collectPaths(a.valor, paths));
-  bandeja.forEach((m) => paths.push(m.storagePathOriginal));
+  bandeja.forEach((m) => {
+    paths.push(m.storagePathOriginal);
+    if (m.storagePathMarcado) paths.push(m.storagePathMarcado);
+  });
   signatures.forEach((s) => { if (s.storagePath) paths.push(s.storagePath); });
   const urlMap = await signedReportUrls(paths);
+  // Mapa original -> versão marcada (setas/círculos). A foto do apontamento é
+  // guardada pelo caminho original; na exibição preferimos a marcada.
+  const markedOf: Record<string, string> = {};
+  bandeja.forEach((m) => { if (m.storagePathMarcado) markedOf[m.storagePathOriginal] = m.storagePathMarcado; });
   const url = (p?: string) => (p && urlMap[p]) || '';
+  // URL de exibição de uma foto: usa a marcada quando existir.
+  const display = (p?: string) => url(p && markedOf[p] ? markedOf[p] : p);
 
   const cards = extractCards(answers);
   const grupos = Array.from(new Set(cards.map((c) => c.grupo || 'Geral')));
@@ -108,7 +117,7 @@ export async function gerarPdfExecucao(
     fotos.length === 0
       ? ''
       : `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${fotos
-          .map((p) => `<img src="${esc(url(p))}" style="width:150px;height:110px;object-fit:cover;border:1px solid #ddd;border-radius:4px" />`)
+          .map((p) => `<img src="${esc(display(p))}" style="width:150px;height:110px;object-fit:cover;border:1px solid #ddd;border-radius:4px" />`)
           .join('')}</div>`;
 
   const servicosHtml = grupos
@@ -119,8 +128,8 @@ export async function gerarPdfExecucao(
           const antesDepois =
             c.foto && c.foto.length === 2
               ? `<div style="display:flex;gap:8px;margin-top:6px">
-                   <div><div style="font-size:9px;color:#888">ANTES</div><img src="${esc(url(c.foto[0]))}" style="width:170px;height:120px;object-fit:cover;border:1px solid #ddd;border-radius:4px" /></div>
-                   <div><div style="font-size:9px;color:#888">DEPOIS</div><img src="${esc(url(c.foto[1]))}" style="width:170px;height:120px;object-fit:cover;border:1px solid #ddd;border-radius:4px" /></div>
+                   <div><div style="font-size:9px;color:#888">ANTES</div><img src="${esc(display(c.foto[0]))}" style="width:170px;height:120px;object-fit:cover;border:1px solid #ddd;border-radius:4px" /></div>
+                   <div><div style="font-size:9px;color:#888">DEPOIS</div><img src="${esc(display(c.foto[1]))}" style="width:170px;height:120px;object-fit:cover;border:1px solid #ddd;border-radius:4px" /></div>
                  </div>`
               : fotoGrid(c.foto || []);
           const qtd = c.quantidade ? `${esc(c.quantidade)} ${esc(c.unidade || '')}` : '';
@@ -154,7 +163,7 @@ export async function gerarPdfExecucao(
       ? ''
       : `<h2 style="color:${NAVY};margin-top:18px">Registro Fotográfico Geral</h2>
          <div style="display:flex;flex-wrap:wrap;gap:6px">${bandejaGeral
-           .map((m) => `<img src="${esc(url(m.storagePathOriginal))}" style="width:150px;height:110px;object-fit:cover;border:1px solid #ddd;border-radius:4px" />`)
+           .map((m) => `<img src="${esc(display(m.storagePathOriginal))}" style="width:150px;height:110px;object-fit:cover;border:1px solid #ddd;border-radius:4px" />`)
            .join('')}</div>`;
 
   const assinaturasHtml =

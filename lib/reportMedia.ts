@@ -11,6 +11,9 @@ interface CapturedPhoto {
   blob: Blob;
   previewUrl: string;
   tipo?: 'antes' | 'depois' | 'evidencia' | 'geral';
+  /** Versão marcada (setas/círculos desenhados pelo técnico). Original é preservado. */
+  markedBlob?: Blob;
+  markedPreviewUrl?: string;
 }
 const photoRegistry = new Map<string, CapturedPhoto>();
 
@@ -23,18 +26,35 @@ export function getCapturedPhoto(id: string): CapturedPhoto | undefined {
   return photoRegistry.get(id);
 }
 export function getPhotoPreview(id: string): string | undefined {
-  return photoRegistry.get(id)?.previewUrl;
+  const p = photoRegistry.get(id);
+  // Mostra a versão marcada quando existir (é o que representa o apontamento).
+  return p?.markedPreviewUrl || p?.previewUrl;
+}
+/** Grava a versão marcada de uma foto (não sobrescreve o original). */
+export function setPhotoMarkup(id: string, marked: Blob): void {
+  const p = photoRegistry.get(id);
+  if (!p) return;
+  if (p.markedPreviewUrl) URL.revokeObjectURL(p.markedPreviewUrl);
+  p.markedBlob = marked;
+  p.markedPreviewUrl = URL.createObjectURL(marked);
+}
+export function hasMarkup(id: string): boolean {
+  return !!photoRegistry.get(id)?.markedBlob;
 }
 export function forgetPhoto(id: string): void {
   const p = photoRegistry.get(id);
   if (p) {
     URL.revokeObjectURL(p.previewUrl);
+    if (p.markedPreviewUrl) URL.revokeObjectURL(p.markedPreviewUrl);
     photoRegistry.delete(id);
   }
 }
 /** Revoga todas as object URLs e limpa o registro (chamar ao encerrar o form). */
 export function clearPhotoRegistry(): void {
-  photoRegistry.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+  photoRegistry.forEach((p) => {
+    URL.revokeObjectURL(p.previewUrl);
+    if (p.markedPreviewUrl) URL.revokeObjectURL(p.markedPreviewUrl);
+  });
   photoRegistry.clear();
 }
 /** Um valor é um ID de foto registrada nesta sessão? */

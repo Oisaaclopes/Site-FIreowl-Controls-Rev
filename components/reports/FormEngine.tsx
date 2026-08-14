@@ -11,7 +11,8 @@ import {
   isFieldVisibleForRole,
   fotoLabels,
 } from '@/lib/reportSchema';
-import { registerPhoto, getPhotoPreview } from '@/lib/reportMedia';
+import { registerPhoto, getPhotoPreview, setPhotoMarkup, hasMarkup } from '@/lib/reportMedia';
+import { MarkupCanvas } from '@/components/reports/MarkupCanvas';
 import { getSignature } from '@/lib/signatures';
 import { SignatureCanvas } from '@/components/reports/SignatureCanvas';
 
@@ -66,6 +67,8 @@ const FieldControl: React.FC<{
   catalog: CatalogSources;
 }> = ({ field, value, onValue, catalog }) => {
   const [sigOpen, setSigOpen] = useState(false);
+  const [markupId, setMarkupId] = useState<string | null>(null);
+  const [, forceTick] = useState(0); // re-render após gravar markup (registro é mutável)
   const negative = isNegativeAnswer(field, value as never);
 
   const negHint = negative ? (
@@ -207,19 +210,39 @@ const FieldControl: React.FC<{
             <div className="flex flex-wrap gap-1.5">
               {arr.map((pid, i) => {
                 const preview = getPhotoPreview(pid);
+                const marcada = hasMarkup(pid);
                 return (
-                  <div key={pid + i} className="w-12 h-12 rounded-md overflow-hidden border border-slate-200 bg-slate-100">
+                  <button
+                    key={pid + i}
+                    type="button"
+                    onClick={() => setMarkupId(pid)}
+                    title="Marcar foto (destacar o problema)"
+                    className="relative w-12 h-12 rounded-md overflow-hidden border border-slate-200 bg-slate-100 group"
+                  >
                     {preview ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={preview} alt="foto" className="w-full h-full object-cover" />
                     ) : (
                       <span className="material-symbols-outlined text-slate-300 flex items-center justify-center w-full h-full">image</span>
                     )}
-                  </div>
+                    <span className={`absolute bottom-0 right-0 material-symbols-outlined text-[13px] leading-none p-0.5 rounded-tl ${marcada ? 'bg-[#E63946] text-white' : 'bg-black/50 text-white opacity-0 group-hover:opacity-100'}`}>
+                      {marcada ? 'check' : 'edit'}
+                    </span>
+                  </button>
                 );
               })}
             </div>
           )}
+          <MarkupCanvas
+            open={markupId !== null}
+            imageUrl={markupId ? getPhotoPreview(markupId) : undefined}
+            onClose={() => setMarkupId(null)}
+            onDone={(blob) => {
+              if (markupId) setPhotoMarkup(markupId, blob);
+              setMarkupId(null);
+              forceTick((n) => n + 1);
+            }}
+          />
         </div>
       );
     }
