@@ -12,8 +12,9 @@ import {
 } from '@/lib/reportSchema';
 import { FormEngine, CatalogSources } from '@/components/reports/FormEngine';
 import { isSupabaseConfigured } from '@/lib/inventory';
-import { createReport, updateReport, upsertAnswer } from '@/lib/reports';
+import { createReport, updateReport, upsertAnswer, insertMedia } from '@/lib/reports';
 import { insertPendencia } from '@/lib/pendencias';
+import { uploadReportPhoto, getCapturedPhoto, getPhotoPreview, isPhotoId } from '@/lib/reportMedia';
 
 interface ReportFormProps {
   template: TemplateSchema;
@@ -123,10 +124,10 @@ export const ReportForm: React.FC<ReportFormProps> = ({
     setPersistErr(null);
   };
 
-  const handleFastPhotoCaptured = (url: string) => {
+  const handleFastPhotoCaptured = (photoId: string) => {
     const newPhoto: UnclassifiedPhoto = {
-      id: `photo_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-      url,
+      id: photoId, // ID do registro transitório (aponta para o arquivo real)
+      url: getPhotoPreview(photoId) || '',
       timestamp: new Date().toLocaleTimeString('pt-BR', { hour12: false }),
     };
     setUnclassifiedPhotos((prev) => [newPhoto, ...prev]);
@@ -151,7 +152,6 @@ export const ReportForm: React.FC<ReportFormProps> = ({
     const selected = unclassifiedPhotos.filter((p) => photoIds.includes(p.id));
     if (selected.length === 0) return;
 
-    const urls = selected.map((s) => s.url);
     const notas = selected.map((s) => s.notaRapida).filter(Boolean).join('; ');
     const descFinal = descricao || notas || 'Apontamento capturado em campo';
 
@@ -162,7 +162,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       quantidade: 1,
       descricao: descFinal,
       acao_recomendada: 'investigar',
-      foto: urls,
+      foto: selected.map((s) => s.id), // IDs de foto (viram storage_path na finalização)
     };
 
     handleChange('apontamentos', [...currentCards, newCard]);
@@ -210,6 +210,51 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   };
 
 
+  // Sobe todas as fotos capturadas (campos foto + apontamentos + bandeja) ao
+  // Storage e cria as linhas report_media. Retorna { photoId: storage_path }.
+  const uploadPhotos = async (reportId: string): Promise<Record<string, string>> => {
+    const ids = new Set<string>();
+    const collect = (v: unknown) => {
+      if (!Array.isArray(v)) return;
+      v.forEach((item) => {
+        if (typeof item === 'string' && isPhotoId(item)) ids.add(item);
+        else if (item && typeof item === 'object') {
+          Object.values(item as Record<string, unknown>).forEach((val) => {
+            if (Array.isArray(val)) val.forEach((x) => { if (typeof x === 'string' && isPhotoId(x)) ids.add(x); });
+          });
+        }
+      });
+    };
+    for (const secao of template.secoes) for (const field of secao.campos) collect(values[field.key]);
+    unclassifiedPhotos.forEach((p) => { if (isPhotoId(p.id)) ids.add(p.id); });
+
+    const pathById: Record<string, string> = {};
+    let seq = 0;
+    for (const id of ids) {
+      const cap = getCapturedPhoto(id);
+      if (!cap) continue;
+      const naBandeja = unclassifiedPhotos.some((p) => p.id === id);
+      const tipo = (cap.tipo || (naBandeja ? 'geral' : 'evidencia')) as 'antes' | 'depois' | 'evidencia' | 'geral';
+      const path = await uploadReportPhoto({
+        file: cap.blob,
+        reportId,
+        clienteId: cliente?.id,
+        tipo,
+        seq: `${Date.now()}_${seq++}`,
+      });
+      pathById[id] = path;
+      await insertMedia({
+        id: '',
+        reportId,
+        tipo,
+        storagePathOriginal: path,
+        answerId: undefined, // vínculo fino a apontamento fica para uma fatia futura
+        notaRapida: unclassifiedPhotos.find((p) => p.id === id)?.notaRapida,
+      });
+    }
+    return pathById;
+  };
+
   const handleFinalize = async () => {
     const found = validateFinalize(template, values, hasPhoto);
     setIssues(found);
@@ -243,16 +288,36 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         status: 'rascunho',
       });
 
-      // 2) respostas (uma por campo de topo; repeater como jsonb)
+      // 2) sobe as fotos ao Storage e cria report_media; devolve id->storage_path
+      const pathById = await uploadPhotos(report.id);
+
+      // substitui os IDs de foto (transitórios) pelos storage_path nas respostas
+      const mapId = (x: unknown) => (typeof x === 'string' && pathById[x] ? pathById[x] : x);
+      const cleanValue = (v: unknown): unknown => {
+        if (!Array.isArray(v)) return v;
+        return v.map((item) => {
+          if (typeof item === 'string') return mapId(item);
+          if (item && typeof item === 'object') {
+            const obj: Record<string, unknown> = { ...(item as Record<string, unknown>) };
+            for (const k of Object.keys(obj)) {
+              if (Array.isArray(obj[k])) obj[k] = (obj[k] as unknown[]).map(mapId);
+            }
+            return obj;
+          }
+          return item;
+        });
+      };
+
+      // 3) respostas (uma por campo de topo; repeater como jsonb)
       for (const secao of template.secoes) {
         for (const field of secao.campos) {
           const v = values[field.key];
           if (v === undefined) continue;
-          await upsertAnswer({ id: '', reportId: report.id, secao: secao.key, fieldKey: field.key, valor: v });
+          await upsertAnswer({ id: '', reportId: report.id, secao: secao.key, fieldKey: field.key, valor: cleanValue(v) });
         }
       }
 
-      // 3) pendências detectadas
+      // 4) pendências detectadas
       const pends = buildPendencias(template, values, cliente?.id || '', catalog.itens);
       for (const p of pends) {
         await insertPendencia({ ...p, reportOrigemId: report.id });

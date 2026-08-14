@@ -2,6 +2,41 @@ import { getSupabaseClient } from './supabaseClient';
 
 const BUCKET = 'report-media';
 
+/* ---------------------------------------------------------------------------
+ * Registro transitório de fotos capturadas (client-side). Os campos de foto e
+ * a captura rápida guardam apenas um ID leve; o arquivo real fica aqui até a
+ * finalização, quando é comprimido, enviado ao Storage e vira report_media.
+ * ------------------------------------------------------------------------- */
+interface CapturedPhoto {
+  blob: Blob;
+  previewUrl: string;
+  tipo?: 'antes' | 'depois' | 'evidencia' | 'geral';
+}
+const photoRegistry = new Map<string, CapturedPhoto>();
+
+export function registerPhoto(blob: Blob, tipo?: CapturedPhoto['tipo']): string {
+  const id = `ph_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+  photoRegistry.set(id, { blob, previewUrl: URL.createObjectURL(blob), tipo });
+  return id;
+}
+export function getCapturedPhoto(id: string): CapturedPhoto | undefined {
+  return photoRegistry.get(id);
+}
+export function getPhotoPreview(id: string): string | undefined {
+  return photoRegistry.get(id)?.previewUrl;
+}
+export function forgetPhoto(id: string): void {
+  const p = photoRegistry.get(id);
+  if (p) {
+    URL.revokeObjectURL(p.previewUrl);
+    photoRegistry.delete(id);
+  }
+}
+/** Um valor é um ID de foto registrada nesta sessão? */
+export function isPhotoId(v: unknown): v is string {
+  return typeof v === 'string' && photoRegistry.has(v);
+}
+
 /**
  * Comprime a imagem no cliente antes de subir (Parte 4.2): máx. 1600px no
  * maior lado, JPEG ~0.7. Uma preventiva de shopping gera 60+ fotos.

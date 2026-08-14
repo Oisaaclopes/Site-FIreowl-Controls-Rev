@@ -11,6 +11,7 @@ import {
   isFieldVisibleForRole,
   fotoLabels,
 } from '@/lib/reportSchema';
+import { registerPhoto, getPhotoPreview } from '@/lib/reportMedia';
 
 export interface CatalogSources {
   categorias: string[];
@@ -173,29 +174,48 @@ const FieldControl: React.FC<{
       const labels = fotoLabels(field);
       const arr = Array.isArray(value) ? (value as string[]) : [];
       return (
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer">
-            <span className="material-symbols-outlined text-base">photo_camera</span>
-            Adicionar foto
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                const names = Array.from(e.target.files || []).map((f) => f.name);
-                onValue([...arr, ...names]);
-              }}
-            />
-          </label>
-          <span className="text-[10px] text-slate-400">
-            {arr.length}/{labels.length} {labels[0] === 'foto' ? 'foto(s)' : labels.join(' + ')}
-          </span>
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer">
+              <span className="material-symbols-outlined text-base">photo_camera</span>
+              Adicionar foto
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  const ids = Array.from(e.target.files || []).map((f) => registerPhoto(f));
+                  onValue([...arr, ...ids]);
+                }}
+              />
+            </label>
+            <span className="text-[10px] text-slate-400">
+              {arr.length}/{labels.length} {labels[0] === 'foto' ? 'foto(s)' : labels.join(' + ')}
+            </span>
+            {arr.length > 0 && (
+              <button type="button" onClick={() => onValue([])} className="text-[10px] text-[#E63946] font-semibold hover:underline">
+                limpar
+              </button>
+            )}
+          </div>
           {arr.length > 0 && (
-            <button type="button" onClick={() => onValue([])} className="text-[10px] text-[#E63946] font-semibold hover:underline">
-              limpar
-            </button>
+            <div className="flex flex-wrap gap-1.5">
+              {arr.map((pid, i) => {
+                const preview = getPhotoPreview(pid);
+                return (
+                  <div key={pid + i} className="w-12 h-12 rounded-md overflow-hidden border border-slate-200 bg-slate-100">
+                    {preview ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={preview} alt="foto" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="material-symbols-outlined text-slate-300 flex items-center justify-center w-full h-full">image</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       );
@@ -339,9 +359,9 @@ export const FormEngine: React.FC<FormEngineProps & {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     Array.from(files).forEach((file) => {
-      const url = URL.createObjectURL(file);
+      const id = registerPhoto(file); // guarda o arquivo; devolve um ID leve
       if (onFastPhotoCaptured) {
-        onFastPhotoCaptured(url);
+        onFastPhotoCaptured(id);
       }
     });
   };
