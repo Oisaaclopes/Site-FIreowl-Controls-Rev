@@ -144,17 +144,26 @@ export function validateFinalize(
           });
         }
       }
-      if (field.tipo === 'repeater' && field.gera_pendencia) {
+      if (field.tipo === 'repeater') {
         const cards = Array.isArray(v) ? (v as RepeaterCard[]) : [];
-        cards.forEach((_, i) => {
-          if (!hasPhoto(field.key, i)) {
-            issues.push({
-              secao: secao.titulo,
-              campo: `${field.label || field.key} #${i + 1}`,
-              motivo: 'Apontamento sem foto — foto é obrigatória para sustentar a pendência.',
-            });
-          }
-        });
+        // Foto exigida por card quando: gera pendência (apontamento) OU o card
+        // tem um campo foto marcado obrigatório (ex.: Corretiva antes/depois).
+        const fotoObrigatoria =
+          !!field.gera_pendencia ||
+          (field.card_schema || []).some((cf) => cf.tipo === 'foto' && cf.obrigatorio);
+        if (fotoObrigatoria) {
+          cards.forEach((_, i) => {
+            if (!hasPhoto(field.key, i)) {
+              issues.push({
+                secao: secao.titulo,
+                campo: `${field.label || field.key} #${i + 1}`,
+                motivo: field.gera_pendencia
+                  ? 'Apontamento sem foto — foto é obrigatória para sustentar a pendência.'
+                  : 'Foto obrigatória não anexada neste item.',
+              });
+            }
+          });
+        }
       }
     }
   }

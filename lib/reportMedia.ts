@@ -32,6 +32,11 @@ export function forgetPhoto(id: string): void {
     photoRegistry.delete(id);
   }
 }
+/** Revoga todas as object URLs e limpa o registro (chamar ao encerrar o form). */
+export function clearPhotoRegistry(): void {
+  photoRegistry.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+  photoRegistry.clear();
+}
 /** Um valor é um ID de foto registrada nesta sessão? */
 export function isPhotoId(v: unknown): v is string {
   return typeof v === 'string' && photoRegistry.has(v);

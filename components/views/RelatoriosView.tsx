@@ -261,18 +261,21 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const startForm = () => {
     const loaded = templates.find((t) => t.schema.tipo === wTipo) || null;
     if (!loaded) return;
-    const cliente = clients.find((c) => c.id === wClienteId);
-    // Pendências aprovadas do cliente (para a Corretiva)
-    const aprovadas = pendencias
-      .filter((p) => p.status === 'aprovada' && p.clienteId === wClienteId)
-      .map((p) => ({ id: p.id, label: `${p.grupo || 'Pendência'} — ${p.descricao || ''}`.slice(0, 60) }));
-    catalog.pendenciasAprovadas = aprovadas;
     setFormTemplate(loaded.schema);
     setFormTemplateId(loaded.id);
-    setFormCliente(cliente);
+    setFormCliente(clients.find((c) => c.id === wClienteId));
     setFormContext({ osId: wOsId || undefined, contratoId: wContratoId || undefined });
     setWizardStep(0);
     setMode('form');
+  };
+
+  // Catálogo do formulário: base + pendências aprovadas do cliente escolhido
+  // (para a Corretiva). Derivado sem mutar o catalog memoizado.
+  const formCatalog: CatalogSources = {
+    ...catalog,
+    pendenciasAprovadas: pendencias
+      .filter((p) => p.status === 'aprovada' && p.clienteId === formCliente?.id)
+      .map((p) => ({ id: p.id, label: `${p.grupo || 'Pendência'} — ${p.descricao || ''}`.slice(0, 60) })),
   };
 
   const clienteContratos = contracts.filter((c) => clientName(wClienteId) === c.clientName);
@@ -285,7 +288,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         template={formTemplate}
         templateId={formTemplateId}
         cliente={formCliente}
-        catalog={catalog}
+        catalog={formCatalog}
         userRole={userRole}
         currentUserName={currentUserName}
         contexto={formContext}

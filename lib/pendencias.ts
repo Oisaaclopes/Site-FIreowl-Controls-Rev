@@ -69,13 +69,14 @@ function pendenciaToRow(p: Pendencia): Record<string, unknown> {
  */
 export async function fetchPendencias(
   role: UserRole,
-  filter?: { clienteId?: string; status?: PendenciaStatus }
+  filter?: { clienteId?: string; status?: PendenciaStatus; reportOrigemId?: string }
 ): Promise<Pendencia[]> {
   const supabase = getSupabaseClient() as any;
   const cols = role === 'TECNICO' ? TECNICO_COLUMNS : '*';
   let query = supabase.from(TABLE).select(cols).order('criada_em', { ascending: false });
   if (filter?.clienteId) query = query.eq('cliente_id', filter.clienteId);
   if (filter?.status) query = query.eq('status', filter.status);
+  if (filter?.reportOrigemId) query = query.eq('report_origem_id', filter.reportOrigemId);
   const { data, error } = await query;
   if (error) throw error;
   return (data || []).map(rowToPendencia);

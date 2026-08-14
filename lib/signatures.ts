@@ -32,6 +32,11 @@ export function forgetSignature(id: string): void {
     sigRegistry.delete(id);
   }
 }
+/** Revoga todas as object URLs e limpa o registro (chamar ao encerrar o form). */
+export function clearSignatureRegistry(): void {
+  sigRegistry.forEach((s) => URL.revokeObjectURL(s.previewUrl));
+  sigRegistry.clear();
+}
 
 /** Sobe o PNG da assinatura ao Storage privado. Retorna o storage_path. */
 export async function uploadSignaturePng(

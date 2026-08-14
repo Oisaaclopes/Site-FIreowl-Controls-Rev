@@ -211,7 +211,7 @@ export const CORRETIVA_SDAI: TemplateSchema = {
             { key: 'local', tipo: 'texto', label: 'Local' },
             { key: 'acao_executada', tipo: 'select', label: 'Ação executada', opcoes: ['Substituição', 'Reparo', 'Limpeza', 'Reposicionamento', 'Reprogramação', 'Instalação', 'Ajuste'] },
             { key: 'descricao', tipo: 'texto', label: 'Descrição', multilinha: true },
-            { key: 'foto', tipo: 'foto', label: 'Fotos', fotos: ['antes', 'depois'] },
+            { key: 'foto', tipo: 'foto', label: 'Fotos', fotos: ['antes', 'depois'], obrigatorio: true },
           ],
         },
       ],

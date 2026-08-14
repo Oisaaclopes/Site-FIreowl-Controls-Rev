@@ -15,8 +15,8 @@ import { FormEngine, CatalogSources } from '@/components/reports/FormEngine';
 import { isSupabaseConfigured } from '@/lib/inventory';
 import { createReport, updateReport, upsertAnswer, insertMedia } from '@/lib/reports';
 import { insertPendencia } from '@/lib/pendencias';
-import { uploadReportPhoto, getCapturedPhoto, getPhotoPreview, isPhotoId, registerPhoto } from '@/lib/reportMedia';
-import { getSignature, isSignatureId, uploadSignaturePng, insertSignature } from '@/lib/signatures';
+import { uploadReportPhoto, getCapturedPhoto, getPhotoPreview, isPhotoId, registerPhoto, clearPhotoRegistry } from '@/lib/reportMedia';
+import { getSignature, isSignatureId, uploadSignaturePng, insertSignature, clearSignatureRegistry } from '@/lib/signatures';
 
 interface ReportFormProps {
   template: TemplateSchema;
@@ -417,6 +417,10 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         finalizadoEm: new Date().toISOString(),
         geoFim: geoFim || undefined,
       });
+
+      // fotos/assinaturas já subiram ao Storage — libera a memória da sessão
+      clearPhotoRegistry();
+      clearSignatureRegistry();
 
       setSavedInfo({ reportId: report.id, count: pends.length });
       setFinalized(true);

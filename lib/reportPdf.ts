@@ -84,10 +84,10 @@ export async function gerarPdfExecucao(
   const [answers, signatures, pendAll, bandeja] = await Promise.all([
     fetchAnswers(report.id),
     fetchSignatures(report.id),
-    fetchPendencias(userRole),
+    fetchPendencias(userRole, { reportOrigemId: report.id }),
     fetchBandeja(report.id),
   ]);
-  const pendencias: Pendencia[] = pendAll.filter((p) => p.reportOrigemId === report.id);
+  const pendencias: Pendencia[] = pendAll;
 
   const paths: string[] = [];
   answers.forEach((a) => collectPaths(a.valor, paths));
@@ -98,6 +98,11 @@ export async function gerarPdfExecucao(
 
   const cards = extractCards(answers);
   const grupos = Array.from(new Set(cards.map((c) => c.grupo || 'Geral')));
+
+  // Fotos já exibidas nos cards de apontamento/serviço — não repetir no geral.
+  const classifiedPaths = new Set<string>();
+  cards.forEach((c) => (c.foto || []).forEach((p) => classifiedPaths.add(p)));
+  const bandejaGeral = bandeja.filter((m) => !classifiedPaths.has(m.storagePathOriginal));
 
   const fotoGrid = (fotos: string[]) =>
     fotos.length === 0
@@ -145,10 +150,10 @@ export async function gerarPdfExecucao(
           .join('');
 
   const bandejaHtml =
-    bandeja.length === 0
+    bandejaGeral.length === 0
       ? ''
       : `<h2 style="color:${NAVY};margin-top:18px">Registro Fotográfico Geral</h2>
-         <div style="display:flex;flex-wrap:wrap;gap:6px">${bandeja
+         <div style="display:flex;flex-wrap:wrap;gap:6px">${bandejaGeral
            .map((m) => `<img src="${esc(url(m.storagePathOriginal))}" style="width:150px;height:110px;object-fit:cover;border:1px solid #ddd;border-radius:4px" />`)
            .join('')}</div>`;
 
