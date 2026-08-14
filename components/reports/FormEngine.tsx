@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   TemplateSchema,
   SectionSchema,
@@ -12,6 +12,8 @@ import {
   fotoLabels,
 } from '@/lib/reportSchema';
 import { registerPhoto, getPhotoPreview } from '@/lib/reportMedia';
+import { getSignature } from '@/lib/signatures';
+import { SignatureCanvas } from '@/components/reports/SignatureCanvas';
 
 export interface CatalogSources {
   categorias: string[];
@@ -63,6 +65,7 @@ const FieldControl: React.FC<{
   onValue: (v: unknown) => void;
   catalog: CatalogSources;
 }> = ({ field, value, onValue, catalog }) => {
+  const [sigOpen, setSigOpen] = useState(false);
   const negative = isNegativeAnswer(field, value as never);
 
   const negHint = negative ? (
@@ -220,18 +223,32 @@ const FieldControl: React.FC<{
         </div>
       );
     }
-    case 'assinatura':
+    case 'assinatura': {
+      const sig = typeof value === 'string' && value ? getSignature(value) : undefined;
+      const assinada = typeof value === 'string' && value.length > 0;
       return (
-        <button
-          type="button"
-          onClick={() => onValue(value ? '' : `Assinado em ${new Date().toLocaleString('pt-BR')}`)}
-          className={`w-full py-2.5 rounded-lg text-[11px] font-semibold uppercase tracking-wide border-2 border-dashed transition-colors ${
-            value ? 'border-emerald-400 text-emerald-700 bg-emerald-50' : 'border-slate-300 text-slate-500 hover:bg-slate-50'
-          }`}
-        >
-          {value ? String(value) : 'Coletar assinatura'}
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={() => setSigOpen(true)}
+            className={`w-full py-2.5 rounded-lg text-[11px] font-semibold uppercase tracking-wide border-2 border-dashed transition-colors flex items-center justify-center gap-1.5 ${
+              assinada ? 'border-emerald-400 text-emerald-700 bg-emerald-50' : 'border-slate-300 text-slate-500 hover:bg-slate-50'
+            }`}
+          >
+            <span className="material-symbols-outlined text-base">{assinada ? 'task_alt' : 'draw'}</span>
+            {sig ? `Assinado por ${sig.nome}` : assinada ? 'Assinatura coletada' : 'Coletar assinatura'}
+          </button>
+          <SignatureCanvas
+            open={sigOpen}
+            onClose={() => setSigOpen(false)}
+            onDone={(id) => {
+              onValue(id);
+              setSigOpen(false);
+            }}
+          />
+        </>
       );
+    }
     default:
       return null;
   }

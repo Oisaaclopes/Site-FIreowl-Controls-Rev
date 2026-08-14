@@ -16,6 +16,7 @@ import { isSupabaseConfigured } from '@/lib/inventory';
 import { createReport, updateReport, upsertAnswer, insertMedia } from '@/lib/reports';
 import { insertPendencia } from '@/lib/pendencias';
 import { uploadReportPhoto, getCapturedPhoto, getPhotoPreview, isPhotoId } from '@/lib/reportMedia';
+import { getSignature, isSignatureId, uploadSignaturePng, insertSignature } from '@/lib/signatures';
 
 interface ReportFormProps {
   template: TemplateSchema;
@@ -263,6 +264,37 @@ export const ReportForm: React.FC<ReportFormProps> = ({
     return pathById;
   };
 
+  // Sobe as assinaturas coletadas ao Storage e cria report_signatures.
+  const uploadSignatures = async (reportId: string): Promise<Record<string, string>> => {
+    const ids = new Set<string>();
+    for (const secao of template.secoes)
+      for (const field of secao.campos) {
+        if (field.tipo === 'assinatura') {
+          const v = values[field.key];
+          if (typeof v === 'string' && isSignatureId(v)) ids.add(v);
+        }
+      }
+    const map: Record<string, string> = {};
+    let seq = 0;
+    for (const id of ids) {
+      const sig = getSignature(id);
+      if (!sig) continue;
+      const path = await uploadSignaturePng(reportId, sig.blob, sig.papel, `${Date.now()}_${seq++}`);
+      map[id] = path;
+      await insertSignature({
+        id: '',
+        reportId,
+        papel: sig.papel,
+        nome: sig.nome,
+        documento: sig.documento,
+        cargo: sig.cargo,
+        storagePath: path,
+        geo: geoInicio || undefined,
+      });
+    }
+    return map;
+  };
+
   const handleFinalize = async () => {
     const found = validateFinalize(template, values, hasPhoto);
     setIssues(found);
@@ -297,11 +329,13 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         geoInicio: geoInicio || undefined,
       });
 
-      // 2) sobe as fotos ao Storage e cria report_media; devolve id->storage_path
+      // 2) sobe fotos e assinaturas ao Storage; devolve id->storage_path
       const pathById = await uploadPhotos(report.id);
+      const sigPathById = await uploadSignatures(report.id);
+      const allPaths: Record<string, string> = { ...pathById, ...sigPathById };
 
-      // substitui os IDs de foto (transitórios) pelos storage_path nas respostas
-      const mapId = (x: unknown) => (typeof x === 'string' && pathById[x] ? pathById[x] : x);
+      // substitui os IDs (transitórios) pelos storage_path nas respostas
+      const mapId = (x: unknown) => (typeof x === 'string' && allPaths[x] ? allPaths[x] : x);
       const cleanValue = (v: unknown): unknown => {
         if (!Array.isArray(v)) return v;
         return v.map((item) => {
