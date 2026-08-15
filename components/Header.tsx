@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserRole } from '@/lib/types';
 import { usePrivacy } from '@/lib/privacy';
+import { pendingCount, isOnline } from '@/lib/offline/reportSync';
 
 interface HeaderProps {
   userRole: UserRole;
@@ -26,11 +27,30 @@ export const Header: React.FC<HeaderProps> = ({
   const [currentDateTime, setCurrentDateTime] = useState('24 Mai 2024 | 14:30');
   const [showNotifications, setShowNotifications] = useState(false);
 
+  // Indicador de sincronização (fila offline do IndexedDB)
+  const [online, setOnline] = useState(true);
+  const [pend, setPend] = useState(0);
+  useEffect(() => {
+    const refresh = () => pendingCount().then(setPend).catch(() => {});
+    setOnline(isOnline());
+    refresh();
+    const on = () => { setOnline(true); refresh(); };
+    const off = () => setOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    const id = setInterval(refresh, 15000);
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', off);
+      clearInterval(id);
+    };
+  }, []);
+
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
       const day = now.getDate().toString().padStart(2, '0');
-      const months = ['Jan', 'Fev', 'Mai', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+      const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
       const month = months[now.getMonth()];
       const year = now.getFullYear();
       const hours = now.getHours().toString().padStart(2, '0');
@@ -65,7 +85,30 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 md:gap-4">
+        {/* Indicador de sincronização (fila offline) */}
+        <div
+          title={
+            online
+              ? pend > 0
+                ? `${pend} relatório(s) aguardando envio ao servidor`
+                : 'Tudo sincronizado'
+              : 'Sem conexão — dados salvos no aparelho'
+          }
+          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${
+            !online
+              ? 'bg-slate-200 text-slate-600'
+              : pend > 0
+                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+          }`}
+        >
+          <span className="material-symbols-outlined text-base">
+            {online ? (pend > 0 ? 'cloud_upload' : 'cloud_done') : 'cloud_off'}
+          </span>
+          <span className="hidden sm:inline">{online ? (pend > 0 ? `${pend} p/ enviar` : 'Sync') : 'Offline'}</span>
+        </div>
+
         {/* Notifications Icon with Popup */}
         <div className="relative">
           <button

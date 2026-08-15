@@ -16,6 +16,7 @@ import {
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
 import { usePrivacy } from '@/lib/privacy';
 import { DevicesManager } from '@/components/reports/DevicesManager';
+import { EmptyState } from '@/components/EmptyState';
 
 interface CrmViewProps {
   clients: Client[];
@@ -241,15 +242,13 @@ export const CrmView: React.FC<CrmViewProps> = ({
 
           {/* Lista de clientes (DataListRow) */}
           {filteredClients.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm py-16 text-center text-slate-400">
-              <span className="material-symbols-outlined text-4xl text-slate-300">domain_disabled</span>
-              <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">
-                {searchTerm ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'}
-              </p>
-              <p className="text-xs text-slate-400 mt-1">
-                {searchTerm ? 'Ajuste os termos da busca.' : 'Clique em "Novo Cliente" para começar.'}
-              </p>
-            </div>
+            <EmptyState
+              variant="clientes"
+              title={searchTerm ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'}
+              description={searchTerm ? 'Ajuste os termos da busca.' : 'Cadastre o primeiro cliente para começar.'}
+              actionLabel={searchTerm ? undefined : 'Novo cliente'}
+              onAction={searchTerm ? undefined : () => setShowAddClientModal(true)}
+            />
           ) : (
             <div className="flex flex-col gap-3">
               {filteredClients.map((client) => {

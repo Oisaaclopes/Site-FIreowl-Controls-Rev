@@ -24,6 +24,7 @@ import { fetchDevices } from '@/lib/devices';
 import { fetchOrdensServico } from '@/lib/ordensServico';
 import { fetchCicloAtivo, quotaPorVisita } from '@/lib/ciclos';
 import { flushOutbox, pendingCount, isOnline } from '@/lib/offline/reportSync';
+import { EmptyState } from '@/components/EmptyState';
 import { fetchTemplates } from '@/lib/reportTemplates';
 import { gerarPdfExecucao } from '@/lib/reportPdf';
 import { NovaProposta } from '@/components/reports/NovaProposta';
@@ -559,13 +560,13 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       {loading ? (
         <div className="bg-white rounded-xl shadow-sm py-16 text-center text-slate-400 text-sm">Carregando relatórios…</div>
       ) : filtered.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm py-16 text-center text-slate-400">
-          <span className="material-symbols-outlined text-4xl text-slate-300">assignment</span>
-          <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">Nenhum relatório</p>
-          <p className="text-xs text-slate-400 mt-1">
-            {canCreate ? 'Clique em "Novo relatório" para começar.' : 'Sem relatórios para exibir.'}
-          </p>
-        </div>
+        <EmptyState
+          variant="relatorio"
+          title="Nenhum relatório"
+          description={canCreate ? 'Abra um novo relatório de campo para começar.' : 'Sem relatórios para exibir com os filtros atuais.'}
+          actionLabel={canCreate ? 'Novo relatório' : undefined}
+          onAction={canCreate ? openWizard : undefined}
+        />
       ) : (
         <>
         {/* Desktop: tabela; Mobile: cards compactos (mais intuitivo no celular) */}
