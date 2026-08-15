@@ -56,6 +56,7 @@ import {
 } from '@/lib/mockData';
 
 import { DashboardView } from '@/components/views/DashboardView';
+import { TechDashboard } from '@/components/views/TechDashboard';
 import { PedidosView } from '@/components/views/PedidosView';
 import { ContratosView } from '@/components/views/ContratosView';
 import { ReceitasView } from '@/components/views/ReceitasView';
@@ -659,7 +660,15 @@ export function CrmApp({
 
         {/* View Switcher — padding inferior no mobile do técnico p/ o BottomNav */}
         <main className={`pt-16 min-h-[calc(100vh-64px)] ${userRole === 'TECNICO' ? 'pb-20 lg:pb-0' : ''}`}>
-          {currentTab === 'painel' && (
+          {currentTab === 'painel' && userRole === 'TECNICO' && (
+            <TechDashboard
+              currentUser={userName}
+              pedidosOS={pedidosOS}
+              onNavigateToTab={setCurrentTab}
+              onNewOSClick={handleNewOSQuick}
+            />
+          )}
+          {currentTab === 'painel' && userRole !== 'TECNICO' && (
             <DashboardView
               transactions={transactions}
               pedidosOS={pedidosOS}

@@ -8,14 +8,15 @@ import { allowedTabs } from '@/lib/rbac';
    Substitui a sidebar como navegação primária no celular do técnico de campo. */
 
 const META: Record<string, { label: string; icon: string }> = {
+  painel: { label: 'Início', icon: 'home' },
   agenda: { label: 'Agenda', icon: 'calendar_today' },
   relatorios: { label: 'Relatórios', icon: 'assignment' },
   ponto: { label: 'Ponto', icon: 'schedule' },
   pedidos: { label: 'Pedidos', icon: 'receipt_long' },
 };
 
-// Ordem no bottom bar (Relatórios ao centro, foco do técnico).
-const TECH_ORDER: TabPath[] = ['agenda', 'relatorios', 'ponto', 'pedidos'];
+// Ordem no bottom bar (Início, e Relatórios em destaque — foco do técnico).
+const TECH_ORDER: TabPath[] = ['painel', 'agenda', 'relatorios', 'ponto'];
 
 interface BottomNavProps {
   currentTab: TabPath;
