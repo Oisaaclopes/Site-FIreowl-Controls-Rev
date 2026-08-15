@@ -8,7 +8,7 @@ import { AcaoRecomendada } from './types';
  * relatório. Reference data versionada em código (não precisa de migração).
  * ===================================================================== */
 
-export type AreaFalha = 'SDAI' | 'CFTV' | 'CONTROLE_ACESSO' | 'BMS';
+export type AreaFalha = 'SDAI' | 'CFTV' | 'CONTROLE_ACESSO' | 'BMS' | 'ALARME';
 
 export interface FalhaPadrao {
   area: AreaFalha;
@@ -142,11 +142,49 @@ const BMS: FalhaBase[] = [
   { grupo: 'BMS > Supervisório', titulo: 'Falha no banco de histórico', descricao: 'Sistema não está arquivando os gráficos de tendência de temperatura ou consumo de energia.', acao: 'reparar', criticidade: 1 },
 ];
 
+/* ---------------------- Alarme (Intrusão e Pânico) ---------------------- */
+const ALARME: FalhaBase[] = [
+  // Central de Alarme (Painel e Placa Principal)
+  { grupo: 'Alarme > Central', titulo: 'Bateria selada (12V) viciada ou descarregada', descricao: 'Perda de autonomia do painel em caso de falta de energia elétrica.', acao: 'substituir', criticidade: 3 },
+  { grupo: 'Alarme > Central', titulo: 'Falha na alimentação AC (rede elétrica)', descricao: 'Central operando exclusivamente via bateria por disjuntor desligado ou fonte danificada.', acao: 'reparar', criticidade: 3 },
+  { grupo: 'Alarme > Central', titulo: 'Teclado de operação inoperante ou travado', descricao: 'Teclas sem resposta, falha de backlight ou display danificado.', acao: 'substituir', criticidade: 2 },
+  { grupo: 'Alarme > Central', titulo: 'Memória ou parâmetros corrompidos', descricao: 'Perda de programação de zonas, senhas ou configurações de fábrica após pico de tensão.', acao: 'reprogramar', criticidade: 3 },
+  { grupo: 'Alarme > Central', titulo: 'Falha no circuito de sirene', descricao: 'Saída de áudio queimada ou em curto-circuito, impedindo o disparo sonoro.', acao: 'reparar', criticidade: 3 },
+  // Dispositivos Sem Fio e Controles (RF)
+  { grupo: 'Alarme > Sem Fio', titulo: 'Bateria fraca em periférico wireless', descricao: 'Nível de carga crítico em controles remotos, sensores sem fio ou botoeiras de pânico.', acao: 'substituir', criticidade: 2 },
+  { grupo: 'Alarme > Sem Fio', titulo: 'Perda de sincronismo (desprogramação)', descricao: 'Dispositivo sem fio que deixou de responder à central ou ao receptor dedicado.', acao: 'reprogramar', criticidade: 2 },
+  { grupo: 'Alarme > Sem Fio', titulo: 'Interferência de radiofrequência (RF)', descricao: 'Ruído ambiental ou obstrução física impedindo a recepção correta do sinal sem fio.', acao: 'investigar', criticidade: 2 },
+  { grupo: 'Alarme > Sem Fio', titulo: 'Dano físico ou mecânico', descricao: 'Carcaça quebrada, botões travados ou infiltração de umidade em controles e botoeiras.', acao: 'substituir', criticidade: 2 },
+  { grupo: 'Alarme > Sem Fio', titulo: 'Nomenclatura ou cadastro incorreto', descricao: 'Identificação trocada do dispositivo no software de monitoramento ou no painel.', acao: 'reprogramar', criticidade: 1 },
+  // Sensores de Intrusão e Perimetrais
+  { grupo: 'Alarme > Sensores', titulo: 'Disparo falso recorrente (IVP)', descricao: 'Sensor de movimento ativado indevidamente por correntes de ar, insetos, reflexos ou luz solar direta.', acao: 'reposicionar', criticidade: 2 },
+  { grupo: 'Alarme > Sensores', titulo: 'Magnético desalinhado ou frouxo', descricao: 'Ímã de porta/janela fora de posição, mantendo a zona aberta permanentemente.', acao: 'reposicionar', criticidade: 2 },
+  { grupo: 'Alarme > Sensores', titulo: 'Obstrução do campo de visão', descricao: 'Presença de móveis, estoques ou divisórias bloqueando a detecção do sensor.', acao: 'desobstruir', criticidade: 2 },
+  { grupo: 'Alarme > Sensores', titulo: 'Lente ou cobertura danificada', descricao: 'Rachaduras ou sujeira excessiva na lente Fresnel alterando a sensibilidade do dispositivo.', acao: 'substituir', criticidade: 2 },
+  { grupo: 'Alarme > Sensores', titulo: 'Falha de violação (tamper aberto)', descricao: 'Chave antissabotagem acionada por mau fechamento da tampa do sensor.', acao: 'reparar', criticidade: 2 },
+  // Dispositivos Sonoros e Visuais
+  { grupo: 'Alarme > Sinalização', titulo: 'Sirene danificada ou queimada', descricao: 'Bobina interna rompida ou falha no elemento piezoelétrico, impedindo emissão de som.', acao: 'substituir', criticidade: 3 },
+  { grupo: 'Alarme > Sinalização', titulo: 'Volume acústico insuficiente', descricao: 'Som abafado por instalação incorreta ou obstrução física ao redor da sirene.', acao: 'reposicionar', criticidade: 2 },
+  { grupo: 'Alarme > Sinalização', titulo: 'Strobe (flash visual) inoperante', descricao: 'Lâmpada estroboscópica sem acionamento visual durante o evento de alarme.', acao: 'substituir', criticidade: 2 },
+  { grupo: 'Alarme > Sinalização', titulo: 'Curto-circuito na fiação externa', descricao: 'Cabos da sirene rompidos, oxidados ou em curto na tubulação.', acao: 'reparar', criticidade: 3 },
+  // Módulos de Comunicação e Transmissão
+  { grupo: 'Alarme > Comunicação', titulo: 'Falha no módulo GPRS/4G (chip SIM)', descricao: 'Sem sinal de operadora ou falha de comunicação de dados com a central de monitoramento.', acao: 'investigar', criticidade: 3 },
+  { grupo: 'Alarme > Comunicação', titulo: 'Cabo de rede (Ethernet) desconectado', descricao: 'Perda de conectividade IP principal do painel.', acao: 'reparar', criticidade: 3 },
+  { grupo: 'Alarme > Comunicação', titulo: 'Falha de handshake / protocolo', descricao: 'Central dispara localmente, mas os eventos não são entregues ao software receptor da base.', acao: 'reprogramar', criticidade: 3 },
+  { grupo: 'Alarme > Comunicação', titulo: 'Linha telefônica muda ou ocupada', descricao: 'Queda de sinal na comunicação analógica tradicional (quando aplicável).', acao: 'investigar', criticidade: 2 },
+  // Infraestrutura, Fiação e Alimentação Auxiliar
+  { grupo: 'Alarme > Infraestrutura', titulo: 'Curto-circuito em laço de zona', descricao: 'Condutores positivo e negativo em contato direto, gerando pane no setor.', acao: 'reparar', criticidade: 3 },
+  { grupo: 'Alarme > Infraestrutura', titulo: 'Fuga para o terra', descricao: 'Isolamento do cabeamento rompido em contato com estruturas metálicas ou umidade.', acao: 'reparar', criticidade: 2 },
+  { grupo: 'Alarme > Infraestrutura', titulo: 'Fonte auxiliar (colmeia) desarmada', descricao: 'Falha na entrega de 12V/24V para alimentação de sensores de alto consumo.', acao: 'substituir', criticidade: 3 },
+  { grupo: 'Alarme > Infraestrutura', titulo: 'Conexões oxidadas ou soldas frias', descricao: 'Pontos de interligação nos bornes gerando resistência elétrica e quedas intermitentes.', acao: 'reparar', criticidade: 2 },
+];
+
 export const CATALOGO_FALHAS: FalhaPadrao[] = [
   ...SDAI.map((f): FalhaPadrao => ({ ...f, area: 'SDAI' })),
   ...CFTV.map((f): FalhaPadrao => ({ ...f, area: 'CFTV' })),
   ...CONTROLE_ACESSO.map((f): FalhaPadrao => ({ ...f, area: 'CONTROLE_ACESSO' })),
   ...BMS.map((f): FalhaPadrao => ({ ...f, area: 'BMS' })),
+  ...ALARME.map((f): FalhaPadrao => ({ ...f, area: 'ALARME' })),
 ];
 
 /** Falhas de uma área (ou todas, se área não informada). */
