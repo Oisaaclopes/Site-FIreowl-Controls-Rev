@@ -8,7 +8,7 @@ import { AcaoRecomendada } from './types';
  * relatório. Reference data versionada em código (não precisa de migração).
  * ===================================================================== */
 
-export type AreaFalha = 'SDAI' | 'CFTV';
+export type AreaFalha = 'SDAI' | 'CFTV' | 'CONTROLE_ACESSO' | 'BMS';
 
 export interface FalhaPadrao {
   area: AreaFalha;
@@ -94,9 +94,59 @@ const CFTV: FalhaBase[] = [
   { grupo: 'CFTV > Rede', titulo: 'Bloqueio de senha', descricao: 'Acesso ao gravador bloqueado por tentativas incorretas ou perda da senha de administrador.', acao: 'reprogramar', criticidade: 2 },
 ];
 
+/* --------------------------- Controle de Acesso --------------------------- */
+const CONTROLE_ACESSO: FalhaBase[] = [
+  // Leitoras e Reconhecimento
+  { grupo: 'CA > Leitoras', titulo: 'Leitor biométrico sujo / riscado', descricao: 'Dificuldade em reconhecer digitais, gerando lentidão no acesso.', acao: 'limpar', criticidade: 2 },
+  { grupo: 'CA > Leitoras', titulo: 'Falha de leitura RFID', descricao: 'Dispositivo não emite bip nem lê cartões / TAGs de proximidade.', acao: 'substituir', criticidade: 3 },
+  { grupo: 'CA > Leitoras', titulo: 'Teclado com desgaste', descricao: 'Botões numéricos falhando ou com contato intermitente.', acao: 'substituir', criticidade: 2 },
+  { grupo: 'CA > Leitoras', titulo: 'Leitor facial ofuscado', descricao: 'Câmera do leitor não reconhece faces devido a reflexos de sol direto ou sujeira na lente.', acao: 'reposicionar', criticidade: 2 },
+  // Fechaduras e Ferragens
+  { grupo: 'CA > Fechaduras', titulo: 'Eletroímã sem força', descricao: 'Atraque fraco devido a queda de tensão na fonte ou superfície oxidada.', acao: 'reparar', criticidade: 3 },
+  { grupo: 'CA > Fechaduras', titulo: 'Pino da fechadura solenoide travado', descricao: 'Mecanismo não recua, mantendo a porta trancada mesmo após liberação pelo sistema.', acao: 'reparar', criticidade: 3 },
+  { grupo: 'CA > Fechaduras', titulo: 'Suporte / cantoneira frouxa', descricao: 'Fixação do eletroímã cedendo, gerando desalinhamento entre o ímã e a chapa "blanque".', acao: 'reparar', criticidade: 2 },
+  { grupo: 'CA > Fechaduras', titulo: 'Mola aérea desregulada', descricao: 'Porta batendo com força ou não fechando totalmente, impedindo o travamento magnético.', acao: 'reparar', criticidade: 2 },
+  { grupo: 'CA > Fechaduras', titulo: 'Botoeira de saída (RTE) com mau contato', descricao: 'Botão afundado ou microswitch interno quebrado.', acao: 'substituir', criticidade: 2 },
+  // Bloqueios Físicos (Catracas, Cancelas e Torniquetes)
+  { grupo: 'CA > Bloqueios', titulo: 'Mecanismo de catraca travado', descricao: 'Solenoide ou sistema de amortecimento mecânico danificado, impedindo o giro do braço.', acao: 'reparar', criticidade: 3 },
+  { grupo: 'CA > Bloqueios', titulo: 'Braço de catraca com folga', descricao: 'Eixo desgastado, permitindo giro parcial sem liberação.', acao: 'reparar', criticidade: 2 },
+  { grupo: 'CA > Bloqueios', titulo: 'Sensor de passagem (fotocélula) obstruído', descricao: 'Poeira ou desalinhamento da barreira infravermelha, impedindo o fechamento automático da cancela ou porta.', acao: 'desobstruir', criticidade: 2 },
+  { grupo: 'CA > Bloqueios', titulo: 'Haste de cancela quebrada / torta', descricao: 'Dano físico geralmente causado por colisão de veículos.', acao: 'substituir', criticidade: 2 },
+  // Controladoras, Fontes e Rede
+  { grupo: 'CA > Controladoras', titulo: 'Placa controladora offline', descricao: 'Perda de comunicação TCP/IP com o servidor principal.', acao: 'investigar', criticidade: 3 },
+  { grupo: 'CA > Controladoras', titulo: 'Relé da controladora colado', descricao: 'Contato metálico grudado, mantendo a porta permanentemente aberta.', acao: 'substituir', criticidade: 3 },
+  { grupo: 'CA > Controladoras', titulo: 'Bateria do nobreak / fonte viciada', descricao: 'Sistema desliga e as portas se abrem (ou trancam) imediatamente em caso de queda de energia.', acao: 'substituir', criticidade: 2 },
+  { grupo: 'CA > Controladoras', titulo: 'Erro de sincronização de software', descricao: 'Níveis de acesso e usuários não estão sendo enviados do servidor para o hardware local.', acao: 'reprogramar', criticidade: 2 },
+];
+
+/* ------------------------- Automação Predial (BMS) ------------------------ */
+const BMS: FalhaBase[] = [
+  // Controladores Lógicos (CLPs) e Módulos (I/O)
+  { grupo: 'BMS > Controladores', titulo: 'Módulo de expansão em falha', descricao: 'LED de diagnóstico indicando erro interno na placa de entrada / saída.', acao: 'substituir', criticidade: 3 },
+  { grupo: 'BMS > Controladores', titulo: 'Porta de comunicação queimada', descricao: 'Falha no barramento RS-485, BACnet ou Modbus (geralmente por surto de tensão).', acao: 'reparar', criticidade: 3 },
+  { grupo: 'BMS > Controladores', titulo: 'Perda de memória / programa', descricao: 'Controlador em estado de "falha de inicialização" após pico de energia.', acao: 'reprogramar', criticidade: 3 },
+  { grupo: 'BMS > Controladores', titulo: 'Fonte chaveada oscilando', descricao: 'Alimentação de 24VDC flutuando, fazendo os painéis de automação reiniciarem sozinhos.', acao: 'substituir', criticidade: 3 },
+  // Sensores e Instrumentação
+  { grupo: 'BMS > Sensores', titulo: 'Sensor de temperatura / umidade descalibrado', descricao: 'Leitura divergente da realidade do ambiente, forçando o ar-condicionado a trabalhar incorretamente.', acao: 'reparar', criticidade: 2 },
+  { grupo: 'BMS > Sensores', titulo: 'Leitura oscilante ("sujeira" no sinal)', descricao: 'Interferência eletromagnética (ruído) no cabo de instrumentação.', acao: 'investigar', criticidade: 2 },
+  { grupo: 'BMS > Sensores', titulo: 'Pressostato ou transdutor vazando', descricao: 'Conexão mecânica do sensor de pressão com vazamento de água ou ar.', acao: 'reparar', criticidade: 2 },
+  { grupo: 'BMS > Sensores', titulo: 'Sensor de nível (boia) travado', descricao: 'Falha mecânica no reservatório, enviando sinal falso de "caixa d\'água cheia".', acao: 'reparar', criticidade: 2 },
+  // Atuadores e Comandos de Painel
+  { grupo: 'BMS > Atuadores', titulo: 'Válvula proporcional travada', descricao: 'Atuador do ar-condicionado (Chiller / Fancoil) não obedece ao comando de abertura / fechamento.', acao: 'reparar', criticidade: 3 },
+  { grupo: 'BMS > Atuadores', titulo: 'Contator não atraca', descricao: 'Bobina do painel elétrico queimada, impedindo o acionamento de bombas ou ventiladores.', acao: 'substituir', criticidade: 3 },
+  { grupo: 'BMS > Atuadores', titulo: 'Inversor de frequência em falha', descricao: 'Equipamento desarmado exibindo código de erro (sobrecarga, falta de fase) no painel de bombas.', acao: 'investigar', criticidade: 3 },
+  { grupo: 'BMS > Atuadores', titulo: 'Damper mecânico emperrado', descricao: 'Aletas de ventilação presas por sujeira ou falta de lubrificação, forçando o motor.', acao: 'limpar', criticidade: 2 },
+  // Interface e Software Supervisório (SCADA / IHM)
+  { grupo: 'BMS > Supervisório', titulo: 'Variável (tag) offline no gráfico', descricao: 'Animação da bomba ou ventilador não atualiza na tela de operação.', acao: 'investigar', criticidade: 2 },
+  { grupo: 'BMS > Supervisório', titulo: 'Touchscreen da IHM quebrado / descalibrado', descricao: 'Tela do painel local da máquina não responde aos toques do operador.', acao: 'substituir', criticidade: 2 },
+  { grupo: 'BMS > Supervisório', titulo: 'Falha no banco de histórico', descricao: 'Sistema não está arquivando os gráficos de tendência de temperatura ou consumo de energia.', acao: 'reparar', criticidade: 1 },
+];
+
 export const CATALOGO_FALHAS: FalhaPadrao[] = [
   ...SDAI.map((f): FalhaPadrao => ({ ...f, area: 'SDAI' })),
   ...CFTV.map((f): FalhaPadrao => ({ ...f, area: 'CFTV' })),
+  ...CONTROLE_ACESSO.map((f): FalhaPadrao => ({ ...f, area: 'CONTROLE_ACESSO' })),
+  ...BMS.map((f): FalhaPadrao => ({ ...f, area: 'BMS' })),
 ];
 
 /** Falhas de uma área (ou todas, se área não informada). */
