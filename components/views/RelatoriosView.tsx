@@ -96,11 +96,11 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 
   // Wizard "+ Novo relatório"
   const [wizardStep, setWizardStep] = useState<0 | 1 | 2 | 3>(0);
-  const [wTipo, setWTipo] = useState<string>('');
+  const [wTipo, setWTipo] = useState<string>(''); // tipo do template escolhido
+  const [wCodigo, setWCodigo] = useState<string>(''); // código do template escolhido
   const [wClienteId, setWClienteId] = useState<string>('');
   const [wContratoId, setWContratoId] = useState<string>('');
   const [wOsId, setWOsId] = useState<string>('');
-  const [wArea, setWArea] = useState<Device['sistema']>('SDAI'); // área da corretiva
 
   // Estado do cadastro provisório em campo (§6.3 / §9.1)
   const [provNome, setProvNome] = useState('');
@@ -182,7 +182,9 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     if (!isSupabaseConfigured()) return;
     try {
       let rows = await fetchTemplates();
-      if (rows.length === 0 && userRole === 'ADMINISTRATIVO') {
+      // Semeia (upsert idempotente por código) quando o banco tem menos templates
+      // que o pacote — cobre a 1ª carga e a chegada de novas disciplinas.
+      if (rows.length < ALL_TEMPLATES.length && userRole === 'ADMINISTRATIVO') {
         await seedReportTemplates();
         rows = await fetchTemplates();
       }
@@ -304,6 +306,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   // ---- Wizard ----
   const openWizard = () => {
     setWTipo('');
+    setWCodigo('');
     setWClienteId(clients[0]?.id || '');
     setWContratoId('');
     setWOsId('');
@@ -312,8 +315,10 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const closeWizard = () => setWizardStep(0);
 
   const startForm = () => {
-    const loaded = templates.find((t) => t.schema.tipo === wTipo) || null;
+    const loaded = templates.find((t) => t.schema.codigo === wCodigo) || null;
     if (!loaded) return;
+    // A área da corretiva vem do próprio template (disciplina).
+    const areaTemplate = (loaded.schema.area as Device['sistema']) || 'SDAI';
     setFormTemplate(loaded.schema);
     setFormTemplateId(loaded.id);
     setFormCliente(clients.find((c) => c.id === wClienteId));
@@ -328,7 +333,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     // que alimentam "dispositivos afetados". Ativos apenas.
     if (loaded.schema.tipo === 'CORRETIVA' && wClienteId) {
       fetchDevices(wClienteId)
-        .then((ds) => setFormAreaDevices(ds.filter((d) => d.status === 'ativo' && d.sistema === wArea)))
+        .then((ds) => setFormAreaDevices(ds.filter((d) => d.status === 'ativo' && d.sistema === areaTemplate)))
         .catch(() => setFormAreaDevices([]));
     }
     if (loaded.schema.tipo === 'PREVENTIVA' && wClienteId) {
@@ -683,23 +688,27 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
             </div>
 
             <div className="p-5 overflow-y-auto">
-              {/* Passo 1 — Tipo */}
+              {/* Passo 1 — Tipo/disciplina (um card por template) */}
               {wizardStep === 1 && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                   {templates.map(({ schema: t }) => (
                     <button
                       key={t.codigo}
                       onClick={() => {
                         setWTipo(t.tipo);
+                        setWCodigo(t.codigo);
                         setWizardStep(2);
                       }}
-                      className="border-2 border-slate-200 rounded-xl p-4 text-left hover:border-[#1A1A72] hover:bg-[#1A1A72]/5 transition-colors"
+                      className="border-2 border-slate-200 rounded-xl p-3 text-left hover:border-[#1A1A72] hover:bg-[#1A1A72]/5 transition-colors"
                     >
-                      <span className="material-symbols-outlined text-2xl text-[#1A1A72]">
-                        {t.tipo === 'LEVANTAMENTO' ? 'search' : t.tipo === 'CORRETIVA' ? 'build' : 'fact_check'}
-                      </span>
-                      <p className="font-bold text-slate-900 text-sm mt-2">{TIPO_LABEL[t.tipo]}</p>
-                      <p className="text-[10px] text-slate-500 mt-0.5">{t.nome}</p>
+                      <div className="flex items-center justify-between">
+                        <span className="material-symbols-outlined text-xl text-[#1A1A72]">
+                          {t.tipo === 'LEVANTAMENTO' ? 'search' : t.tipo === 'CORRETIVA' ? 'build' : 'fact_check'}
+                        </span>
+                        <span className="text-[8px] font-bold uppercase tracking-wide text-slate-400">{t.area || 'SDAI'}</span>
+                      </div>
+                      <p className="font-bold text-slate-900 text-[12px] mt-1.5 leading-tight">{t.nome}</p>
+                      <p className="text-[9px] text-slate-500 mt-0.5 uppercase tracking-wide">{TIPO_LABEL[t.tipo]}</p>
                     </button>
                   ))}
                 </div>
@@ -810,34 +819,18 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                     )}
                   </div>
                   {wTipo === 'CORRETIVA' && (
-                    <>
-                      <div>
-                        <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Área da corretiva</label>
-                        <select
-                          value={wArea}
-                          onChange={(e) => setWArea(e.target.value as Device['sistema'])}
-                          className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
-                        >
-                          <option value="SDAI">SDAI — Detecção e Alarme</option>
-                          <option value="CFTV">CFTV</option>
-                          <option value="CONTROLE_ACESSO">Controle de Acesso</option>
-                          <option value="BMS">Automação / BMS</option>
-                        </select>
-                        <p className="text-[10px] text-slate-400 mt-1">Os dispositivos dessa área entram como “dispositivos afetados”. (Hoje só SDAI tem parque cadastrado.)</p>
-                      </div>
-                      <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/50">
-                        <p className="text-[11px] font-bold text-slate-700 uppercase mb-1">Pendências aprovadas (viram checklist)</p>
-                        {clientePendAprovadas.length === 0 ? (
-                          <p className="text-[10px] text-slate-400 italic">Nenhuma pendência aprovada — a corretiva abre em branco.</p>
-                        ) : (
-                          <ul className="space-y-1 max-h-32 overflow-y-auto">
-                            {clientePendAprovadas.map((p) => (
-                              <li key={p.id} className="text-[10px] text-slate-600">• {p.grupo ? `${p.grupo}: ` : ''}{p.descricao}</li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    </>
+                    <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/50">
+                      <p className="text-[11px] font-bold text-slate-700 uppercase mb-1">Pendências aprovadas (viram checklist)</p>
+                      {clientePendAprovadas.length === 0 ? (
+                        <p className="text-[10px] text-slate-400 italic">Nenhuma pendência aprovada — a corretiva abre em branco.</p>
+                      ) : (
+                        <ul className="space-y-1 max-h-32 overflow-y-auto">
+                          {clientePendAprovadas.map((p) => (
+                            <li key={p.id} className="text-[10px] text-slate-600">• {p.grupo ? `${p.grupo}: ` : ''}{p.descricao}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   )}
                 </div>
               )}

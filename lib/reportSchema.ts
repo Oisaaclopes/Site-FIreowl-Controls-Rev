@@ -80,6 +80,8 @@ export interface TemplateSchema {
   codigo: string;
   nome: string;
   tipo: ReportTipo;
+  /** Disciplina: SDAI | CFTV | CONTROLE_ACESSO | BMS | ALARME. Default SDAI. */
+  area?: string;
   secoes: SectionSchema[];
 }
 

@@ -20,8 +20,9 @@ const CRITICIDADE_FIELD: FieldSchema = {
   help: 'Uso interno para ordenar escopo e dimensionar a visita. Nunca aparece no PDF do cliente.',
 };
 
-/** Card de apontamento (seção 3 do documento). `fotos` define a config por template. */
-function apontamentosRepeater(fotos: number | Array<'antes' | 'depois'>): FieldSchema {
+/** Card de apontamento (seção 3 do documento). `fotos` define a config por template;
+ * `area` liga o seletor de falhas padrão à disciplina (SDAI, CFTV, ...). */
+function apontamentosRepeater(fotos: number | Array<'antes' | 'depois'>, area = 'SDAI'): FieldSchema {
   return {
     key: 'apontamentos',
     tipo: 'repeater',
@@ -29,7 +30,7 @@ function apontamentosRepeater(fotos: number | Array<'antes' | 'depois'>): FieldS
     botao_adicionar: '+ Adicionar apontamento',
     gera_pendencia: true,
     card_schema: [
-      { key: 'falha_padrao', tipo: 'select_falha', origem: 'SDAI', label: 'Falha padrão (preenchimento rápido)' },
+      { key: 'falha_padrao', tipo: 'select_falha', origem: area, label: 'Falha padrão (preenchimento rápido)' },
       { key: 'grupo', tipo: 'select_catalogo', origem: 'categorias', label: 'Grupo', obrigatorio: true },
       { key: 'item', tipo: 'autocomplete_catalogo', origem: 'estoque_servicos', label: 'Item / material', permite_texto_livre: true },
       { key: 'local', tipo: 'texto', label: 'Local', obrigatorio: true },
@@ -46,7 +47,8 @@ function apontamentosRepeater(fotos: number | Array<'antes' | 'depois'>): FieldS
 
 export const LEVANTAMENTO_SDAI: TemplateSchema = {
   codigo: 'LEVANTAMENTO_SDAI',
-  nome: 'Levantamento Técnico (Orçamento)',
+  nome: 'Levantamento SDAI (Orçamento)',
+  area: 'SDAI',
   tipo: 'LEVANTAMENTO',
   secoes: [
     {
@@ -162,7 +164,8 @@ export const LEVANTAMENTO_SDAI: TemplateSchema = {
 
 export const CORRETIVA_SDAI: TemplateSchema = {
   codigo: 'CORRETIVA_SDAI',
-  nome: 'Manutenção Corretiva',
+  nome: 'Corretiva SDAI',
+  area: 'SDAI',
   tipo: 'CORRETIVA',
   secoes: [
     {
@@ -269,7 +272,8 @@ export const CORRETIVA_SDAI: TemplateSchema = {
 
 export const PREVENTIVA_SDAI: TemplateSchema = {
   codigo: 'PREVENTIVA_SDAI',
-  nome: 'Manutenção Preventiva',
+  nome: 'Preventiva SDAI',
+  area: 'SDAI',
   tipo: 'PREVENTIVA',
   secoes: [
     {
@@ -369,7 +373,152 @@ export const PREVENTIVA_SDAI: TemplateSchema = {
   ],
 };
 
-export const ALL_TEMPLATES: TemplateSchema[] = [LEVANTAMENTO_SDAI, CORRETIVA_SDAI, PREVENTIVA_SDAI];
+/* =====================================================================
+ * Templates das demais disciplinas (CFTV, Controle de Acesso, BMS, Alarme).
+ * Reaproveitam o motor: identificação enxuta + apontamento com o catálogo de
+ * falhas da área (auto-preenchimento). A Corretiva usa o checklist de
+ * pendências aprovadas (comum a todas as disciplinas).
+ * ===================================================================== */
+
+// Checklist de pendências aprovadas — comum às corretivas (semeado do Supabase).
+const CHECKLIST_PENDENCIAS_FIELD: FieldSchema = {
+  key: 'pendencias_aprovadas',
+  tipo: 'checklist_pendencias',
+  label: 'Pendências aprovadas (verificar cada uma)',
+  botao_adicionar: '+ Adicionar pendência',
+  card_schema: [
+    { key: 'pendencia', tipo: 'texto', label: 'Pendência' },
+    { key: 'situacao', tipo: 'select', label: 'Situação', opcoes: ['Corrigida', 'Corrigida parcialmente', 'Não corrigida', 'Não localizada'], obrigatorio: true, abre_pendencia_se: ['Corrigida parcialmente', 'Não corrigida'] },
+    { key: 'observacao', tipo: 'texto', label: 'Observação' },
+    { key: 'foto', tipo: 'foto', label: 'Foto (depois)', fotos: ['depois'] },
+  ],
+};
+
+// Intervenções executadas — comum às corretivas.
+const INTERVENCOES_FIELD: FieldSchema = {
+  key: 'intervencoes',
+  tipo: 'repeater',
+  label: 'Intervenções',
+  botao_adicionar: '+ Adicionar intervenção',
+  card_schema: [
+    { key: 'grupo', tipo: 'select_catalogo', origem: 'categorias', label: 'Grupo' },
+    { key: 'item', tipo: 'autocomplete_catalogo', origem: 'estoque_servicos', label: 'Item / material aplicado', permite_texto_livre: true },
+    { key: 'quantidade', tipo: 'numero', label: 'Quantidade', default: 1 },
+    { key: 'local', tipo: 'texto', label: 'Local' },
+    { key: 'acao_executada', tipo: 'select', label: 'Ação executada', opcoes: ['Substituição', 'Reparo', 'Limpeza', 'Reposicionamento', 'Reprogramação', 'Instalação', 'Ajuste'] },
+    { key: 'descricao', tipo: 'texto', label: 'Descrição', multilinha: true },
+    { key: 'foto', tipo: 'foto', label: 'Fotos', fotos: ['antes', 'depois'], obrigatorio: true },
+  ],
+};
+
+function levantamentoDisciplina(area: string, codigo: string, nome: string, identificacao: FieldSchema[]): TemplateSchema {
+  return {
+    codigo,
+    nome,
+    tipo: 'LEVANTAMENTO',
+    area,
+    secoes: [
+      { key: 'identificacao', titulo: 'Identificação do sistema', campos: identificacao },
+      {
+        key: 'apontamentos',
+        titulo: 'Apontamentos',
+        descricao: 'Cada apontamento vira uma pendência para a proposta. Use a "Falha padrão" para preencher rápido.',
+        campos: [apontamentosRepeater(1, area)],
+      },
+    ],
+  };
+}
+
+function corretivaDisciplina(area: string, codigo: string, nome: string): TemplateSchema {
+  return {
+    codigo,
+    nome,
+    tipo: 'CORRETIVA',
+    area,
+    secoes: [
+      {
+        key: 'chamado',
+        titulo: 'Chamado',
+        campos: [
+          { key: 'origem_chamado', tipo: 'select', label: 'Origem do chamado', opcoes: ['Solicitação do cliente', 'Falha detectada em monitoramento', 'Pendência de levantamento', 'Pendência de preventiva'] },
+          CHECKLIST_PENDENCIAS_FIELD,
+          { key: 'problema_relatado', tipo: 'texto', label: 'Problema relatado pelo cliente', multilinha: true },
+          { key: 'foto_antes', tipo: 'foto', label: 'Foto do estado inicial', obrigatorio: true },
+        ],
+      },
+      {
+        key: 'servico_executado',
+        titulo: 'Serviço executado',
+        descricao: 'Foto antes e depois obrigatórias por intervenção.',
+        campos: [INTERVENCOES_FIELD],
+      },
+      {
+        key: 'encerramento',
+        titulo: 'Encerramento',
+        campos: [
+          { key: 'sistema_operante', tipo: 'select', label: 'Sistema entregue operante', opcoes: ['Sim', 'Sim, com ressalvas', 'Não'], obrigatorio: true, abre_pendencia_se: ['Não'] },
+          { key: 'observacoes', tipo: 'texto', label: 'Observações / pendências remanescentes', multilinha: true },
+          { key: 'foto_depois', tipo: 'foto', label: 'Foto final do sistema', obrigatorio: true },
+        ],
+      },
+    ],
+  };
+}
+
+/* ---- Identificação por disciplina ---- */
+const ID_CFTV: FieldSchema[] = [
+  { key: 'possui', tipo: 'select', label: 'O local possui CFTV instalado?', opcoes: ['Sim, completo', 'Sim, parcial', 'Não possui'], obrigatorio: true },
+  { key: 'tecnologia', tipo: 'select', label: 'Tecnologia', opcoes: ['Analógico / HD (HDCVI/AHD/TVI)', 'IP', 'Híbrido', 'Não identificado'] },
+  { key: 'gravador', tipo: 'autocomplete_catalogo', origem: 'marcas', label: 'Gravador (marca/modelo DVR/NVR)', permite_texto_livre: true },
+  { key: 'qtd_canais', tipo: 'numero', label: 'Nº de canais do gravador' },
+  { key: 'qtd_cameras', tipo: 'numero', label: 'Nº de câmeras ativas' },
+  { key: 'armazenamento', tipo: 'texto', label: 'Armazenamento (HDs / capacidade)' },
+  { key: 'acesso_remoto', tipo: 'select', label: 'Acesso remoto', opcoes: ['Funciona (P2P/DDNS)', 'Instável', 'Não configurado', 'Não avaliado'] },
+  { key: 'foto_rack', tipo: 'foto', label: 'Foto do gravador / rack', obrigatorio: true },
+];
+const ID_CA: FieldSchema[] = [
+  { key: 'possui', tipo: 'select', label: 'O local possui controle de acesso?', opcoes: ['Sim, completo', 'Sim, parcial', 'Não possui'], obrigatorio: true },
+  { key: 'controladora', tipo: 'autocomplete_catalogo', origem: 'marcas', label: 'Controladora (marca/modelo)', permite_texto_livre: true },
+  { key: 'qtd_portas', tipo: 'numero', label: 'Nº de portas / acessos controlados' },
+  { key: 'tipo_leitor', tipo: 'multiselect', label: 'Tipo de leitor', opcoes: ['Biométrico', 'RFID / proximidade', 'Facial', 'Teclado / senha'] },
+  { key: 'bloqueios', tipo: 'multiselect', label: 'Ferragens / bloqueios', opcoes: ['Eletroímã', 'Fechadura solenoide', 'Catraca', 'Cancela', 'Torniquete'] },
+  { key: 'software', tipo: 'texto', label: 'Software de gestão (marca/versão)' },
+  { key: 'foto', tipo: 'foto', label: 'Foto da controladora / ponto', obrigatorio: true },
+];
+const ID_BMS: FieldSchema[] = [
+  { key: 'possui', tipo: 'select', label: 'O local possui automação predial (BMS)?', opcoes: ['Sim, completo', 'Sim, parcial', 'Não possui'], obrigatorio: true },
+  { key: 'controlador', tipo: 'autocomplete_catalogo', origem: 'marcas', label: 'Controlador / CLP (marca/modelo)', permite_texto_livre: true },
+  { key: 'protocolo', tipo: 'multiselect', label: 'Protocolo de comunicação', opcoes: ['BACnet', 'Modbus', 'RS-485', 'KNX', 'Proprietário', 'Não identificado'] },
+  { key: 'supervisorio', tipo: 'texto', label: 'Supervisório / IHM (SCADA)' },
+  { key: 'sistemas', tipo: 'texto', label: 'Sistemas monitorados (HVAC, bombas, iluminação...)' },
+  { key: 'foto', tipo: 'foto', label: 'Foto do painel / controlador', obrigatorio: true },
+];
+const ID_ALARME: FieldSchema[] = [
+  { key: 'possui', tipo: 'select', label: 'O local possui alarme de intrusão?', opcoes: ['Sim, completo', 'Sim, parcial', 'Não possui'], obrigatorio: true },
+  { key: 'central', tipo: 'autocomplete_catalogo', origem: 'marcas', label: 'Central (marca/modelo)', permite_texto_livre: true },
+  { key: 'qtd_zonas', tipo: 'numero', label: 'Nº de zonas / partições' },
+  { key: 'tecnologia', tipo: 'multiselect', label: 'Tecnologia', opcoes: ['Com fio', 'Sem fio (RF)', 'Híbrido'] },
+  { key: 'comunicacao', tipo: 'multiselect', label: 'Comunicação com monitoramento', opcoes: ['GPRS / 4G', 'Ethernet / IP', 'Linha telefônica', 'Sem monitoramento'] },
+  { key: 'monitoramento', tipo: 'texto', label: 'Empresa de monitoramento (se houver)' },
+  { key: 'foto', tipo: 'foto', label: 'Foto da central', obrigatorio: true },
+];
+
+export const LEVANTAMENTO_CFTV = levantamentoDisciplina('CFTV', 'LEVANTAMENTO_CFTV', 'Levantamento CFTV (Orçamento)', ID_CFTV);
+export const CORRETIVA_CFTV = corretivaDisciplina('CFTV', 'CORRETIVA_CFTV', 'Corretiva CFTV');
+export const LEVANTAMENTO_CA = levantamentoDisciplina('CONTROLE_ACESSO', 'LEVANTAMENTO_CA', 'Levantamento Controle de Acesso (Orçamento)', ID_CA);
+export const CORRETIVA_CA = corretivaDisciplina('CONTROLE_ACESSO', 'CORRETIVA_CA', 'Corretiva Controle de Acesso');
+export const LEVANTAMENTO_BMS = levantamentoDisciplina('BMS', 'LEVANTAMENTO_BMS', 'Levantamento Automação/BMS (Orçamento)', ID_BMS);
+export const CORRETIVA_BMS = corretivaDisciplina('BMS', 'CORRETIVA_BMS', 'Corretiva Automação/BMS');
+export const LEVANTAMENTO_ALARME = levantamentoDisciplina('ALARME', 'LEVANTAMENTO_ALARME', 'Levantamento Alarme (Orçamento)', ID_ALARME);
+export const CORRETIVA_ALARME = corretivaDisciplina('ALARME', 'CORRETIVA_ALARME', 'Corretiva Alarme');
+
+export const ALL_TEMPLATES: TemplateSchema[] = [
+  LEVANTAMENTO_SDAI, CORRETIVA_SDAI, PREVENTIVA_SDAI,
+  LEVANTAMENTO_CFTV, CORRETIVA_CFTV,
+  LEVANTAMENTO_CA, CORRETIVA_CA,
+  LEVANTAMENTO_BMS, CORRETIVA_BMS,
+  LEVANTAMENTO_ALARME, CORRETIVA_ALARME,
+];
 
 /**
  * Grava/atualiza os três templates na tabela report_templates (schema em jsonb).
