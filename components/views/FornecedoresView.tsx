@@ -11,6 +11,7 @@ const supplierStatusColor = (status: Supplier['activeStatus']) =>
 interface FornecedoresViewProps {
   suppliers: Supplier[];
   partnerBrands: PartnerBrand[];
+  onAddBrand?: (name: string) => void;
   onAddSupplier: (s: Supplier) => void;
   onUpdateSupplier?: (s: Supplier) => void;
   onDeleteSupplier?: (id: string) => void;
@@ -25,6 +26,7 @@ const labelCls = 'block text-slate-600 mb-1 font-semibold uppercase text-[11px]'
 export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
   suppliers,
   partnerBrands,
+  onAddBrand,
   onAddSupplier,
   onUpdateSupplier,
   onDeleteSupplier,
@@ -44,8 +46,22 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
   const [leadTimeDays, setLeadTimeDays] = useState(0);
   const [brands, setBrands] = useState<string[]>([]);
 
+  const [novaMarca, setNovaMarca] = useState('');
+
   const toggleBrand = (nome: string) =>
     setBrands((prev) => (prev.includes(nome) ? prev.filter((b) => b !== nome) : [...prev, nome]));
+
+  const adicionarMarca = () => {
+    const nome = novaMarca.trim();
+    if (!nome) return;
+    // Cria no registro global de marcas se ainda não existir (por nome).
+    if (!partnerBrands.some((b) => b.name.toLowerCase() === nome.toLowerCase())) {
+      onAddBrand?.(nome);
+    }
+    // Já deixa selecionada neste fornecedor.
+    setBrands((prev) => (prev.some((b) => b.toLowerCase() === nome.toLowerCase()) ? prev : [...prev, nome]));
+    setNovaMarca('');
+  };
 
   const openPanel = () => {
     setEditing(null);
@@ -322,31 +338,57 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
 
           <FormSection icon="sell" title="Marcas que trabalha">
             <p className="text-[11px] text-slate-500 mb-2">
-              Marque as marcas/fabricantes fornecidos. É o que responde “quem vende essa marca?” no cadastro de dispositivos.
+              Digite uma marca e adicione (ela é criada no catálogo na hora), ou marque as já cadastradas. Responde “quem vende essa marca?” no cadastro de dispositivos.
             </p>
-            {partnerBrands.length === 0 ? (
-              <p className="text-[11px] text-slate-400 italic">Nenhuma marca cadastrada ainda. Cadastre em Conta &gt; Marcas ou ao criar um dispositivo.</p>
-            ) : (
-              <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
-                {partnerBrands.map((b) => {
-                  const on = brands.includes(b.name);
-                  return (
-                    <button
-                      key={b.id}
-                      type="button"
-                      onClick={() => toggleBrand(b.name)}
-                      className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors ${
-                        on
-                          ? 'bg-[#1A1A72] text-white border-[#1A1A72]'
-                          : 'bg-white text-slate-600 border-slate-200 hover:border-[#1A1A72]'
-                      }`}
-                    >
-                      {on ? '✓ ' : ''}{b.name}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            {/* Digitar nova marca */}
+            <div className="flex gap-1.5 mb-2">
+              <input
+                type="text"
+                value={novaMarca}
+                onChange={(e) => setNovaMarca(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); adicionarMarca(); }
+                }}
+                placeholder="Ex.: Bosch, Notifier, Intelbras…"
+                className={inputCls}
+              />
+              <button
+                type="button"
+                onClick={adicionarMarca}
+                disabled={!novaMarca.trim()}
+                className="shrink-0 px-3 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] text-white text-[11px] font-bold uppercase disabled:opacity-40"
+              >
+                Adicionar
+              </button>
+            </div>
+            {/* Chips: união das marcas do catálogo + as já selecionadas (mostra a recém-digitada na hora) */}
+            {(() => {
+              const todas = Array.from(new Set([...partnerBrands.map((b) => b.name), ...brands]));
+              if (todas.length === 0) {
+                return <p className="text-[11px] text-slate-400 italic">Nenhuma marca ainda — digite acima para criar a primeira.</p>;
+              }
+              return (
+                <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
+                  {todas.map((nome) => {
+                    const on = brands.includes(nome);
+                    return (
+                      <button
+                        key={nome}
+                        type="button"
+                        onClick={() => toggleBrand(nome)}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors ${
+                          on
+                            ? 'bg-[#1A1A72] text-white border-[#1A1A72]'
+                            : 'bg-white text-slate-600 border-slate-200 hover:border-[#1A1A72]'
+                        }`}
+                      >
+                        {on ? '✓ ' : ''}{nome}
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
             {brands.length > 0 && <p className="text-[10px] text-slate-400 mt-2">{brands.length} marca(s) selecionada(s).</p>}
           </FormSection>
 

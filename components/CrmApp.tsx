@@ -745,6 +745,7 @@ export function CrmApp({
             <FornecedoresView
               suppliers={suppliers}
               partnerBrands={partnerBrands}
+              onAddBrand={(name) => handleAddPartnerBrand({ id: `pb_${Date.now()}`, name, category: 'SDAI' })}
               onAddSupplier={handleAddSupplier}
               onUpdateSupplier={handleUpdateSupplier}
               onDeleteSupplier={handleDeleteSupplier}
