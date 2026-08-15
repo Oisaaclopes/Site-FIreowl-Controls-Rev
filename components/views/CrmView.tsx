@@ -10,6 +10,7 @@ import {
   FinancialTransaction,
   ServiceCatalogItem,
   TabPath,
+  PartnerBrand,
 } from '@/lib/types';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
 import { usePrivacy } from '@/lib/privacy';
@@ -23,6 +24,8 @@ interface CrmViewProps {
   transactions: FinancialTransaction[];
   inventory: InventoryItem[];
   services: ServiceCatalogItem[];
+  partnerBrands: PartnerBrand[];
+  onAddPartnerBrand: (brand: PartnerBrand) => void;
   onAddClient: (client: Client) => void;
   onAddOS: (os: PedidoOS) => void;
   onSelectClientForReport?: (clientName: string) => void;
@@ -68,6 +71,8 @@ export const CrmView: React.FC<CrmViewProps> = ({
   transactions,
   inventory,
   services,
+  partnerBrands,
+  onAddPartnerBrand,
   onAddClient,
   onSelectClientForReport,
   onNavigateToTab,
@@ -596,6 +601,8 @@ export const CrmView: React.FC<CrmViewProps> = ({
           pedidosOS={pedidosOS}
           transactions={transactions}
           maskMoney={maskMoney}
+          fabricantes={partnerBrands}
+          onAddFabricante={(name) => onAddPartnerBrand({ id: `pb_${Date.now()}`, name, category: 'SDAI' })}
           onClose={() => setSelectedClientDetail(null)}
           onOpenReport={(name) => {
             setSelectedClientDetail(null);
@@ -620,6 +627,8 @@ interface ClientDetailProps {
   pedidosOS: PedidoOS[];
   transactions: FinancialTransaction[];
   maskMoney: (v: string) => string;
+  fabricantes: PartnerBrand[];
+  onAddFabricante: (name: string) => void;
   onClose: () => void;
   onOpenReport: (name: string) => void;
   onNavigateToTab: (tab: TabPath) => void;
@@ -632,6 +641,8 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
   pedidosOS,
   transactions,
   maskMoney,
+  fabricantes,
+  onAddFabricante,
   onClose,
   onOpenReport,
   onNavigateToTab,
@@ -830,6 +841,8 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
         onClose={() => setShowDevices(false)}
         clienteId={client.id}
         clienteNome={client.name}
+        fabricantes={fabricantes}
+        onAddFabricante={onAddFabricante}
       />
     </div>
   );

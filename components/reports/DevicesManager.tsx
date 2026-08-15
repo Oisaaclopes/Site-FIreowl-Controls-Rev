@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Device } from '@/lib/types';
+import { Device, PartnerBrand } from '@/lib/types';
 import { fetchDevices, upsertDevice, deleteDevice } from '@/lib/devices';
 import { isSupabaseConfigured } from '@/lib/inventory';
 
@@ -10,10 +10,28 @@ interface DevicesManagerProps {
   onClose: () => void;
   clienteId: string;
   clienteNome: string;
+  /** Fabricantes cadastrados (marcas parceiras) para o seletor. */
+  fabricantes: PartnerBrand[];
+  /** Cadastra um novo fabricante e o deixa disponível na lista. */
+  onAddFabricante: (name: string) => void;
 }
 
 const inputCls = 'w-full border border-slate-200 rounded-lg p-2 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20';
-const SISTEMAS: Device['sistema'][] = ['SDAI', 'CFTV', 'CONTROLE_ACESSO', 'BMS'];
+
+// Tipos de dispositivo SDAI. A CENTRAL é um dispositivo como os demais — por isso
+// encabeça a lista. (CFTV/Controle de Acesso/BMS terão seus próprios tipos depois.)
+const TIPOS_SDAI = [
+  'Central de alarme endereçável',
+  'Central de alarme convencional',
+  'Repetidor',
+  'Detector óptico de fumaça',
+  'Detector de temperatura / termovelocimétrico',
+  'Detector linear (barreira)',
+  'Acionador manual',
+  'Sirene audiovisual',
+  'Módulo isolador',
+  'Módulo de comando / relé',
+];
 
 const emptyForm = (clienteId: string): Device => ({
   id: '',
@@ -30,12 +48,28 @@ const emptyForm = (clienteId: string): Device => ({
   status: 'ativo',
 });
 
-export const DevicesManager: React.FC<DevicesManagerProps> = ({ open, onClose, clienteId, clienteNome }) => {
+export const DevicesManager: React.FC<DevicesManagerProps> = ({ open, onClose, clienteId, clienteNome, fabricantes, onAddFabricante }) => {
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<Device>(emptyForm(clienteId));
   const [err, setErr] = useState<string | null>(null);
+  const [addingFab, setAddingFab] = useState(false);
+  const [newFab, setNewFab] = useState('');
+
+  // Centrais já cadastradas deste cliente (para referência dos demais dispositivos).
+  const centraisExistentes = Array.from(
+    new Set(devices.map((d) => (d.central || '').trim()).filter(Boolean))
+  );
+
+  const confirmarFab = () => {
+    const nome = newFab.trim();
+    if (!nome) return;
+    onAddFabricante(nome);
+    setForm((f) => ({ ...f, fabricante: nome }));
+    setNewFab('');
+    setAddingFab(false);
+  };
 
   const load = () => {
     if (!isSupabaseConfigured()) return;
@@ -102,16 +136,47 @@ export const DevicesManager: React.FC<DevicesManagerProps> = ({ open, onClose, c
         <div className="p-5 overflow-y-auto space-y-4">
           {/* Formulário de cadastro */}
           <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/50 space-y-2">
-            <p className="text-[11px] font-semibold uppercase text-slate-600">Novo dispositivo</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-[11px] font-semibold uppercase text-slate-600">Novo dispositivo</p>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#1A1A72] bg-[#1A1A72]/10 px-2 py-0.5 rounded">SDAI</span>
+              <span className="text-[10px] text-slate-400">CFTV, Controle de Acesso e BMS terão cadastro próprio (em breve).</span>
+            </div>
+            <p className="text-[10px] text-slate-500 leading-snug">
+              A <b>central é um dispositivo</b>: cadastre-a com Tipo “Central de alarme…” e um identificador em <b>Central</b> (ex.: “Central 01”). Os demais dispositivos apontam para ela por esse identificador (Central / Laço / Endereço = endereçamento).
+            </p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              <select value={form.sistema} onChange={(e) => set('sistema', e.target.value)} className={inputCls}>
-                {SISTEMAS.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-              <input className={inputCls} placeholder="Central" value={form.central || ''} onChange={(e) => set('central', e.target.value)} />
+              {/* Central: referência a um painel já cadastrado deste cliente (ou novo) */}
+              <input list="dm-centrais" className={inputCls} placeholder="Central (ex.: Central 01)" value={form.central || ''} onChange={(e) => set('central', e.target.value)} />
+              <datalist id="dm-centrais">{centraisExistentes.map((c) => <option key={c} value={c} />)}</datalist>
+
               <input className={inputCls} placeholder="Laço" value={form.laco || ''} onChange={(e) => set('laco', e.target.value)} />
               <input className={inputCls} placeholder="Endereço" value={form.endereco || ''} onChange={(e) => set('endereco', e.target.value)} />
-              <input className={`${inputCls} col-span-2`} placeholder="Tipo (ex.: Detector óptico)" value={form.tipoDispositivo || ''} onChange={(e) => set('tipoDispositivo', e.target.value)} />
-              <input className={inputCls} placeholder="Fabricante" value={form.fabricante || ''} onChange={(e) => set('fabricante', e.target.value)} />
+
+              {/* Tipo: lista SDAI (a Central é uma opção) + texto livre */}
+              <input list="dm-tipos" className={`${inputCls} col-span-2`} placeholder="Tipo (ex.: Detector óptico)" value={form.tipoDispositivo || ''} onChange={(e) => set('tipoDispositivo', e.target.value)} />
+              <datalist id="dm-tipos">{TIPOS_SDAI.map((t) => <option key={t} value={t} />)}</datalist>
+
+              {/* Fabricante: lista cadastrada + cadastrar novo */}
+              {addingFab ? (
+                <div className="col-span-2 flex gap-1">
+                  <input autoFocus className={inputCls} placeholder="Novo fabricante" value={newFab}
+                    onChange={(e) => setNewFab(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); confirmarFab(); } }} />
+                  <button type="button" onClick={confirmarFab} className="px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold">OK</button>
+                  <button type="button" onClick={() => { setAddingFab(false); setNewFab(''); }} className="px-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-600 text-[11px]">✕</button>
+                </div>
+              ) : (
+                <select className={inputCls} value={form.fabricante || ''}
+                  onChange={(e) => { if (e.target.value === '__novo__') setAddingFab(true); else set('fabricante', e.target.value); }}>
+                  <option value="">Fabricante…</option>
+                  {form.fabricante && !fabricantes.some((f) => f.name === form.fabricante) && (
+                    <option value={form.fabricante}>{form.fabricante}</option>
+                  )}
+                  {fabricantes.map((f) => <option key={f.id} value={f.name}>{f.name}</option>)}
+                  <option value="__novo__">＋ Cadastrar novo fabricante…</option>
+                </select>
+              )}
+
               <input className={inputCls} placeholder="Modelo" value={form.modelo || ''} onChange={(e) => set('modelo', e.target.value)} />
               <input className={inputCls} placeholder="Localização" value={form.localizacao || ''} onChange={(e) => set('localizacao', e.target.value)} />
               <input className={inputCls} placeholder="Pavimento" value={form.pavimento || ''} onChange={(e) => set('pavimento', e.target.value)} />

@@ -711,6 +711,8 @@ export function CrmApp({
               transactions={transactions}
               inventory={inventory}
               services={services}
+              partnerBrands={partnerBrands}
+              onAddPartnerBrand={handleAddPartnerBrand}
               onAddClient={handleAddClient}
               onAddOS={handleAddOS}
               onSelectClientForReport={handleSelectClientForReport}
