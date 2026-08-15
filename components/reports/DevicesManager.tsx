@@ -167,8 +167,8 @@ export const DevicesManager: React.FC<DevicesManagerProps> = ({ open, onClose, c
               <input list="dm-centrais" className={inputCls} placeholder="Central (ex.: Central 01)" value={form.central || ''} onChange={(e) => set('central', e.target.value)} />
               <datalist id="dm-centrais">{centraisExistentes.map((c) => <option key={c} value={c} />)}</datalist>
 
-              <input className={inputCls} placeholder="Laço" value={form.laco || ''} onChange={(e) => set('laco', e.target.value)} />
-              <input className={inputCls} placeholder="Endereço" value={form.endereco || ''} onChange={(e) => set('endereco', e.target.value)} />
+              <input className={inputCls} placeholder="Laço (1-10)" inputMode="numeric" value={form.laco || ''} onChange={(e) => set('laco', e.target.value)} />
+              <input className={inputCls} placeholder="Endereço" inputMode="numeric" value={form.endereco || ''} onChange={(e) => set('endereco', e.target.value)} />
 
               {/* Tipo: lista SDAI (a Central é uma opção) + texto livre */}
               <input list="dm-tipos" className={`${inputCls} col-span-2`} placeholder="Tipo (ex.: Detector óptico)" value={form.tipoDispositivo || ''} onChange={(e) => set('tipoDispositivo', e.target.value)} />

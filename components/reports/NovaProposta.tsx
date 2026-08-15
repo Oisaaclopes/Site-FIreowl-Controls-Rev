@@ -104,6 +104,8 @@ export const NovaProposta: React.FC<NovaPropostaProps> = ({ open, onClose, clien
   if (!open) return null;
 
   const semPreco = escolhidas.some((p) => precoItem(p) === 0);
+  // Criticidade operacional 3 = urgente (INTERNO — nunca vai ao PDF do cliente).
+  const temCritico = escolhidas.some((p) => p.criticidadeOperacional === 3);
 
   const gerar = async () => {
     if (provisorio || escolhidas.length === 0) return;
@@ -201,11 +203,20 @@ export const NovaProposta: React.FC<NovaPropostaProps> = ({ open, onClose, clien
                         className="mt-0.5"
                       />
                       <span>
+                        {p.criticidadeOperacional === 3 && (
+                          <span className="mr-1 inline-block align-middle text-[9px] font-bold uppercase bg-red-100 text-red-700 px-1.5 py-0.5 rounded">C3 Urgente</span>
+                        )}
                         <span className="font-semibold text-slate-800">{p.grupo || 'Pendência'}</span> — {p.descricao}
                         {precoItem(p) === 0 && <span className="ml-1 text-amber-600 font-semibold">(a precificar)</span>}
                       </span>
                     </label>
                   ))}
+                </div>
+              )}
+              {temCritico && (
+                <div className="mt-2 flex items-start gap-1.5 text-[11px] text-red-800 bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5">
+                  <span className="material-symbols-outlined text-sm text-red-600">priority_high</span>
+                  <span>Contém pendência <b>crítica (C3)</b> — considere <b>taxa emergencial</b> ou margem adicional. (Interno; não aparece no PDF do cliente.)</span>
                 </div>
               )}
             </div>
