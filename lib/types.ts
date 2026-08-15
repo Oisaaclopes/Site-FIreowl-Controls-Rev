@@ -131,6 +131,8 @@ export interface Supplier {
   rating: number;
   leadTimeDays: number;
   activeStatus: 'HOMOLOGADO' | 'EM AVALIACAO' | 'SUSPENSO';
+  /** Marcas/fabricantes que este fornecedor trabalha (por nome). */
+  brands?: string[];
 }
 
 export interface ServiceCatalogItem {

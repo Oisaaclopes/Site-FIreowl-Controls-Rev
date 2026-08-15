@@ -73,6 +73,7 @@ import { fetchPunches, insertPunch } from '@/lib/timepunch';
 import { fetchPedidos, upsertPedido, updatePedidoStatus, deletePedido } from '@/lib/pedidos';
 import { fetchQuotes, insertQuote } from '@/lib/quotes';
 import { fetchSuppliers, upsertSupplier, deleteSupplier } from '@/lib/suppliers';
+import { fetchBrands, ensureBrand, deleteBrand, seedBrands } from '@/lib/brands';
 import { fetchClients, upsertClient } from '@/lib/clients';
 import { fetchTransactions, upsertTransaction, deleteTransaction } from '@/lib/transactions';
 import { fetchContracts, upsertContract } from '@/lib/contracts';
@@ -171,6 +172,20 @@ export function CrmApp({
     fetchSuppliers()
       .then((rows) => setSuppliers(rows))
       .catch((err) => console.warn('Fornecedores: falha ao carregar do Supabase.', err));
+    fetchBrands()
+      .then(async (rows) => {
+        // Semeia as marcas empacotadas na primeira carga (idempotente por nome).
+        if (rows.length === 0) {
+          try {
+            await seedBrands(INITIAL_PARTNER_BRANDS);
+            rows = await fetchBrands();
+          } catch (e) {
+            console.warn('Marcas: falha ao semear.', e);
+          }
+        }
+        if (rows.length > 0) setPartnerBrands(rows);
+      })
+      .catch((err) => console.warn('Marcas: falha ao carregar do Supabase.', err));
     fetchClients()
       .then((rows) => setClients(rows))
       .catch((err) => console.warn('Clientes: falha ao carregar do Supabase.', err));
@@ -296,13 +311,19 @@ export function CrmApp({
   };
 
   const handleAddPartnerBrand = (brand: PartnerBrand) => {
-    setPartnerBrands((prev) => [...prev, brand]);
+    // Otimista + dedup por nome; persiste na tabela brands (idempotente).
+    setPartnerBrands((prev) => (prev.some((b) => b.name === brand.name) ? prev : [...prev, brand]));
     logAction('Cadastro de Marca', 'Conta', `Marca parceira homologada: ${brand.name}`);
+    if (!isSupabaseConfigured()) return;
+    ensureBrand(brand.name, brand.category)
+      .then((saved) => setPartnerBrands((prev) => [...prev.filter((b) => b.name !== saved.name), saved]))
+      .catch((err) => console.warn('Marca: falha ao salvar no Supabase.', err));
   };
 
   const handleDeletePartnerBrand = (id: string) => {
     setPartnerBrands((prev) => prev.filter((b) => b.id !== id));
     logAction('Exclusão de Marca', 'Conta', `Marca parceira removida do catálogo.`);
+    if (isSupabaseConfigured()) deleteBrand(id).catch((err) => console.warn('Marca: falha ao remover no Supabase.', err));
   };
 
   // Handlers
@@ -711,6 +732,7 @@ export function CrmApp({
               transactions={transactions}
               inventory={inventory}
               services={services}
+              suppliers={suppliers}
               partnerBrands={partnerBrands}
               onAddPartnerBrand={handleAddPartnerBrand}
               onAddClient={handleAddClient}
@@ -723,6 +745,7 @@ export function CrmApp({
           {currentTab === 'fornecedores' && (
             <FornecedoresView
               suppliers={suppliers}
+              partnerBrands={partnerBrands}
               onAddSupplier={handleAddSupplier}
               onUpdateSupplier={handleUpdateSupplier}
               onDeleteSupplier={handleDeleteSupplier}

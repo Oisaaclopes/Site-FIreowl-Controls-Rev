@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Device, PartnerBrand } from '@/lib/types';
+import { Device, PartnerBrand, Supplier, InventoryItem } from '@/lib/types';
 import { fetchDevices, upsertDevice, deleteDevice } from '@/lib/devices';
 import { isSupabaseConfigured } from '@/lib/inventory';
 
@@ -12,6 +12,10 @@ interface DevicesManagerProps {
   clienteNome: string;
   /** Fabricantes cadastrados (marcas parceiras) para o seletor. */
   fabricantes: PartnerBrand[];
+  /** Fornecedores — para mostrar quem trabalha a marca escolhida. */
+  suppliers: Supplier[];
+  /** Estoque — para mostrar se há itens da marca/modelo. */
+  inventory: InventoryItem[];
   /** Cadastra um novo fabricante e o deixa disponível na lista. */
   onAddFabricante: (name: string) => void;
 }
@@ -48,7 +52,7 @@ const emptyForm = (clienteId: string): Device => ({
   status: 'ativo',
 });
 
-export const DevicesManager: React.FC<DevicesManagerProps> = ({ open, onClose, clienteId, clienteNome, fabricantes, onAddFabricante }) => {
+export const DevicesManager: React.FC<DevicesManagerProps> = ({ open, onClose, clienteId, clienteNome, fabricantes, suppliers, inventory, onAddFabricante }) => {
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -61,6 +65,20 @@ export const DevicesManager: React.FC<DevicesManagerProps> = ({ open, onClose, c
   const centraisExistentes = Array.from(
     new Set(devices.map((d) => (d.central || '').trim()).filter(Boolean))
   );
+
+  // Interligação marca -> fornecedor -> estoque (pela marca escolhida no form).
+  const marca = (form.fabricante || '').trim();
+  const marcaLc = marca.toLowerCase();
+  const fornecedoresDaMarca = marca
+    ? suppliers.filter((s) => (s.brands || []).some((b) => b.toLowerCase() === marcaLc))
+    : [];
+  const itensEmEstoque = marca
+    ? inventory.filter((i) => (i.brand || '').trim().toLowerCase() === marcaLc)
+    : [];
+  const qtdEstoque = itensEmEstoque.reduce((acc, i) => acc + (Number(i.quantity) || 0), 0);
+  const modelosEstoque = Array.from(
+    new Set(itensEmEstoque.map((i) => i.model || i.name).filter(Boolean))
+  ).slice(0, 4);
 
   const confirmarFab = () => {
     const nome = newFab.trim();
@@ -181,6 +199,40 @@ export const DevicesManager: React.FC<DevicesManagerProps> = ({ open, onClose, c
               <input className={inputCls} placeholder="Localização" value={form.localizacao || ''} onChange={(e) => set('localizacao', e.target.value)} />
               <input className={inputCls} placeholder="Pavimento" value={form.pavimento || ''} onChange={(e) => set('pavimento', e.target.value)} />
             </div>
+
+            {/* Interligação: quem fornece a marca escolhida e se há em estoque */}
+            {marca && (
+              <div className="rounded-lg border border-slate-200 bg-white p-2.5 text-[11px] space-y-1.5">
+                <div className="flex items-start gap-1.5">
+                  <span className="material-symbols-outlined text-sm text-slate-400 mt-px">local_shipping</span>
+                  <span>
+                    <span className="font-semibold text-slate-600">Fornecedores de {marca}: </span>
+                    {fornecedoresDaMarca.length === 0 ? (
+                      <span className="text-amber-600">nenhum fornecedor marcou esta marca — defina em Fornecedores.</span>
+                    ) : (
+                      <span className="text-slate-700">
+                        {fornecedoresDaMarca.map((s) => `${s.name}${s.leadTimeDays ? ` (${s.leadTimeDays}d)` : ''}`).join(' · ')}
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex items-start gap-1.5">
+                  <span className="material-symbols-outlined text-sm text-slate-400 mt-px">inventory_2</span>
+                  <span>
+                    <span className="font-semibold text-slate-600">Em estoque: </span>
+                    {qtdEstoque > 0 ? (
+                      <span className="text-emerald-700 font-semibold">{qtdEstoque} un</span>
+                    ) : (
+                      <span className="text-slate-400">sem itens desta marca no estoque</span>
+                    )}
+                    {modelosEstoque.length > 0 && (
+                      <span className="text-slate-400"> · {modelosEstoque.join(', ')}</span>
+                    )}
+                  </span>
+                </div>
+              </div>
+            )}
+
             {err && <p className="text-[11px] font-semibold text-[#E63946]">{err}</p>}
             <button onClick={add} disabled={saving} className="px-4 py-2 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] disabled:opacity-60 text-white text-xs font-semibold uppercase tracking-wide">
               {saving ? 'Salvando…' : 'Adicionar dispositivo'}

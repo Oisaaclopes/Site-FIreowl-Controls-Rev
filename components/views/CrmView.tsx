@@ -11,6 +11,7 @@ import {
   ServiceCatalogItem,
   TabPath,
   PartnerBrand,
+  Supplier,
 } from '@/lib/types';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
 import { usePrivacy } from '@/lib/privacy';
@@ -24,6 +25,7 @@ interface CrmViewProps {
   transactions: FinancialTransaction[];
   inventory: InventoryItem[];
   services: ServiceCatalogItem[];
+  suppliers: Supplier[];
   partnerBrands: PartnerBrand[];
   onAddPartnerBrand: (brand: PartnerBrand) => void;
   onAddClient: (client: Client) => void;
@@ -71,6 +73,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
   transactions,
   inventory,
   services,
+  suppliers,
   partnerBrands,
   onAddPartnerBrand,
   onAddClient,
@@ -602,6 +605,8 @@ export const CrmView: React.FC<CrmViewProps> = ({
           transactions={transactions}
           maskMoney={maskMoney}
           fabricantes={partnerBrands}
+          suppliers={suppliers}
+          inventory={inventory}
           onAddFabricante={(name) => onAddPartnerBrand({ id: `pb_${Date.now()}`, name, category: 'SDAI' })}
           onClose={() => setSelectedClientDetail(null)}
           onOpenReport={(name) => {
@@ -628,6 +633,8 @@ interface ClientDetailProps {
   transactions: FinancialTransaction[];
   maskMoney: (v: string) => string;
   fabricantes: PartnerBrand[];
+  suppliers: Supplier[];
+  inventory: InventoryItem[];
   onAddFabricante: (name: string) => void;
   onClose: () => void;
   onOpenReport: (name: string) => void;
@@ -642,6 +649,8 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
   transactions,
   maskMoney,
   fabricantes,
+  suppliers,
+  inventory,
   onAddFabricante,
   onClose,
   onOpenReport,
@@ -842,6 +851,8 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
         clienteId={client.id}
         clienteNome={client.name}
         fabricantes={fabricantes}
+        suppliers={suppliers}
+        inventory={inventory}
         onAddFabricante={onAddFabricante}
       />
     </div>

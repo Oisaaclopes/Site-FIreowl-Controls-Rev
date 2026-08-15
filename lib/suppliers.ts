@@ -17,6 +17,7 @@ function rowToSupplier(r: any): Supplier {
     rating: Number(r.rating ?? 0),
     leadTimeDays: Number(r.lead_time_days ?? 0),
     activeStatus: (r.active_status || 'HOMOLOGADO') as Supplier['activeStatus'],
+    brands: Array.isArray(r.brands) ? r.brands.map(String) : [],
   };
 }
 
@@ -34,6 +35,7 @@ function supplierToRow(s: Supplier): Record<string, unknown> {
     rating: s.rating,
     lead_time_days: s.leadTimeDays,
     active_status: s.activeStatus,
+    brands: s.brands ?? [],
     updated_at: new Date().toISOString(),
   };
 }
