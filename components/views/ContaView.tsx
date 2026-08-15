@@ -8,6 +8,7 @@ import {
   mesclarClienteProvisorio,
   fetchCatalogoProvisorio,
   atualizarCatalogoProvisorio,
+  precificarComoEstoque,
 } from '@/lib/homologacao';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
 import { Toggle, SidePanel } from '@/components/SidePanel';
@@ -197,8 +198,9 @@ export const ContaView: React.FC<ContaViewProps> = ({
     }
     setHomolBusy(it.id);
     try {
-      await atualizarCatalogoProvisorio(it.id, { status: 'aprovado', dados: { ...it.dados, preco_venda: val } });
+      const novo = await precificarComoEstoque(it, val);
       await loadHomologacao();
+      alert(`Item cadastrado no Estoque (código ${novo.code}) com preço de R$ ${val.toFixed(2)}.`);
     } catch {
       alert('Falha ao precificar item.');
     } finally {

@@ -1,5 +1,6 @@
 import { getSupabaseClient } from './supabaseClient';
-import { CatalogoProvisorio } from './types';
+import { CatalogoProvisorio, InventoryItem } from './types';
+import { insertInventoryItem } from './inventory';
 
 /* ---------------------------------------------------------------------------
  * Homologação (§6.3 & §9): registros criados em campo nascem provisórios e são
@@ -56,6 +57,37 @@ export async function fetchCatalogoProvisorio(filter?: {
   const { data, error } = await query;
   if (error) throw error;
   return (data || []).map(rowToCatalogo);
+}
+
+/**
+ * Precifica um item provisório criando de fato a linha oficial no Estoque e
+ * apontando o provisório para ela (fecha o loop da homologação de itens).
+ */
+export async function precificarComoEstoque(cat: CatalogoProvisorio, precoVenda: number): Promise<InventoryItem> {
+  const d = cat.dados || {};
+  const nome = String(d.nome || d.descricao || d.item || 'Item homologado de campo');
+  const novo = await insertInventoryItem({
+    id: '',
+    code: `HOM-${Date.now().toString(36).toUpperCase()}`,
+    name: nome,
+    category: String(d.categoria || d.grupo || 'SDAI'),
+    quantity: 0,
+    minQuantity: 0,
+    unitPrice: precoVenda,
+    supplier: String(d.fornecedor || ''),
+    location: '',
+    unit: d.unidade ? String(d.unidade) : 'un',
+    salePrice: precoVenda,
+    stockManaged: true,
+    brand: d.marca ? String(d.marca) : undefined,
+    description: `Homologado a partir de registro de campo${cat.reportOrigemId ? ` (relatório ${cat.reportOrigemId})` : ''}.`,
+  });
+  await atualizarCatalogoProvisorio(cat.id, {
+    status: 'aprovado',
+    registroFinalId: novo.id,
+    dados: { ...d, preco_venda: precoVenda },
+  });
+  return novo;
 }
 
 /** Atualiza status/dados de um registro provisório do catálogo. */
