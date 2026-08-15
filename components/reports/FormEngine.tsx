@@ -13,6 +13,14 @@ import {
 } from '@/lib/reportSchema';
 import { registerPhoto, getPhotoPreview, setPhotoMarkup, hasMarkup } from '@/lib/reportMedia';
 import { MarkupCanvas } from '@/components/reports/MarkupCanvas';
+import { CATALOGO_FALHAS, GRUPOS_FALHA, falhaLabel, findFalhaByLabel } from '@/lib/catalogoFalhas';
+
+// Rótulo da criticidade (bate com as opções do campo select_interno).
+const CRIT_LABEL: Record<1 | 2 | 3, string> = {
+  1: '1 - pode aguardar',
+  2: '2 - programar',
+  3: '3 - executar com urgência',
+};
 import { getSignature } from '@/lib/signatures';
 import { SignatureCanvas } from '@/components/reports/SignatureCanvas';
 
@@ -296,6 +304,10 @@ const Repeater: React.FC<{
   const updateCard = (idx: number, key: string, v: unknown) => {
     onCards(cards.map((c, i) => (i === idx ? { ...c, [key]: v } : c)));
   };
+  // Aplica vários campos de uma vez (usado pelo seletor de falha padrão).
+  const patchCard = (idx: number, patch: Record<string, unknown>) => {
+    onCards(cards.map((c, i) => (i === idx ? { ...c, ...patch } : c)));
+  };
   const removeCard = (idx: number) => onCards(cards.filter((_, i) => i !== idx));
 
   return (
@@ -315,11 +327,44 @@ const Repeater: React.FC<{
             {schema
               .filter((f) => isFieldVisibleForRole(f, role))
               .map((f) => (
-                <div key={f.key} className={f.multilinha ? 'md:col-span-2' : ''}>
+                <div key={f.key} className={f.tipo === 'select_falha' || f.multilinha ? 'md:col-span-2' : ''}>
                   <label className={labelCls}>
                     {f.label || f.key} {f.obrigatorio && <span className="text-[#E63946]">*</span>}
                   </label>
-                  <FieldControl field={f} value={card[f.key]} onValue={(v) => updateCard(idx, f.key, v)} catalog={catalog} />
+                  {f.tipo === 'select_falha' ? (
+                    <select
+                      className={inputCls}
+                      value={(card[f.key] as string) || ''}
+                      onChange={(e) => {
+                        const fa = findFalhaByLabel(e.target.value);
+                        if (!fa) {
+                          patchCard(idx, { [f.key]: '' });
+                          return;
+                        }
+                        // Preenche o card inteiro; o técnico ainda pode editar tudo.
+                        patchCard(idx, {
+                          [f.key]: e.target.value,
+                          grupo: fa.grupo,
+                          descricao: fa.descricao,
+                          acao_recomendada: fa.acao,
+                          criticidade_operacional: CRIT_LABEL[fa.criticidade],
+                        });
+                      }}
+                    >
+                      <option value="">— escolher falha padrão (preenche o resto) —</option>
+                      {GRUPOS_FALHA.map((g) => (
+                        <optgroup key={g} label={g.replace('SDAI > ', '')}>
+                          {CATALOGO_FALHAS.filter((x) => x.grupo === g).map((x) => (
+                            <option key={x.titulo} value={falhaLabel(x)}>
+                              {x.titulo}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  ) : (
+                    <FieldControl field={f} value={card[f.key]} onValue={(v) => updateCard(idx, f.key, v)} catalog={catalog} />
+                  )}
                 </div>
               ))}
           </div>

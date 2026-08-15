@@ -21,7 +21,8 @@ export type FieldType =
   | 'assinatura'
   | 'repeater'
   | 'checklist_dispositivos' // repeater gerado a partir do inventário devices
-  | 'checklist_pendencias'; // repeater gerado a partir das pendências aprovadas
+  | 'checklist_pendencias' // repeater gerado a partir das pendências aprovadas
+  | 'select_falha'; // seletor do catálogo de falhas — preenche o card (grupo/descrição/ação/criticidade)
 
 /** Sugestão para pré-abertura automática de pendência a partir da resposta. */
 export interface PendenciaSugerida {

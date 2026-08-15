@@ -25,6 +25,7 @@ import { fetchOrdensServico } from '@/lib/ordensServico';
 import { fetchCicloAtivo, quotaPorVisita } from '@/lib/ciclos';
 import { flushOutbox, pendingCount, isOnline } from '@/lib/offline/reportSync';
 import { EmptyState } from '@/components/EmptyState';
+import { GRUPOS_FALHA } from '@/lib/catalogoFalhas';
 import { fetchTemplates } from '@/lib/reportTemplates';
 import { gerarPdfExecucao } from '@/lib/reportPdf';
 import { NovaProposta } from '@/components/reports/NovaProposta';
@@ -231,7 +232,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 
   const catalog: CatalogSources = useMemo(
     () => ({
-      categorias: uniq([...inventory.map((i) => i.category), ...services.map((s) => s.category)]),
+      categorias: uniq([...GRUPOS_FALHA, ...inventory.map((i) => i.category), ...services.map((s) => s.category)]),
       itens: uniq([...inventory.map((i) => i.name), ...services.map((s) => s.title)]),
       marcas: uniq([...brands.map((b) => b.name), ...inventory.map((i) => i.brand || '')]),
       devices: [],
