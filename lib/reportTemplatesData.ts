@@ -29,7 +29,7 @@ function apontamentosRepeater(fotos: number | Array<'antes' | 'depois'>): FieldS
     botao_adicionar: '+ Adicionar apontamento',
     gera_pendencia: true,
     card_schema: [
-      { key: 'falha_padrao', tipo: 'select_falha', label: 'Falha padrão (preenchimento rápido)' },
+      { key: 'falha_padrao', tipo: 'select_falha', origem: 'SDAI', label: 'Falha padrão (preenchimento rápido)' },
       { key: 'grupo', tipo: 'select_catalogo', origem: 'categorias', label: 'Grupo', obrigatorio: true },
       { key: 'item', tipo: 'autocomplete_catalogo', origem: 'estoque_servicos', label: 'Item / material', permite_texto_livre: true },
       { key: 'local', tipo: 'texto', label: 'Local', obrigatorio: true },

@@ -13,7 +13,7 @@ import {
 } from '@/lib/reportSchema';
 import { registerPhoto, getPhotoPreview, setPhotoMarkup, hasMarkup } from '@/lib/reportMedia';
 import { MarkupCanvas } from '@/components/reports/MarkupCanvas';
-import { CATALOGO_FALHAS, GRUPOS_FALHA, falhaLabel, findFalhaByLabel } from '@/lib/catalogoFalhas';
+import { falhasPorArea, AreaFalha, falhaLabel, findFalhaByLabel } from '@/lib/catalogoFalhas';
 
 // Rótulo da criticidade (bate com as opções do campo select_interno).
 const CRIT_LABEL: Record<1 | 2 | 3, string> = {
@@ -352,15 +352,19 @@ const Repeater: React.FC<{
                       }}
                     >
                       <option value="">— escolher falha padrão (preenche o resto) —</option>
-                      {GRUPOS_FALHA.map((g) => (
-                        <optgroup key={g} label={g.replace('SDAI > ', '')}>
-                          {CATALOGO_FALHAS.filter((x) => x.grupo === g).map((x) => (
-                            <option key={x.titulo} value={falhaLabel(x)}>
-                              {x.titulo}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))}
+                      {(() => {
+                        const falhas = falhasPorArea(field.origem as AreaFalha | undefined);
+                        const grupos = Array.from(new Set(falhas.map((x) => x.grupo)));
+                        return grupos.map((g) => (
+                          <optgroup key={g} label={g.split('> ').pop()}>
+                            {falhas.filter((x) => x.grupo === g).map((x) => (
+                              <option key={x.titulo} value={falhaLabel(x)}>
+                                {x.titulo}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ));
+                      })()}
                     </select>
                   ) : (
                     <FieldControl field={f} value={card[f.key]} onValue={(v) => updateCard(idx, f.key, v)} catalog={catalog} />
