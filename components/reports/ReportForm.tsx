@@ -2,8 +2,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { Client, UserRole, Pendencia, AcaoRecomendada, GeoPoint, Device, CicloAmostragem } from '@/lib/types';
-import { marcarTesteFuncional } from '@/lib/devices';
-import { registrarTestesNoCiclo } from '@/lib/ciclos';
 import { getGeoPoint } from '@/lib/geo';
 import {
   TemplateSchema,
@@ -15,11 +13,21 @@ import {
 } from '@/lib/reportSchema';
 import { FormEngine, CatalogSources } from '@/components/reports/FormEngine';
 import { isSupabaseConfigured } from '@/lib/inventory';
-import { createReport, updateReport, upsertAnswer, insertMedia } from '@/lib/reports';
-import { updateOrdemServicoStatus } from '@/lib/ordensServico';
-import { insertPendencia } from '@/lib/pendencias';
-import { uploadReportPhoto, getCapturedPhoto, getPhotoPreview, isPhotoId, registerPhoto, clearPhotoRegistry } from '@/lib/reportMedia';
-import { getSignature, isSignatureId, uploadSignaturePng, insertSignature, clearSignatureRegistry } from '@/lib/signatures';
+import { getCapturedPhoto, getPhotoPreview, isPhotoId, registerPhoto, clearPhotoRegistry } from '@/lib/reportMedia';
+import { getSignature, isSignatureId, clearSignatureRegistry } from '@/lib/signatures';
+import {
+  ReportBundle,
+  BundleMedia,
+  BundleSignature,
+  BundleAnswer,
+  MediaTipo,
+  newClientUuid,
+  offlineAvailable,
+  isOnline,
+  enqueueBundle,
+  persistReportBundle,
+  removeBundle,
+} from '@/lib/offline/reportSync';
 
 interface ReportFormProps {
   template: TemplateSchema;
@@ -43,8 +51,6 @@ interface PendenciaPreview {
   local?: string;
   origem: string;
 }
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const firstDigit = (s: unknown): number | undefined => {
   const m = /(\d)/.exec(String(s ?? ''));
@@ -145,6 +151,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   const [saving, setSaving] = useState(false);
   const [persistErr, setPersistErr] = useState<string | null>(null);
   const [savedInfo, setSavedInfo] = useState<{ reportId: string; count: number } | null>(null);
+  const [offlineSaved, setOfflineSaved] = useState(false);
 
   // Estado da bandeja de fotos não classificadas (Seção 3.1)
   const [unclassifiedPhotos, setUnclassifiedPhotos] = useState<UnclassifiedPhoto[]>([]);
@@ -334,93 +341,116 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   };
 
 
-  // Sobe todas as fotos capturadas (campos foto + apontamentos + bandeja) ao
-  // Storage e cria as linhas report_media. Retorna { photoId: storage_path }.
-  const uploadPhotos = async (reportId: string): Promise<Record<string, string>> => {
-    const ids = new Set<string>();
+  // Monta o "bundle" auto-contido da finalização (dados + blobs), pronto para
+  // ser gravado offline no IndexedDB e replicado no Supabase (Parte 4.1).
+  const buildBundle = async (): Promise<ReportBundle> => {
+    // fotos referenciadas nas respostas + na bandeja de triagem
+    const photoIds = new Set<string>();
     const collect = (v: unknown) => {
       if (!Array.isArray(v)) return;
       v.forEach((item) => {
-        if (typeof item === 'string' && isPhotoId(item)) ids.add(item);
+        if (typeof item === 'string' && isPhotoId(item)) photoIds.add(item);
         else if (item && typeof item === 'object') {
           Object.values(item as Record<string, unknown>).forEach((val) => {
-            if (Array.isArray(val)) val.forEach((x) => { if (typeof x === 'string' && isPhotoId(x)) ids.add(x); });
+            if (Array.isArray(val)) val.forEach((x) => { if (typeof x === 'string' && isPhotoId(x)) photoIds.add(x); });
           });
         }
       });
     };
     for (const secao of template.secoes) for (const field of secao.campos) collect(values[field.key]);
-    unclassifiedPhotos.forEach((p) => { if (isPhotoId(p.id)) ids.add(p.id); });
+    unclassifiedPhotos.forEach((p) => { if (isPhotoId(p.id)) photoIds.add(p.id); });
 
-    const pathById: Record<string, string> = {};
-    let seq = 0;
-    for (const id of ids) {
+    const media: BundleMedia[] = [];
+    for (const id of photoIds) {
       const cap = getCapturedPhoto(id);
       if (!cap) continue;
       const naBandeja = unclassifiedPhotos.some((p) => p.id === id);
-      const tipo = (cap.tipo || (naBandeja ? 'geral' : 'evidencia')) as 'antes' | 'depois' | 'evidencia' | 'geral';
-      const path = await uploadReportPhoto({
-        file: cap.blob,
-        reportId,
-        clienteId: cliente?.id,
+      const tipo = (cap.tipo || (naBandeja ? 'geral' : 'evidencia')) as MediaTipo;
+      media.push({
+        photoId: id,
         tipo,
-        seq: `${Date.now()}_${seq++}`,
-      });
-      pathById[id] = path;
-      // Versão marcada (setas/círculos), quando o técnico anotou a foto.
-      let markedPath: string | undefined;
-      if (cap.markedBlob) {
-        markedPath = await uploadReportPhoto({
-          file: cap.markedBlob,
-          reportId,
-          clienteId: cliente?.id,
-          tipo: `${tipo}_marcado`,
-          seq: `${Date.now()}_${seq++}`,
-        });
-      }
-      await insertMedia({
-        id: '',
-        reportId,
-        tipo,
-        storagePathOriginal: path,
-        storagePathMarcado: markedPath,
-        answerId: undefined, // vínculo fino a apontamento fica para uma fatia futura
+        blob: cap.blob,
+        markedBlob: cap.markedBlob,
         notaRapida: unclassifiedPhotos.find((p) => p.id === id)?.notaRapida,
         geo: geoInicio || undefined,
       });
     }
-    return pathById;
-  };
 
-  // Sobe as assinaturas coletadas ao Storage e cria report_signatures.
-  const uploadSignatures = async (reportId: string): Promise<Record<string, string>> => {
-    const ids = new Set<string>();
+    const signatures: BundleSignature[] = [];
     for (const secao of template.secoes)
       for (const field of secao.campos) {
-        if (field.tipo === 'assinatura') {
-          const v = values[field.key];
-          if (typeof v === 'string' && isSignatureId(v)) ids.add(v);
-        }
+        if (field.tipo !== 'assinatura') continue;
+        const v = values[field.key];
+        if (typeof v !== 'string' || !isSignatureId(v)) continue;
+        const sig = getSignature(v);
+        if (!sig) continue;
+        signatures.push({
+          sigId: v,
+          papel: sig.papel,
+          nome: sig.nome,
+          documento: sig.documento,
+          cargo: sig.cargo,
+          blob: sig.blob,
+          geo: geoInicio || undefined,
+        });
       }
-    const map: Record<string, string> = {};
-    let seq = 0;
-    for (const id of ids) {
-      const sig = getSignature(id);
-      if (!sig) continue;
-      const path = await uploadSignaturePng(reportId, sig.blob, sig.papel, `${Date.now()}_${seq++}`);
-      map[id] = path;
-      await insertSignature({
-        id: '',
-        reportId,
-        papel: sig.papel,
-        nome: sig.nome,
-        documento: sig.documento,
-        cargo: sig.cargo,
-        storagePath: path,
-        geo: geoInicio || undefined,
-      });
+
+    const answers: BundleAnswer[] = [];
+    for (const secao of template.secoes)
+      for (const field of secao.campos) {
+        const v = values[field.key];
+        if (v === undefined) continue;
+        answers.push({ secao: secao.key, fieldKey: field.key, valor: v });
+      }
+
+    const pends = buildPendencias(template, values, cliente?.id || '', catalog.itens);
+    const geoFim = await getGeoPoint();
+
+    // amostragem: dispositivos efetivamente testados (Aprovado/Reprovado)
+    let deviceTests: ReportBundle['deviceTests'];
+    let cicloInfo: ReportBundle['ciclo'];
+    const checklist = template.secoes.flatMap((s) => s.campos).find((f) => f.tipo === 'checklist_dispositivos');
+    if (checklist) {
+      const cards = Array.isArray(values[checklist.key]) ? (values[checklist.key] as RepeaterCard[]) : [];
+      const testadosIds = cards
+        .filter((c) => ['Aprovado', 'Reprovado'].includes(String(c.teste_funcional)))
+        .map((c) => String(c.device_id || ''))
+        .filter(Boolean);
+      if (testadosIds.length > 0) {
+        deviceTests = { ids: testadosIds, dataISO: new Date().toISOString().slice(0, 10), cicloId: ciclo?.id };
+        if (ciclo) cicloInfo = { novos: testadosIds.length };
+      }
     }
-    return map;
+
+    const prefix = template.tipo === 'LEVANTAMENTO' ? 'LEV' : template.tipo === 'CORRETIVA' ? 'COR' : 'PRE';
+    const numero = `${prefix}-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
+
+    return {
+      clientUuid: newClientUuid(),
+      createdAt: new Date().toISOString(),
+      report: {
+        templateId,
+        templateCodigo: template.codigo,
+        numero,
+        tipo: template.tipo,
+        clienteId: cliente?.id || undefined,
+        clienteNome: cliente?.name,
+        osId: contexto?.osId,
+        contratoId: contexto?.contratoId,
+        tecnicoNome: currentUserName || undefined,
+        titulo: `${template.nome} — ${cliente?.name || ''}`.trim(),
+        geoInicio: geoInicio || undefined,
+      },
+      answers,
+      pendencias: pends,
+      media,
+      signatures,
+      geoFim: geoFim || undefined,
+      os: contexto?.osId ? { id: contexto.osId } : undefined,
+      deviceTests,
+      ciclo: cicloInfo,
+      pendCount: pends.length,
+    };
   };
 
   const handleFinalize = async () => {
@@ -438,111 +468,35 @@ export const ReportForm: React.FC<ReportFormProps> = ({
     }
     setSaving(true);
     try {
-      const prefix = template.tipo === 'LEVANTAMENTO' ? 'LEV' : template.tipo === 'CORRETIVA' ? 'COR' : 'PRE';
-      const numero = `${prefix}-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
+      // Offline-first: monta o bundle (dados + blobs) e grava no IndexedDB ANTES
+      // de tocar a rede — nada se perde se o app cair ou o sinal sumir.
+      const bundle = await buildBundle();
 
-      // 1) cria em rascunho (respostas só podem ser gravadas enquanto editável)
-      const report = await createReport({
-        id: '',
-        templateId,
-        templateCodigo: template.codigo,
-        numero,
-        tipo: template.tipo,
-        clienteId: cliente?.id || undefined,
-        osId: contexto?.osId,
-        contratoId: contexto?.contratoId,
-        tecnicoNome: currentUserName || undefined,
-        titulo: `${template.nome} — ${cliente?.name || ''}`.trim(),
-        status: 'rascunho',
-        geoInicio: geoInicio || undefined,
-      });
-
-      // 2) sobe fotos e assinaturas ao Storage; devolve id->storage_path
-      const pathById = await uploadPhotos(report.id);
-      const sigPathById = await uploadSignatures(report.id);
-      const allPaths: Record<string, string> = { ...pathById, ...sigPathById };
-
-      // substitui os IDs (transitórios) pelos storage_path nas respostas
-      const mapId = (x: unknown) => (typeof x === 'string' && allPaths[x] ? allPaths[x] : x);
-      const cleanValue = (v: unknown): unknown => {
-        if (!Array.isArray(v)) return v;
-        return v.map((item) => {
-          if (typeof item === 'string') return mapId(item);
-          if (item && typeof item === 'object') {
-            const obj: Record<string, unknown> = { ...(item as Record<string, unknown>) };
-            for (const k of Object.keys(obj)) {
-              if (Array.isArray(obj[k])) obj[k] = (obj[k] as unknown[]).map(mapId);
-            }
-            return obj;
-          }
-          return item;
-        });
-      };
-
-      // 3) respostas (uma por campo de topo; repeater como jsonb)
-      for (const secao of template.secoes) {
-        for (const field of secao.campos) {
-          const v = values[field.key];
-          if (v === undefined) continue;
-          await upsertAnswer({ id: '', reportId: report.id, secao: secao.key, fieldKey: field.key, valor: cleanValue(v) });
-        }
-      }
-
-      // 4) pendências detectadas
-      const pends = buildPendencias(template, values, cliente?.id || '', catalog.itens);
-      for (const p of pends) {
-        await insertPendencia({ ...p, reportOrigemId: report.id });
-      }
-
-      // 4) finaliza por último (torna o relatório imutável) — captura geo de fecho
-      const geoFim = await getGeoPoint();
-      await updateReport({
-        ...report,
-        status: 'finalizado',
-        finalizadoEm: new Date().toISOString(),
-        geoFim: geoFim || undefined,
-      });
-
-      // Vínculo com a Ordem de Serviço (corretiva): registra este relatório como
-      // execução e conclui a OS. Só quando osId é uma OS real (uuid), não texto.
-      if (contexto?.osId && UUID_RE.test(contexto.osId)) {
-        try {
-          await updateOrdemServicoStatus(contexto.osId, 'concluida', {
-            reportId: report.id,
-            dataConclusao: new Date().toISOString().slice(0, 10),
-          });
-        } catch (e) {
-          console.warn('Não foi possível vincular a Ordem de Serviço:', e);
-        }
-      }
-
-      // Amostragem rotativa (Preventiva): registra o teste funcional dos
-      // dispositivos efetivamente testados e atualiza a cobertura do ciclo.
-      try {
-        const checklist = template.secoes
-          .flatMap((s) => s.campos)
-          .find((f) => f.tipo === 'checklist_dispositivos');
-        if (checklist) {
-          const cards = Array.isArray(values[checklist.key]) ? (values[checklist.key] as RepeaterCard[]) : [];
-          const testadosIds = cards
-            .filter((c) => ['Aprovado', 'Reprovado'].includes(String(c.teste_funcional)))
-            .map((c) => String(c.device_id || ''))
-            .filter(Boolean);
-          if (testadosIds.length > 0) {
-            const hoje = new Date().toISOString().slice(0, 10);
-            await marcarTesteFuncional(testadosIds, hoje, ciclo?.id);
-            if (ciclo) await registrarTestesNoCiclo(ciclo, testadosIds.length);
+      let syncedNow = false;
+      if (offlineAvailable()) {
+        await enqueueBundle(bundle);
+        if (isOnline()) {
+          try {
+            await persistReportBundle(bundle);
+            await removeBundle(bundle.clientUuid);
+            syncedNow = true;
+          } catch (e) {
+            // fica na fila offline; o worker reenvia quando a rede voltar
+            console.warn('Sincronização adiada — relatório guardado no aparelho:', e);
           }
         }
-      } catch (e) {
-        console.warn('Não foi possível atualizar a amostragem/ciclo:', e);
+      } else {
+        // Sem IndexedDB (navegador antigo): exige rede, caminho direto.
+        await persistReportBundle(bundle);
+        syncedNow = true;
       }
 
-      // fotos/assinaturas já subiram ao Storage — libera a memória da sessão
+      // fotos/assinaturas já estão no bundle durável — libera a memória da sessão
       clearPhotoRegistry();
       clearSignatureRegistry();
 
-      setSavedInfo({ reportId: report.id, count: pends.length });
+      setOfflineSaved(!syncedNow);
+      setSavedInfo({ reportId: syncedNow ? '' : bundle.clientUuid, count: bundle.pendCount });
       setFinalized(true);
       onSaved();
     } catch (err) {
@@ -562,12 +516,22 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       {finalized && savedInfo && (
         <div className="fixed inset-0 z-[70] bg-white/95 flex items-center justify-center p-6">
           <div className="text-center max-w-sm">
-            <span className="material-symbols-outlined text-6xl text-emerald-500">task_alt</span>
-            <h2 className="text-lg font-bold text-slate-900 mt-2">Relatório gravado</h2>
+            <span className={`material-symbols-outlined text-6xl ${offlineSaved ? 'text-amber-500' : 'text-emerald-500'}`}>
+              {offlineSaved ? 'cloud_off' : 'task_alt'}
+            </span>
+            <h2 className="text-lg font-bold text-slate-900 mt-2">
+              {offlineSaved ? 'Salvo no aparelho' : 'Relatório gravado'}
+            </h2>
             <p className="text-xs text-slate-500 mt-1">
               {savedInfo.count} pendência{savedInfo.count === 1 ? '' : 's'} aberta{savedInfo.count === 1 ? '' : 's'} · {cliente?.name || 'cliente'}
             </p>
-            <p className="font-data-mono text-[10px] text-slate-400 mt-1">ref {savedInfo.reportId}</p>
+            {offlineSaved ? (
+              <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2">
+                Sem conexão agora. O relatório fica guardado com segurança e é enviado automaticamente quando a internet voltar.
+              </p>
+            ) : (
+              <p className="font-data-mono text-[10px] text-slate-400 mt-1">enviado</p>
+            )}
             <button onClick={onBack} className="mt-4 px-6 py-2.5 rounded-lg bg-[#1A1A72] text-white text-xs font-semibold uppercase tracking-wide">
               Voltar à lista
             </button>

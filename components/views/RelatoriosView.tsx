@@ -23,6 +23,7 @@ import { fetchPendencias } from '@/lib/pendencias';
 import { fetchDevices } from '@/lib/devices';
 import { fetchOrdensServico } from '@/lib/ordensServico';
 import { ensureCicloAtivo, quotaPorVisita } from '@/lib/ciclos';
+import { flushOutbox, pendingCount, isOnline } from '@/lib/offline/reportSync';
 import { fetchTemplates } from '@/lib/reportTemplates';
 import { gerarPdfExecucao } from '@/lib/reportPdf';
 import { NovaProposta } from '@/components/reports/NovaProposta';
@@ -152,6 +153,9 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const [formContext, setFormContext] = useState<{ osId?: string; contratoId?: string }>({});
   const [formDevices, setFormDevices] = useState<Device[] | undefined>(undefined);
   const [formCiclo, setFormCiclo] = useState<CicloAmostragem | undefined>(undefined);
+  const [offlinePend, setOfflinePend] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const [online, setOnline] = useState(true);
 
   const clientName = (id?: string) => clients.find((c) => c.id === id)?.name || '—';
 
@@ -166,6 +170,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       })
       .catch((err) => console.warn('Relatórios: falha ao carregar.', err))
       .finally(() => setLoading(false));
+    pendingCount().then(setOfflinePend).catch(() => {});
   };
 
   // Carrega templates do banco; se vazio e admin, semeia os empacotados.
@@ -188,6 +193,36 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   useEffect(() => {
     refresh();
     loadTemplates();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Worker de sincronização offline: esvazia a fila ao montar e sempre que a
+  // conexão voltar; mantém o contador de pendentes atualizado.
+  const sincronizar = async () => {
+    setSyncing(true);
+    try {
+      const r = await flushOutbox();
+      setOfflinePend(r.pending);
+      if (r.synced > 0) refresh(); // relatórios enviados aparecem na lista
+    } catch (e) {
+      console.warn('Falha ao sincronizar a fila offline.', e);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    setOnline(isOnline());
+    pendingCount().then(setOfflinePend).catch(() => {});
+    if (isOnline()) sincronizar();
+    const onOnline = () => { setOnline(true); sincronizar(); };
+    const onOffline = () => setOnline(false);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -377,6 +412,32 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
           )}
         </div>
       </div>
+
+      {/* Fila de sincronização offline (relatórios finalizados sem conexão) */}
+      {(offlinePend > 0 || !online) && (
+        <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border px-4 py-3 ${offlinePend > 0 ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
+          <div className="flex items-center gap-2 text-xs">
+            <span className={`material-symbols-outlined text-lg ${online ? 'text-amber-600' : 'text-slate-500'}`}>
+              {online ? 'cloud_upload' : 'cloud_off'}
+            </span>
+            <span className="text-slate-700">
+              {!online && <strong className="text-slate-900">Sem conexão. </strong>}
+              {offlinePend > 0
+                ? `${offlinePend} relatório(s) aguardando envio ao servidor.`
+                : 'Você está offline — relatórios finalizados ficam guardados no aparelho.'}
+            </span>
+          </div>
+          {offlinePend > 0 && online && (
+            <button
+              onClick={sincronizar}
+              disabled={syncing}
+              className="shrink-0 px-4 py-1.5 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] text-white text-[11px] font-bold uppercase tracking-wide disabled:opacity-50"
+            >
+              {syncing ? 'Sincronizando…' : 'Sincronizar agora'}
+            </button>
+          )}
+        </div>
+      )}
 
       <NovaProposta
         open={showProposta}
