@@ -383,12 +383,12 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 
   // ===== Índice =====
   return (
-    <div className="flex flex-col w-full p-4 md:p-8 gap-5 md:gap-6">
+    <div className="flex flex-col w-full p-3 md:p-6 gap-3 md:gap-4">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-5">
-        <div>
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Relatórios Técnicos de Campo — SDAI</span>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">
+      <div className="flex flex-row items-center justify-between gap-3 border-b border-slate-200 pb-3">
+        <div className="min-w-0">
+          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Relatórios de Campo — SDAI</span>
+          <h1 className="text-lg md:text-2xl font-bold text-slate-900 tracking-tight truncate">
             {isTecnico ? 'Meu trabalho pendente' : 'Acompanhamento de Relatórios'}
           </h1>
         </div>
@@ -544,7 +544,9 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
           </p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+        <>
+        {/* Desktop: tabela; Mobile: cards compactos (mais intuitivo no celular) */}
+        <div className="hidden md:block bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-200">
@@ -595,6 +597,46 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
             </tbody>
           </table>
         </div>
+
+        {/* Mobile: lista de cards */}
+        <div className="md:hidden flex flex-col gap-2">
+          {filtered.map((r) => (
+            <div key={r.id} className="bg-white rounded-lg border border-slate-200 shadow-sm p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-data-mono text-[11px] font-bold text-slate-500">{r.numero || shortId(r.id)}</span>
+                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${STATUS_COLOR[r.status] || 'bg-slate-100 text-slate-700'}`}>
+                  {r.status}
+                </span>
+              </div>
+              <p className="font-bold text-slate-900 text-sm uppercase truncate mt-1">{clientName(r.clienteId)}</p>
+              <div className="flex items-center justify-between gap-2 mt-1.5">
+                <span className="text-[11px] text-slate-500 font-data-mono truncate">
+                  {TIPO_LABEL[r.tipo] || r.tipo} · {fmtDate(r.finalizadoEm || r.iniciadoEm)}
+                </span>
+                <div className="flex items-center gap-3 shrink-0">
+                  {(pendCountByReport[r.id] || 0) > 0 && (
+                    <span className="font-data-mono text-[11px] font-bold text-[#E63946]">{pendCountByReport[r.id]} pend.</span>
+                  )}
+                  {r.status === 'finalizado' && (
+                    <button
+                      onClick={() =>
+                        gerarPdfExecucao(r, clientName(r.clienteId), userRole).catch((e) => {
+                          console.error(e);
+                          alert('Falha ao gerar o PDF.');
+                        })
+                      }
+                      title="Gerar PDF de execução"
+                      className="w-8 h-8 -my-1 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#E63946] hover:bg-red-50 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-lg">picture_as_pdf</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        </>
       )}
 
       {!isSupabaseConfigured() && (
@@ -801,17 +843,17 @@ const IndChip: React.FC<{ label: string; value: number; tone: 'slate' | 'red' | 
   return (
     <button
       onClick={onClick}
-      className={`shrink-0 bg-white border border-slate-200 rounded-xl px-4 py-3 text-left shadow-sm ${onClick ? 'hover:border-slate-300' : 'cursor-default'}`}
+      className={`shrink-0 bg-white border border-slate-200 rounded-lg px-3 py-2 text-left shadow-sm ${onClick ? 'hover:border-slate-300' : 'cursor-default'}`}
     >
-      <p className={`font-data-mono text-2xl font-bold ${toneCls}`}>{value}</p>
-      <p className="text-[10px] text-slate-500 uppercase tracking-wider whitespace-nowrap">{label}</p>
+      <p className={`font-data-mono text-lg font-bold leading-none ${toneCls}`}>{value}</p>
+      <p className="text-[9px] text-slate-500 uppercase tracking-wider whitespace-nowrap mt-0.5">{label}</p>
     </button>
   );
 };
 
 const VolCard: React.FC<{ label: string; value: number }> = ({ label, value }) => (
-  <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-    <p className="font-data-mono text-xl font-bold text-slate-900">{value}</p>
-    <p className="text-[10px] text-slate-500 uppercase tracking-wider">{label}</p>
+  <div className="bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm">
+    <p className="font-data-mono text-lg font-bold text-slate-900 leading-none">{value}</p>
+    <p className="text-[9px] text-slate-500 uppercase tracking-wider mt-0.5">{label}</p>
   </div>
 );
