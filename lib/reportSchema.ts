@@ -20,7 +20,8 @@ export type FieldType =
   | 'foto'
   | 'assinatura'
   | 'repeater'
-  | 'checklist_dispositivos'; // repeater gerado a partir do inventário devices
+  | 'checklist_dispositivos' // repeater gerado a partir do inventário devices
+  | 'checklist_pendencias'; // repeater gerado a partir das pendências aprovadas
 
 /** Sugestão para pré-abertura automática de pendência a partir da resposta. */
 export interface PendenciaSugerida {
@@ -166,9 +167,9 @@ export function validateFinalize(
           });
         }
       }
-      if (field.tipo === 'checklist_dispositivos') {
+      if (field.tipo === 'checklist_dispositivos' || field.tipo === 'checklist_pendencias') {
         // No checklist a foto só é exigida no card que reprovou (qualquer campo
-        // com abre_pendencia_se disparado) — evita travar a preventiva inteira.
+        // com abre_pendencia_se disparado) — evita travar o relatório inteiro.
         const cards = Array.isArray(v) ? (v as RepeaterCard[]) : [];
         const schema = field.card_schema || [];
         cards.forEach((c, i) => {
@@ -176,8 +177,8 @@ export function validateFinalize(
           if (reprovou && !hasPhoto(field.key, i)) {
             issues.push({
               secao: secao.titulo,
-              campo: `${(c.dispositivo as string) || field.label || field.key} #${i + 1}`,
-              motivo: 'Dispositivo reprovado sem foto — foto é obrigatória para sustentar a pendência.',
+              campo: `${(c.dispositivo as string) || (c.pendencia as string) || field.label || field.key} #${i + 1}`,
+              motivo: 'Item reprovado/não corrigido sem foto — foto é obrigatória para sustentar a evidência.',
             });
           }
         });

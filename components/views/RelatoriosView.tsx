@@ -98,6 +98,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const [wClienteId, setWClienteId] = useState<string>('');
   const [wContratoId, setWContratoId] = useState<string>('');
   const [wOsId, setWOsId] = useState<string>('');
+  const [wArea, setWArea] = useState<Device['sistema']>('SDAI'); // área da corretiva
 
   // Estado do cadastro provisório em campo (§6.3 / §9.1)
   const [provNome, setProvNome] = useState('');
@@ -153,6 +154,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const [formContext, setFormContext] = useState<{ osId?: string; contratoId?: string }>({});
   const [formDevices, setFormDevices] = useState<Device[] | undefined>(undefined);
   const [formCiclo, setFormCiclo] = useState<CicloAmostragem | undefined>(undefined);
+  const [formAreaDevices, setFormAreaDevices] = useState<Device[]>([]); // corretiva: dispositivos da área
   const [offlinePend, setOfflinePend] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [online, setOnline] = useState(true);
@@ -319,6 +321,14 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     // teste). Outros tipos não usam devices/ciclo.
     setFormDevices(undefined);
     setFormCiclo(undefined);
+    setFormAreaDevices([]);
+    // Corretiva: carrega os dispositivos da ÁREA escolhida (filtro por sistema),
+    // que alimentam "dispositivos afetados". Ativos apenas.
+    if (loaded.schema.tipo === 'CORRETIVA' && wClienteId) {
+      fetchDevices(wClienteId)
+        .then((ds) => setFormAreaDevices(ds.filter((d) => d.status === 'ativo' && d.sistema === wArea)))
+        .catch(() => setFormAreaDevices([]));
+    }
     if (loaded.schema.tipo === 'PREVENTIVA' && wClienteId) {
       (async () => {
         try {
@@ -353,10 +363,20 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   // (para a Corretiva). Derivado sem mutar o catalog memoizado.
   const formCatalog: CatalogSources = {
     ...catalog,
+    // Dispositivos da área escolhida (Corretiva) — alimenta "dispositivos afetados".
+    devices: formAreaDevices.map((d) => ({
+      id: d.id,
+      label: `${d.tipoDispositivo || 'Dispositivo'} · ${[d.central, d.laco, d.endereco].filter(Boolean).join('/')}`,
+    })),
     pendenciasAprovadas: pendencias
       .filter((p) => p.status === 'aprovada' && p.clienteId === formCliente?.id)
       .map((p) => ({ id: p.id, label: `${p.grupo || 'Pendência'} — ${p.descricao || ''}`.slice(0, 60) })),
   };
+
+  // Pendências aprovadas do cliente do formulário — semeiam o checklist da Corretiva.
+  const formPendAprovadas = pendencias
+    .filter((p) => p.status === 'aprovada' && p.clienteId === formCliente?.id)
+    .map((p) => ({ id: p.id, descricao: p.descricao, grupo: p.grupo }));
 
   const clienteContratos = contracts.filter((c) => clientName(wClienteId) === c.clientName);
   const clientePendAprovadas = pendencias.filter((p) => p.status === 'aprovada' && p.clienteId === wClienteId);
@@ -376,6 +396,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         currentUserName={currentUserName}
         contexto={formContext}
         devices={formDevices}
+        pendenciasAprovadas={formPendAprovadas}
         ciclo={formCiclo}
         onBack={() => setMode('index')}
         onSaved={refresh}
@@ -787,18 +808,34 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                     )}
                   </div>
                   {wTipo === 'CORRETIVA' && (
-                    <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/50">
-                      <p className="text-[11px] font-bold text-slate-700 uppercase mb-1">Pendências aprovadas deste cliente</p>
-                      {clientePendAprovadas.length === 0 ? (
-                        <p className="text-[10px] text-slate-400 italic">Nenhuma pendência aprovada — a corretiva abre em branco.</p>
-                      ) : (
-                        <ul className="space-y-1 max-h-32 overflow-y-auto">
-                          {clientePendAprovadas.map((p) => (
-                            <li key={p.id} className="text-[10px] text-slate-600">• {p.grupo ? `${p.grupo}: ` : ''}{p.descricao}</li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
+                    <>
+                      <div>
+                        <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Área da corretiva</label>
+                        <select
+                          value={wArea}
+                          onChange={(e) => setWArea(e.target.value as Device['sistema'])}
+                          className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                        >
+                          <option value="SDAI">SDAI — Detecção e Alarme</option>
+                          <option value="CFTV">CFTV</option>
+                          <option value="CONTROLE_ACESSO">Controle de Acesso</option>
+                          <option value="BMS">Automação / BMS</option>
+                        </select>
+                        <p className="text-[10px] text-slate-400 mt-1">Os dispositivos dessa área entram como “dispositivos afetados”. (Hoje só SDAI tem parque cadastrado.)</p>
+                      </div>
+                      <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/50">
+                        <p className="text-[11px] font-bold text-slate-700 uppercase mb-1">Pendências aprovadas (viram checklist)</p>
+                        {clientePendAprovadas.length === 0 ? (
+                          <p className="text-[10px] text-slate-400 italic">Nenhuma pendência aprovada — a corretiva abre em branco.</p>
+                        ) : (
+                          <ul className="space-y-1 max-h-32 overflow-y-auto">
+                            {clientePendAprovadas.map((p) => (
+                              <li key={p.id} className="text-[10px] text-slate-600">• {p.grupo ? `${p.grupo}: ` : ''}{p.descricao}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
               )}

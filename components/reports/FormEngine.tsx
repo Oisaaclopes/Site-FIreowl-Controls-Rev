@@ -356,7 +356,7 @@ const Section: React.FC<{
         {section.campos
           .filter((f) => isFieldVisibleForRole(f, role))
           .map((field) => {
-            const isRepeater = field.tipo === 'repeater' || field.tipo === 'checklist_dispositivos';
+            const isRepeater = field.tipo === 'repeater' || field.tipo === 'checklist_dispositivos' || field.tipo === 'checklist_pendencias';
             const isWide = isRepeater || field.multilinha || field.tipo === 'multiselect';
             return (
               <div key={field.key} className={isWide ? 'md:col-span-2' : ''}>

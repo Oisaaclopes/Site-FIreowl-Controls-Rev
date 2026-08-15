@@ -4,7 +4,8 @@ import { uploadReportPhoto } from '../reportMedia';
 import { uploadSignaturePng, insertSignature } from '../signatures';
 import { updateOrdemServicoStatus } from '../ordensServico';
 import { marcarTesteFuncional } from '../devices';
-import { insertPendencia } from '../pendencias';
+import { insertPendencia, updatePendenciaStatus } from '../pendencias';
+import { PendenciaStatus } from '../types';
 import { fetchCicloAtivo, registrarTestesNoCiclo } from '../ciclos';
 import { idbPut, idbGetAll, idbDelete, idbCount, idbAvailable, STORE_OUTBOX } from './idb';
 
@@ -67,6 +68,8 @@ export interface ReportBundle {
   geoFim?: GeoPoint | null;
   os?: { id: string };
   deviceTests?: { ids: string[]; dataISO: string; cicloId?: string };
+  /** Pendências existentes a atualizar (Corretiva: as marcadas 'Corrigida'). */
+  pendenciaUpdates?: { id: string; status: string }[];
   ciclo?: { novos: number };
   pendCount: number;
 }
@@ -219,6 +222,17 @@ export async function persistReportBundle(b: ReportBundle): Promise<{ reportId?:
       await marcarTesteFuncional(b.deviceTests.ids, b.deviceTests.dataISO, b.deviceTests.cicloId);
     } catch (e) {
       console.warn('Testes funcionais não gravados na sincronização:', e);
+    }
+  }
+  // Corretiva: conclui as pendências corrigidas (best-effort; admin/gestor na RLS).
+  if (b.pendenciaUpdates?.length) {
+    const resolvidaEm = new Date().toISOString();
+    for (const u of b.pendenciaUpdates) {
+      try {
+        await updatePendenciaStatus(u.id, u.status as PendenciaStatus, { resolvidaEm });
+      } catch (e) {
+        console.warn('Pendência não atualizada na sincronização:', e);
+      }
     }
   }
   if (b.ciclo && b.report.clienteId) {

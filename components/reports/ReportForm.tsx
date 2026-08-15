@@ -39,6 +39,8 @@ interface ReportFormProps {
   contexto?: { osId?: string; contratoId?: string };
   /** Inventário do cliente — semeia o checklist_dispositivos (Preventiva). */
   devices?: Device[];
+  /** Pendências aprovadas do cliente — semeiam o checklist_pendencias (Corretiva). */
+  pendenciasAprovadas?: { id: string; descricao?: string; grupo?: string }[];
   /** Ciclo de amostragem vigente (Preventiva) — atualiza cobertura ao finalizar. */
   ciclo?: CicloAmostragem;
   onBack: () => void;
@@ -138,6 +140,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   currentUserName = '',
   contexto,
   devices,
+  pendenciasAprovadas,
   ciclo,
   onBack,
   onSaved,
@@ -187,6 +190,25 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       return { ...prev, [field.key]: cards };
     });
   }, [devices, template]);
+
+  // Semeadura do checklist_pendencias a partir das pendências aprovadas (Corretiva).
+  // Um card por pendência aprovada; o técnico marca a situação de cada uma.
+  useEffect(() => {
+    if (!pendenciasAprovadas || pendenciasAprovadas.length === 0) return;
+    const field = template.secoes
+      .flatMap((s) => s.campos)
+      .find((f) => f.tipo === 'checklist_pendencias');
+    if (!field) return;
+    setValues((prev) => {
+      const atual = prev[field.key];
+      if (Array.isArray(atual) && atual.length > 0) return prev; // já semeado
+      const cards: RepeaterCard[] = pendenciasAprovadas.map((p) => ({
+        pendencia_id: p.id, // vínculo oculto p/ atualizar o status no fecho
+        pendencia: `${p.grupo ? p.grupo + ': ' : ''}${p.descricao || 'Pendência'}`,
+      }));
+      return { ...prev, [field.key]: cards };
+    });
+  }, [pendenciasAprovadas, template]);
 
   // Navegação em passos (uma seção por tela — modo campo, Partes 4.7/8)
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -422,6 +444,17 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       }
     }
 
+    // Corretiva: pendências marcadas 'Corrigida' no checklist são resolvidas.
+    let pendenciaUpdates: ReportBundle['pendenciaUpdates'];
+    const checkPend = template.secoes.flatMap((s) => s.campos).find((f) => f.tipo === 'checklist_pendencias');
+    if (checkPend) {
+      const cards = Array.isArray(values[checkPend.key]) ? (values[checkPend.key] as RepeaterCard[]) : [];
+      const corrigidas = cards
+        .filter((c) => String(c.situacao) === 'Corrigida' && c.pendencia_id)
+        .map((c) => ({ id: String(c.pendencia_id), status: 'corrigida' as const }));
+      if (corrigidas.length > 0) pendenciaUpdates = corrigidas;
+    }
+
     const prefix = template.tipo === 'LEVANTAMENTO' ? 'LEV' : template.tipo === 'CORRETIVA' ? 'COR' : 'PRE';
     const numero = `${prefix}-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
 
@@ -448,6 +481,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       geoFim: geoFim || undefined,
       os: contexto?.osId ? { id: contexto.osId } : undefined,
       deviceTests,
+      pendenciaUpdates,
       ciclo: cicloInfo,
       pendCount: pends.length,
     };

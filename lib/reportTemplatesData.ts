@@ -170,10 +170,11 @@ export const CORRETIVA_SDAI: TemplateSchema = {
       campos: [
         { key: 'origem_chamado', tipo: 'select', label: 'Origem do chamado', opcoes: ['Solicitação do cliente', 'Pendência de preventiva', 'Pendência de levantamento', 'Falha detectada em monitoramento'] },
         {
-          key: 'pendencias_aprovadas', tipo: 'repeater', label: 'Pendências aprovadas para esta OS', botao_adicionar: '+ Vincular pendência',
+          key: 'pendencias_aprovadas', tipo: 'checklist_pendencias', label: 'Pendências aprovadas (verificar cada uma)', botao_adicionar: '+ Adicionar pendência',
           card_schema: [
-            { key: 'pendencia_id', tipo: 'select_catalogo', origem: 'pendencias_aprovadas', label: 'Pendência', obrigatorio: true },
-            { key: 'resultado', tipo: 'select', label: 'Resultado', opcoes: ['Corrigida', 'Corrigida parcialmente', 'Não foi possível corrigir'], obrigatorio: true },
+            { key: 'pendencia', tipo: 'texto', label: 'Pendência' },
+            { key: 'situacao', tipo: 'select', label: 'Situação', opcoes: ['Corrigida', 'Corrigida parcialmente', 'Não corrigida', 'Não localizada'], obrigatorio: true, abre_pendencia_se: ['Corrigida parcialmente', 'Não corrigida'] },
+            { key: 'observacao', tipo: 'texto', label: 'Observação' },
             { key: 'foto', tipo: 'foto', label: 'Foto (depois)', fotos: ['depois'] },
           ],
         },
