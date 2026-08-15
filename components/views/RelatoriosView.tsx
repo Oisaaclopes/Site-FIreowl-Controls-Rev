@@ -22,7 +22,7 @@ import { fetchReports } from '@/lib/reports';
 import { fetchPendencias } from '@/lib/pendencias';
 import { fetchDevices } from '@/lib/devices';
 import { fetchOrdensServico } from '@/lib/ordensServico';
-import { ensureCicloAtivo, quotaPorVisita } from '@/lib/ciclos';
+import { fetchCicloAtivo, quotaPorVisita } from '@/lib/ciclos';
 import { flushOutbox, pendingCount, isOnline } from '@/lib/offline/reportSync';
 import { fetchTemplates } from '@/lib/reportTemplates';
 import { gerarPdfExecucao } from '@/lib/reportPdf';
@@ -324,22 +324,24 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         try {
           const ativos = (await fetchDevices(wClienteId)).filter((d) => d.status === 'ativo');
           if (ativos.length === 0) return;
-          const ciclo = await ensureCicloAtivo(wClienteId, ativos.length, { contratoId: wContratoId || undefined });
-          const quota = quotaPorVisita(ciclo);
-          const amostra = [...ativos]
-            .sort((a, b) => (a.ultimoTesteFuncional || '').localeCompare(b.ultimoTesteFuncional || ''))
-            .slice(0, quota);
-          setFormCiclo(ciclo);
-          setFormDevices(amostra);
-        } catch (e) {
-          console.warn('Amostragem: falha ao preparar o ciclo.', e);
-          // Fallback: sem ciclo, semeia todos os ativos.
-          try {
-            const ativos = (await fetchDevices(wClienteId)).filter((d) => d.status === 'ativo');
+          // Periodicidade/amostragem só quando há contrato COM ciclo já definido.
+          // Preventiva avulsa (sem contrato) não impõe periodicidade: lista todos
+          // os dispositivos ativos, sem amostragem.
+          const ciclo = wContratoId ? await fetchCicloAtivo(wClienteId) : null;
+          if (ciclo) {
+            const quota = quotaPorVisita(ciclo);
+            const amostra = [...ativos]
+              .sort((a, b) => (a.ultimoTesteFuncional || '').localeCompare(b.ultimoTesteFuncional || ''))
+              .slice(0, quota);
+            setFormCiclo(ciclo);
+            setFormDevices(amostra);
+          } else {
+            setFormCiclo(undefined);
             setFormDevices(ativos);
-          } catch {
-            setFormDevices(undefined);
           }
+        } catch (e) {
+          console.warn('Preventiva: falha ao carregar dispositivos.', e);
+          setFormDevices(undefined);
         }
       })();
     }

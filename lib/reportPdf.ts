@@ -210,8 +210,8 @@ export async function gerarPdfExecucao(
         <div class="grid">
           <div><b>Técnico:</b> ${esc(report.tecnicoNome || '—')}</div>
           <div><b>Data:</b> ${esc(dataFim)}</div>
-          <div><b>Local:</b> ${esc(report.local || '—')}</div>
-          <div><b>Contrato:</b> ${esc(report.contratoId || '—')}</div>
+          ${report.local ? `<div><b>Local:</b> ${esc(report.local)}</div>` : ''}
+          ${report.numero ? `<div><b>Nº do relatório:</b> ${esc(report.numero)}</div>` : ''}
         </div>
       </div>
 
