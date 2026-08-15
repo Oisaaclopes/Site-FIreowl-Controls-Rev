@@ -89,6 +89,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
   const [selectedClientDetail, setSelectedClientDetail] = useState<Client | null>(null);
 
   // Formulário de novo cliente (cadastro completo)
+  const [nTipoPessoa, setNTipoPessoa] = useState<'PJ' | 'PF'>('PJ');
   const [nName, setNName] = useState('');
   const [nFantasia, setNFantasia] = useState('');
   const [nCNPJ, setNCNPJ] = useState('');
@@ -108,6 +109,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
   );
 
   const resetClientForm = () => {
+    setNTipoPessoa('PJ');
     setNName('');
     setNFantasia('');
     setNCNPJ('');
@@ -451,127 +453,161 @@ export const CrmView: React.FC<CrmViewProps> = ({
 
       {/* Modal Add Client — cadastro completo */}
       {showAddClientModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl relative border border-slate-200 max-h-[92vh] flex flex-col">
-            <div className="flex items-start justify-between p-6 border-b border-slate-100">
+        <div className="fixed inset-0 z-50 flex justify-end">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setShowAddClientModal(false)} aria-hidden="true" />
+          {/* Drawer (desliza da direita) */}
+          <div className="relative bg-slate-50 w-full max-w-lg h-full shadow-2xl border-l border-slate-200 flex flex-col animate-[slideIn_.25s_ease-out]">
+            <style>{`@keyframes slideIn{from{transform:translateX(24px);opacity:.6}to{transform:translateX(0);opacity:1}}`}</style>
+            <div className="flex items-start justify-between p-5 border-b border-slate-200 bg-white">
               <div>
-                <h3 className="text-lg font-bold text-slate-900 uppercase">Novo Cadastro de Cliente</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Dados cadastrais completos + contatos. Tudo fica vinculado a contratos, pedidos e OS.</p>
+                <h3 className="text-base font-bold text-slate-900 uppercase">Novo cliente</h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">Vinculado a contratos, pedidos e OS.</p>
               </div>
-              <button
-                onClick={() => setShowAddClientModal(false)}
-                className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none"
-              >
-                ✕
-              </button>
+              <button onClick={() => setShowAddClientModal(false)} className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none">✕</button>
             </div>
 
-            <form onSubmit={handleCreateClientSubmit} className="p-6 space-y-4 text-xs font-medium overflow-y-auto">
-              {/* Identificação */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className={labelCls}>Razão Social *</label>
-                  <input required type="text" value={nName} onChange={(e) => setNName(e.target.value)} className={inputCls} placeholder="Ex: Londrina Norte Shopping Ltda" />
-                </div>
-                <div>
-                  <label className={labelCls}>Nome Fantasia</label>
-                  <input type="text" value={nFantasia} onChange={(e) => setNFantasia(e.target.value)} className={inputCls} placeholder="Ex: Norte Shopping" />
-                </div>
+            <form id="novoClienteForm" onSubmit={handleCreateClientSubmit} className="flex-1 overflow-y-auto p-4 space-y-3 text-xs font-medium">
+              {/* Toggle PF / PJ */}
+              <div className="flex items-center gap-1 bg-slate-200/70 p-1 rounded-lg w-full">
+                {(['PJ', 'PF'] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setNTipoPessoa(t)}
+                    className={`flex-1 py-1.5 rounded-md text-[11px] font-bold uppercase tracking-wide transition-colors ${
+                      nTipoPessoa === t ? 'bg-white text-[#1A1A72] shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    {t === 'PJ' ? 'Pessoa Jurídica' : 'Pessoa Física'}
+                  </button>
+                ))}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {/* Card: Identificação */}
+              <section className="rounded-xl border border-slate-200 bg-white p-3.5 space-y-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-sm text-[#1A1A72]">badge</span> Identificação
+                </p>
                 <div>
-                  <label className={labelCls}>CNPJ / CPF</label>
-                  <input type="text" value={nCNPJ} onChange={(e) => setNCNPJ(e.target.value)} className={`${inputCls} font-data-mono`} placeholder="00.000.000/0001-00" />
+                  <label className={labelCls}>{nTipoPessoa === 'PJ' ? 'Razão Social *' : 'Nome completo *'}</label>
+                  <input required type="text" value={nName} onChange={(e) => setNName(e.target.value)} className={inputCls} placeholder={nTipoPessoa === 'PJ' ? 'Ex: Londrina Norte Shopping Ltda' : 'Ex: João da Silva'} />
                 </div>
-                <div>
-                  <label className={labelCls}>Inscrição Estadual</label>
-                  <input type="text" value={nIE} onChange={(e) => setNIE(e.target.value)} className={`${inputCls} font-data-mono`} placeholder="Isento / número" />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className={labelCls}>{nTipoPessoa === 'PJ' ? 'CNPJ' : 'CPF'}</label>
+                    <input type="text" inputMode="numeric" value={nCNPJ} onChange={(e) => setNCNPJ(e.target.value)} className={`${inputCls} font-data-mono`} placeholder={nTipoPessoa === 'PJ' ? '00.000.000/0001-00' : '000.000.000-00'} />
+                  </div>
+                  {nTipoPessoa === 'PJ' ? (
+                    <div>
+                      <label className={labelCls}>Inscrição Estadual</label>
+                      <input type="text" value={nIE} onChange={(e) => setNIE(e.target.value)} className={`${inputCls} font-data-mono`} placeholder="Isento / número" />
+                    </div>
+                  ) : (
+                    <div>
+                      <label className={labelCls}>Segmento</label>
+                      <input type="text" value={nSegment} onChange={(e) => setNSegment(e.target.value)} className={inputCls} placeholder="Residencial, comércio..." />
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <label className={labelCls}>Segmento</label>
-                  <select value={nSegment} onChange={(e) => setNSegment(e.target.value)} className={inputCls}>
-                    <option value="Shopping Center">Shopping Center</option>
-                    <option value="Indústria">Indústria</option>
-                    <option value="Condomínio Residencial">Condomínio Residencial</option>
-                    <option value="Condomínio Comercial">Condomínio Comercial</option>
-                    <option value="Logística & Galpões">Logística &amp; Galpões</option>
-                    <option value="Varejo / Supermercado">Varejo / Supermercado</option>
-                    <option value="Hospitalar">Hospitalar</option>
-                    <option value="Educacional">Educacional</option>
-                    <option value="Órgão Público">Órgão Público</option>
-                  </select>
-                </div>
-              </div>
+                {nTipoPessoa === 'PJ' && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className={labelCls}>Nome Fantasia</label>
+                      <input type="text" value={nFantasia} onChange={(e) => setNFantasia(e.target.value)} className={inputCls} placeholder="Ex: Norte Shopping" />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Segmento</label>
+                      <select value={nSegment} onChange={(e) => setNSegment(e.target.value)} className={inputCls}>
+                        <option value="Shopping Center">Shopping Center</option>
+                        <option value="Indústria">Indústria</option>
+                        <option value="Condomínio Residencial">Condomínio Residencial</option>
+                        <option value="Condomínio Comercial">Condomínio Comercial</option>
+                        <option value="Logística & Galpões">Logística &amp; Galpões</option>
+                        <option value="Varejo / Supermercado">Varejo / Supermercado</option>
+                        <option value="Hospitalar">Hospitalar</option>
+                        <option value="Educacional">Educacional</option>
+                        <option value="Órgão Público">Órgão Público</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </section>
 
-              {/* Localização */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="md:col-span-2">
-                  <label className={labelCls}>Endereço (logradouro, nº, bairro)</label>
+              {/* Card: Endereço */}
+              <section className="rounded-xl border border-slate-200 bg-white p-3.5 space-y-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-sm text-[#1A1A72]">location_on</span> Endereço
+                </p>
+                <div>
+                  <label className={labelCls}>Logradouro, nº, bairro</label>
                   <input type="text" value={nAddress} onChange={(e) => setNAddress(e.target.value)} className={inputCls} placeholder="Av. Higienópolis, 1200 — Centro" />
                 </div>
                 <div>
                   <label className={labelCls}>Cidade / UF</label>
                   <input type="text" value={nCity} onChange={(e) => setNCity(e.target.value)} className={inputCls} placeholder="Londrina/PR" />
                 </div>
-              </div>
+              </section>
 
-              {/* Comercial */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className={labelCls}>Status Cadastral</label>
-                  <select value={nStatus} onChange={(e) => setNStatus(e.target.value as Client['contractStatus'])} className={inputCls}>
-                    <option value="EM DIA">EM DIA</option>
-                    <option value="PENDENTE">PENDENTE</option>
-                    <option value="ATRASADO">ATRASADO</option>
-                  </select>
+              {/* Card: Dados comerciais */}
+              <section className="rounded-xl border border-slate-200 bg-white p-3.5 space-y-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-sm text-[#1A1A72]">payments</span> Dados comerciais
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className={labelCls}>Status cadastral</label>
+                    <select value={nStatus} onChange={(e) => setNStatus(e.target.value as Client['contractStatus'])} className={inputCls}>
+                      <option value="EM DIA">EM DIA</option>
+                      <option value="PENDENTE">PENDENTE</option>
+                      <option value="ATRASADO">ATRASADO</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Valor anual estimado (R$)</label>
+                    <input type="number" min={0} step="0.01" inputMode="decimal" value={nAnnual} onChange={(e) => setNAnnual(Number(e.target.value))} className={`${inputCls} font-data-mono`} />
+                  </div>
                 </div>
-                <div>
-                  <label className={labelCls}>Valor Anual Estimado em Contratos (R$)</label>
-                  <input type="number" min={0} step="0.01" value={nAnnual} onChange={(e) => setNAnnual(Number(e.target.value))} className={`${inputCls} font-data-mono`} />
-                </div>
-              </div>
+              </section>
 
-              {/* Contatos dinâmicos */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="font-semibold uppercase text-[11px] text-slate-600">Contatos</label>
-                  <button
-                    type="button"
-                    onClick={addContactRow}
-                    className="text-[11px] font-semibold text-[#1A1A72] hover:text-[#E63946] flex items-center gap-1 uppercase"
-                  >
-                    <span className="material-symbols-outlined text-sm">add</span> Adicionar contato
+              {/* Card: Contatos */}
+              <section className="rounded-xl border border-slate-200 bg-white p-3.5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-sm text-[#1A1A72]">contacts</span> Contatos
+                  </p>
+                  <button type="button" onClick={addContactRow} className="text-[11px] font-semibold text-[#1A1A72] hover:text-[#E63946] flex items-center gap-1 uppercase">
+                    <span className="material-symbols-outlined text-sm">add</span> Adicionar
                   </button>
                 </div>
                 <div className="space-y-2">
                   {nContacts.map((c, idx) => (
-                    <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center bg-slate-50 border border-slate-200 rounded-lg p-2">
-                      <input type="text" value={c.name} onChange={(e) => updateContact(idx, 'name', e.target.value)} className={`${inputCls} md:col-span-3`} placeholder="Nome" />
-                      <input type="text" value={c.role} onChange={(e) => updateContact(idx, 'role', e.target.value)} className={`${inputCls} md:col-span-3`} placeholder="Cargo/Função" />
-                      <input type="text" value={c.phone} onChange={(e) => updateContact(idx, 'phone', e.target.value)} className={`${inputCls} md:col-span-2 font-data-mono`} placeholder="(43) 90000-0000" />
-                      <input type="email" value={c.email} onChange={(e) => updateContact(idx, 'email', e.target.value)} className={`${inputCls} md:col-span-3`} placeholder="email@cliente.com" />
-                      <button
-                        type="button"
-                        onClick={() => removeContactRow(idx)}
-                        disabled={nContacts.length === 1}
-                        className="md:col-span-1 flex items-center justify-center text-slate-400 hover:text-[#E63946] disabled:opacity-30 disabled:hover:text-slate-400"
-                        title="Remover contato"
-                      >
-                        <span className="material-symbols-outlined text-lg">delete</span>
-                      </button>
+                    <div key={idx} className="grid grid-cols-2 gap-2 bg-slate-50 border border-slate-200 rounded-lg p-2 relative">
+                      <input type="text" value={c.name} onChange={(e) => updateContact(idx, 'name', e.target.value)} className={inputCls} placeholder="Nome" />
+                      <input type="text" value={c.role} onChange={(e) => updateContact(idx, 'role', e.target.value)} className={inputCls} placeholder="Cargo/Função" />
+                      <input type="tel" inputMode="tel" value={c.phone} onChange={(e) => updateContact(idx, 'phone', e.target.value)} className={`${inputCls} font-data-mono`} placeholder="(43) 90000-0000" />
+                      <input type="email" inputMode="email" value={c.email} onChange={(e) => updateContact(idx, 'email', e.target.value)} className={inputCls} placeholder="email@cliente.com" />
+                      {nContacts.length > 1 && (
+                        <button type="button" onClick={() => removeContactRow(idx)} className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 hover:text-[#E63946]" title="Remover contato">
+                          <span className="material-symbols-outlined text-sm">close</span>
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
-              </div>
+              </section>
+            </form>
 
+            {/* Rodapé fixo */}
+            <div className="p-4 border-t border-slate-200 bg-white">
               <button
                 type="submit"
+                form="novoClienteForm"
                 className="w-full bg-[#E63946] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
               >
-                Cadastrar Cliente
+                Cadastrar {nTipoPessoa === 'PJ' ? 'empresa' : 'pessoa'}
               </button>
-            </form>
+            </div>
           </div>
         </div>
       )}
