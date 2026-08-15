@@ -46,28 +46,28 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col w-full p-4 md:p-8 gap-5 md:gap-6">
+    <div className="flex flex-col w-full p-3 md:p-6 gap-3 md:gap-4">
       {/* Header */}
-      <div className="flex justify-between items-center border-b border-slate-200 pb-5">
-        <div>
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            Composição Comercial (Regra 70% Mão de Obra / 30% Materiais)
+      <div className="flex justify-between items-center gap-3 border-b border-slate-200 pb-3">
+        <div className="min-w-0">
+          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+            Composição 70% M.O. / 30% Materiais
           </span>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">
-            Orçamentos &amp; Propostas Técnicas
+          <h1 className="text-lg md:text-2xl font-bold text-slate-900 tracking-tight truncate">
+            Orçamentos &amp; Propostas
           </h1>
         </div>
 
         <button
           onClick={() => setShowModal(true)}
-          className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase"
+          className="shrink-0 bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase"
         >
-          <span className="material-symbols-outlined text-base">add</span> Elaborar Orçamento
+          <span className="material-symbols-outlined text-base">add</span> <span className="hidden sm:inline">Elaborar Orçamento</span><span className="sm:hidden">Novo</span>
         </button>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      {/* Desktop: tabela */}
+      <div className="hidden md:block bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="bg-slate-900 px-6 py-4 text-white text-xs font-bold uppercase tracking-wider">
           Propostas Comerciais Ativas
         </div>
@@ -119,6 +119,39 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Mobile: cards compactos */}
+      <div className="md:hidden flex flex-col gap-2">
+        {quotes.length === 0 ? (
+          <p className="text-[11px] text-slate-400 italic text-center py-6">Nenhum orçamento ativo.</p>
+        ) : (
+          quotes.map((q) => (
+            <div key={q.id} className="bg-white rounded-lg border border-slate-200 shadow-sm p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-data-mono text-[11px] font-bold text-[#E63946]">{q.id}</span>
+                <span className="bg-slate-900 text-white px-2 py-0.5 rounded text-[9px] font-bold uppercase">{q.status}</span>
+              </div>
+              <p className="font-bold text-slate-900 text-sm uppercase truncate mt-1">{q.clientName}</p>
+              <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{q.description}</p>
+              <div className="flex items-end justify-between gap-2 mt-2">
+                <div className="font-data-mono min-w-0">
+                  <p className="font-bold text-slate-900 text-sm">R$ {q.finalValue.toLocaleString('pt-BR')}</p>
+                  <p className="text-slate-400 text-[10px]">M.O R$ {q.laborValue.toLocaleString('pt-BR')} · Mat R$ {q.materialValue.toLocaleString('pt-BR')} · -{q.discountApplied}%</p>
+                </div>
+                <button
+                  onClick={() => {
+                    onConvertToOS(q);
+                    alert(`Orçamento ${q.id} convertido em Pedido e Ordem de Serviço!`);
+                  }}
+                  className="shrink-0 bg-[#E63946] hover:bg-[#a51515] text-white text-[10px] font-semibold px-3 py-1.5 rounded uppercase tracking-wider shadow-sm"
+                >
+                  Converter em OS
+                </button>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Modal Add Quote */}

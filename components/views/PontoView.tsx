@@ -871,21 +871,21 @@ export const PontoView: React.FC<PontoViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col w-full p-4 md:p-8 gap-5 md:gap-6">
+    <div className="flex flex-col w-full p-3 md:p-6 gap-3 md:gap-4">
       {/* Header */}
-      <div className="flex flex-wrap justify-between items-center gap-4 border-b border-slate-200 pb-5">
-        <div>
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            Conformidade Trabalhista (Portaria MTP 671/2021)
+      <div className="flex flex-wrap justify-between items-center gap-3 border-b border-slate-200 pb-3">
+        <div className="min-w-0">
+          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+            Portaria MTP 671/2021
           </span>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">
-            Ponto Eletrônico &amp; Espelho de Frequência
+          <h1 className="text-lg md:text-2xl font-bold text-slate-900 tracking-tight truncate">
+            Ponto Eletrônico &amp; Frequência
           </h1>
         </div>
 
         {/* Relógio grande + sincronização */}
         <div className="text-right">
-          <p className="font-data-mono text-3xl font-bold text-slate-900 tabular-nums leading-none">{fmtClock(now)}</p>
+          <p className="font-data-mono text-2xl md:text-3xl font-bold text-slate-900 tabular-nums leading-none">{fmtClock(now)}</p>
           <div className="flex items-center justify-end gap-3 mt-1.5">
             <span className="text-[10px] uppercase tracking-wider text-slate-400">Horário oficial</span>
             <span
