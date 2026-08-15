@@ -59,6 +59,31 @@ export function montarHtmlProposta(p: PropostaPublica, opts?: { mascararValor?: 
       )
       .join('')}</tbody></table>`;
 
+  // 09 Garantia — tabela por objeto + condicionante + observações + exclusões.
+  // A lista de exclusões é SEMPRE renderizada por inteiro: ocultar uma linha da
+  // tabela não remove a exclusão correspondente (regra da Parte 10).
+  const g = p.garantia;
+  const garantiaTabela = `<table style="border-collapse:collapse;width:100%;font-size:11px">
+    <thead><tr>
+      <th style="padding:5px 8px;border:1px solid #e2e8f0;background:${NAVY};color:#fff;text-align:left">Objeto</th>
+      <th style="padding:5px 8px;border:1px solid #e2e8f0;background:${NAVY};color:#fff;text-align:left">Prazo</th>
+      <th style="padding:5px 8px;border:1px solid #e2e8f0;background:${NAVY};color:#fff;text-align:left">Observação</th>
+    </tr></thead>
+    <tbody>${g.linhas
+      .map(
+        (l) => `<tr>
+          <td style="padding:5px 8px;border:1px solid #e2e8f0">${esc(l.objeto)}</td>
+          <td style="padding:5px 8px;border:1px solid #e2e8f0;font-weight:700;color:${l.prazo === 'Sem garantia' ? RED : NAVY}">${esc(l.prazo)}</td>
+          <td style="padding:5px 8px;border:1px solid #e2e8f0;font-size:10px;color:#556">${esc(l.observacao || '')}</td>
+        </tr>`
+      )
+      .join('')}</tbody></table>`;
+  const garantiaCorpo = `${garantiaTabela}
+    ${g.textoCondicionante ? `<p style="font-size:11px;margin-top:6px">${esc(g.textoCondicionante)}</p>` : ''}
+    ${g.observacoes ? `<p style="font-size:11px;margin-top:6px">${esc(g.observacoes)}</p>` : ''}
+    <p style="font-size:11px;font-weight:700;color:${NAVY};margin:10px 0 2px">Situações não cobertas pela garantia</p>
+    ${listHtml(g.exclusoes)}`;
+
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const fontFace = `
     @font-face{font-family:'Poppins';src:url('${origin}/fonts/Poppins-Regular.woff2') format('woff2');font-weight:400;font-display:swap}
@@ -101,7 +126,7 @@ export function montarHtmlProposta(p: PropostaPublica, opts?: { mascararValor?: 
           <div class="num" style="font-size:24px;font-weight:700;color:${NAVY}">${mascarar ? 'R$ •••••••' : brl(p.precoVenda)}</div>
         </div>
         ${p.regime !== 'unitario' ? `<p style="font-size:10px;color:#888;margin-top:4px">Preço fechado por resultado. Quantitativos${p.regime === 'fechado_com_anexo' ? ' em anexo separado' : ''} não integram este documento; a delimitação de escopo e as premissas prevalecem.</p>` : ''}`)}
-      ${sec('09', 'Garantia', `<p style="font-size:11px">${esc(p.garantia)}</p>`)}
+      ${sec('09', 'Garantia', garantiaCorpo)}
       ${sec('10', 'Responsabilidade técnica', `<p style="font-size:11px">${esc(p.responsabilidadeTecnica)}</p>`)}
       <section class="aceite" style="margin-top:24px">
         <h3 style="color:${NAVY};border-bottom:2px solid ${AMBER};padding-bottom:3px">12 Aceite</h3>

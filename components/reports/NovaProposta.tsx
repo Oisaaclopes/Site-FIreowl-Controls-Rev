@@ -2,7 +2,14 @@
 
 import React, { useMemo, useState } from 'react';
 import { Client, InventoryItem, ServiceCatalogItem, Pendencia } from '@/lib/types';
-import { montarProposta, RegimePrecificacao } from '@/lib/proposta';
+import {
+  montarProposta,
+  RegimePrecificacao,
+  GarantiaConfig,
+  GarantiaMateriaisModo,
+  avisosGarantia,
+  GARANTIA_SERVICO_PISO_MESES,
+} from '@/lib/proposta';
 import { gerarPdfProposta } from '@/lib/propostaPdf';
 import { updatePendenciaStatus } from '@/lib/pendencias';
 import { usePrivacy } from '@/lib/privacy';
@@ -30,6 +37,26 @@ export const NovaProposta: React.FC<NovaPropostaProps> = ({ open, onClose, clien
   const [tecnicos, setTecnicos] = useState(2);
   const [logistica, setLogistica] = useState(0);
   const [selecionadas, setSelecionadas] = useState<Record<string, boolean>>({});
+
+  // Garantia configurável por proposta (Parte 10)
+  const [garServicoMeses, setGarServicoMeses] = useState(12);
+  const [garServicoExibir, setGarServicoExibir] = useState(true);
+  const [garMateriaisModo, setGarMateriaisModo] = useState<GarantiaMateriaisModo>('conforme_fabricante');
+  const [garMateriaisMeses, setGarMateriaisMeses] = useState(12);
+  const [garPreexistenteExibir, setGarPreexistenteExibir] = useState(true);
+  const [garCondicionadaPreventiva, setGarCondicionadaPreventiva] = useState(false);
+  const [garObservacoes, setGarObservacoes] = useState('');
+
+  const garantiaConfig: GarantiaConfig = {
+    servicoMeses: garServicoMeses,
+    servicoExibir: garServicoExibir,
+    materiaisModo: garMateriaisModo,
+    materiaisMeses: garMateriaisModo === 'unificada' ? garMateriaisMeses : undefined,
+    preexistenteExibir: garPreexistenteExibir,
+    condicionadaPreventiva: garCondicionadaPreventiva,
+    observacoes: garObservacoes,
+  };
+  const avisosGar = avisosGarantia(garantiaConfig);
 
   const cliente = clients.find((c) => c.id === clienteId);
   const provisorio = !!cliente?.pendenteValidacao;
@@ -64,9 +91,14 @@ export const NovaProposta: React.FC<NovaPropostaProps> = ({ open, onClose, clien
         prazoDias,
         tecnicos,
         contexto: 'Proposta elaborada a partir de pendências de levantamento/preventiva em campo.',
+        garantia: garantiaConfig,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [escolhidas, cliente, regime, contingenciaPct, margemPct, logistica, prazoDias, tecnicos]
+    [
+      escolhidas, cliente, regime, contingenciaPct, margemPct, logistica, prazoDias, tecnicos,
+      garServicoMeses, garServicoExibir, garMateriaisModo, garMateriaisMeses,
+      garPreexistenteExibir, garCondicionadaPreventiva, garObservacoes,
+    ]
   );
 
   if (!open) return null;
@@ -176,6 +208,88 @@ export const NovaProposta: React.FC<NovaPropostaProps> = ({ open, onClose, clien
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* Garantia configurável por proposta (Parte 10) */}
+            <div className="border border-slate-200 rounded-xl p-3 space-y-2.5 bg-white">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[#1A1A72]">Garantia</p>
+
+              <div className="grid grid-cols-2 gap-2 items-end">
+                <div>
+                  <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Serviço (meses)</label>
+                  <input
+                    type="number"
+                    min={GARANTIA_SERVICO_PISO_MESES}
+                    value={garServicoMeses}
+                    onChange={(e) => setGarServicoMeses(Number(e.target.value))}
+                    className={`${inputCls} font-data-mono`}
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-[11px] text-slate-700 pb-2.5 cursor-pointer">
+                  <input type="checkbox" checked={garServicoExibir} onChange={(e) => setGarServicoExibir(e.target.checked)} />
+                  Exibir linha do serviço
+                </label>
+              </div>
+              <p className="text-[10px] text-slate-400 -mt-1">Piso de 3 meses (90 dias) é aplicado automaticamente, mesmo se digitar menos.</p>
+
+              <div className="grid grid-cols-2 gap-2 items-end">
+                <div>
+                  <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Materiais</label>
+                  <select
+                    value={garMateriaisModo}
+                    onChange={(e) => setGarMateriaisModo(e.target.value as GarantiaMateriaisModo)}
+                    className={inputCls}
+                  >
+                    <option value="conforme_fabricante">Conforme fabricante</option>
+                    <option value="unificada">Prazo unificado</option>
+                    <option value="por_item" disabled>Por item (Fase 4)</option>
+                  </select>
+                </div>
+                {garMateriaisModo === 'unificada' && (
+                  <div>
+                    <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Material (meses)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={garMateriaisMeses}
+                      onChange={(e) => setGarMateriaisMeses(Number(e.target.value))}
+                      className={`${inputCls} font-data-mono`}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-2 text-[11px] text-slate-700 cursor-pointer">
+                  <input type="checkbox" checked={garPreexistenteExibir} onChange={(e) => setGarPreexistenteExibir(e.target.checked)} />
+                  Exibir linha “sistema preexistente: sem garantia”
+                </label>
+                <label className="flex items-center gap-2 text-[11px] text-slate-700 cursor-pointer">
+                  <input type="checkbox" checked={garCondicionadaPreventiva} onChange={(e) => setGarCondicionadaPreventiva(e.target.checked)} />
+                  Condicionar à manutenção preventiva (NBR 17240)
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Observações da garantia</label>
+                <textarea
+                  value={garObservacoes}
+                  onChange={(e) => setGarObservacoes(e.target.value)}
+                  rows={2}
+                  placeholder="Opcional — texto livre que entra na seção de garantia."
+                  className={`${inputCls} resize-none`}
+                />
+              </div>
+
+              <p className="text-[10px] text-slate-400">
+                Ocultar uma linha da tabela é escolha visual — a exclusão correspondente permanece na lista de “situações não cobertas”.
+              </p>
+
+              {avisosGar.map((a, i) => (
+                <p key={i} className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+                  ⚠ {a}
+                </p>
+              ))}
             </div>
           </div>
 

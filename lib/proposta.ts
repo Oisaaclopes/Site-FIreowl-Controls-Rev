@@ -46,9 +46,131 @@ export interface PropostaPublica {
   matriz: { item: string; responsavel: 'Contratada' | 'Contratante' }[];
   prazoDias?: number;
   tecnicos?: number;
-  garantia: string;
+  garantia: GarantiaPublica;
   responsabilidadeTecnica: string;
   precoVenda: number;
+}
+
+/* --------------------------- Garantia (Parte 10) --------------------------- */
+
+export type GarantiaMateriaisModo = 'conforme_fabricante' | 'unificada' | 'por_item';
+
+/** Piso legal do serviço: 90 dias (3 meses). Travado na lógica, não só no front. */
+export const GARANTIA_SERVICO_PISO_MESES = 3;
+
+/**
+ * Configuração de garantia por proposta. Nomes-espelho da spec ao lado:
+ *  servicoMeses          → garantia_servico_meses (piso 3)
+ *  servicoExibir         → garantia_servico_exibir
+ *  materiaisModo         → garantia_materiais_modo
+ *  materiaisMeses        → garantia_materiais_meses (modo 'unificada')
+ *  preexistenteExibir    → garantia_preexistente_exibir
+ *  condicionadaPreventiva→ garantia_condicionada_preventiva
+ *  observacoes           → garantia_observacoes
+ */
+export interface GarantiaConfig {
+  servicoMeses: number;
+  servicoExibir: boolean;
+  materiaisModo: GarantiaMateriaisModo;
+  materiaisMeses?: number;
+  preexistenteExibir: boolean;
+  condicionadaPreventiva: boolean;
+  observacoes?: string;
+}
+
+export const GARANTIA_PADRAO: GarantiaConfig = {
+  servicoMeses: 12,
+  servicoExibir: true,
+  materiaisModo: 'conforme_fabricante',
+  preexistenteExibir: true,
+  condicionadaPreventiva: false,
+};
+
+/**
+ * Exclusões de garantia (situações NÃO cobertas) — texto padrão versionado.
+ * IMPORTANTE: esta lista é SEMPRE renderizada por inteiro. Ocultar uma linha da
+ * TABELA de garantia (servicoExibir/preexistenteExibir=false) é escolha visual e
+ * NÃO remove a exclusão correspondente daqui — a delimitação legal permanece.
+ */
+export const GARANTIA_EXCLUSOES: string[] = [
+  'Mau uso, operação indevida ou intervenção de terceiros não autorizados.',
+  'Vandalismo, furto, sinistro, descarga atmosférica ou surto elétrico.',
+  'Infiltração, alagamento ou incêndio.',
+  'Ausência de manutenção preventiva no período.',
+  'Alteração de layout ou obra posterior que afete a instalação.',
+  'Componentes preexistentes não substituídos nesta contratação.',
+  'Materiais fornecidos pelo contratante.',
+];
+
+const CONDICIONANTE_PREVENTIVA =
+  'A garantia do serviço fica condicionada à realização de manutenção preventiva periódica conforme ABNT NBR 17240, executada pela Fireowl Controls ou por empresa tecnicamente habilitada, com comprovação documental.';
+
+export interface GarantiaLinha {
+  objeto: string;
+  prazo: string;
+  observacao?: string;
+}
+
+/** Objeto público de garantia (sem nada interno). Vai ao PDF. */
+export interface GarantiaPublica {
+  linhas: GarantiaLinha[];
+  condicionadaPreventiva: boolean;
+  textoCondicionante?: string;
+  observacoes?: string;
+  exclusoes: string[];
+}
+
+const mesesLabel = (m: number) => `${m} ${m === 1 ? 'mês' : 'meses'}`;
+
+/** Aplica o piso legal (>= 3 meses) — travado aqui, independe do input do front. */
+export function normalizarGarantia(cfg: GarantiaConfig): GarantiaConfig {
+  const servicoMeses = Math.max(GARANTIA_SERVICO_PISO_MESES, Math.floor(cfg.servicoMeses || 0));
+  const materiaisMeses =
+    cfg.materiaisMeses != null && !Number.isNaN(cfg.materiaisMeses)
+      ? Math.max(1, Math.floor(cfg.materiaisMeses))
+      : undefined;
+  return { ...cfg, servicoMeses, materiaisMeses };
+}
+
+/** Avisos não-bloqueantes p/ a tela (ex.: serviço com garantia maior que material). */
+export function avisosGarantia(cfg: GarantiaConfig): string[] {
+  const c = normalizarGarantia(cfg);
+  const avisos: string[] = [];
+  if (c.materiaisModo === 'unificada' && c.materiaisMeses != null && c.servicoMeses > c.materiaisMeses) {
+    avisos.push(
+      `A garantia de serviço (${mesesLabel(c.servicoMeses)}) excede a de material (${mesesLabel(
+        c.materiaisMeses
+      )}). Você pode ficar responsável pelo material além do prazo coberto pelo fornecedor.`
+    );
+  }
+  return avisos;
+}
+
+/** Monta o objeto público de garantia a partir da config (piso já aplicado). */
+export function montarGarantiaPublica(cfg: GarantiaConfig): GarantiaPublica {
+  const c = normalizarGarantia(cfg);
+  const linhas: GarantiaLinha[] = [];
+  if (c.servicoExibir) {
+    linhas.push({ objeto: 'Serviço executado', prazo: mesesLabel(c.servicoMeses) });
+  }
+  let prazoMat = 'Conforme garantia do fabricante';
+  let obsMat: string | undefined;
+  if (c.materiaisModo === 'unificada' && c.materiaisMeses != null) {
+    prazoMat = mesesLabel(c.materiaisMeses);
+  } else if (c.materiaisModo === 'por_item') {
+    obsMat = 'Prazo por item — ver ficha técnica de cada material.';
+  }
+  linhas.push({ objeto: 'Materiais fornecidos', prazo: prazoMat, observacao: obsMat });
+  if (c.preexistenteExibir) {
+    linhas.push({ objeto: 'Sistema preexistente', prazo: 'Sem garantia', observacao: 'Não coberto por esta contratação.' });
+  }
+  return {
+    linhas,
+    condicionadaPreventiva: c.condicionadaPreventiva,
+    textoCondicionante: c.condicionadaPreventiva ? CONDICIONANTE_PREVENTIVA : undefined,
+    observacoes: c.observacoes?.trim() || undefined,
+    exclusoes: GARANTIA_EXCLUSOES,
+  };
 }
 
 /* --- Textos padrão VERSIONADOS (10.6) — reproduzíveis como foram aceitos --- */
@@ -86,6 +208,7 @@ export interface MontarPropostaOpts {
   tecnicos?: number;
   premissas?: string[];
   contexto?: string;
+  garantia?: GarantiaConfig; // config de garantia da proposta (default: GARANTIA_PADRAO)
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -154,7 +277,7 @@ export function montarProposta(
     matriz: TEXTOS_PADRAO.matrizBase,
     prazoDias: opts.prazoDias,
     tecnicos: opts.tecnicos,
-    garantia: TEXTOS_PADRAO.garantia,
+    garantia: montarGarantiaPublica(opts.garantia || GARANTIA_PADRAO),
     responsabilidadeTecnica: TEXTOS_PADRAO.responsabilidadeTecnica,
     precoVenda,
   };
