@@ -69,7 +69,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => onNavigateToTab('tecnico')}
+            onClick={() => onNavigateToTab('relatorios')}
             className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 shadow-sm transition-colors flex items-center gap-1.5"
           >
             <span className="material-symbols-outlined text-base">fact_check</span>
@@ -256,10 +256,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
 
             <button
-              onClick={() => onNavigateToTab('clientes')}
+              onClick={() => onNavigateToTab('relatorios')}
               className="mt-6 w-full py-2.5 bg-[#E63946] hover:bg-[#a51515] text-white rounded-lg font-semibold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-md"
             >
-              <span>Executar Auditoria NBR 17240</span>
+              <span>Ver pendências / anomalias</span>
               <span className="material-symbols-outlined text-base">arrow_forward</span>
             </button>
           </div>

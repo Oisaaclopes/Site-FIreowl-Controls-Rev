@@ -38,6 +38,8 @@ interface PedidosViewProps {
   pdfPrefs: PdfPrefs;
   userRole: UserRole;
   currentUserName?: string;
+  /** Aba inicial ao abrir (ex.: atalho "Nova OS" do painel). */
+  initialView?: 'propostas' | 'ordens_servico' | null;
 }
 
 // Metadados de status das propostas (cor usada em borda, texto e badge)
@@ -78,13 +80,14 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   pdfPrefs,
   userRole,
   currentUserName = '',
+  initialView,
 }) => {
   const { maskMoney } = usePrivacy();
   const isTecnico = userRole === 'TECNICO';
 
-  // Técnico só vê Ordens de Serviço; demais começam nas propostas
+  // Aba inicial: atalho "Nova OS" força OS; técnico começa em OS; demais em propostas
   const [viewTab, setViewTab] = useState<'propostas' | 'ordens_servico'>(
-    isTecnico ? 'ordens_servico' : 'propostas'
+    initialView ?? (isTecnico ? 'ordens_servico' : 'propostas')
   );
 
   // Modo de exibição das propostas

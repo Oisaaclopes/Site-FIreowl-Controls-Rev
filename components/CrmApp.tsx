@@ -106,6 +106,7 @@ export function CrmApp({
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // menu off-canvas (mobile)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // mini-sidebar (desktop)
+  const [pedidosInitialView, setPedidosInitialView] = useState<'propostas' | 'ordens_servico' | null>(null); // atalho "Nova OS"
 
   // RBAC: se a aba atual não é permitida ao perfil, volta para a primeira permitida
   useEffect(() => {
@@ -591,23 +592,10 @@ export function CrmApp({
     setCurrentTab('servicos');
   };
 
+  // Sem falsa promessa: em vez de injetar OS fake + alert, leva o usuário para
+  // o módulo de Pedidos/OS, onde a OS é criada de verdade.
   const handleNewOSQuick = () => {
-    const seq = getNextSeq();
-    const quickOS: PedidoOS = {
-      id: `OS-2024-${seq}`,
-      pedidoId: `PED-QUICK-${seq}`,
-      clientId: 'c4',
-      clientName: 'Catuaí Shopping Londrina',
-      title: 'Atendimento Emergencial Solicitado no Painel',
-      type: 'Corretiva Urgente',
-      technicianName: 'Eng. Ricardo M.',
-      scheduledDate: '24 MAI 2024 | AGORA',
-      status: 'EM ANDAMENTO',
-      priority: 'CRITICA',
-      value: 1850,
-    };
-    handleAddOS(quickOS);
-    alert(`Nova Ordem de Serviço emergencial (${quickOS.id}) criada com sucesso!`);
+    setPedidosInitialView('ordens_servico');
     setCurrentTab('pedidos');
   };
 
@@ -696,6 +684,7 @@ export function CrmApp({
               pdfPrefs={pdfPrefs}
               userRole={userRole}
               currentUserName={userName}
+              initialView={pedidosInitialView}
             />
           )}
 

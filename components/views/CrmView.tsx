@@ -81,7 +81,9 @@ export const CrmView: React.FC<CrmViewProps> = ({
   onNavigateToTab,
 }) => {
   const { maskMoney } = usePrivacy();
-  const [crmSubTab, setCrmSubTab] = useState<'clientes' | 'pedidos_os' | 'estoque' | 'servicos'>('clientes');
+  // O CRM não clona o menu lateral: mostra só a base de Clientes. (Estoque,
+  // Pedidos e Serviços têm suas próprias abas.)
+  const [crmSubTab] = useState<'clientes' | 'pedidos_os' | 'estoque' | 'servicos'>('clientes');
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddClientModal, setShowAddClientModal] = useState(false);
   const [selectedClientDetail, setSelectedClientDetail] = useState<Client | null>(null);
@@ -186,30 +188,9 @@ export const CrmView: React.FC<CrmViewProps> = ({
         </div>
       </div>
 
-      {/* Sub Navigation Tabs */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-2">
-        <div className="flex gap-2 overflow-x-auto">
-          {[
-            { id: 'clientes', label: 'Clientes', icon: 'domain' },
-            { id: 'pedidos_os', label: 'Pedidos & OS', icon: 'engineering' },
-            { id: 'estoque', label: 'Estoque & Série BP', icon: 'inventory_2' },
-            { id: 'servicos', label: 'Catálogo de Serviços', icon: 'handyman' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setCrmSubTab(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
-                crmSubTab === tab.id
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-              }`}
-            >
-              <span className="material-symbols-outlined text-base">{tab.icon}</span>
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
+      {/* Ação do módulo (sem sub-abas que clonam o menu lateral) */}
+      <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-2">
+        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Base de clientes</p>
         <button
           onClick={() => setShowAddClientModal(true)}
           className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
