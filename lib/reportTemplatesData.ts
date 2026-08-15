@@ -512,12 +512,153 @@ export const CORRETIVA_BMS = corretivaDisciplina('BMS', 'CORRETIVA_BMS', 'Corret
 export const LEVANTAMENTO_ALARME = levantamentoDisciplina('ALARME', 'LEVANTAMENTO_ALARME', 'Levantamento Alarme (Orçamento)', ID_ALARME);
 export const CORRETIVA_ALARME = corretivaDisciplina('ALARME', 'CORRETIVA_ALARME', 'Corretiva Alarme');
 
+// Helper: check pass/fail que abre pendência quando reprovado.
+const pf = (key: string, label: string, grupo?: string, acao?: string, extraOpcoes: string[] = []): FieldSchema => ({
+  key,
+  tipo: 'passfail',
+  label,
+  opcoes: ['Aprovado', 'Reprovado', ...extraOpcoes],
+  abre_pendencia_se: ['Reprovado'],
+  ...(grupo ? { pendencia_sugerida: { grupo, acao: acao as never } } : {}),
+});
+const SISTEMA_OPERANTE: FieldSchema = {
+  key: 'sistema_operante',
+  tipo: 'select',
+  label: 'Sistema entregue operante',
+  opcoes: ['Sim', 'Sim, com ressalvas', 'Não'],
+  obrigatorio: true,
+  abre_pendencia_se: ['Não'],
+};
+
+/* ------------------------------ Preventiva CFTV ------------------------------ */
+export const PREVENTIVA_CFTV: TemplateSchema = {
+  codigo: 'PREVENTIVA_CFTV', nome: 'Preventiva CFTV', tipo: 'PREVENTIVA', area: 'CFTV',
+  secoes: [
+    { key: 'gravador', titulo: 'Gravador (DVR/NVR)', campos: [
+      pf('energizado', 'Gravador energizado e operante', 'CFTV > Gravação', 'reparar'),
+      pf('hd_saude', 'HD reconhecido e sem erro (SMART)', 'CFTV > Gravação', 'substituir'),
+      pf('gravacao_continua', 'Gravação contínua com histórico disponível', 'CFTV > Gravação', 'reparar'),
+      pf('data_hora', 'Data e hora corretas'),
+      { key: 'retencao_dias', tipo: 'numero', label: 'Dias de retenção disponíveis' },
+      pf('ventilacao', 'Ventilação / cooler sem superaquecimento', 'CFTV > Gravação', 'limpar'),
+      { key: 'foto_tela', tipo: 'foto', label: 'Foto do mosaico / tela do gravador', obrigatorio: true },
+    ]},
+    { key: 'cameras', titulo: 'Câmeras', campos: [
+      pf('todas_com_imagem', 'Todas as câmeras com imagem (sem perda de vídeo)', 'CFTV > Câmeras', 'investigar'),
+      { key: 'qtd_com_defeito', tipo: 'numero', label: 'Nº de câmeras com defeito' },
+      pf('ir_noturno', 'Infravermelho noturno testado', 'CFTV > Câmeras', 'substituir', ['Não aplicável']),
+      pf('foco_nitidez', 'Foco e nitidez adequados', 'CFTV > Câmeras', 'limpar'),
+      pf('posicionamento', 'Posicionamento correto (sem ponto cego)', 'CFTV > Câmeras', 'reposicionar'),
+      { key: 'limpeza_domos', tipo: 'select', label: 'Limpeza de domos / lentes', opcoes: ['Executada', 'Não executada', 'Não aplicável'] },
+    ]},
+    { key: 'rede', titulo: 'Rede e acesso remoto', campos: [
+      pf('acesso_remoto', 'Acesso remoto testado (P2P/DDNS)', 'CFTV > Rede', 'reprogramar'),
+      pf('switch_poe', 'Switch PoE / injetores operantes', 'CFTV > Alimentação', 'substituir', ['Não aplicável']),
+    ]},
+    { key: 'energia', titulo: 'Alimentação e infraestrutura', campos: [
+      pf('fontes', 'Fontes / nobreak operantes', 'CFTV > Alimentação', 'substituir'),
+      pf('conectores', 'Conectores / baluns sem oxidação', 'CFTV > Infraestrutura', 'reparar'),
+      SISTEMA_OPERANTE,
+    ]},
+  ],
+};
+
+/* -------------------------- Preventiva Controle de Acesso -------------------------- */
+export const PREVENTIVA_CA: TemplateSchema = {
+  codigo: 'PREVENTIVA_CA', nome: 'Preventiva Controle de Acesso', tipo: 'PREVENTIVA', area: 'CONTROLE_ACESSO',
+  secoes: [
+    { key: 'controladora', titulo: 'Controladora e servidor', campos: [
+      pf('online', 'Controladora online com o servidor', 'CA > Controladoras', 'investigar'),
+      pf('sincronizacao', 'Sincronização de usuários e níveis de acesso', 'CA > Controladoras', 'reprogramar'),
+      { key: 'backup', tipo: 'select', label: 'Backup da base executado', opcoes: ['Executado', 'Não executado'] },
+      pf('bateria', 'Bateria / nobreak testada', 'CA > Controladoras', 'substituir'),
+      { key: 'foto', tipo: 'foto', label: 'Foto da controladora', obrigatorio: true },
+    ]},
+    { key: 'leitoras', titulo: 'Leitoras e reconhecimento', campos: [
+      pf('leitura', 'Teste de leitura (RFID / biometria / facial)', 'CA > Leitoras', 'reparar'),
+      pf('teclados', 'Teclados de senha operantes', 'CA > Leitoras', 'substituir', ['Não aplicável']),
+      { key: 'limpeza', tipo: 'select', label: 'Limpeza de leitores executada', opcoes: ['Executada', 'Não executada'] },
+    ]},
+    { key: 'ferragens', titulo: 'Fechaduras e ferragens', campos: [
+      pf('eletroima', 'Eletroímãs com força de atraque', 'CA > Fechaduras', 'reparar'),
+      pf('mola_aerea', 'Molas aéreas reguladas (porta fecha e trava)', 'CA > Fechaduras', 'reparar'),
+      pf('botoeira_rte', 'Botoeiras de saída (RTE) operantes', 'CA > Fechaduras', 'substituir'),
+      pf('tamper', 'Tampas / tamper fechados corretamente', 'CA > Fechaduras', 'reparar'),
+    ]},
+    { key: 'bloqueios', titulo: 'Bloqueios físicos', campos: [
+      pf('catracas', 'Catracas / torniquetes: giro e travamento', 'CA > Bloqueios', 'reparar', ['Não aplicável']),
+      pf('fotocelulas', 'Fotocélulas / sensores de passagem', 'CA > Bloqueios', 'desobstruir', ['Não aplicável']),
+      SISTEMA_OPERANTE,
+    ]},
+  ],
+};
+
+/* ------------------------------ Preventiva BMS ------------------------------ */
+export const PREVENTIVA_BMS: TemplateSchema = {
+  codigo: 'PREVENTIVA_BMS', nome: 'Preventiva Automação/BMS', tipo: 'PREVENTIVA', area: 'BMS',
+  secoes: [
+    { key: 'controladores', titulo: 'Controladores (CLP) e I/O', campos: [
+      pf('energizado', 'Controladores energizados e sem falha de inicialização', 'BMS > Controladores', 'reparar'),
+      pf('io_ok', 'Módulos de I/O sem erro de diagnóstico', 'BMS > Controladores', 'substituir'),
+      pf('fonte_24v', 'Fonte 24VDC estável (sem oscilação)', 'BMS > Controladores', 'substituir'),
+      pf('comunicacao', 'Comunicação de campo íntegra (BACnet/Modbus/RS-485)', 'BMS > Controladores', 'reparar'),
+      { key: 'foto', tipo: 'foto', label: 'Foto do painel / controlador', obrigatorio: true },
+    ]},
+    { key: 'sensores', titulo: 'Sensores e instrumentação', campos: [
+      pf('leituras_coerentes', 'Leituras coerentes com o ambiente (calibração)', 'BMS > Sensores', 'reparar'),
+      pf('sinal_limpo', 'Sinal sem ruído / oscilação', 'BMS > Sensores', 'investigar'),
+      pf('mecanica', 'Conexões mecânicas sem vazamento (pressostatos/boias)', 'BMS > Sensores', 'reparar', ['Não aplicável']),
+    ]},
+    { key: 'atuadores', titulo: 'Atuadores e comandos', campos: [
+      pf('valvulas_dampers', 'Válvulas / dampers respondem ao comando', 'BMS > Atuadores', 'reparar'),
+      pf('contatores', 'Contatores atracam (bombas / ventiladores)', 'BMS > Atuadores', 'substituir'),
+      pf('inversores', 'Inversores de frequência sem falha', 'BMS > Atuadores', 'investigar', ['Não aplicável']),
+    ]},
+    { key: 'supervisorio', titulo: 'Supervisório e IHM', campos: [
+      pf('tags_online', 'Variáveis (tags) atualizando no supervisório', 'BMS > Supervisório', 'investigar'),
+      pf('ihm', 'IHM responsiva e calibrada', 'BMS > Supervisório', 'substituir', ['Não aplicável']),
+      pf('historico', 'Banco de histórico / tendências arquivando', 'BMS > Supervisório', 'reparar'),
+      SISTEMA_OPERANTE,
+    ]},
+  ],
+};
+
+/* ------------------------------ Preventiva Alarme ------------------------------ */
+export const PREVENTIVA_ALARME: TemplateSchema = {
+  codigo: 'PREVENTIVA_ALARME', nome: 'Preventiva Alarme', tipo: 'PREVENTIVA', area: 'ALARME',
+  secoes: [
+    { key: 'central', titulo: 'Central', campos: [
+      pf('energizada', 'Central energizada e em condição normal', 'Alarme > Central', 'reparar'),
+      pf('alimentacao_ac', 'Alimentação AC presente (não só bateria)', 'Alarme > Central', 'reparar'),
+      pf('bateria', 'Bateria selada testada (autonomia)', 'Alarme > Central', 'substituir'),
+      pf('teclado', 'Teclado de operação respondendo', 'Alarme > Central', 'substituir'),
+      { key: 'programacao', tipo: 'select', label: 'Backup da programação', opcoes: ['Executado', 'Não executado'] },
+      { key: 'foto', tipo: 'foto', label: 'Foto da central', obrigatorio: true },
+    ]},
+    { key: 'sensores', titulo: 'Sensores (walk test)', campos: [
+      pf('walk_test', 'Teste de caminhada (walk test) em todas as zonas', 'Alarme > Sensores', 'reparar'),
+      pf('magneticos', 'Magnéticos de porta/janela alinhados', 'Alarme > Sensores', 'reposicionar'),
+      pf('tamper', 'Tamper (antissabotagem) fechado', 'Alarme > Sensores', 'reparar'),
+      { key: 'disparos_falsos', tipo: 'texto', label: 'Zonas com histórico de disparo falso' },
+    ]},
+    { key: 'sinalizacao', titulo: 'Sinalização', campos: [
+      pf('sirene', 'Sirene acionada e audível', 'Alarme > Sinalização', 'substituir'),
+      pf('strobe', 'Strobe (flash visual) operante', 'Alarme > Sinalização', 'substituir', ['Não aplicável']),
+    ]},
+    { key: 'semfio_comunicacao', titulo: 'Sem fio e comunicação', campos: [
+      pf('baterias_perifericos', 'Baterias de periféricos sem fio ok', 'Alarme > Sem Fio', 'substituir', ['Não aplicável']),
+      pf('comunicacao_base', 'Teste de comunicação com a central de monitoramento', 'Alarme > Comunicação', 'investigar', ['Não aplicável']),
+      SISTEMA_OPERANTE,
+    ]},
+  ],
+};
+
 export const ALL_TEMPLATES: TemplateSchema[] = [
   LEVANTAMENTO_SDAI, CORRETIVA_SDAI, PREVENTIVA_SDAI,
-  LEVANTAMENTO_CFTV, CORRETIVA_CFTV,
-  LEVANTAMENTO_CA, CORRETIVA_CA,
-  LEVANTAMENTO_BMS, CORRETIVA_BMS,
-  LEVANTAMENTO_ALARME, CORRETIVA_ALARME,
+  LEVANTAMENTO_CFTV, CORRETIVA_CFTV, PREVENTIVA_CFTV,
+  LEVANTAMENTO_CA, CORRETIVA_CA, PREVENTIVA_CA,
+  LEVANTAMENTO_BMS, CORRETIVA_BMS, PREVENTIVA_BMS,
+  LEVANTAMENTO_ALARME, CORRETIVA_ALARME, PREVENTIVA_ALARME,
 ];
 
 /**
