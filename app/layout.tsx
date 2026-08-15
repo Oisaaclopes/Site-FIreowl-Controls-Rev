@@ -1,11 +1,13 @@
 import type {Metadata} from 'next';
-import { Oswald, Roboto, Montserrat } from 'next/font/google';
+import { Poppins, Roboto, Montserrat } from 'next/font/google';
 import './globals.css'; // Global styles
 
-const oswald = Oswald({
+// Títulos/headings: Poppins (amigável, arredondada) — mesma família dos PDFs.
+// Substitui o antigo Oswald (condensado/industrial, aspecto "quadriculado").
+const poppins = Poppins({
   subsets: ['latin'],
-  weight: ['600', '700'],
-  variable: '--font-oswald',
+  weight: ['500', '600', '700'],
+  variable: '--font-poppins',
   display: 'swap',
 });
 
@@ -33,7 +35,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
-    <html lang="pt-BR" className={`${oswald.variable} ${roboto.variable} ${montserrat.variable}`}>
+    <html lang="pt-BR" className={`${poppins.variable} ${roboto.variable} ${montserrat.variable}`}>
       <body suppressHydrationWarning className="bg-white antialiased text-gray-800">
         {children}
       </body>

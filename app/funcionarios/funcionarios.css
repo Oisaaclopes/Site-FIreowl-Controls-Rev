@@ -3,12 +3,12 @@
    importado no globals.css raiz, por isso não é reimportado aqui.
 
    As fontes seguem a MESMA linguagem visual do site:
-   - Títulos: Oswald (var --font-oswald, definida no layout raiz)
-   - Corpo:   Roboto (var --font-roboto, definida no layout raiz)
+   - Títulos: Poppins (var --font-poppins, definida no layout raiz)
+   - Corpo:   Plus Jakarta Sans (amigável; carregada no layout /funcionarios), Roboto de fallback
    - Dados/monospace: Roboto Mono */
 
 .font-display-lg {
-  font-family: var(--font-oswald), 'Oswald', sans-serif;
+  font-family: var(--font-poppins), 'Poppins', sans-serif;
   font-size: 38px;
   line-height: 1.15;
   letter-spacing: 0.02em;
@@ -17,7 +17,7 @@
 }
 
 .font-headline-lg {
-  font-family: var(--font-oswald), 'Oswald', sans-serif;
+  font-family: var(--font-poppins), 'Poppins', sans-serif;
   font-size: 26px;
   line-height: 1.25;
   letter-spacing: 0.01em;
@@ -25,28 +25,28 @@
 }
 
 .font-headline-md {
-  font-family: var(--font-oswald), 'Oswald', sans-serif;
+  font-family: var(--font-poppins), 'Poppins', sans-serif;
   font-size: 18px;
   line-height: 1.3;
   font-weight: 600;
 }
 
 .font-body-lg {
-  font-family: var(--font-roboto), 'Roboto', sans-serif;
+  font-family: 'Plus Jakarta Sans', var(--font-roboto), sans-serif;
   font-size: 16px;
   line-height: 26px;
   font-weight: 400;
 }
 
 .font-body-md {
-  font-family: var(--font-roboto), 'Roboto', sans-serif;
+  font-family: 'Plus Jakarta Sans', var(--font-roboto), sans-serif;
   font-size: 14px;
   line-height: 22px;
   font-weight: 400;
 }
 
 .font-body-sm {
-  font-family: var(--font-roboto), 'Roboto', sans-serif;
+  font-family: 'Plus Jakarta Sans', var(--font-roboto), sans-serif;
   font-size: 13px;
   line-height: 18px;
   font-weight: 400;
@@ -60,7 +60,7 @@
 }
 
 .font-label-caps {
-  font-family: var(--font-roboto), 'Roboto', sans-serif;
+  font-family: 'Plus Jakarta Sans', var(--font-roboto), sans-serif;
   font-size: 11px;
   line-height: 14px;
   font-weight: 700;

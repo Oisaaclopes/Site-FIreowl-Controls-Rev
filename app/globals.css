@@ -8,7 +8,7 @@
   --color-bg-white: #FFFFFF;
   --color-bg-light-gray: #F8F9FA;
   --font-sans: var(--font-roboto), sans-serif;
-  --font-display: var(--font-oswald), sans-serif;
+  --font-display: var(--font-poppins), sans-serif;
   --font-montserrat: var(--font-montserrat), sans-serif;
 }
 
@@ -28,7 +28,7 @@ body {
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-oswald), sans-serif;
+  font-family: var(--font-poppins), sans-serif;
 }
 
 @keyframes floatUp {
