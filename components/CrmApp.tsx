@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
+import { BottomNav } from '@/components/BottomNav';
 import { Header } from '@/components/Header';
 import { AuthModal } from '@/components/AuthModal';
 import { PrivacyProvider } from '@/lib/privacy';
@@ -656,8 +657,8 @@ export function CrmApp({
           sidebarCollapsed={isSidebarCollapsed}
         />
 
-        {/* View Switcher */}
-        <main className="pt-16 min-h-[calc(100vh-64px)]">
+        {/* View Switcher — padding inferior no mobile do técnico p/ o BottomNav */}
+        <main className={`pt-16 min-h-[calc(100vh-64px)] ${userRole === 'TECNICO' ? 'pb-20 lg:pb-0' : ''}`}>
           {currentTab === 'painel' && (
             <DashboardView
               transactions={transactions}
@@ -817,6 +818,9 @@ export function CrmApp({
           )}
         </main>
       </div>
+
+      {/* Bottom nav — técnico no mobile */}
+      <BottomNav currentTab={currentTab} onSelectTab={setCurrentTab} userRole={userRole} />
 
       {/* Auth & Operator Modal */}
       <AuthModal

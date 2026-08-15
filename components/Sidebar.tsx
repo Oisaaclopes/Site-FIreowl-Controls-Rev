@@ -54,7 +54,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // RBAC: mostra apenas as abas permitidas ao perfil logado
   const permitted = allowedTabs(userRole);
-  const navItems = allNavItems.filter((item) => permitted.includes(item.path));
+  const META = Object.fromEntries(allNavItems.map((i) => [i.path, i])) as Record<
+    TabPath,
+    { path: TabPath; label: string; icon: string; count?: number }
+  >;
+
+  // Agrupamento por domínio (Painel fica solto no topo, sem cabeçalho).
+  const GROUPS: { title?: string; items: TabPath[] }[] = [
+    { items: ['painel'] },
+    { title: 'Comercial', items: ['clientes', 'pedidos', 'contratos'] },
+    { title: 'Operação', items: ['agenda', 'relatorios', 'ponto'] },
+    { title: 'Suprimentos', items: ['servicos', 'estoque', 'fornecedores'] },
+    { title: 'Financeiro', items: ['receitas', 'despesas', 'financas'] },
+    { title: 'Sistema', items: ['conta'] },
+  ];
+  const visibleGroups = GROUPS.map((g) => ({
+    title: g.title,
+    items: g.items.filter((p) => permitted.includes(p)).map((p) => META[p]),
+  })).filter((g) => g.items.length > 0);
 
   // No mobile a sidebar é sempre "cheia" (off-canvas). O modo recolhido só
   // vale no desktop, por isso as classes de largura usam o prefixo lg:.
@@ -124,57 +141,72 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-      {/* Navigation items */}
-      <nav className={`flex-1 py-4 px-3 space-y-1 overflow-y-auto scrollbar-hide ${isCollapsed ? 'lg:overflow-visible' : ''}`}>
-        {navItems.map((item) => {
-          const isActive = currentTab === item.path;
-          return (
-            <button
-              key={item.path}
-              onClick={() => {
-                onSelectTab(item.path);
-                onCloseMobile?.();
-              }}
-              title={isCollapsed ? item.label : undefined}
-              className={`group/nav relative w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg transition-all duration-150 text-left ${
-                isCollapsed ? 'lg:justify-center lg:px-0' : ''
-              } ${
-                isActive
-                  ? 'bg-[#E63946] text-white font-semibold shadow-sm'
-                  : 'text-white/70 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              <div className={`flex items-center min-w-0 ${isCollapsed ? 'lg:justify-center' : ''}`}>
-                <span className={`material-symbols-outlined text-[20px] transition-transform group-hover/nav:scale-105 ${isCollapsed ? 'lg:mr-0 mr-3' : 'mr-3'} ${isActive ? 'text-white' : 'text-white/70 group-hover/nav:text-white'}`}>
-                  {item.icon}
-                </span>
-                <span className={`text-xs uppercase tracking-wider font-semibold truncate ${isCollapsed ? 'lg:hidden' : ''}`}>
-                  {item.label}
-                </span>
-              </div>
-              {item.count ? (
-                <span className={`font-data-mono text-[10px] px-2 py-0.5 rounded-full font-bold ${isCollapsed ? 'lg:hidden' : ''} ${isActive ? 'bg-white/20 text-white' : 'bg-white/10 text-white/70'}`}>
-                  {item.count}
-                </span>
-              ) : null}
+      {/* Navigation items — agrupados por domínio */}
+      <nav className={`flex-1 py-3 px-3 overflow-y-auto scrollbar-hide ${isCollapsed ? 'lg:overflow-visible' : ''}`}>
+        {visibleGroups.map((group, gi) => (
+          <div key={group.title || `g${gi}`} className={gi > 0 ? 'mt-4' : ''}>
+            {/* Cabeçalho do grupo (some no modo recolhido; vira divisória) */}
+            {group.title && (
+              <>
+                <p className={`px-3 mb-1.5 text-[10px] font-bold uppercase tracking-widest text-white/35 ${isCollapsed ? 'lg:hidden' : ''}`}>
+                  {group.title}
+                </p>
+                {isCollapsed && <div className="hidden lg:block mx-2 mb-1.5 border-t border-white/10" />}
+              </>
+            )}
+            <div className="space-y-1">
+              {group.items.map((item) => {
+                const isActive = currentTab === item.path;
+                return (
+                  <button
+                    key={item.path}
+                    onClick={() => {
+                      onSelectTab(item.path);
+                      onCloseMobile?.();
+                    }}
+                    title={isCollapsed ? item.label : undefined}
+                    className={`group/nav relative w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg transition-all duration-150 text-left ${
+                      isCollapsed ? 'lg:justify-center lg:px-0' : ''
+                    } ${
+                      isActive
+                        ? 'bg-[#E63946] text-white font-semibold shadow-sm'
+                        : 'text-white/70 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <div className={`flex items-center min-w-0 ${isCollapsed ? 'lg:justify-center' : ''}`}>
+                      <span className={`material-symbols-outlined text-[20px] transition-transform group-hover/nav:scale-105 ${isCollapsed ? 'lg:mr-0 mr-3' : 'mr-3'} ${isActive ? 'text-white' : 'text-white/70 group-hover/nav:text-white'}`}>
+                        {item.icon}
+                      </span>
+                      <span className={`text-xs uppercase tracking-wider font-semibold truncate ${isCollapsed ? 'lg:hidden' : ''}`}>
+                        {item.label}
+                      </span>
+                    </div>
+                    {item.count ? (
+                      <span className={`font-data-mono text-[10px] px-2 py-0.5 rounded-full font-bold ${isCollapsed ? 'lg:hidden' : ''} ${isActive ? 'bg-white/20 text-white' : 'bg-white/10 text-white/70'}`}>
+                        {item.count}
+                      </span>
+                    ) : null}
 
-              {/* Tooltip (somente no modo recolhido, desktop) */}
-              {isCollapsed && (
-                <span
-                  role="tooltip"
-                  className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50 hidden lg:flex items-center whitespace-nowrap rounded-md bg-slate-900 text-white text-[11px] font-semibold uppercase tracking-wider px-2.5 py-1.5 shadow-lg opacity-0 -translate-x-1 transition-all duration-150 group-hover/nav:opacity-100 group-hover/nav:translate-x-0"
-                >
-                  {item.label}
-                  {item.count ? (
-                    <span className="ml-2 font-data-mono bg-white/15 rounded-full px-1.5 py-0.5 text-[10px]">
-                      {item.count}
-                    </span>
-                  ) : null}
-                </span>
-              )}
-            </button>
-          );
-        })}
+                    {/* Tooltip (somente no modo recolhido, desktop) */}
+                    {isCollapsed && (
+                      <span
+                        role="tooltip"
+                        className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50 hidden lg:flex items-center whitespace-nowrap rounded-md bg-slate-900 text-white text-[11px] font-semibold uppercase tracking-wider px-2.5 py-1.5 shadow-lg opacity-0 -translate-x-1 transition-all duration-150 group-hover/nav:opacity-100 group-hover/nav:translate-x-0"
+                      >
+                        {item.label}
+                        {item.count ? (
+                          <span className="ml-2 font-data-mono bg-white/15 rounded-full px-1.5 py-0.5 text-[10px]">
+                            {item.count}
+                          </span>
+                        ) : null}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Footer System Status / Operator Info */}
