@@ -800,6 +800,7 @@ export function CrmApp({
               onAddInventoryItem={handleAddInventoryItem}
               onUpdateInventoryItem={handleUpdateInventoryItem}
               onDeleteInventoryItem={handleDeleteInventoryItem}
+              onAddSupplier={handleAddSupplier}
               loading={inventoryLoading}
             />
           )}

@@ -3,12 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { InventoryItem, StockMovement, Supplier } from '@/lib/types';
 import { insertStockMovement, fetchStockMovements, isSupabaseConfigured } from '@/lib/inventory';
-import {
-  INTELBRAS_VISION_SDAI,
-  MARCA_PADRAO,
-  FORNECEDOR_PADRAO,
-  MARGEM_PADRAO,
-} from '@/lib/catalogoIntelbrasVision';
+import { PRODUCT_CATALOGS, CatalogoConfig } from '@/lib/catalogosProdutos';
 
 interface EstoqueViewProps {
   inventory: InventoryItem[];
@@ -16,6 +11,8 @@ interface EstoqueViewProps {
   onAddInventoryItem: (item: InventoryItem) => void | Promise<void>;
   onUpdateInventoryItem?: (item: InventoryItem) => void | Promise<void>;
   onDeleteInventoryItem?: (id: string) => void | Promise<void>;
+  /** Cria/atualiza um fornecedor (usado ao importar um catálogo com fornecedor). */
+  onAddSupplier?: (s: Supplier) => void | Promise<void>;
   loading?: boolean;
 }
 
@@ -734,6 +731,7 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
   onAddInventoryItem,
   onUpdateInventoryItem,
   onDeleteInventoryItem,
+  onAddSupplier,
   loading = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -1004,10 +1002,13 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     (i) => /^PROV-/i.test(i.code || '') || i.pendenteValidacao === true
   ).length;
 
-  // Itens do catálogo Intelbras (Vision) ainda não importados para o Estoque.
-  const faltamCatalogo = INTELBRAS_VISION_SDAI.filter(
-    (p) => !inventory.some((i) => (i.code || '').toUpperCase() === p.code.toUpperCase())
-  ).length;
+  // Catálogos com produtos ainda não importados (um banner por catálogo).
+  const catalogosPendentes = PRODUCT_CATALOGS.map((cfg) => ({
+    cfg,
+    faltam: cfg.produtos.filter(
+      (p) => !inventory.some((i) => (i.code || '').toUpperCase() === p.code.toUpperCase())
+    ).length,
+  })).filter((c) => c.faltam > 0);
 
   const term = searchTerm.toLowerCase();
   const filteredInventory = inventory
@@ -1097,53 +1098,65 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     }
   };
 
-  // Importa o catálogo Intelbras (fornecedor Vision) em massa. O valor é o
-  // custo; aplica a margem padrão (40%) para calcular preço de venda e markup.
+  // Importa um catálogo de produtos em massa. O valor do catálogo é o custo;
+  // aplica a margem para calcular preço de venda e markup. Cria o fornecedor
+  // (se informado e ainda não existir) e vincula os produtos a ele.
   // Idempotente por código: itens já cadastrados são ignorados.
-  const handleImportCatalogo = async () => {
+  const handleImportCatalogo = async (cfg: CatalogoConfig) => {
     if (importing) return;
-    if (!window.confirm(
-      `Importar ${INTELBRAS_VISION_SDAI.length} produtos Intelbras (fornecedor ${FORNECEDOR_PADRAO}) com ${MARGEM_PADRAO}% de margem?\n\n` +
-        'Itens com código já cadastrado serão ignorados. Estoque entra zerado (ajuste depois).'
-    )) return;
+    if (
+      !window.confirm(
+        `Importar ${cfg.produtos.length} produtos ${cfg.label} (fornecedor ${cfg.supplier}) com ${cfg.margem}% de margem?\n\n` +
+          'Itens com código já cadastrado serão ignorados. Estoque entra zerado (ajuste depois).'
+      )
+    )
+      return;
     setImporting(true);
-    const existentes = new Set(inventory.map((i) => (i.code || '').toUpperCase()));
     let added = 0;
     let skipped = 0;
     try {
-      for (const p of INTELBRAS_VISION_SDAI) {
+      // Cria o fornecedor, se ele ainda não existe no módulo Fornecedores.
+      if (cfg.supplierInfo && onAddSupplier && !suppliers.some((s) => s.name.toLowerCase() === cfg.supplier.toLowerCase())) {
+        try {
+          await onAddSupplier(cfg.supplierInfo);
+        } catch (e) {
+          console.warn('Falha ao criar o fornecedor do catálogo (segue com os produtos):', e);
+        }
+      }
+      const existentes = new Set(inventory.map((i) => (i.code || '').toUpperCase()));
+      for (const p of cfg.produtos) {
         if (existentes.has(p.code.toUpperCase())) {
           skipped++;
           continue;
         }
         const cost = p.costPrice;
-        const sale = round2(cost / (1 - MARGEM_PADRAO / 100));
+        const sale = round2(cost / (1 - cfg.margem / 100));
         const mk = cost > 0 ? round2(((sale - cost) / cost) * 100) : 0;
         const item: InventoryItem = {
           id: `inv_cat_${p.code}`,
           code: p.code,
           name: p.name,
-          category: 'SDAI',
+          category: cfg.categoria,
           subcategory: p.subcategory || undefined,
           quantity: 0,
           minQuantity: 0,
           unitPrice: sale,
-          supplier: FORNECEDOR_PADRAO,
+          supplier: cfg.supplier,
           location: '',
           unit: 'UN — Unidade',
           salePrice: sale,
           costPrice: cost,
-          profitMargin: MARGEM_PADRAO,
+          profitMargin: cfg.margem,
           markup: mk,
           stockManaged: true,
-          brand: MARCA_PADRAO,
+          brand: cfg.brand,
           description: p.indisponivel ? 'Indisponível no fornecedor no momento da importação.' : undefined,
         };
         await onAddInventoryItem(item);
         added++;
       }
       alert(
-        `Catálogo importado: ${added} produto(s) adicionado(s)` +
+        `Catálogo ${cfg.label} importado: ${added} produto(s) adicionado(s)` +
           (skipped ? `, ${skipped} já existiam (ignorados).` : '.')
       );
     } catch (err) {
@@ -1250,19 +1263,23 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                     Somente nível crítico
                   </button>
                   <div className="my-1 h-px bg-slate-100" />
-                  <button
-                    onClick={() => {
-                      setShowHeaderMenu(false);
-                      handleImportCatalogo();
-                    }}
-                    disabled={importing}
-                    className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 disabled:opacity-60"
-                  >
-                    <span className={`material-symbols-outlined text-base text-[#1A1A72] ${importing ? 'animate-spin' : ''}`}>
-                      {importing ? 'progress_activity' : 'download'}
-                    </span>
-                    {importing ? 'Importando…' : 'Importar catálogo Intelbras (Vision)'}
-                  </button>
+                  <p className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Importar catálogo</p>
+                  {PRODUCT_CATALOGS.map((cfg) => (
+                    <button
+                      key={cfg.key}
+                      onClick={() => {
+                        setShowHeaderMenu(false);
+                        handleImportCatalogo(cfg);
+                      }}
+                      disabled={importing}
+                      className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 disabled:opacity-60"
+                    >
+                      <span className={`material-symbols-outlined text-base text-[#1A1A72] ${importing ? 'animate-spin' : ''}`}>
+                        {importing ? 'progress_activity' : 'download'}
+                      </span>
+                      {cfg.label}
+                    </button>
+                  ))}
                 </div>
               </>
             )}
@@ -1328,18 +1345,21 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
         </div>
       )}
 
-      {/* Catálogo Intelbras (Vision) pronto para importar */}
-      {faltamCatalogo > 0 && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-[#1A1A72]/25 bg-[#1A1A72]/5 px-4 py-3">
+      {/* Catálogos de fornecedores prontos para importar (um por catálogo) */}
+      {catalogosPendentes.map(({ cfg, faltam }) => (
+        <div
+          key={cfg.key}
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-[#1A1A72]/25 bg-[#1A1A72]/5 px-4 py-3"
+        >
           <div className="flex items-start gap-2 text-xs text-[#1A1A72]">
             <span className="material-symbols-outlined text-lg">download</span>
             <span>
-              <strong>Catálogo Intelbras (fornecedor Vision):</strong> {faltamCatalogo} produto(s) prontos para importar
-              com {MARGEM_PADRAO}% de margem. Depois de importar, eles também aparecem na lista pré-pronta da preventiva SDAI.
+              <strong>Catálogo {cfg.label} (fornecedor {cfg.supplier}):</strong> {faltam} produto(s) prontos para importar
+              com {cfg.margem}% de margem. Depois de importar, também aparecem na lista pré-pronta da preventiva SDAI.
             </span>
           </div>
           <button
-            onClick={handleImportCatalogo}
+            onClick={() => handleImportCatalogo(cfg)}
             disabled={importing}
             className="shrink-0 px-4 py-2 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] text-white text-[11px] font-bold uppercase tracking-wide flex items-center gap-1.5 disabled:opacity-60"
           >
@@ -1349,7 +1369,7 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
             {importing ? 'Importando…' : 'Importar agora'}
           </button>
         </div>
-      )}
+      ))}
 
       {/* Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
