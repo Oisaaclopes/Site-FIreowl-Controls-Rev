@@ -57,6 +57,11 @@ interface RelatoriosViewProps {
   onUpdateSupplier?: (s: Supplier) => void | Promise<void>;
   /** Remove uma marca do catálogo (usado pelo botão "remover" na janela). */
   onDeletePartnerBrand?: (id: string) => void;
+  /** Baixa de estoque dos materiais aplicados ao finalizar o relatório. */
+  onConsumeMaterials?: (
+    materials: { nome: string; quantidade: number }[],
+    contexto?: { numero?: string; clienteNome?: string }
+  ) => void | Promise<void>;
 }
 
 const uniq = (arr: string[]) => Array.from(new Set(arr.filter(Boolean)));
@@ -148,6 +153,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   suppliers = [],
   onUpdateSupplier,
   onDeletePartnerBrand,
+  onConsumeMaterials,
 }) => {
   const isTecnico = userRole === 'TECNICO';
   const isFinanceiro = userRole === 'FINANCEIRO';
@@ -933,6 +939,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         }}
         onBack={() => setMode('index')}
         onSaved={refresh}
+        onConsumeMaterials={onConsumeMaterials}
       />
       {provPanel}
       {brandPanel}

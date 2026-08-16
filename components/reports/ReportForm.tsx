@@ -50,6 +50,11 @@ interface ReportFormProps {
   onCreateCatalogo?: (origem: string, name: string) => void;
   onBack: () => void;
   onSaved: () => void;
+  /** Baixa de estoque dos materiais aplicados ao finalizar (Corretiva). */
+  onConsumeMaterials?: (
+    materials: { nome: string; quantidade: number }[],
+    contexto?: { numero?: string; clienteNome?: string }
+  ) => void | Promise<void>;
 }
 
 interface PendenciaPreview {
@@ -150,6 +155,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   onCreateCatalogo,
   onBack,
   onSaved,
+  onConsumeMaterials,
 }) => {
   const roleForEngine = userRole.toLowerCase();
   const isTecnico = userRole === 'TECNICO';
@@ -540,6 +546,28 @@ export const ReportForm: React.FC<ReportFormProps> = ({
     };
   };
 
+  // Materiais aplicados que devem baixar do estoque ao finalizar. Prefere a
+  // seção "Materiais Aplicados" (materiais_aplicados); se o template não tiver,
+  // usa as "Intervenções" (item + quantidade). Levantamento/Preventiva não
+  // consomem materiais, então normalmente retorna vazio.
+  const collectConsumedMaterials = (): { nome: string; quantidade: number }[] => {
+    const campos = template.secoes.flatMap((s) => s.campos);
+    const key = campos.some((f) => f.key === 'materiais_aplicados')
+      ? 'materiais_aplicados'
+      : campos.some((f) => f.key === 'intervencoes')
+      ? 'intervencoes'
+      : null;
+    if (!key) return [];
+    const cards = Array.isArray(values[key]) ? (values[key] as RepeaterCard[]) : [];
+    const out: { nome: string; quantidade: number }[] = [];
+    for (const c of cards) {
+      const nome = String(c.item ?? '').trim();
+      if (!nome) continue;
+      out.push({ nome, quantidade: Number(c.quantidade) || 1 });
+    }
+    return out;
+  };
+
   const handleFinalize = async () => {
     const found = validateFinalize(template, values, hasPhoto);
     setIssues(found);
@@ -551,6 +579,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
     }
     if (!isSupabaseConfigured()) {
       setFinalized(true);
+      onConsumeMaterials?.(collectConsumedMaterials(), { clienteNome: cliente?.name });
       return;
     }
     setSaving(true);
@@ -586,6 +615,8 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       setSavedInfo({ reportId: syncedNow ? '' : bundle.clientUuid, count: bundle.pendCount });
       setFinalized(true);
       onSaved();
+      // Baixa de estoque dos materiais aplicados (Corretiva).
+      onConsumeMaterials?.(collectConsumedMaterials(), { numero: bundle.report.numero, clienteNome: cliente?.name });
     } catch (err) {
       console.error('Falha ao gravar relatório:', err);
       setPersistErr(err instanceof Error ? err.message : 'Falha ao gravar no banco.');

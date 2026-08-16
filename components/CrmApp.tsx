@@ -11,6 +11,7 @@ import {
   insertInventoryItem,
   updateInventoryItem,
   deleteInventoryItem,
+  insertStockMovement,
   isSupabaseConfigured,
 } from '@/lib/inventory';
 
@@ -623,6 +624,56 @@ export function CrmApp({
     logAction('Exclusão de Serviço', 'Serviços', `Serviço ${svc?.code || id} removido do catálogo`);
   };
 
+  // Baixa de estoque a partir dos materiais aplicados num relatório (Corretiva).
+  // Casa por NOME do item (o campo do relatório é autocomplete do catálogo).
+  // Materiais fora do catálogo não baixam. Gera saída + histórico e loga.
+  const handleConsumeReportMaterials = async (
+    materials: { nome: string; quantidade: number }[],
+    contexto?: { numero?: string; clienteNome?: string }
+  ) => {
+    if (!materials || materials.length === 0) return;
+    const norm = (s: string) => s.trim().toLowerCase();
+    // Consolida quantidades por item (caso o mesmo material apareça em vários cards).
+    const porItem = new Map<string, number>();
+    for (const m of materials) {
+      const q = Math.max(0, Math.floor(Number(m.quantidade) || 0));
+      if (!m.nome || q <= 0) continue;
+      porItem.set(m.nome, (porItem.get(m.nome) || 0) + q);
+    }
+    for (const [nome, q] of porItem) {
+      const item = inventory.find((i) => norm(i.name) === norm(nome));
+      if (!item || item.stockManaged === false) continue; // fora do catálogo / não gerenciado
+      const newQty = Math.max(0, (item.quantity || 0) - q);
+      const updated: InventoryItem = { ...item, quantity: newQty };
+      setInventory((prev) => prev.map((x) => (x.id === item.id ? updated : x)));
+      const note =
+        `Consumo em relatório${contexto?.numero ? ` ${contexto.numero}` : ''}` +
+        `${contexto?.clienteNome ? ` — ${contexto.clienteNome}` : ''}`;
+      if (isSupabaseConfigured()) {
+        try {
+          await updateInventoryItem(updated);
+          try {
+            await insertStockMovement({
+              id: '',
+              itemId: item.id,
+              itemCode: item.code,
+              itemName: item.name,
+              type: 'saida',
+              quantity: q,
+              resultingBalance: newQty,
+              note,
+            });
+          } catch (e) {
+            console.warn('Baixa aplicada, mas o histórico de movimentação não foi gravado:', e);
+          }
+        } catch (e) {
+          console.error('Falha ao baixar o estoque do material do relatório:', e);
+        }
+      }
+      logAction('Baixa de Estoque (Relatório)', 'Estoque', `Saída de ${q} un de ${item.code} - ${item.name} (saldo ${newQty})`);
+    }
+  };
+
   const handleSelectClientForReport = (clientName: string) => {
     setTechnicalReport((prev) => ({
       ...prev,
@@ -832,6 +883,7 @@ export function CrmApp({
               suppliers={suppliers}
               onUpdateSupplier={handleUpdateSupplier}
               onDeletePartnerBrand={handleDeletePartnerBrand}
+              onConsumeMaterials={handleConsumeReportMaterials}
             />
           )}
 
