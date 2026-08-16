@@ -1,5 +1,7 @@
 'use client';
 
+// Motor de formulário por template (renderer). onCreateCatalogo é threadeado
+// FormEngine -> Repeater/FieldControl para o "Cadastrar novo…" dos comboboxes.
 import React, { useState } from 'react';
 import {
   TemplateSchema,
