@@ -1029,10 +1029,26 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     }
     if (errs.name || errs.category || errs.unit) return;
 
+    // Finalização automática de cadastro provisório: quando o item veio de um
+    // cadastro em campo (código "PROV-…") e agora tem fornecedor e custo/preço,
+    // troca o código provisório por um definitivo e sai da lista de pendentes.
+    // Enquanto faltar fornecedor/preço, permanece pendente.
+    const eraProvisorio = editingItem
+      ? /^PROV-/i.test(editingItem.code || '') || editingItem.pendenteValidacao === true
+      : false;
+    const finalizandoAgora =
+      eraProvisorio && supplier.trim() !== '' && (Number(costPrice) > 0 || Number(salePrice) > 0);
+    const codigoFinal =
+      finalizandoAgora && /^PROV-/i.test(code || '') ? generateCode(category) : code || generateCode(category);
+    // Ao finalizar, remove o aviso "Cadastro iniciado em campo…" da descrição.
+    const descricaoFinal = finalizandoAgora
+      ? (description || '').replace(/^Cadastro iniciado em campo[^]*?(?: — |$)/, '').trim()
+      : description;
+
     const seq = (invSeq++).toString();
     const payload: InventoryItem = {
       id: editingItem ? editingItem.id : `inv-${seq}`,
-      code: code || generateCode(category),
+      code: codigoFinal,
       serialBP: editingItem ? editingItem.serialBP : `BP-EQUIP-${seq}00`,
       name,
       category,
@@ -1053,7 +1069,8 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
       reservedQuantity: stockManaged ? Number(reservedQuantity) : undefined,
       brand: brand || undefined,
       model: model || undefined,
-      description: description || undefined,
+      description: descricaoFinal || undefined,
+      pendenteValidacao: finalizandoAgora ? false : eraProvisorio ? true : undefined,
     };
     try {
       setSaving(true);
@@ -1354,6 +1371,18 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
 
             {/* Corpo rolável */}
             <form onSubmit={handleSave} className="overflow-y-auto px-6 py-5 space-y-5 text-xs font-medium flex-1">
+              {/* Aviso de finalização de cadastro provisório (originado em campo) */}
+              {editingItem && (/^PROV-/i.test(editingItem.code || '') || editingItem.pendenteValidacao === true) && (
+                <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 flex items-start gap-2">
+                  <span className="material-symbols-outlined text-lg text-amber-600">pending</span>
+                  <p className="text-[11px] text-amber-900 leading-relaxed">
+                    <strong>Cadastro pendente iniciado em campo.</strong> Informe o <strong>fornecedor</strong> e o{' '}
+                    <strong>custo ou preço de venda</strong> e salve: o código provisório <span className="font-data-mono">{editingItem.code}</span> será
+                    substituído por um definitivo automaticamente e o item sai da lista de pendentes.
+                  </p>
+                </div>
+              )}
+
               {/* FOTO */}
               <div className={cardCls}>
                 <SectionTitle icon="photo_camera">Foto do produto</SectionTitle>
