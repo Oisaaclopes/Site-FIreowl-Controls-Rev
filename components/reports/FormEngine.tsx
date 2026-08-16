@@ -28,6 +28,7 @@ export interface CatalogSources {
   categorias: string[];
   itens: string[]; // Estoque + Serviços (labels)
   marcas: string[];
+  modelos?: string[]; // modelos cadastrados no estoque
   devices: { id: string; label: string }[];
   contratos: { id: string; label: string }[];
   pendenciasAprovadas: { id: string; label: string }[];
@@ -54,6 +55,8 @@ function catalogOptions(field: FieldSchema, catalog: CatalogSources): string[] {
       return catalog.itens;
     case 'marcas':
       return catalog.marcas;
+    case 'modelos':
+      return catalog.modelos || [];
     case 'devices':
       return catalog.devices.map((d) => d.label);
     case 'contratos':

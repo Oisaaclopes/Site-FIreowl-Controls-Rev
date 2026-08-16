@@ -182,9 +182,12 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     if (!isSupabaseConfigured()) return;
     try {
       let rows = await fetchTemplates();
-      // Semeia (upsert idempotente por código) quando o banco tem menos templates
-      // que o pacote — cobre a 1ª carga e a chegada de novas disciplinas.
-      if (rows.length < ALL_TEMPLATES.length && userRole === 'ADMINISTRATIVO') {
+      // Admin re-sincroniza os templates empacotados (upsert idempotente por
+      // código): propaga tanto novas disciplinas quanto MUDANÇAS de schema
+      // (ex.: split de campo). Enquanto os templates evoluem, isso mantém o
+      // banco alinhado ao código. (Quando estabilizar, dá para trocar por
+      // versionamento e semear só quando a versão mudar.)
+      if (userRole === 'ADMINISTRATIVO') {
         await seedReportTemplates();
         rows = await fetchTemplates();
       }
@@ -237,6 +240,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       categorias: uniq([...GRUPOS_FALHA, ...inventory.map((i) => i.category), ...services.map((s) => s.category)]),
       itens: uniq([...inventory.map((i) => i.name), ...services.map((s) => s.title)]),
       marcas: uniq([...brands.map((b) => b.name), ...inventory.map((i) => i.brand || '')]),
+      modelos: uniq(inventory.map((i) => i.model || '')),
       devices: [],
       contratos: contracts.map((c) => ({ id: c.id, label: `${c.contractType || c.unit} (${c.id})` })),
       pendenciasAprovadas: [],
