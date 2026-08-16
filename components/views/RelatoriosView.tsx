@@ -99,8 +99,8 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 
   // Wizard "+ Novo relatório"
   const [wizardStep, setWizardStep] = useState<0 | 1 | 2 | 3>(0);
-  const [wTipo, setWTipo] = useState<string>(''); // tipo do template escolhido
-  const [wCodigo, setWCodigo] = useState<string>(''); // código do template escolhido
+  const [wTipo, setWTipo] = useState<string>(''); // LEVANTAMENTO | CORRETIVA | PREVENTIVA
+  const [wArea, setWArea] = useState<string>(''); // disciplina (SDAI, CFTV, ...)
   const [wClienteId, setWClienteId] = useState<string>('');
   const [wContratoId, setWContratoId] = useState<string>('');
   const [wOsId, setWOsId] = useState<string>('');
@@ -313,7 +313,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   // ---- Wizard ----
   const openWizard = () => {
     setWTipo('');
-    setWCodigo('');
+    setWArea('');
     setWClienteId(clients[0]?.id || '');
     setWContratoId('');
     setWOsId('');
@@ -322,9 +322,10 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const closeWizard = () => setWizardStep(0);
 
   const startForm = () => {
-    const loaded = templates.find((t) => t.schema.codigo === wCodigo) || null;
+    // Resolve o template pela combinação Tipo + Área.
+    const loaded =
+      templates.find((t) => t.schema.tipo === wTipo && (t.schema.area || 'SDAI') === wArea) || null;
     if (!loaded) return;
-    // A área da corretiva vem do próprio template (disciplina).
     const areaTemplate = (loaded.schema.area as Device['sistema']) || 'SDAI';
     setFormTemplate(loaded.schema);
     setFormTemplateId(loaded.id);
@@ -700,29 +701,68 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
             </div>
 
             <div className="p-5 overflow-y-auto">
-              {/* Passo 1 — Tipo/disciplina (um card por template) */}
+              {/* Passo 1 — Tipo (cartões) + Área (chips) */}
               {wizardStep === 1 && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                  {templates.map(({ schema: t }) => (
-                    <button
-                      key={t.codigo}
-                      onClick={() => {
-                        setWTipo(t.tipo);
-                        setWCodigo(t.codigo);
-                        setWizardStep(2);
-                      }}
-                      className="border-2 border-slate-200 rounded-xl p-3 text-left hover:border-[#1A1A72] hover:bg-[#1A1A72]/5 transition-colors"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="material-symbols-outlined text-xl text-[#1A1A72]">
-                          {t.tipo === 'LEVANTAMENTO' ? 'search' : t.tipo === 'CORRETIVA' ? 'build' : 'fact_check'}
-                        </span>
-                        <span className="text-[8px] font-bold uppercase tracking-wide text-slate-400">{t.area || 'SDAI'}</span>
-                      </div>
-                      <p className="font-bold text-slate-900 text-[12px] mt-1.5 leading-tight">{t.nome}</p>
-                      <p className="text-[9px] text-slate-500 mt-0.5 uppercase tracking-wide">{TIPO_LABEL[t.tipo]}</p>
-                    </button>
-                  ))}
+                <div className="space-y-5">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">1. Tipo de relatório</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      {[
+                        { id: 'CORRETIVA', label: 'Manutenção Corretiva', icon: 'build' },
+                        { id: 'LEVANTAMENTO', label: 'Levantamento (Orçamento)', icon: 'search' },
+                        { id: 'PREVENTIVA', label: 'Manutenção Preventiva', icon: 'fact_check' },
+                      ].map((t) => {
+                        const on = wTipo === t.id;
+                        return (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => setWTipo(t.id)}
+                            aria-pressed={on}
+                            className={`border-2 rounded-xl p-4 text-left transition-colors ${
+                              on ? 'border-[#1A1A72] bg-[#1A1A72]/5' : 'border-slate-200 hover:border-[#1A1A72]/50'
+                            }`}
+                          >
+                            <span className={`material-symbols-outlined text-2xl ${on ? 'text-[#1A1A72]' : 'text-slate-400'}`}>{t.icon}</span>
+                            <p className="font-bold text-slate-900 text-[13px] mt-2 leading-tight">{t.label}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">2. Selecione a área</p>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { id: 'SDAI', label: 'SDAI' },
+                        { id: 'CFTV', label: 'CFTV' },
+                        { id: 'ALARME', label: 'Alarme' },
+                        { id: 'CONTROLE_ACESSO', label: 'Controle de Acesso' },
+                        { id: 'BMS', label: 'BMS (Automação)' },
+                      ].map((a) => {
+                        const on = wArea === a.id;
+                        return (
+                          <button
+                            key={a.id}
+                            type="button"
+                            onClick={() => setWArea(a.id)}
+                            aria-pressed={on}
+                            className={`px-4 py-2 rounded-full text-xs font-semibold border transition-colors ${
+                              on ? 'bg-[#E63946] text-white border-[#E63946] shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-[#E63946]'
+                            }`}
+                          >
+                            {a.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {wTipo && wArea && (
+                      <p className="text-[10px] text-slate-400 mt-2">
+                        Selecionado: <b className="text-slate-600">{TIPO_LABEL[wTipo]} · {wArea === 'CONTROLE_ACESSO' ? 'Controle de Acesso' : wArea === 'BMS' ? 'BMS' : wArea === 'ALARME' ? 'Alarme' : wArea}</b>
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -856,6 +896,15 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
               >
                 {wizardStep > 1 ? 'Voltar' : 'Cancelar'}
               </button>
+              {wizardStep === 1 && (
+                <button
+                  onClick={() => setWizardStep(2)}
+                  disabled={!wTipo || !wArea}
+                  className="px-5 py-2 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] disabled:opacity-50 text-white text-xs font-semibold uppercase tracking-wide"
+                >
+                  Próximo
+                </button>
+              )}
               {wizardStep === 2 && (
                 <button
                   onClick={() => setWizardStep(3)}
