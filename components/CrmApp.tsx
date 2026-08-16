@@ -91,6 +91,8 @@ interface CrmAppProps {
   userName?: string;
   userEmail?: string;
   userSchedule?: WorkSchedule;
+  /** Aba inicial (vem da URL /funcionarios/<aba>). */
+  initialTab?: TabPath;
   onLogout?: () => void;
 }
 
@@ -99,9 +101,12 @@ export function CrmApp({
   userName = 'Operador Fireowl',
   userEmail = '',
   userSchedule,
+  initialTab,
   onLogout,
 }: CrmAppProps) {
-  const [currentTab, setCurrentTab] = useState<TabPath>(allowedTabs(initialRole)[0]);
+  const [currentTab, setCurrentTab] = useState<TabPath>(() =>
+    initialTab && isTabAllowed(initialRole, initialTab) ? initialTab : allowedTabs(initialRole)[0]
+  );
   const [userRole, setUserRole] = useState<UserRole>(initialRole);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // menu off-canvas (mobile)
@@ -114,6 +119,42 @@ export function CrmApp({
       setCurrentTab(allowedTabs(userRole)[0]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userRole]);
+
+  // URL por aba: cada aba tem seu link (/funcionarios/<aba>). Mantém a barra de
+  // endereços em sincronia com a aba ativa e habilita voltar/avançar do
+  // navegador. `skipUrlSync` evita empurrar histórico quando a mudança veio do
+  // próprio popstate; a primeira sincronização usa replaceState (normaliza a
+  // URL sem criar uma entrada extra).
+  const skipUrlSync = React.useRef(false);
+  const firstUrlSync = React.useRef(true);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (skipUrlSync.current) {
+      skipUrlSync.current = false;
+      firstUrlSync.current = false;
+      return;
+    }
+    const path = `/funcionarios/${currentTab}/`;
+    if (window.location.pathname !== path) {
+      if (firstUrlSync.current) window.history.replaceState({ tab: currentTab }, '', path);
+      else window.history.pushState({ tab: currentTab }, '', path);
+    }
+    firstUrlSync.current = false;
+  }, [currentTab]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onPop = () => {
+      const seg = window.location.pathname.split('/').filter(Boolean); // ['funcionarios','<aba>']
+      const tab = seg[1] as TabPath | undefined;
+      if (tab && isTabAllowed(userRole, tab)) {
+        skipUrlSync.current = true;
+        setCurrentTab(tab);
+      }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
   }, [userRole]);
 
   // System State Data

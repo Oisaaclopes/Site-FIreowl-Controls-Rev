@@ -25,7 +25,7 @@ import { fetchOrdensServico } from '@/lib/ordensServico';
 import { fetchCicloAtivo, quotaPorVisita } from '@/lib/ciclos';
 import { flushOutbox, pendingCount, isOnline } from '@/lib/offline/reportSync';
 import { EmptyState } from '@/components/EmptyState';
-import { GRUPOS_FALHA } from '@/lib/catalogoFalhas';
+import { GRUPOS_FALHA, falhasPorArea, AreaFalha } from '@/lib/catalogoFalhas';
 import { fetchTemplates } from '@/lib/reportTemplates';
 import { gerarPdfExecucao } from '@/lib/reportPdf';
 import { NovaProposta } from '@/components/reports/NovaProposta';
@@ -385,8 +385,16 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 
   // Catálogo do formulário: base + pendências aprovadas do cliente escolhido
   // (para a Corretiva). Derivado sem mutar o catalog memoizado.
+  //
+  // Grupos de falha limitados à ÁREA do relatório (ex.: Levantamento SDAI só
+  // mostra grupos "SDAI > ...", nunca CFTV/BMS/CA/Alarme). Os apontamentos e a
+  // triagem de fotos passam a listar apenas a disciplina certa. As categorias
+  // de estoque/serviços (genéricas, sem área) seguem disponíveis.
+  const formArea = ((formTemplate?.area as AreaFalha) || 'SDAI') as AreaFalha;
+  const gruposDaArea = uniq(falhasPorArea(formArea).map((f) => f.grupo));
   const formCatalog: CatalogSources = {
     ...catalog,
+    categorias: uniq([...gruposDaArea, ...inventory.map((i) => i.category), ...services.map((s) => s.category)]),
     // Dispositivos da área escolhida (Corretiva) — alimenta "dispositivos afetados".
     devices: formAreaDevices.map((d) => ({
       id: d.id,

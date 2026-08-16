@@ -5,9 +5,12 @@ import { Client, UserRole, Pendencia, AcaoRecomendada, GeoPoint, Device, CicloAm
 import { getGeoPoint } from '@/lib/geo';
 import {
   TemplateSchema,
+  SectionSchema,
+  FieldSchema,
   FormValues,
   RepeaterCard,
   isNegativeAnswer,
+  isFieldVisibleForRole,
   validateFinalize,
   FinalizeIssue,
 } from '@/lib/reportSchema';
@@ -245,8 +248,55 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       setSectionErr(`Preencha: ${faltando.label || faltando.key}`);
       return;
     }
+    // Fotos são obrigatórias para avançar (pedido do usuário): não deixa passar
+    // para a próxima etapa sem postar a evidência, evitando perder o trabalho.
+    const faltaFoto = missingPhotoInSection(currentSection);
+    if (faltaFoto) {
+      setSectionErr(`Adicione a foto antes de avançar: ${faltaFoto}`);
+      return;
+    }
     setSectionErr(null);
     setCurrentIdx(Math.min(visibleSections.length - 1, idx + 1));
+  };
+
+  // Primeiro campo de foto ainda vazio na seção: campo de foto no topo da seção
+  // ou dentro de um card de repeater já iniciado (apontamentos, intervenções,
+  // dispositivos). Retorna o rótulo do pendente, ou null se está tudo postado.
+  const missingPhotoInSection = (section?: SectionSchema): string | null => {
+    if (!section) return null;
+    const cardStarted = (schema: FieldSchema[], card: RepeaterCard) =>
+      schema.some((cf) => {
+        if (cf.tipo === 'foto') return false;
+        const v = card[cf.key];
+        if (v === undefined || v === null || v === '') return false;
+        if (Array.isArray(v) && v.length === 0) return false;
+        return true;
+      });
+    const cardFotoOk = (card: RepeaterCard, key: string) => {
+      const v = card[key];
+      return Array.isArray(v) ? v.length > 0 : !!v;
+    };
+    for (const f of section.campos) {
+      if (!isFieldVisibleForRole(f, roleForEngine)) continue;
+      if (f.tipo === 'foto') {
+        if (!hasPhoto(f.key)) return f.label || f.key;
+        continue;
+      }
+      // Só os repeaters de itens adicionados pelo técnico (apontamentos,
+      // dispositivos, intervenções). Os checklists auto-semeados (preventiva/
+      // corretiva) não entram — a foto ali é condicional, não bloqueante.
+      if (f.tipo !== 'repeater') continue;
+      const schema = f.card_schema || [];
+      const fotoFields = schema.filter((cf) => cf.tipo === 'foto');
+      if (fotoFields.length === 0) continue;
+      const cards = Array.isArray(values[f.key]) ? (values[f.key] as RepeaterCard[]) : [];
+      for (let i = 0; i < cards.length; i++) {
+        if (!cardStarted(schema, cards[i])) continue; // card em branco não bloqueia
+        const faltando = fotoFields.find((cf) => !cardFotoOk(cards[i], cf.key));
+        if (faltando) return `${f.label || f.key} #${i + 1} — ${faltando.label || 'Foto'}`;
+      }
+    }
+    return null;
   };
 
   const onCamFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
