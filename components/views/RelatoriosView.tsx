@@ -476,11 +476,14 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       categorias: uniq([...GRUPOS_FALHA, ...inventory.map((i) => i.category), ...services.map((s) => s.category)]),
       itens: uniq([...inventory.map((i) => i.name), ...services.map((s) => s.title)]),
       marcas: uniqCI([...brands.map((b) => b.name), ...inventory.map((i) => i.brand || '')]),
-      modelos: uniq(inventory.map((i) => i.model || '')),
+      // Modelo do produto; quando o item não tem "modelo" preenchido (ex.: os
+      // catálogos importados de Intelbras/Tecnohold), cai para o NOME — assim a
+      // central/detector aparece no campo "modelo" mesmo sem coluna de modelo.
+      modelos: uniqCI(inventory.map((i) => (i.model || i.name || '').trim())),
       // Agrupa modelos por marca (do estoque) para filtrar o campo modelo.
       modelosPorMarca: inventory.reduce<Record<string, string[]>>((acc, i) => {
         const marca = (i.brand || '').trim();
-        const modelo = (i.model || '').trim();
+        const modelo = (i.model || '').trim() || (i.name || '').trim();
         if (!marca || !modelo) return acc;
         if (!acc[marca]) acc[marca] = [];
         if (!acc[marca].includes(modelo)) acc[marca].push(modelo);

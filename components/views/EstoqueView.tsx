@@ -1002,12 +1002,20 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     (i) => /^PROV-/i.test(i.code || '') || i.pendenteValidacao === true
   ).length;
 
-  // Catálogos com produtos ainda não importados (um banner por catálogo).
+  // Catálogos com produtos a importar OU a completar (modelo/marca/fornecedor
+  // faltando num item já cadastrado). Um banner por catálogo.
   const catalogosPendentes = PRODUCT_CATALOGS.map((cfg) => ({
     cfg,
-    faltam: cfg.produtos.filter(
-      (p) => !inventory.some((i) => (i.code || '').toUpperCase() === p.code.toUpperCase())
-    ).length,
+    faltam: cfg.produtos.filter((p) => {
+      const ex = inventory.find((i) => (i.code || '').toUpperCase() === p.code.toUpperCase());
+      if (!ex) return true; // ainda não importado
+      // já existe, mas falta modelo/marca/fornecedor
+      return (
+        (!!p.model && !(ex.model || '').trim()) ||
+        (!!cfg.brand && !(ex.brand || '').trim()) ||
+        (!!cfg.supplier && !(ex.supplier || '').trim())
+      );
+    }).length,
   })).filter((c) => c.faltam > 0);
 
   const term = searchTerm.toLowerCase();
@@ -1113,6 +1121,7 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
       return;
     setImporting(true);
     let added = 0;
+    let updated = 0;
     let skipped = 0;
     try {
       // Cria o fornecedor, se ele ainda não existe no módulo Fornecedores.
@@ -1123,10 +1132,22 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
           console.warn('Falha ao criar o fornecedor do catálogo (segue com os produtos):', e);
         }
       }
-      const existentes = new Set(inventory.map((i) => (i.code || '').toUpperCase()));
+      const existentes = new Map(inventory.map((i) => [(i.code || '').toUpperCase(), i]));
       for (const p of cfg.produtos) {
-        if (existentes.has(p.code.toUpperCase())) {
-          skipped++;
+        const ex = existentes.get(p.code.toUpperCase());
+        if (ex) {
+          // Já cadastrado: completa modelo/marca/fornecedor que estejam faltando,
+          // SEM tocar em preço/quantidade (não sobrescreve o que você ajustou).
+          const patch: Partial<InventoryItem> = {};
+          if (p.model && !(ex.model || '').trim()) patch.model = p.model;
+          if (cfg.brand && !(ex.brand || '').trim()) patch.brand = cfg.brand;
+          if (cfg.supplier && !(ex.supplier || '').trim()) patch.supplier = cfg.supplier;
+          if (Object.keys(patch).length > 0 && onUpdateInventoryItem) {
+            await onUpdateInventoryItem({ ...ex, ...patch });
+            updated++;
+          } else {
+            skipped++;
+          }
           continue;
         }
         const cost = p.costPrice;
@@ -1150,14 +1171,15 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
           markup: mk,
           stockManaged: true,
           brand: cfg.brand,
+          model: p.model || undefined,
           description: p.indisponivel ? 'Indisponível no fornecedor no momento da importação.' : undefined,
         };
         await onAddInventoryItem(item);
         added++;
       }
       alert(
-        `Catálogo ${cfg.label} importado: ${added} produto(s) adicionado(s)` +
-          (skipped ? `, ${skipped} já existiam (ignorados).` : '.')
+        `Catálogo ${cfg.label}: ${added} adicionado(s), ${updated} atualizado(s)` +
+          (skipped ? `, ${skipped} sem alteração.` : '.')
       );
     } catch (err) {
       console.error('Falha ao importar o catálogo:', err);
@@ -1354,8 +1376,9 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
           <div className="flex items-start gap-2 text-xs text-[#1A1A72]">
             <span className="material-symbols-outlined text-lg">download</span>
             <span>
-              <strong>Catálogo {cfg.label} (fornecedor {cfg.supplier}):</strong> {faltam} produto(s) prontos para importar
-              com {cfg.margem}% de margem. Depois de importar, também aparecem na lista pré-pronta da preventiva SDAI.
+              <strong>Catálogo {cfg.label} (fornecedor {cfg.supplier}):</strong> {faltam} produto(s) para importar ou
+              completar (modelo/marca/fornecedor), com {cfg.margem}% de margem. Assim as centrais e dispositivos aparecem
+              no campo de fabricante/modelo do relatório e na lista da preventiva.
             </span>
           </div>
           <button
