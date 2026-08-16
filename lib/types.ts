@@ -341,6 +341,9 @@ export interface InventoryItem {
   brand?: string;
   model?: string;
   description?: string;
+  /** Cadastro provisório iniciado em campo (relatório). O marcador persistido é
+   * o código "PROV-…"; este flag é a conveniência em memória na sessão. */
+  pendenteValidacao?: boolean;
 }
 
 export interface StockMovement {

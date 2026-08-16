@@ -48,9 +48,55 @@ interface RelatoriosViewProps {
   onAddClient?: (newClient: Client) => void;
   /** Cadastra uma nova marca (usado pelo "Cadastrar nova marca" dos comboboxes). */
   onAddBrand?: (name: string) => void;
+  /** Cadastra um produto (usado pelo cadastro provisório de produto em campo). */
+  onAddInventoryItem?: (item: InventoryItem) => void | Promise<void>;
 }
 
 const uniq = (arr: string[]) => Array.from(new Set(arr.filter(Boolean)));
+
+// Categoria de estoque sugerida a partir da área/disciplina do relatório.
+const AREA_TO_CATEGORY: Record<string, string> = {
+  SDAI: 'SDAI',
+  CFTV: 'CFTV',
+  CONTROLE_ACESSO: 'Controle de Acesso',
+  ALARME: 'Alarme de Intrusão',
+  BMS: '',
+};
+
+// Monta um produto PROVISÓRIO a partir do cadastro em campo. Vai para o Estoque
+// já visível, mesmo sem fornecedor/custo — o código "PROV-…" e a descrição
+// sinalizam que o cadastro precisa ser finalizado depois. Não exige migração:
+// o marcador viaja no próprio código (persiste no banco e sobrevive ao reload).
+function buildProvisionalInventory(data: {
+  name: string;
+  brand?: string;
+  model?: string;
+  unit?: string;
+  description?: string;
+  area?: string;
+}): InventoryItem {
+  const rand = Math.floor(1000 + Math.random() * 9000);
+  const note = 'Cadastro iniciado em campo (relatório). Finalize no Estoque: informe fornecedor, custo e preço de venda.';
+  return {
+    id: `inv_prov_${Date.now()}`,
+    code: `PROV-${rand}`,
+    name: data.name,
+    category: AREA_TO_CATEGORY[data.area || 'SDAI'] ?? '',
+    quantity: 0,
+    minQuantity: 0,
+    unitPrice: 0,
+    supplier: '',
+    location: '',
+    unit: data.unit || undefined,
+    brand: data.brand || undefined,
+    model: data.model || undefined,
+    description: data.description ? `${note} — ${data.description}` : note,
+    stockManaged: true,
+    salePrice: 0,
+    costPrice: undefined,
+    pendenteValidacao: true,
+  };
+}
 const olderThan15d = (iso?: string) => !!iso && Date.now() - new Date(iso).getTime() > 15 * 864e5;
 const shortId = (id: string) => `#${id.slice(0, 8)}`;
 const fmtDate = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '—');
@@ -76,6 +122,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   currentUserName = '',
   onAddClient,
   onAddBrand,
+  onAddInventoryItem,
 }) => {
   const isTecnico = userRole === 'TECNICO';
   const isFinanceiro = userRole === 'FINANCEIRO';
@@ -163,6 +210,55 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const [offlinePend, setOfflinePend] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [online, setOnline] = useState(true);
+
+  // Cadastro PROVISÓRIO de produto em campo (aba flutuante). Disparado ao
+  // "Cadastrar novo item/modelo" nos comboboxes do relatório; salva um produto
+  // pendente no Estoque para ser finalizado depois.
+  const [lastBrand, setLastBrand] = useState('');
+  const [provProdOpen, setProvProdOpen] = useState(false);
+  const [ppName, setPpName] = useState('');
+  const [ppBrand, setPpBrand] = useState('');
+  const [ppModel, setPpModel] = useState('');
+  const [ppUnit, setPpUnit] = useState('');
+  const [ppDesc, setPpDesc] = useState('');
+  const [ppSaving, setPpSaving] = useState(false);
+  const [ppDone, setPpDone] = useState<string | null>(null);
+
+  const openProvProduct = (name: string, origem: string) => {
+    // origem 'modelos' → o texto é o modelo (nome fica pro usuário completar);
+    // origem 'estoque_servicos' → o texto é o próprio nome do produto.
+    setPpName(origem === 'modelos' ? '' : name);
+    setPpModel(origem === 'modelos' ? name : '');
+    setPpBrand(lastBrand || '');
+    setPpUnit('');
+    setPpDesc('');
+    setPpDone(null);
+    setProvProdOpen(true);
+  };
+
+  const confirmProvProduct = async () => {
+    const nome = (ppName.trim() || ppModel.trim());
+    if (!nome || ppSaving) return;
+    const area = (formTemplate?.area as string) || 'SDAI';
+    const item = buildProvisionalInventory({
+      name: nome,
+      brand: ppBrand.trim() || undefined,
+      model: ppModel.trim() || undefined,
+      unit: ppUnit.trim() || undefined,
+      description: ppDesc.trim() || undefined,
+      area,
+    });
+    setPpSaving(true);
+    try {
+      await onAddInventoryItem?.(item);
+      setPpDone(nome);
+    } catch (err) {
+      console.error('Falha ao salvar produto provisório no Estoque:', err);
+      alert('Não foi possível enviar o produto ao Estoque. Tente novamente.');
+    } finally {
+      setPpSaving(false);
+    }
+  };
 
   const clientName = (id?: string) => clients.find((c) => c.id === id)?.name || '—';
 
@@ -416,9 +512,128 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     (o) => o.clienteId === wClienteId && ['aberta', 'agendada', 'em_execucao'].includes(o.status)
   );
 
+  // Aba flutuante do cadastro provisório de produto (renderizada por cima do
+  // formulário e do índice). Some fornecedor/custo: são preenchidos no Estoque.
+  const marcaOptions = uniq([...(brands?.map((b) => b.name) || []), ...inventory.map((i) => i.brand || '')]);
+  const provPanel = provProdOpen ? (
+    <div className="fixed inset-0 z-[80] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white w-full max-w-md rounded-xl shadow-2xl border border-slate-200 max-h-[92vh] flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[#E63946]">inventory_2</span>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 uppercase">Cadastro rápido de produto</h3>
+              <p className="text-[11px] text-slate-500">Vai para o Estoque como pendente</p>
+            </div>
+          </div>
+          <button onClick={() => setProvProdOpen(false)} className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none">✕</button>
+        </div>
+
+        {ppDone ? (
+          <div className="p-6 text-center">
+            <span className="material-symbols-outlined text-5xl text-emerald-500">task_alt</span>
+            <h4 className="text-base font-bold text-slate-900 mt-2">Produto enviado ao Estoque</h4>
+            <p className="text-xs text-slate-500 mt-1">
+              <b>{ppDone}</b> foi criado como <b>cadastro pendente</b>. Abra a aba <b>Estoque</b> quando puder para
+              informar fornecedor, custo e preço de venda e finalizar o cadastro.
+            </p>
+            <button
+              onClick={() => setProvProdOpen(false)}
+              className="mt-4 px-6 py-2.5 rounded-lg bg-[#1A1A72] text-white text-xs font-semibold uppercase tracking-wide"
+            >
+              Continuar relatório
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="p-4 overflow-y-auto space-y-3">
+              <div>
+                <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Nome do produto *</label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={ppName}
+                  onChange={(e) => setPpName(e.target.value)}
+                  placeholder="Ex.: Detector óptico endereçável"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Marca</label>
+                  <input
+                    type="text"
+                    list="prov-marcas"
+                    value={ppBrand}
+                    onChange={(e) => setPpBrand(e.target.value)}
+                    placeholder="Ex.: Tecnohold"
+                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                  />
+                  <datalist id="prov-marcas">
+                    {marcaOptions.map((m) => (
+                      <option key={m} value={m} />
+                    ))}
+                  </datalist>
+                </div>
+                <div>
+                  <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Modelo</label>
+                  <input
+                    type="text"
+                    value={ppModel}
+                    onChange={(e) => setPpModel(e.target.value)}
+                    placeholder="Ex.: TH-2000"
+                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Unidade (opcional)</label>
+                <input
+                  type="text"
+                  value={ppUnit}
+                  onChange={(e) => setPpUnit(e.target.value)}
+                  placeholder="Ex.: UN, PC, M"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs font-data-mono focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Observação (opcional)</label>
+                <textarea
+                  rows={2}
+                  value={ppDesc}
+                  onChange={(e) => setPpDesc(e.target.value)}
+                  placeholder="Detalhe técnico que ajude a finalizar o cadastro depois…"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs resize-none focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                />
+              </div>
+              <p className="text-[10px] text-slate-500 flex items-start gap-1 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                <span className="material-symbols-outlined text-sm text-amber-600">info</span>
+                <span>Você não precisa do fornecedor nem do preço agora. O produto vai para o Estoque marcado como <b>pendente</b> para você finalizar com calma.</span>
+              </p>
+            </div>
+            <div className="flex items-center justify-between p-4 border-t border-slate-100">
+              <button onClick={() => setProvProdOpen(false)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 uppercase">
+                Cancelar
+              </button>
+              <button
+                onClick={confirmProvProduct}
+                disabled={!(ppName.trim() || ppModel.trim()) || ppSaving}
+                className="px-5 py-2 rounded-lg bg-[#E63946] hover:bg-[#a51515] disabled:opacity-50 text-white text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5"
+              >
+                {ppSaving && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
+                {ppSaving ? 'Enviando…' : 'Enviar ao Estoque'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  ) : null;
+
   // ===== Formulário aberto =====
   if (mode === 'form' && formTemplate) {
     return (
+      <>
       <ReportForm
         template={formTemplate}
         templateId={formTemplateId}
@@ -431,13 +646,22 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         pendenciasAprovadas={formPendAprovadas}
         ciclo={formCiclo}
         onCreateCatalogo={(origem, name) => {
-          if (origem === 'marcas') onAddBrand?.(name);
-          // 'modelos'/'estoque_servicos': o valor é capturado no relatório; a
-          // criação no catálogo global fica para uma fatia futura.
+          if (origem === 'marcas') {
+            onAddBrand?.(name);
+            setLastBrand(name); // prefila a marca no cadastro de produto seguinte
+            return;
+          }
+          // Item/material ou modelo novo → abre o cadastro provisório de produto,
+          // que persiste no Estoque como pendente para finalizar depois.
+          if (origem === 'modelos' || origem === 'estoque_servicos') {
+            openProvProduct(name, origem);
+          }
         }}
         onBack={() => setMode('index')}
         onSaved={refresh}
       />
+      {provPanel}
+      </>
     );
   }
 
@@ -943,6 +1167,8 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
           </div>
         </div>
       )}
+
+      {provPanel}
     </div>
   );
 };

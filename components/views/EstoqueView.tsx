@@ -492,6 +492,9 @@ const StockItemCard: React.FC<{
   const [menuOpen, setMenuOpen] = useState(false);
   const price = item.salePrice ?? item.unitPrice ?? 0;
   const esgotado = item.quantity <= 0;
+  // Produto criado provisoriamente em campo (relatório): falta finalizar
+  // (fornecedor, custo, preço). Marcador persistido no código "PROV-…".
+  const provisorio = /^PROV-/i.test(item.code || '') || item.pendenteValidacao === true;
 
   // Edição in-line dos dados financeiros
   const [editingFin, setEditingFin] = useState(false);
@@ -527,7 +530,7 @@ const StockItemCard: React.FC<{
   );
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col md:flex-row md:items-center gap-4 hover:shadow-md hover:border-slate-300 transition-all">
+    <div className={`bg-white rounded-xl border p-4 flex flex-col md:flex-row md:items-center gap-4 hover:shadow-md transition-all ${provisorio ? 'border-amber-300 bg-amber-50/40 hover:border-amber-400' : 'border-slate-200 hover:border-slate-300'}`}>
       {/* Esquerda: imagem + dados */}
       <div className="flex items-center gap-3 flex-1 min-w-0">
         {item.imageUrl ? (
@@ -635,7 +638,15 @@ const StockItemCard: React.FC<{
           )}
         </div>
 
-        {esgotado ? (
+        {provisorio ? (
+          <span
+            title="Cadastro iniciado em campo. Clique em editar para informar fornecedor, custo e preço."
+            className="shrink-0 px-2.5 py-1 rounded-full border border-amber-400 bg-amber-100 text-amber-800 text-[10px] font-bold uppercase tracking-wide inline-flex items-center gap-1"
+          >
+            <span className="material-symbols-outlined text-xs">pending</span>
+            Cadastro pendente
+          </span>
+        ) : esgotado ? (
           <span className="shrink-0 px-2.5 py-1 rounded-full border border-[#E63946] text-[#E63946] text-[10px] font-bold uppercase tracking-wide">
             Esgotado
           </span>
@@ -980,6 +991,12 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     setMargin(sale > 0 ? round2(((sale - costPrice) / sale) * 100) : 0);
   };
 
+  // Produtos criados provisoriamente em campo (relatório), à espera de
+  // finalização (fornecedor/custo/preço).
+  const pendentesCount = inventory.filter(
+    (i) => /^PROV-/i.test(i.code || '') || i.pendenteValidacao === true
+  ).length;
+
   const term = searchTerm.toLowerCase();
   const filteredInventory = inventory
     // Aba "Lista de compras": só itens no nível mínimo ou abaixo
@@ -1236,6 +1253,27 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
           </p>
         </div>
       </div>
+
+      {/* Aviso: produtos iniciados em campo aguardando finalização */}
+      {pendentesCount > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex items-center gap-2 text-xs text-amber-900">
+            <span className="material-symbols-outlined text-lg text-amber-600">pending</span>
+            <span>
+              <strong>{pendentesCount}</strong> produto(s) criado(s) em campo aguardando finalização (fornecedor, custo e preço).
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              setShowSearch(true);
+              setSearchTerm('PROV-');
+            }}
+            className="shrink-0 px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold uppercase tracking-wide"
+          >
+            Ver pendentes
+          </button>
+        </div>
+      )}
 
       {/* Lista de produtos (List View) */}
       {loading ? (

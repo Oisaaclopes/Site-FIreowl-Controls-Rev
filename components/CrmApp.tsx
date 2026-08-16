@@ -827,6 +827,7 @@ export function CrmApp({
               currentUserName={userName}
               onAddClient={handleAddClient}
               onAddBrand={(name) => handleAddPartnerBrand({ id: `pb_${Date.now()}`, name, category: 'SDAI' })}
+              onAddInventoryItem={handleAddInventoryItem}
             />
           )}
 
