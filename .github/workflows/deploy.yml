@@ -24,6 +24,12 @@ jobs:
 
       - name: Gerar o build estático (pasta out/)
         run: npm run build
+        env:
+          # Chaves do Supabase embutidas no bundle do navegador (NEXT_PUBLIC_*).
+          # A anon key é pública por design (protegida por RLS), então pode ser
+          # embutida no site estático — mas fica como secret no GitHub.
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       - name: Publicar via FTP no Hostinger
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
