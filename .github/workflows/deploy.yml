@@ -1,0 +1,44 @@
+name: Deploy para o Hostinger
+
+# Roda a cada push na main (ou manualmente pelo botão "Run workflow").
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Instalar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Gerar o build estático (pasta out/)
+        run: npm run build
+
+      - name: Publicar via FTP no Hostinger
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          # Hostinger aceita FTPS (mais seguro). Se der erro de conexão,
+          # troque para: protocol: ftp
+          protocol: ftps
+          port: 21
+          security: loose
+          # Sobe o conteúdo do build para a raiz do site.
+          local-dir: ./out/
+          # Se a sua conta de FTP já abre dentro do public_html, troque para: /
+          server-dir: /public_html/
+          # Só envia o que mudou (sync incremental); remove arquivos apagados.
+          dangerous-clean-slate: false
