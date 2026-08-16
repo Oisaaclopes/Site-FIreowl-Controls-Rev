@@ -488,9 +488,27 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   // de estoque/serviços (genéricas, sem área) seguem disponíveis.
   const formArea = ((formTemplate?.area as AreaFalha) || 'SDAI') as AreaFalha;
   const gruposDaArea = uniq(falhasPorArea(formArea).map((f) => f.grupo));
+  // Lista pré-pronta de dispositivos (preventiva): produtos do Estoque da mesma
+  // disciplina do relatório, agrupados por subcategoria. Assim a preventiva SDAI
+  // oferece os dispositivos SDAI cadastrados (ex.: catálogo Intelbras/Vision).
+  const areaCategory = AREA_TO_CATEGORY[formArea] || '';
+  const dispositivosPadrao = (() => {
+    const grouped: Record<string, string[]> = {};
+    inventory
+      .filter((i) => areaCategory && i.category === areaCategory)
+      .forEach((i) => {
+        const g = i.subcategory || 'Outros';
+        if (!grouped[g]) grouped[g] = [];
+        if (!grouped[g].includes(i.name)) grouped[g].push(i.name);
+      });
+    return Object.entries(grouped)
+      .map(([grupo, itens]) => ({ grupo, itens: itens.sort((a, b) => a.localeCompare(b, 'pt-BR')) }))
+      .sort((a, b) => a.grupo.localeCompare(b.grupo, 'pt-BR'));
+  })();
   const formCatalog: CatalogSources = {
     ...catalog,
     categorias: uniq([...gruposDaArea, ...inventory.map((i) => i.category), ...services.map((s) => s.category)]),
+    dispositivosPadrao,
     // Dispositivos da área escolhida (Corretiva) — alimenta "dispositivos afetados".
     devices: formAreaDevices.map((d) => ({
       id: d.id,

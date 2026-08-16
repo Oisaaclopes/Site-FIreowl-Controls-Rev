@@ -3,6 +3,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { InventoryItem, StockMovement, Supplier } from '@/lib/types';
 import { insertStockMovement, fetchStockMovements, isSupabaseConfigured } from '@/lib/inventory';
+import {
+  INTELBRAS_VISION_SDAI,
+  MARCA_PADRAO,
+  FORNECEDOR_PADRAO,
+  MARGEM_PADRAO,
+} from '@/lib/catalogoIntelbrasVision';
 
 interface EstoqueViewProps {
   inventory: InventoryItem[];
@@ -740,6 +746,7 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
   const [showPanel, setShowPanel] = useState(false);
   const [showUnitModal, setShowUnitModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [errors, setErrors] = useState<{ name?: boolean; category?: boolean; unit?: boolean }>({});
   const fileRef = useRef<HTMLInputElement>(null);
@@ -1085,6 +1092,63 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     }
   };
 
+  // Importa o catálogo Intelbras (fornecedor Vision) em massa. O valor é o
+  // custo; aplica a margem padrão (40%) para calcular preço de venda e markup.
+  // Idempotente por código: itens já cadastrados são ignorados.
+  const handleImportCatalogo = async () => {
+    if (importing) return;
+    if (!window.confirm(
+      `Importar ${INTELBRAS_VISION_SDAI.length} produtos Intelbras (fornecedor ${FORNECEDOR_PADRAO}) com ${MARGEM_PADRAO}% de margem?\n\n` +
+        'Itens com código já cadastrado serão ignorados. Estoque entra zerado (ajuste depois).'
+    )) return;
+    setImporting(true);
+    const existentes = new Set(inventory.map((i) => (i.code || '').toUpperCase()));
+    let added = 0;
+    let skipped = 0;
+    try {
+      for (const p of INTELBRAS_VISION_SDAI) {
+        if (existentes.has(p.code.toUpperCase())) {
+          skipped++;
+          continue;
+        }
+        const cost = p.costPrice;
+        const sale = round2(cost / (1 - MARGEM_PADRAO / 100));
+        const mk = cost > 0 ? round2(((sale - cost) / cost) * 100) : 0;
+        const item: InventoryItem = {
+          id: `inv_cat_${p.code}`,
+          code: p.code,
+          name: p.name,
+          category: 'SDAI',
+          subcategory: p.subcategory || undefined,
+          quantity: 0,
+          minQuantity: 0,
+          unitPrice: sale,
+          supplier: FORNECEDOR_PADRAO,
+          location: '',
+          unit: 'UN — Unidade',
+          salePrice: sale,
+          costPrice: cost,
+          profitMargin: MARGEM_PADRAO,
+          markup: mk,
+          stockManaged: true,
+          brand: MARCA_PADRAO,
+          description: p.indisponivel ? 'Indisponível no fornecedor no momento da importação.' : undefined,
+        };
+        await onAddInventoryItem(item);
+        added++;
+      }
+      alert(
+        `Catálogo importado: ${added} produto(s) adicionado(s)` +
+          (skipped ? `, ${skipped} já existiam (ignorados).` : '.')
+      );
+    } catch (err) {
+      console.error('Falha ao importar o catálogo:', err);
+      alert(`Importação interrompida após ${added} item(ns). Verifique a conexão e tente novamente.`);
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const SaveButton = (
     <button
       type="button"
@@ -1179,6 +1243,20 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                       {criticalOnly ? 'check_box' : 'check_box_outline_blank'}
                     </span>
                     Somente nível crítico
+                  </button>
+                  <div className="my-1 h-px bg-slate-100" />
+                  <button
+                    onClick={() => {
+                      setShowHeaderMenu(false);
+                      handleImportCatalogo();
+                    }}
+                    disabled={importing}
+                    className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 disabled:opacity-60"
+                  >
+                    <span className={`material-symbols-outlined text-base text-[#1A1A72] ${importing ? 'animate-spin' : ''}`}>
+                      {importing ? 'progress_activity' : 'download'}
+                    </span>
+                    {importing ? 'Importando…' : 'Importar catálogo Intelbras (Vision)'}
                   </button>
                 </div>
               </>

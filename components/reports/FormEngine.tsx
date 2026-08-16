@@ -38,6 +38,9 @@ export interface CatalogSources {
   contratos: { id: string; label: string }[];
   pendenciasAprovadas: { id: string; label: string }[];
   pendenciasAbertas: { id: string; label: string }[];
+  /** Lista pré-pronta de dispositivos por categoria (ex.: catálogo SDAI do
+   * Estoque) para adição rápida no checklist da preventiva. */
+  dispositivosPadrao?: { grupo: string; itens: string[] }[];
 }
 
 interface FormEngineProps {
@@ -327,12 +330,29 @@ const Repeater: React.FC<{
   onCreateCatalogo?: (origem: string, name: string) => void;
 }> = ({ field, cards, onCards, catalog, role, onCreateCatalogo }) => {
   const schema = field.card_schema || [];
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [addedCount, setAddedCount] = useState(0);
+  // Lista pré-pronta só faz sentido no checklist de dispositivos (preventiva).
+  const dispositivosPadrao =
+    field.tipo === 'checklist_dispositivos' ? catalog.dispositivosPadrao || [] : [];
+  const showPadrao = dispositivosPadrao.length > 0;
+
   const addCard = () => {
     const blank: RepeaterCard = {};
     schema.forEach((f) => {
       if (f.default !== undefined) blank[f.key] = f.default;
     });
     onCards([...cards, blank]);
+  };
+  // Adiciona um card a partir da lista pré-pronta, preenchendo o "dispositivo".
+  const addFromPadrao = (nome: string) => {
+    const blank: RepeaterCard = {};
+    schema.forEach((f) => {
+      if (f.default !== undefined) blank[f.key] = f.default;
+    });
+    blank['dispositivo'] = nome;
+    onCards([...cards, blank]);
+    setAddedCount((n) => n + 1);
   };
   const updateCard = (idx: number, key: string, v: unknown) => {
     onCards(cards.map((c, i) => (i === idx ? { ...c, [key]: v } : c)));
@@ -414,13 +434,87 @@ const Repeater: React.FC<{
           </div>
         </div>
       ))}
-      <button
-        type="button"
-        onClick={addCard}
-        className="w-full py-2 rounded-lg border border-dashed border-[#1A1A72]/40 text-[11px] font-semibold text-[#1A1A72] hover:bg-[#1A1A72]/5 transition-colors"
-      >
-        {field.botao_adicionar || '+ Adicionar'}
-      </button>
+      <div className="flex flex-col sm:flex-row gap-2">
+        {showPadrao && (
+          <button
+            type="button"
+            onClick={() => {
+              setAddedCount(0);
+              setPickerOpen(true);
+            }}
+            className="flex-1 py-2 rounded-lg border border-[#E63946]/50 bg-[#E63946]/5 text-[11px] font-semibold text-[#E63946] hover:bg-[#E63946]/10 transition-colors flex items-center justify-center gap-1.5"
+          >
+            <span className="material-symbols-outlined text-base">list_alt</span>
+            Adicionar da lista padrão
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={addCard}
+          className="flex-1 py-2 rounded-lg border border-dashed border-[#1A1A72]/40 text-[11px] font-semibold text-[#1A1A72] hover:bg-[#1A1A72]/5 transition-colors"
+        >
+          {field.botao_adicionar || '+ Adicionar'}
+        </button>
+      </div>
+
+      {/* Seletor da lista pré-pronta (dispositivos por categoria) */}
+      {pickerOpen && (
+        <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl max-h-[85vh] flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-slate-100">
+              <div>
+                <h4 className="text-sm font-bold text-slate-900 uppercase">Lista de dispositivos</h4>
+                <p className="text-[11px] text-slate-500">Toque para adicionar ao checklist</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPickerOpen(false)}
+                className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="overflow-y-auto p-4 space-y-4">
+              {dispositivosPadrao.map((g) => (
+                <div key={g.grupo}>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">{g.grupo}</p>
+                  <div className="flex flex-col gap-1.5">
+                    {g.itens.map((nome) => (
+                      <button
+                        key={nome}
+                        type="button"
+                        onClick={() => addFromPadrao(nome)}
+                        className="w-full flex items-center justify-between gap-2 text-left px-3 py-2 rounded-lg border border-slate-200 hover:border-[#1A1A72] hover:bg-[#1A1A72]/5 transition-colors"
+                      >
+                        <span className="text-xs text-slate-700">{nome}</span>
+                        <span className="material-symbols-outlined text-base text-[#1A1A72] shrink-0">add_circle</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between p-4 border-t border-slate-100">
+              <span className="text-[11px] text-slate-500">
+                {addedCount > 0 ? (
+                  <>
+                    <strong className="text-slate-800">{addedCount}</strong> adicionado(s)
+                  </>
+                ) : (
+                  'Nenhum adicionado ainda'
+                )}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPickerOpen(false)}
+                className="px-5 py-2 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] text-white text-xs font-semibold uppercase tracking-wide"
+              >
+                Concluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
