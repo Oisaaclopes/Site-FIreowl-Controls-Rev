@@ -43,6 +43,8 @@ interface ReportFormProps {
   pendenciasAprovadas?: { id: string; descricao?: string; grupo?: string }[];
   /** Ciclo de amostragem vigente (Preventiva) — atualiza cobertura ao finalizar. */
   ciclo?: CicloAmostragem;
+  /** Persistência do "Cadastrar novo…" dos comboboxes (ex.: marca -> brands). */
+  onCreateCatalogo?: (origem: string, name: string) => void;
   onBack: () => void;
   onSaved: () => void;
 }
@@ -142,6 +144,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   devices,
   pendenciasAprovadas,
   ciclo,
+  onCreateCatalogo,
   onBack,
   onSaved,
 }) => {
@@ -614,6 +617,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
           onChange={handleChange}
           catalog={catalog}
           role={roleForEngine}
+          onCreateCatalogo={onCreateCatalogo}
           unclassifiedCount={unclassifiedPhotos.length}
           onOpenTriagem={() => setIsTriagemOpen(true)}
           onFastPhotoCaptured={handleFastPhotoCaptured}

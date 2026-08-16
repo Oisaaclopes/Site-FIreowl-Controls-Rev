@@ -13,6 +13,7 @@ import {
 } from '@/lib/reportSchema';
 import { registerPhoto, getPhotoPreview, setPhotoMarkup, hasMarkup } from '@/lib/reportMedia';
 import { MarkupCanvas } from '@/components/reports/MarkupCanvas';
+import { Combobox } from '@/components/reports/Combobox';
 import { falhasPorArea, AreaFalha, falhaLabel, findFalhaByLabel } from '@/lib/catalogoFalhas';
 
 // Rótulo da criticidade (bate com as opções do campo select_interno).
@@ -41,6 +42,8 @@ interface FormEngineProps {
   onChange: (key: string, value: unknown) => void;
   catalog: CatalogSources;
   role: string;
+  /** Persistência do "Cadastrar novo…" dos comboboxes (ex.: marca -> brands). */
+  onCreateCatalogo?: (origem: string, name: string) => void;
 }
 
 const inputCls =
@@ -70,13 +73,22 @@ function catalogOptions(field: FieldSchema, catalog: CatalogSources): string[] {
   }
 }
 
+/** Rótulo da ação "criar" do combobox, por origem do catálogo. */
+function createLabelFor(origem?: string): string | undefined {
+  if (origem === 'marcas') return 'Cadastrar nova marca';
+  if (origem === 'modelos') return 'Cadastrar novo modelo';
+  if (origem === 'estoque_servicos') return 'Cadastrar novo item';
+  return undefined;
+}
+
 /** Controle de um campo simples (não-repeater). */
 const FieldControl: React.FC<{
   field: FieldSchema;
   value: unknown;
   onValue: (v: unknown) => void;
   catalog: CatalogSources;
-}> = ({ field, value, onValue, catalog }) => {
+  onCreateCatalogo?: (origem: string, name: string) => void;
+}> = ({ field, value, onValue, catalog, onCreateCatalogo }) => {
   const [sigOpen, setSigOpen] = useState(false);
   const [markupId, setMarkupId] = useState<string | null>(null);
   const [, forceTick] = useState(0); // re-render após gravar markup (registro é mutável)
@@ -169,16 +181,18 @@ const FieldControl: React.FC<{
     }
     case 'autocomplete_catalogo': {
       const opts = catalogOptions(field, catalog);
-      const listId = `dl_${field.key}`;
       const known = opts.includes((value as string) || '');
+      const createLabel = createLabelFor(field.origem);
       return (
         <>
-          <input list={listId} className={inputCls} value={(value as string) || ''} onChange={(e) => onValue(e.target.value)} placeholder="Buscar no catálogo…" />
-          <datalist id={listId}>
-            {opts.map((o) => (
-              <option key={o} value={o} />
-            ))}
-          </datalist>
+          <Combobox
+            value={(value as string) || ''}
+            onChange={(v) => onValue(v)}
+            options={opts}
+            placeholder="Buscar no catálogo…"
+            createLabel={createLabel}
+            onCreate={createLabel ? (name) => onCreateCatalogo?.(field.origem || '', name) : undefined}
+          />
           {field.permite_texto_livre && value && !known && (
             <p className="mt-1 text-[10px] font-semibold text-amber-600 flex items-center gap-1">
               <span className="material-symbols-outlined text-[13px]">new_releases</span> Fora do catálogo — sinalizado para cadastro
@@ -295,7 +309,8 @@ const Repeater: React.FC<{
   onCards: (cards: RepeaterCard[]) => void;
   catalog: CatalogSources;
   role: string;
-}> = ({ field, cards, onCards, catalog, role }) => {
+  onCreateCatalogo?: (origem: string, name: string) => void;
+}> = ({ field, cards, onCards, catalog, role, onCreateCatalogo }) => {
   const schema = field.card_schema || [];
   const addCard = () => {
     const blank: RepeaterCard = {};
@@ -370,7 +385,7 @@ const Repeater: React.FC<{
                       })()}
                     </select>
                   ) : (
-                    <FieldControl field={f} value={card[f.key]} onValue={(v) => updateCard(idx, f.key, v)} catalog={catalog} />
+                    <FieldControl field={f} value={card[f.key]} onValue={(v) => updateCard(idx, f.key, v)} catalog={catalog} onCreateCatalogo={onCreateCatalogo} />
                   )}
                 </div>
               ))}
@@ -423,9 +438,10 @@ const Section: React.FC<{
                     onCards={(cards) => onChange(field.key, cards)}
                     catalog={catalog}
                     role={role}
+                    onCreateCatalogo={onCreateCatalogo}
                   />
                 ) : (
-                  <FieldControl field={field} value={values[field.key]} onValue={(v) => onChange(field.key, v)} catalog={catalog} />
+                  <FieldControl field={field} value={values[field.key]} onValue={(v) => onChange(field.key, v)} catalog={catalog} onCreateCatalogo={onCreateCatalogo} />
                 )}
               </div>
             );
@@ -440,7 +456,7 @@ export const FormEngine: React.FC<FormEngineProps & {
   onOpenTriagem?: () => void;
   onFastPhotoCaptured?: (url: string) => void;
   hideFloatingCamera?: boolean;
-}> = ({ template, values, onChange, catalog, role, unclassifiedCount = 0, onOpenTriagem, onFastPhotoCaptured, hideFloatingCamera = false }) => {
+}> = ({ template, values, onChange, catalog, role, onCreateCatalogo, unclassifiedCount = 0, onOpenTriagem, onFastPhotoCaptured, hideFloatingCamera = false }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleCameraClick = () => {

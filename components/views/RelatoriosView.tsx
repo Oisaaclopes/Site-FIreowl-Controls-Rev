@@ -46,6 +46,8 @@ interface RelatoriosViewProps {
   userRole: UserRole;
   currentUserName?: string;
   onAddClient?: (newClient: Client) => void;
+  /** Cadastra uma nova marca (usado pelo "Cadastrar nova marca" dos comboboxes). */
+  onAddBrand?: (name: string) => void;
 }
 
 const uniq = (arr: string[]) => Array.from(new Set(arr.filter(Boolean)));
@@ -73,6 +75,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   userRole,
   currentUserName = '',
   onAddClient,
+  onAddBrand,
 }) => {
   const isTecnico = userRole === 'TECNICO';
   const isFinanceiro = userRole === 'FINANCEIRO';
@@ -409,6 +412,11 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         devices={formDevices}
         pendenciasAprovadas={formPendAprovadas}
         ciclo={formCiclo}
+        onCreateCatalogo={(origem, name) => {
+          if (origem === 'marcas') onAddBrand?.(name);
+          // 'modelos'/'estoque_servicos': o valor é capturado no relatório; a
+          // criação no catálogo global fica para uma fatia futura.
+        }}
         onBack={() => setMode('index')}
         onSaved={refresh}
       />
