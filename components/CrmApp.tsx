@@ -831,6 +831,7 @@ export function CrmApp({
               onAddInventoryItem={handleAddInventoryItem}
               suppliers={suppliers}
               onUpdateSupplier={handleUpdateSupplier}
+              onDeletePartnerBrand={handleDeletePartnerBrand}
             />
           )}
 

@@ -19,7 +19,7 @@ import { TemplateSchema } from '@/lib/reportSchema';
 import { CatalogSources } from '@/components/reports/FormEngine';
 import { ReportForm } from '@/components/reports/ReportForm';
 import { isSupabaseConfigured } from '@/lib/inventory';
-import { fetchReports } from '@/lib/reports';
+import { fetchReports, updateReport, deleteReport } from '@/lib/reports';
 import { fetchPendencias } from '@/lib/pendencias';
 import { fetchDevices } from '@/lib/devices';
 import { fetchOrdensServico } from '@/lib/ordensServico';
@@ -43,7 +43,7 @@ interface RelatoriosViewProps {
   inventory: InventoryItem[];
   services: ServiceCatalogItem[];
   contracts: Contract[];
-  brands: { name: string }[];
+  brands: { id?: string; name: string; category?: string }[];
   userRole: UserRole;
   currentUserName?: string;
   onAddClient?: (newClient: Client) => void;
@@ -55,6 +55,8 @@ interface RelatoriosViewProps {
   suppliers?: Supplier[];
   /** Atualiza um fornecedor (usado ao vincular a marca ao fornecedor). */
   onUpdateSupplier?: (s: Supplier) => void | Promise<void>;
+  /** Remove uma marca do catálogo (usado pelo botão "remover" na janela). */
+  onDeletePartnerBrand?: (id: string) => void;
 }
 
 const uniq = (arr: string[]) => Array.from(new Set(arr.filter(Boolean)));
@@ -145,10 +147,12 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   onAddInventoryItem,
   suppliers = [],
   onUpdateSupplier,
+  onDeletePartnerBrand,
 }) => {
   const isTecnico = userRole === 'TECNICO';
   const isFinanceiro = userRole === 'FINANCEIRO';
   const canCreate = !isFinanceiro; // §6.1 RBAC: criar relatório — admin/gestor/técnico
+  const canManage = userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR'; // editar/excluir relatório
 
   const [mode, setMode] = useState<'index' | 'form'>('index');
   const [board, setBoard] = useState<'relatorios' | 'pendencias'>('relatorios');
@@ -305,6 +309,63 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   };
 
   const brandJaExiste = (nome: string) => marcaOptions.some((m) => m.toLowerCase() === nome.trim().toLowerCase());
+
+  // Marcas removíveis (as que têm id, ou seja, vindas do catálogo de marcas).
+  const removableBrands = (brands || []).filter((b): b is { id: string; name: string; category?: string } => !!b.id);
+  const handleRemoveBrand = (id: string, nome: string) => {
+    if (!onDeletePartnerBrand) return;
+    if (!window.confirm(`Remover a marca "${nome}" do catálogo?`)) return;
+    onDeletePartnerBrand(id);
+  };
+
+  // ---- Edição / exclusão de relatório ----
+  const [editRep, setEditRep] = useState<ReportInstance | null>(null);
+  const [erTitulo, setErTitulo] = useState('');
+  const [erLocal, setErLocal] = useState('');
+  const [erTecnico, setErTecnico] = useState('');
+  const [erStatus, setErStatus] = useState<ReportInstance['status']>('rascunho');
+  const [erSaving, setErSaving] = useState(false);
+
+  const openEditReport = (r: ReportInstance) => {
+    setEditRep(r);
+    setErTitulo(r.titulo || '');
+    setErLocal(r.local || '');
+    setErTecnico(r.tecnicoNome || '');
+    setErStatus(r.status);
+  };
+
+  const saveEditReport = async () => {
+    if (!editRep || erSaving) return;
+    const updated: ReportInstance = {
+      ...editRep,
+      titulo: erTitulo.trim() || undefined,
+      local: erLocal.trim() || undefined,
+      tecnicoNome: erTecnico.trim() || undefined,
+      status: erStatus,
+    };
+    setErSaving(true);
+    try {
+      if (isSupabaseConfigured()) await updateReport(updated);
+      setReports((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+      setEditRep(null);
+    } catch (e) {
+      console.error('Falha ao atualizar relatório:', e);
+      alert('Não foi possível salvar as alterações do relatório.');
+    } finally {
+      setErSaving(false);
+    }
+  };
+
+  const handleDeleteReport = async (r: ReportInstance) => {
+    if (!window.confirm(`Excluir o relatório ${r.numero || shortId(r.id)}?\n\nEsta ação não pode ser desfeita.`)) return;
+    try {
+      if (isSupabaseConfigured()) await deleteReport(r.id);
+      setReports((prev) => prev.filter((x) => x.id !== r.id));
+    } catch (e) {
+      console.error('Falha ao excluir relatório:', e);
+      alert('Não foi possível excluir o relatório. Tente novamente.');
+    }
+  };
 
   const confirmBrand = async () => {
     const nome = bName.trim();
@@ -794,6 +855,35 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                 </select>
                 <p className="mt-1 text-[10px] text-slate-400">Vincular a um fornecedor deixa a marca ligada a quem você compra.</p>
               </div>
+
+              {/* Marcas já cadastradas — permite remover marcas soltas/duplicadas */}
+              {onDeletePartnerBrand && removableBrands.length > 0 && (
+                <div className="pt-1">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Marcas cadastradas</p>
+                  <div className="max-h-40 overflow-y-auto flex flex-col gap-1 border border-slate-100 rounded-lg p-1.5">
+                    {removableBrands
+                      .slice()
+                      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+                      .map((b) => (
+                        <div key={b.id} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-md hover:bg-slate-50">
+                          <span className="text-xs text-slate-700 truncate">
+                            {b.name}
+                            {b.category ? <span className="text-slate-400"> · {b.category}</span> : null}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveBrand(b.id, b.name)}
+                            title="Remover marca"
+                            className="shrink-0 w-7 h-7 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#E63946] hover:bg-red-50 transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-base">delete</span>
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                  <p className="mt-1 text-[10px] text-slate-400">Remova aqui marcas duplicadas ou criadas por engano.</p>
+                </div>
+              )}
             </div>
             <div className="flex items-center justify-between p-4 border-t border-slate-100">
               <button onClick={() => setBrandOpen(false)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 uppercase">
@@ -1026,7 +1116,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                 <th className="py-3 px-4">Data</th>
                 <th className="py-3 px-4">Status</th>
                 <th className="py-3 px-4 text-center">Pend.</th>
-                <th className="py-3 px-4 text-center">PDF</th>
+                <th className="py-3 px-4 text-center">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
@@ -1043,23 +1133,42 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                     </span>
                   </td>
                   <td className="py-3 px-4 text-center font-data-mono font-bold text-[#E63946]">{pendCountByReport[r.id] || 0}</td>
-                  <td className="py-3 px-4 text-center">
-                    {r.status === 'finalizado' ? (
-                      <button
-                        onClick={() =>
-                          gerarPdfExecucao(r, clientName(r.clienteId), userRole).catch((e) => {
-                            console.error(e);
-                            alert('Falha ao gerar o PDF.');
-                          })
-                        }
-                        title="Gerar PDF de execução"
-                        className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#E63946] hover:bg-red-50 transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-lg">picture_as_pdf</span>
-                      </button>
-                    ) : (
-                      <span className="text-slate-300">—</span>
-                    )}
+                  <td className="py-3 px-4">
+                    <div className="flex items-center justify-center gap-1">
+                      {r.status === 'finalizado' && (
+                        <button
+                          onClick={() =>
+                            gerarPdfExecucao(r, clientName(r.clienteId), userRole).catch((e) => {
+                              console.error(e);
+                              alert('Falha ao gerar o PDF.');
+                            })
+                          }
+                          title="Gerar PDF de execução"
+                          className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#E63946] hover:bg-red-50 transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-lg">picture_as_pdf</span>
+                        </button>
+                      )}
+                      {canManage && (
+                        <>
+                          <button
+                            onClick={() => openEditReport(r)}
+                            title="Editar dados do relatório"
+                            className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#1A1A72] hover:bg-slate-100 transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-lg">edit</span>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteReport(r)}
+                            title="Excluir relatório"
+                            className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#E63946] hover:bg-red-50 transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-lg">delete</span>
+                          </button>
+                        </>
+                      )}
+                      {r.status !== 'finalizado' && !canManage && <span className="text-slate-300">—</span>}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -1099,6 +1208,24 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                     >
                       <span className="material-symbols-outlined text-lg">picture_as_pdf</span>
                     </button>
+                  )}
+                  {canManage && (
+                    <>
+                      <button
+                        onClick={() => openEditReport(r)}
+                        title="Editar dados do relatório"
+                        className="w-8 h-8 -my-1 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#1A1A72] hover:bg-slate-100 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-lg">edit</span>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteReport(r)}
+                        title="Excluir relatório"
+                        className="w-8 h-8 -my-1 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#E63946] hover:bg-red-50 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-lg">delete</span>
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -1348,6 +1475,82 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                   Iniciar relatório
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== Editar dados do relatório ===== */}
+      {editRep && (
+        <div className="fixed inset-0 z-[80] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-xl shadow-2xl border border-slate-200 max-h-[92vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#1A1A72]">edit_document</span>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 uppercase">Editar relatório</h3>
+                  <p className="text-[11px] text-slate-500 font-data-mono">{editRep.numero || shortId(editRep.id)}</p>
+                </div>
+              </div>
+              <button onClick={() => setEditRep(null)} className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none">✕</button>
+            </div>
+            <div className="p-4 overflow-y-auto space-y-3">
+              <div>
+                <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Título</label>
+                <input
+                  type="text"
+                  value={erTitulo}
+                  onChange={(e) => setErTitulo(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Local</label>
+                <input
+                  type="text"
+                  value={erLocal}
+                  onChange={(e) => setErLocal(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Técnico responsável</label>
+                <input
+                  type="text"
+                  value={erTecnico}
+                  onChange={(e) => setErTecnico(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Status</label>
+                <select
+                  value={erStatus}
+                  onChange={(e) => setErStatus(e.target.value as ReportInstance['status'])}
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                >
+                  <option value="rascunho">Rascunho</option>
+                  <option value="finalizado">Finalizado</option>
+                  <option value="cancelado">Cancelado</option>
+                </select>
+              </div>
+              <p className="text-[10px] text-slate-500 flex items-start gap-1 bg-slate-50 border border-slate-200 rounded-lg p-2">
+                <span className="material-symbols-outlined text-sm text-slate-400">info</span>
+                <span>Aqui você ajusta os dados do relatório. As respostas e fotos de campo não são reabertas por esta tela.</span>
+              </p>
+            </div>
+            <div className="flex items-center justify-between p-4 border-t border-slate-100">
+              <button onClick={() => setEditRep(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 uppercase">
+                Cancelar
+              </button>
+              <button
+                onClick={saveEditReport}
+                disabled={erSaving}
+                className="px-5 py-2 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] disabled:opacity-50 text-white text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5"
+              >
+                {erSaving && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
+                {erSaving ? 'Salvando…' : 'Salvar'}
+              </button>
             </div>
           </div>
         </div>
