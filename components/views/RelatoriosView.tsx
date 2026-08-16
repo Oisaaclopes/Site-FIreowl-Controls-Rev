@@ -12,6 +12,7 @@ import {
   Device,
   OrdemServico,
   CicloAmostragem,
+  Supplier,
 } from '@/lib/types';
 import { ALL_TEMPLATES, seedReportTemplates } from '@/lib/reportTemplatesData';
 import { TemplateSchema } from '@/lib/reportSchema';
@@ -47,12 +48,31 @@ interface RelatoriosViewProps {
   currentUserName?: string;
   onAddClient?: (newClient: Client) => void;
   /** Cadastra uma nova marca (usado pelo "Cadastrar nova marca" dos comboboxes). */
-  onAddBrand?: (name: string) => void;
+  onAddBrand?: (name: string, category?: string) => void;
   /** Cadastra um produto (usado pelo cadastro provisório de produto em campo). */
   onAddInventoryItem?: (item: InventoryItem) => void | Promise<void>;
+  /** Fornecedores (para vincular uma marca a um fornecedor no cadastro). */
+  suppliers?: Supplier[];
+  /** Atualiza um fornecedor (usado ao vincular a marca ao fornecedor). */
+  onUpdateSupplier?: (s: Supplier) => void | Promise<void>;
 }
 
 const uniq = (arr: string[]) => Array.from(new Set(arr.filter(Boolean)));
+// Deduplica ignorando maiúsc./minúsc. e espaços nas pontas (evita "Tecnohold"
+// aparecer duas vezes por diferença de digitação). Mantém a 1ª grafia vista.
+const uniqCI = (arr: string[]): string[] => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of arr) {
+    const v = (raw || '').trim();
+    if (!v) continue;
+    const k = v.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(v);
+  }
+  return out;
+};
 
 // Categoria de estoque sugerida a partir da área/disciplina do relatório.
 const AREA_TO_CATEGORY: Record<string, string> = {
@@ -123,6 +143,8 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   onAddClient,
   onAddBrand,
   onAddInventoryItem,
+  suppliers = [],
+  onUpdateSupplier,
 }) => {
   const isTecnico = userRole === 'TECNICO';
   const isFinanceiro = userRole === 'FINANCEIRO';
@@ -260,6 +282,54 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     }
   };
 
+  // Marcas conhecidas (catálogo de marcas + marcas de produtos do Estoque),
+  // deduplicadas ignorando maiúsc./minúsc. — base para evitar duplicatas.
+  const marcaOptions = uniqCI([...(brands?.map((b) => b.name) || []), ...inventory.map((i) => i.brand || '')]);
+
+  // Cadastro de MARCA (fabricante) — janela de verdade, disparada ao "Cadastrar
+  // nova marca" no relatório. Evita marca solta/duplicada e permite vincular a
+  // um fornecedor. Nada é criado se o usuário cancelar.
+  const [brandOpen, setBrandOpen] = useState(false);
+  const [bName, setBName] = useState('');
+  const [bCategoria, setBCategoria] = useState('');
+  const [bFornecedor, setBFornecedor] = useState('');
+  const [bSaving, setBSaving] = useState(false);
+  const [bDone, setBDone] = useState<string | null>(null);
+
+  const openBrand = (name: string) => {
+    setBName(name);
+    setBCategoria((formTemplate?.area as string) || 'SDAI');
+    setBFornecedor('');
+    setBDone(null);
+    setBrandOpen(true);
+  };
+
+  const brandJaExiste = (nome: string) => marcaOptions.some((m) => m.toLowerCase() === nome.trim().toLowerCase());
+
+  const confirmBrand = async () => {
+    const nome = bName.trim();
+    if (!nome || bSaving) return;
+    const existe = brandJaExiste(nome);
+    setBSaving(true);
+    try {
+      if (!existe) onAddBrand?.(nome, bCategoria.trim() || 'SDAI');
+      // Vínculo opcional com fornecedor (via lista de marcas do fornecedor).
+      if (bFornecedor && onUpdateSupplier) {
+        const sup = suppliers.find((s) => s.id === bFornecedor);
+        if (sup && !(sup.brands || []).some((b) => b.toLowerCase() === nome.toLowerCase())) {
+          await onUpdateSupplier({ ...sup, brands: [...(sup.brands || []), nome] });
+        }
+      }
+      setLastBrand(nome); // prefila a marca no cadastro de produto seguinte
+      setBDone(existe ? `${nome} (já estava cadastrada)` : nome);
+    } catch (err) {
+      console.error('Falha ao cadastrar a marca:', err);
+      alert('Não foi possível cadastrar a marca. Tente novamente.');
+    } finally {
+      setBSaving(false);
+    }
+  };
+
   const clientName = (id?: string) => clients.find((c) => c.id === id)?.name || '—';
 
   const refresh = () => {
@@ -338,7 +408,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     () => ({
       categorias: uniq([...GRUPOS_FALHA, ...inventory.map((i) => i.category), ...services.map((s) => s.category)]),
       itens: uniq([...inventory.map((i) => i.name), ...services.map((s) => s.title)]),
-      marcas: uniq([...brands.map((b) => b.name), ...inventory.map((i) => i.brand || '')]),
+      marcas: uniqCI([...brands.map((b) => b.name), ...inventory.map((i) => i.brand || '')]),
       modelos: uniq(inventory.map((i) => i.model || '')),
       // Agrupa modelos por marca (do estoque) para filtrar o campo modelo.
       modelosPorMarca: inventory.reduce<Record<string, string[]>>((acc, i) => {
@@ -532,7 +602,6 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 
   // Aba flutuante do cadastro provisório de produto (renderizada por cima do
   // formulário e do índice). Some fornecedor/custo: são preenchidos no Estoque.
-  const marcaOptions = uniq([...(brands?.map((b) => b.name) || []), ...inventory.map((i) => i.brand || '')]);
   const provPanel = provProdOpen ? (
     <div className="fixed inset-0 z-[80] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-md rounded-xl shadow-2xl border border-slate-200 max-h-[92vh] flex flex-col">
@@ -648,6 +717,103 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     </div>
   ) : null;
 
+  // Janela de cadastro de MARCA (fabricante) — cadastro definitivo, com
+  // categoria e vínculo opcional a um fornecedor. Evita marca solta/duplicada.
+  const brandPanel = brandOpen ? (
+    <div className="fixed inset-0 z-[80] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white w-full max-w-md rounded-xl shadow-2xl border border-slate-200 max-h-[92vh] flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[#1A1A72]">verified</span>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 uppercase">Cadastro de marca</h3>
+              <p className="text-[11px] text-slate-500">Fabricante / marca parceira</p>
+            </div>
+          </div>
+          <button onClick={() => setBrandOpen(false)} className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none">✕</button>
+        </div>
+
+        {bDone ? (
+          <div className="p-6 text-center">
+            <span className="material-symbols-outlined text-5xl text-emerald-500">task_alt</span>
+            <h4 className="text-base font-bold text-slate-900 mt-2">Marca cadastrada</h4>
+            <p className="text-xs text-slate-500 mt-1">
+              <b>{bDone}</b> está disponível no campo de fabricante. Você pode gerenciar as marcas em{' '}
+              <b>Conta → Marcas Parceiras</b>.
+            </p>
+            <button
+              onClick={() => setBrandOpen(false)}
+              className="mt-4 px-6 py-2.5 rounded-lg bg-[#1A1A72] text-white text-xs font-semibold uppercase tracking-wide"
+            >
+              Continuar relatório
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="p-4 overflow-y-auto space-y-3">
+              <div>
+                <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Nome da marca *</label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={bName}
+                  onChange={(e) => setBName(e.target.value)}
+                  placeholder="Ex.: Tecnohold"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                />
+                {bName.trim() && brandJaExiste(bName) && (
+                  <p className="mt-1 text-[10px] font-semibold text-amber-600 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[13px]">info</span>
+                    Marca já cadastrada — será usada a existente (sem duplicar).
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Categoria / segmento</label>
+                <input
+                  type="text"
+                  value={bCategoria}
+                  onChange={(e) => setBCategoria(e.target.value)}
+                  placeholder="Ex.: SDAI"
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Fornecedor (opcional)</label>
+                <select
+                  value={bFornecedor}
+                  onChange={(e) => setBFornecedor(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                >
+                  <option value="">— Sem vínculo —</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[10px] text-slate-400">Vincular a um fornecedor deixa a marca ligada a quem você compra.</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between p-4 border-t border-slate-100">
+              <button onClick={() => setBrandOpen(false)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 uppercase">
+                Cancelar
+              </button>
+              <button
+                onClick={confirmBrand}
+                disabled={!bName.trim() || bSaving}
+                className="px-5 py-2 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] disabled:opacity-50 text-white text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5"
+              >
+                {bSaving && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
+                {bSaving ? 'Salvando…' : brandJaExiste(bName) ? 'Usar existente' : 'Cadastrar marca'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  ) : null;
+
   // ===== Formulário aberto =====
   if (mode === 'form' && formTemplate) {
     return (
@@ -664,9 +830,9 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         pendenciasAprovadas={formPendAprovadas}
         ciclo={formCiclo}
         onCreateCatalogo={(origem, name) => {
+          // Marca nova → abre a janela de cadastro de marca (não cria nada solto).
           if (origem === 'marcas') {
-            onAddBrand?.(name);
-            setLastBrand(name); // prefila a marca no cadastro de produto seguinte
+            openBrand(name);
             return;
           }
           // Item/material ou modelo novo → abre o cadastro provisório de produto,
@@ -679,6 +845,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         onSaved={refresh}
       />
       {provPanel}
+      {brandPanel}
       </>
     );
   }
@@ -1187,6 +1354,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       )}
 
       {provPanel}
+      {brandPanel}
     </div>
   );
 };
