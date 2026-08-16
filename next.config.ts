@@ -17,6 +17,10 @@ const nextConfig: NextConfig = {
     unoptimized: true,
   },
   output: 'export',
+  // Gera cada rota como pasta/index.html (ex.: funcionarios/index.html) em vez
+  // de funcionarios.html. Assim o Hostinger/LiteSpeed serve a URL limpa
+  // (/funcionarios) automaticamente, sem precisar de regra de rewrite.
+  trailingSlash: true,
   transpilePackages: ['motion'],
   webpack: (config, {dev}) => {
     // HMR is disabled in AI Studio via DISABLE_HMR env var.
