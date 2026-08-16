@@ -1004,6 +1004,11 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     (i) => /^PROV-/i.test(i.code || '') || i.pendenteValidacao === true
   ).length;
 
+  // Itens do catálogo Intelbras (Vision) ainda não importados para o Estoque.
+  const faltamCatalogo = INTELBRAS_VISION_SDAI.filter(
+    (p) => !inventory.some((i) => (i.code || '').toUpperCase() === p.code.toUpperCase())
+  ).length;
+
   const term = searchTerm.toLowerCase();
   const filteredInventory = inventory
     // Aba "Lista de compras": só itens no nível mínimo ou abaixo
@@ -1320,6 +1325,29 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
               Limpar
             </button>
           )}
+        </div>
+      )}
+
+      {/* Catálogo Intelbras (Vision) pronto para importar */}
+      {faltamCatalogo > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-[#1A1A72]/25 bg-[#1A1A72]/5 px-4 py-3">
+          <div className="flex items-start gap-2 text-xs text-[#1A1A72]">
+            <span className="material-symbols-outlined text-lg">download</span>
+            <span>
+              <strong>Catálogo Intelbras (fornecedor Vision):</strong> {faltamCatalogo} produto(s) prontos para importar
+              com {MARGEM_PADRAO}% de margem. Depois de importar, eles também aparecem na lista pré-pronta da preventiva SDAI.
+            </span>
+          </div>
+          <button
+            onClick={handleImportCatalogo}
+            disabled={importing}
+            className="shrink-0 px-4 py-2 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] text-white text-[11px] font-bold uppercase tracking-wide flex items-center gap-1.5 disabled:opacity-60"
+          >
+            <span className={`material-symbols-outlined text-base ${importing ? 'animate-spin' : ''}`}>
+              {importing ? 'progress_activity' : 'download'}
+            </span>
+            {importing ? 'Importando…' : 'Importar agora'}
+          </button>
         </div>
       )}
 
