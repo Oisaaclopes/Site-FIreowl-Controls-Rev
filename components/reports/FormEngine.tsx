@@ -411,7 +411,8 @@ const Section: React.FC<{
   onChange: (key: string, value: unknown) => void;
   catalog: CatalogSources;
   role: string;
-}> = ({ section, values, onChange, catalog, role }) => {
+  onCreateCatalogo?: (origem: string, name: string) => void;
+}> = ({ section, values, onChange, catalog, role, onCreateCatalogo }) => {
   // Salto condicional
   if (section.pula_se && String(values[section.pula_se.campo]) === section.pula_se.igual) return null;
 
@@ -515,7 +516,7 @@ export const FormEngine: React.FC<FormEngineProps & {
       </div>
 
       {template.secoes.map((section) => (
-        <Section key={section.key} section={section} values={values} onChange={onChange} catalog={catalog} role={role} />
+        <Section key={section.key} section={section} values={values} onChange={onChange} catalog={catalog} role={role} onCreateCatalogo={onCreateCatalogo} />
       ))}
     </div>
   );
