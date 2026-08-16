@@ -244,6 +244,15 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       itens: uniq([...inventory.map((i) => i.name), ...services.map((s) => s.title)]),
       marcas: uniq([...brands.map((b) => b.name), ...inventory.map((i) => i.brand || '')]),
       modelos: uniq(inventory.map((i) => i.model || '')),
+      // Agrupa modelos por marca (do estoque) para filtrar o campo modelo.
+      modelosPorMarca: inventory.reduce<Record<string, string[]>>((acc, i) => {
+        const marca = (i.brand || '').trim();
+        const modelo = (i.model || '').trim();
+        if (!marca || !modelo) return acc;
+        if (!acc[marca]) acc[marca] = [];
+        if (!acc[marca].includes(modelo)) acc[marca].push(modelo);
+        return acc;
+      }, {}),
       devices: [],
       contratos: contracts.map((c) => ({ id: c.id, label: `${c.contractType || c.unit} (${c.id})` })),
       pendenciasAprovadas: [],

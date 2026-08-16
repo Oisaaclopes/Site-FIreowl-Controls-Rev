@@ -57,7 +57,7 @@ export const LEVANTAMENTO_SDAI: TemplateSchema = {
       campos: [
         { key: 'possui_sdai', tipo: 'select', label: 'O local possui SDAI instalado?', opcoes: ['Sim, completo', 'Sim, parcial', 'Não possui'], obrigatorio: true },
         { key: 'central_fabricante', tipo: 'autocomplete_catalogo', origem: 'marcas', label: 'Fabricante da central', permite_texto_livre: true },
-        { key: 'central_modelo', tipo: 'autocomplete_catalogo', origem: 'modelos', label: 'Modelo da central', permite_texto_livre: true },
+        { key: 'central_modelo', tipo: 'autocomplete_catalogo', origem: 'modelos', label: 'Modelo da central', permite_texto_livre: true, filtro_por: 'central_fabricante' },
         { key: 'tipo_central', tipo: 'select', label: 'Tipo de central', opcoes: ['Convencional', 'Endereçável', 'Não identificado'] },
         { key: 'qtd_lacos', tipo: 'numero', label: 'Quantidade de laços/zonas' },
         { key: 'central_operante', tipo: 'select', label: 'A central está operante no momento da visita?', opcoes: ['Sim', 'Sim, com falhas ativas', 'Não', 'Não foi possível acessar'], abre_pendencia_se: ['Não', 'Sim, com falhas ativas'], pendencia_sugerida: { grupo: 'SDAI > Central', acao: 'reparar', descricao: 'Central com falha ativa / inoperante na visita.' } },

@@ -589,14 +589,10 @@ export const INITIAL_COMPANY_PROFILE: CompanyProfile = {
   logoUrl: '',
 };
 
-export const INITIAL_PARTNER_BRANDS: PartnerBrand[] = [
-  { id: 'pb-1', name: 'Edwards EST3X', category: 'Central de detecção e alarme' },
-  { id: 'pb-2', name: 'Notifier Honeywell', category: 'Centrais Endereçáveis & Módulos' },
-  { id: 'pb-3', name: 'Tecnohold', category: 'Painéis Convencionais & Endereçáveis' },
-  { id: 'pb-4', name: 'Intelbras Fire Systems', category: 'Botoeiras, Sirenes & Detectores' },
-  { id: 'pb-5', name: 'Ascael', category: 'Iluminação de Emergência & Alarmes' },
-  { id: 'pb-6', name: 'Siemens Building Tech', category: 'Detectores Múltiplos & Automação' },
-];
+// Sem marcas de exemplo: as marcas reais vêm do Estoque (marca do produto),
+// dos Fornecedores e do "Cadastrar nova marca". Assim o relatório nunca mostra
+// nome fictício (ex.: "Intelbras Fire Systems") que o usuário não cadastrou.
+export const INITIAL_PARTNER_BRANDS: PartnerBrand[] = [];
 
 export const INITIAL_TEMPLATES: PedidoTemplate[] = [
   {

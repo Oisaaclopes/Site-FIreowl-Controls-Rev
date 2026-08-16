@@ -31,7 +31,9 @@ export interface CatalogSources {
   categorias: string[];
   itens: string[]; // Estoque + Serviços (labels)
   marcas: string[];
-  modelos?: string[]; // modelos cadastrados no estoque
+  modelos?: string[]; // modelos cadastrados no estoque (lista completa)
+  /** Modelos agrupados por marca (do estoque), para filtrar o campo modelo. */
+  modelosPorMarca?: Record<string, string[]>;
   devices: { id: string; label: string }[];
   contratos: { id: string; label: string }[];
   pendenciasAprovadas: { id: string; label: string }[];
@@ -52,7 +54,7 @@ const inputCls =
   'w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20 focus:border-[#1A1A72]/40';
 const labelCls = 'block text-slate-600 mb-1 font-semibold uppercase text-[11px]';
 
-function catalogOptions(field: FieldSchema, catalog: CatalogSources): string[] {
+function catalogOptions(field: FieldSchema, catalog: CatalogSources, filtroValor?: string): string[] {
   switch (field.origem) {
     case 'categorias':
       return catalog.categorias;
@@ -60,8 +62,17 @@ function catalogOptions(field: FieldSchema, catalog: CatalogSources): string[] {
       return catalog.itens;
     case 'marcas':
       return catalog.marcas;
-    case 'modelos':
+    case 'modelos': {
+      // Se o campo filtra por marca e há marca escolhida, mostra só os modelos
+      // daquela marca (do estoque). Sem marca escolhida, mostra todos.
+      const marca = (filtroValor || '').trim();
+      if (field.filtro_por && marca) {
+        const doGrupo = catalog.modelosPorMarca?.[marca];
+        if (doGrupo && doGrupo.length > 0) return doGrupo;
+        return []; // marca escolhida sem modelos cadastrados → lista vazia (só "cadastrar novo")
+      }
       return catalog.modelos || [];
+    }
     case 'devices':
       return catalog.devices.map((d) => d.label);
     case 'contratos':
@@ -90,7 +101,9 @@ const FieldControl: React.FC<{
   onValue: (v: unknown) => void;
   catalog: CatalogSources;
   onCreateCatalogo?: (origem: string, name: string) => void;
-}> = ({ field, value, onValue, catalog, onCreateCatalogo }) => {
+  /** Valor do campo-irmão usado como filtro (ex.: marca escolhida, p/ modelos). */
+  filtroValor?: string;
+}> = ({ field, value, onValue, catalog, onCreateCatalogo, filtroValor }) => {
   const [sigOpen, setSigOpen] = useState(false);
   const [markupId, setMarkupId] = useState<string | null>(null);
   const [, forceTick] = useState(0); // re-render após gravar markup (registro é mutável)
@@ -160,7 +173,7 @@ const FieldControl: React.FC<{
       );
     }
     case 'select_catalogo': {
-      const opts = catalogOptions(field, catalog);
+      const opts = catalogOptions(field, catalog, filtroValor);
       return (
         <select className={inputCls} value={(value as string) || ''} onChange={(e) => onValue(e.target.value)}>
           <option value="">— selecione —</option>
@@ -182,7 +195,7 @@ const FieldControl: React.FC<{
       );
     }
     case 'autocomplete_catalogo': {
-      const opts = catalogOptions(field, catalog);
+      const opts = catalogOptions(field, catalog, filtroValor);
       const known = opts.includes((value as string) || '');
       const createLabel = createLabelFor(field.origem);
       return (
@@ -387,7 +400,14 @@ const Repeater: React.FC<{
                       })()}
                     </select>
                   ) : (
-                    <FieldControl field={f} value={card[f.key]} onValue={(v) => updateCard(idx, f.key, v)} catalog={catalog} onCreateCatalogo={onCreateCatalogo} />
+                    <FieldControl
+                      field={f}
+                      value={card[f.key]}
+                      onValue={(v) => updateCard(idx, f.key, v)}
+                      catalog={catalog}
+                      onCreateCatalogo={onCreateCatalogo}
+                      filtroValor={f.filtro_por ? String(card[f.filtro_por] ?? '') : undefined}
+                    />
                   )}
                 </div>
               ))}
@@ -444,7 +464,14 @@ const Section: React.FC<{
                     onCreateCatalogo={onCreateCatalogo}
                   />
                 ) : (
-                  <FieldControl field={field} value={values[field.key]} onValue={(v) => onChange(field.key, v)} catalog={catalog} onCreateCatalogo={onCreateCatalogo} />
+                  <FieldControl
+                    field={field}
+                    value={values[field.key]}
+                    onValue={(v) => onChange(field.key, v)}
+                    catalog={catalog}
+                    onCreateCatalogo={onCreateCatalogo}
+                    filtroValor={field.filtro_por ? String(values[field.filtro_por] ?? '') : undefined}
+                  />
                 )}
               </div>
             );

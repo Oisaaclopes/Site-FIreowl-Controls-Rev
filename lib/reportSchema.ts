@@ -45,6 +45,9 @@ export interface FieldSchema {
   origem?: string;
   /** autocomplete_catalogo: permite gravar texto livre (marca precisa_cadastro_catalogo). */
   permite_texto_livre?: boolean;
+  /** autocomplete_catalogo origem='modelos': filtra os modelos pela marca escolhida
+   * em outro campo (irmão). Ex.: central_modelo.filtro_por = 'central_fabricante'. */
+  filtro_por?: string;
   /** select_interno: perfis que enxergam o campo. Ex.: ['admin','gestor']. */
   visivel_para?: string[];
   /** Referência normativa fica no help text, nunca no corpo da pergunta. */
