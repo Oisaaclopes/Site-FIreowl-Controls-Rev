@@ -159,32 +159,42 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
   const assinante = pedido.responsavelComercialNome || 'Responsável Comercial';
 
   // Índice (numeração fixa do padrão completo).
-  const indice: string[] = [
-    'Carta de Apresentação',
-    'Histórico de Propostas',
-    'Visão Geral da Proposta',
-    'Escopo da Proposta',
-    'Materiais e Serviços Ofertados',
-    'Premissas Adotadas',
-    'Descrição dos Serviços Ofertados',
-    'Embalagem, Transporte e Armazenamento',
-    'Segurança do Trabalho',
-    'Obrigações da Contratante',
-    'Preços',
-    'Informações para o Pedido de Compra',
-    'Impostos e Taxas',
-    'Condições de Pagamento',
-    'Limitação de Responsabilidade',
-    'Prazo de Fornecimento',
-    'Garantia',
-    'Confidencialidade',
-    'Termo de Aceite da Proposta',
-    'Condições Gerais',
-    'Validade da Proposta',
-    'Conclusão',
-    'Aceite da Proposta',
+  // Seções do documento com numeração DINÂMICA: seções não visíveis (ex.:
+  // Embalagem/Transporte quando não há materiais ofertados) são omitidas e não
+  // deixam buraco no número nem no índice.
+  const secoes = [
+    { key: 'carta', titulo: 'Carta de Apresentação', visible: true },
+    { key: 'historico', titulo: 'Histórico de Propostas', visible: true },
+    { key: 'visao', titulo: 'Visão Geral da Proposta', visible: true },
+    { key: 'escopo', titulo: 'Escopo da Proposta', visible: true },
+    { key: 'itens', titulo: 'Materiais e Serviços Ofertados', visible: true },
+    { key: 'premissas', titulo: 'Premissas Adotadas', visible: true },
+    { key: 'servicos', titulo: 'Descrição dos Serviços Ofertados', visible: true },
+    { key: 'embalagem', titulo: 'Embalagem, Transporte e Armazenamento', visible: materiaisPdf.length > 0 },
+    { key: 'seguranca', titulo: 'Segurança do Trabalho', visible: true },
+    { key: 'obrigacoes', titulo: 'Obrigações da Contratante', visible: true },
+    { key: 'precos', titulo: 'Preços', visible: true },
+    { key: 'infoCompra', titulo: 'Informações para o Pedido de Compra', visible: true },
+    { key: 'impostos', titulo: 'Impostos e Taxas', visible: true },
+    { key: 'pagamento', titulo: 'Condições de Pagamento', visible: true },
+    { key: 'limitacao', titulo: 'Limitação de Responsabilidade', visible: true },
+    { key: 'prazo', titulo: 'Prazo de Fornecimento', visible: true },
+    { key: 'garantia', titulo: 'Garantia', visible: true },
+    { key: 'confidencialidade', titulo: 'Confidencialidade', visible: true },
+    { key: 'termoAceite', titulo: 'Termo de Aceite da Proposta', visible: true },
+    { key: 'condicoesGerais', titulo: 'Condições Gerais', visible: true },
+    { key: 'validade', titulo: 'Validade da Proposta', visible: true },
+    { key: 'conclusao', titulo: 'Conclusão', visible: true },
+    { key: 'aceite', titulo: 'Aceite da Proposta', visible: true },
   ];
-  const nn = (i: number) => String(i).padStart(2, '0');
+  const visibleSecoes = secoes.filter((s) => s.visible);
+  // Numeração dinâmica das seções. A única seção condicional é "Embalagem"
+  // (posição fixa 8): quando omitida, as seções seguintes sobem uma posição.
+  const embalagemVisivel = materiaisPdf.length > 0;
+  const nn = (fixed: number) => {
+    const n = !embalagemVisivel && fixed > 8 ? fixed - 1 : fixed;
+    return String(n).padStart(2, '0');
+  };
 
   const Rodape = (
     <div className="pdf-footer">
@@ -305,10 +315,10 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
         <section className="pdf-break pdf-section mb-8">
           <SecHead n="—" titulo="Índice" />
           <ol className="space-y-1.5 text-xs text-slate-700">
-            {indice.map((t, i) => (
-              <li key={i} className="flex items-center gap-2">
-                <span className="font-data-mono font-bold text-[#0B1E38] w-6 shrink-0">{nn(i + 1)}</span>
-                <span className="flex-1">{t}</span>
+            {visibleSecoes.map((s, i) => (
+              <li key={s.key} className="flex items-center gap-2">
+                <span className="font-data-mono font-bold text-[#0B1E38] w-6 shrink-0">{String(i + 1).padStart(2, '0')}</span>
+                <span className="flex-1">{s.titulo}</span>
                 <span className="flex-1 border-b border-dotted border-slate-300 mx-1" />
               </li>
             ))}
@@ -430,11 +440,13 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
           </div>
         </section>
 
-        {/* ===================== 8. EMBALAGEM ===================== */}
-        <section className="pdf-section mb-8">
-          <SecHead n={nn(8)} titulo="Embalagem, Transporte e Armazenamento" />
-          <Paras paras={EMBALAGEM_TRANSPORTE} />
-        </section>
+        {/* ===================== 8. EMBALAGEM (só quando há materiais) ===================== */}
+        {embalagemVisivel && (
+          <section className="pdf-section mb-8">
+            <SecHead n={nn(8)} titulo="Embalagem, Transporte e Armazenamento" />
+            <Paras paras={EMBALAGEM_TRANSPORTE} />
+          </section>
+        )}
 
         {/* ===================== 9. SEGURANÇA DO TRABALHO ===================== */}
         <section className="pdf-section mb-8">
