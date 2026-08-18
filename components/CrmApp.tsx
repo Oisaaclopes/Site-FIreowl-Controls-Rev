@@ -339,7 +339,7 @@ export function CrmApp({
       clientName: pedido.clienteNome,
       title: pedido.referencia || 'Execução do Projeto e Proposta Aceita',
       type: 'Preventiva SDAI',
-      technicianName: pedido.responsavelComercialNome || 'Eng. Ricardo M.',
+      technicianName: pedido.responsavelComercialNome || 'Isaac Lopes',
       scheduledDate: `${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).toUpperCase()} | 08:30`,
       status: 'EM ANDAMENTO',
       priority: 'ALTA',

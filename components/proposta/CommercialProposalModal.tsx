@@ -77,7 +77,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     initialPedido?.dataEmissao || new Date().toISOString().split('T')[0]
   );
   const [responsavelNome, setResponsavelNome] = useState<string>(
-    initialPedido?.responsavelComercialNome || 'Eng. Ricardo M.'
+    initialPedido?.responsavelComercialNome || 'Isaac Lopes'
   );
   const [status, setStatus] = useState<PedidoStatus>(
     initialPedido?.status || 'rascunho'

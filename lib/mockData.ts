@@ -107,7 +107,7 @@ export const INITIAL_PEDIDOS_OS: PedidoOS[] = [
     clientName: 'Logística Integrada S.A.',
     title: 'Inspeção Periódica de Detectores e Laço 02',
     type: 'Inspeção NBR 17240',
-    technicianName: 'Eng. Ricardo M.',
+    technicianName: 'Isaac Lopes',
     scheduledDate: '24 MAI 2024 | 14:30',
     status: 'EM ANDAMENTO',
     priority: 'ALTA',
@@ -165,7 +165,7 @@ export const INITIAL_CONTRACTS: Contract[] = [
     contractedHours: 120,
     usedHours: 94,
     status: 'ATIVO',
-    responsibleTech: 'Eng. Ricardo M.',
+    responsibleTech: 'Isaac Lopes',
     artDocumentRef: 'ART-PR-2024-9981'
   },
   {
@@ -204,7 +204,7 @@ export const INITIAL_CONTRACTS: Contract[] = [
     contractedHours: 150,
     usedHours: 148,
     status: 'A VENCER',
-    responsibleTech: 'Eng. Ricardo M.',
+    responsibleTech: 'Isaac Lopes',
     artDocumentRef: 'ART-PR-2024-8842'
   }
 ];
@@ -255,7 +255,7 @@ export const INITIAL_EQUIPMENT: ClientEquipment[] = [
 export const INITIAL_PUNCH_LOGS: TimePunch[] = [
   {
     id: 'p1',
-    employeeName: 'Eng. Ricardo M.',
+    employeeName: 'Isaac Lopes',
     timestamp: '24 MAI 2024 | 07:58:12',
     type: 'ENTRADA',
     locationStr: 'Catuaí Shopping Londrina (-23.5505, -46.6333)',
@@ -320,7 +320,7 @@ export const INITIAL_TECHNICAL_REPORT: TechnicalReportSDAI = {
     capacity: '250 DISP/LAÇO',
     protocol: 'XP95 / DISCOVERY'
   },
-  inspectorName: 'Eng. Ricardo M.',
+  inspectorName: 'Isaac Lopes',
   creaRegister: 'CREA-PR 4289/D',
   updatedAt: '14:42:05'
 };
@@ -583,7 +583,7 @@ export const INITIAL_COMPANY_PROFILE: CompanyProfile = {
   razaoSocial: 'Fireowl Controls Ltda.',
   cnpj: '38.492.102/0001-90',
   endereco: 'Rua Professor João Cândido, 1200 - Centro, Londrina / PR - CEP 86010-001',
-  telefone: '(43) 3321-9000',
+  telefone: '(43) 98445-5979',
   email: 'comercial@fireowlcontrols.com.br',
   regimeTributario: 'Simples Nacional (Incluso Anexo III)',
   logoUrl: '',
@@ -640,7 +640,7 @@ export const INITIAL_PEDIDOS: Pedido[] = [
     fornecedor: 'Fireowl Controls Ltda.',
     dataEmissao: '2026-08-01',
     responsavelComercialId: 'u1',
-    responsavelComercialNome: 'Eng. Ricardo M.',
+    responsavelComercialNome: 'Isaac Lopes',
     status: 'enviado_ao_cliente',
     createdAt: '01 AGO 2026',
     updatedAt: '01 AGO 2026',
@@ -729,7 +729,7 @@ export const INITIAL_PEDIDOS: Pedido[] = [
     fornecedor: 'Fireowl Controls Ltda.',
     dataEmissao: '2026-08-02',
     responsavelComercialId: 'u1',
-    responsavelComercialNome: 'Eng. Ricardo M.',
+    responsavelComercialNome: 'Isaac Lopes',
     status: 'aceito',
     createdAt: '02 AGO 2026',
     updatedAt: '02 AGO 2026',

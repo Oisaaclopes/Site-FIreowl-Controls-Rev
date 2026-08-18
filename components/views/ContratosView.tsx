@@ -48,7 +48,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
   const [fIndex, setFIndex] = useState('IPCA (+4.5%)');
   const [fHours, setFHours] = useState(100);
   const [fPaymentDay, setFPaymentDay] = useState(10);
-  const [fResponsible, setFResponsible] = useState('Eng. Ricardo M.');
+  const [fResponsible, setFResponsible] = useState('Isaac Lopes');
 
   const selectedClient = clients.find((c) => c.id === fClientId) || null;
 
@@ -63,7 +63,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
     setFIndex('IPCA (+4.5%)');
     setFHours(100);
     setFPaymentDay(10);
-    setFResponsible('Eng. Ricardo M.');
+    setFResponsible('Isaac Lopes');
     setShowModal(true);
   };
 
@@ -417,7 +417,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                       value={fResponsible}
                       onChange={(e) => setFResponsible(e.target.value)}
                       className={inputCls}
-                      placeholder="Eng. Ricardo M."
+                      placeholder="Isaac Lopes"
                     />
                   </div>
                 </div>
