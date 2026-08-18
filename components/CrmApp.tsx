@@ -773,6 +773,7 @@ export function CrmApp({
               onDeletePedido={handleDeletePedido}
               onGenerateOSFromPedido={handleGenerateOSFromPedido}
               onSelectClientForReport={handleSelectClientForReport}
+              onAddClient={handleAddClient}
               pdfPrefs={pdfPrefs}
               userRole={userRole}
               currentUserName={userName}

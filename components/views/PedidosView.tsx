@@ -35,6 +35,7 @@ interface PedidosViewProps {
   onDeletePedido?: (pedidoId: string) => void;
   onGenerateOSFromPedido: (pedido: Pedido) => void;
   onSelectClientForReport?: (clientName: string) => void;
+  onAddClient?: (client: Client) => void;
   pdfPrefs: PdfPrefs;
   userRole: UserRole;
   currentUserName?: string;
@@ -77,6 +78,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   onDeletePedido,
   onGenerateOSFromPedido,
   onSelectClientForReport,
+  onAddClient,
   pdfPrefs,
   userRole,
   currentUserName = '',
@@ -749,6 +751,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
         inventory={inventory}
         partnerBrands={partnerBrands}
         templates={templates}
+        onAddClient={onAddClient}
         onPreviewPDF={(ped) => setPdfPreviewPedido(ped)}
       />
 
