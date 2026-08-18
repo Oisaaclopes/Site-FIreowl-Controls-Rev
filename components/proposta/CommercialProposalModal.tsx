@@ -89,6 +89,11 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
       'Prestação de serviços técnicos especializados de engenharia para fornecimento, manutenção e testes de sistemas de segurança e alarme de incêndio (SDAI).'
   );
 
+  // Carta de apresentação (opcional). Vazio → o PDF usa o texto institucional padrão.
+  const [cartaApresentacao, setCartaApresentacao] = useState<string>(
+    initialPedido?.proposal?.cartaApresentacao || ''
+  );
+
   const [diretrizes, setDiretrizes] = useState<string[]>(
     initialPedido?.proposal?.diretrizesNormativas || [
       'ABNT NBR 17240:2010 — Sistemas de detecção e alarme de incêndio',
@@ -342,6 +347,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
       updatedAt: now,
       proposal: {
         objetivo,
+        cartaApresentacao,
         diretrizesNormativas: diretrizes,
         escopoServico,
         entregaveis,
@@ -598,6 +604,22 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                   placeholder="Descreva o objetivo geral da proposta comercial..."
                   className="w-full border border-slate-300 rounded-lg p-3 text-slate-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
                 />
+              </div>
+
+              {/* Carta de Apresentação (opcional) */}
+              <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-2">
+                <h3 className="font-bold text-[#0B1E38] uppercase text-sm flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-[#0B1E38]" /> Carta de Apresentação
+                  <span className="text-[10px] font-semibold text-slate-400 normal-case">(opcional — 1 parágrafo por linha)</span>
+                </h3>
+                <textarea
+                  rows={4}
+                  value={cartaApresentacao}
+                  onChange={(e) => setCartaApresentacao(e.target.value)}
+                  placeholder="Deixe em branco para usar o texto institucional padrão da Fireowl. Cada linha vira um parágrafo na carta do PDF."
+                  className="w-full border border-slate-300 rounded-lg p-3 text-slate-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                />
+                <p className="text-[10px] text-slate-400">Aparece na 2ª página do PDF (Carta de Apresentação), assinada pelo responsável comercial.</p>
               </div>
 
               {/* Diretrizes Normativas */}

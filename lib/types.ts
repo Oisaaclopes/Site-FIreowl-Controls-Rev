@@ -44,6 +44,8 @@ export interface PedidoBrand {
 
 export interface CommercialProposalData {
   objetivo: string;
+  /** Carta de apresentação (opcional). Vazio → usa o texto institucional padrão. */
+  cartaApresentacao?: string;
   diretrizesNormativas: string[];
   escopoServico: string;
   entregaveis: string[];

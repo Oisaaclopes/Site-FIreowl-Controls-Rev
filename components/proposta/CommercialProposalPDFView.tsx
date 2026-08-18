@@ -216,7 +216,13 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
         {/* ===================== 1. CARTA DE APRESENTAÇÃO ===================== */}
         <section className="pdf-break pdf-section mb-8">
           <SecHead n={nn(1)} titulo="Carta de Apresentação" />
-          <Paras paras={naoVazio(proposal.objetivo) ? [proposal.objetivo, ...CARTA_APRESENTACAO] : CARTA_APRESENTACAO} />
+          <Paras
+            paras={
+              naoVazio(proposal.cartaApresentacao)
+                ? proposal.cartaApresentacao!.split('\n').map((p) => p.trim()).filter(Boolean)
+                : CARTA_APRESENTACAO
+            }
+          />
           <div className="mt-6 text-xs text-slate-700">
             <p className="mb-6">Atenciosamente,</p>
             <p className="font-bold text-slate-900">{assinante}</p>
@@ -449,6 +455,11 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
           <p className="text-xs text-slate-700 leading-relaxed text-justify">
             {naoVazio(proposal.formaPagamento) ? proposal.formaPagamento : 'A combinar entre as partes.'}
           </p>
+          {naoVazio(proposal.faturamento) && (
+            <p className="text-xs text-slate-700 leading-relaxed text-justify mt-1">
+              <strong className="text-slate-900 uppercase">Faturamento:</strong> {proposal.faturamento}
+            </p>
+          )}
         </section>
 
         {/* ===================== 15. LIMITAÇÃO DE RESPONSABILIDADE ===================== */}
