@@ -174,7 +174,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
 
   // Commercial Conditions
   const [composicaoValor, setComposicaoValor] = useState<string>(
-    initialPedido?.proposal?.composicaoValor || '60% materiais e equipamentos / 40% serviços de engenharia'
+    initialPedido?.proposal?.composicaoValor || ''
   );
   const [formaPagamento, setFormaPagamento] = useState<string>(
     initialPedido?.proposal?.formaPagamento || '30% no aceite / 70% na entrega e emissão do laudo'

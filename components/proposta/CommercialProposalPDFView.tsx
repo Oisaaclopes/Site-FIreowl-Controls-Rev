@@ -390,7 +390,9 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
 
             {/* Terms Details */}
             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 col-span-1 md:col-span-2 space-y-2 text-xs">
-              <p><strong className="text-slate-900 uppercase">Composição do Valor:</strong> {proposal.composicaoValor || 'Conforme orçado'}</p>
+              {proposal.composicaoValor?.trim() && (
+                <p><strong className="text-slate-900 uppercase">Composição do Valor:</strong> {proposal.composicaoValor}</p>
+              )}
               <p><strong className="text-slate-900 uppercase">Forma de Pagamento:</strong> {proposal.formaPagamento || 'A combinar'}</p>
               <p><strong className="text-slate-900 uppercase">Faturamento:</strong> {proposal.faturamento || 'Por etapa'}</p>
               <p><strong className="text-slate-900 uppercase">Prazo de Execução:</strong> {proposal.prazoExecucao || 'A definir'}</p>
