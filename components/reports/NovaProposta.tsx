@@ -27,6 +27,43 @@ interface NovaPropostaProps {
 const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 const inputCls = 'w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20';
 
+// Linha de custo editável (composição interna): mostra o valor calculado ou
+// manual num input. Definido no módulo (fora do componente) para o input não
+// perder o foco a cada tecla. Passe null para voltar ao cálculo automático.
+const EditRow: React.FC<{
+  label: string;
+  value: number;
+  onChange: (v: number | null) => void;
+  isManual?: boolean;
+  onAuto?: () => void;
+}> = ({ label, value, onChange, isManual, onAuto }) => (
+  <div className="flex justify-between items-center text-slate-600">
+    <span className="flex items-center gap-1.5">
+      {label}
+      {isManual && onAuto && (
+        <button
+          type="button"
+          onClick={onAuto}
+          title="Voltar ao cálculo automático"
+          className="text-[9px] font-bold uppercase text-[#1A1A72] bg-[#1A1A72]/10 hover:bg-[#1A1A72]/20 rounded px-1.5 py-0.5"
+        >
+          Auto
+        </button>
+      )}
+    </span>
+    <span className="flex items-center gap-1">
+      <span className="text-slate-400 text-[10px] font-data-mono">R$</span>
+      <input
+        type="number"
+        min={0}
+        value={value}
+        onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+        className="w-24 border border-slate-200 rounded px-1.5 py-0.5 text-right font-data-mono text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#1A1A72]/30"
+      />
+    </span>
+  </div>
+);
+
 export const NovaProposta: React.FC<NovaPropostaProps> = ({ open, onClose, clients, inventory, services, pendencias, onGenerated }) => {
   const { maskMoney } = usePrivacy();
   const [clienteId, setClienteId] = useState(clients[0]?.id || '');
@@ -36,6 +73,7 @@ export const NovaProposta: React.FC<NovaPropostaProps> = ({ open, onClose, clien
   const [prazoDias, setPrazoDias] = useState(5);
   const [tecnicos, setTecnicos] = useState(2);
   const [logistica, setLogistica] = useState(0);
+  const [materiaisManual, setMateriaisManual] = useState<number | null>(null);
   const [maoDeObraManual, setMaoDeObraManual] = useState<number | null>(null);
   const [selecionadas, setSelecionadas] = useState<Record<string, boolean>>({});
 
@@ -88,6 +126,7 @@ export const NovaProposta: React.FC<NovaPropostaProps> = ({ open, onClose, clien
         contingenciaPct: contingenciaPct / 100,
         margemPct: margemPct / 100,
         precoItem,
+        materiaisOverride: materiaisManual,
         maoDeObraOverride: maoDeObraManual,
         logistica,
         prazoDias,
@@ -97,7 +136,7 @@ export const NovaProposta: React.FC<NovaPropostaProps> = ({ open, onClose, clien
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
-      escolhidas, cliente, regime, contingenciaPct, margemPct, logistica, prazoDias, tecnicos, maoDeObraManual,
+      escolhidas, cliente, regime, contingenciaPct, margemPct, logistica, prazoDias, tecnicos, materiaisManual, maoDeObraManual,
       garServicoMeses, garServicoExibir, garMateriaisModo, garMateriaisMeses,
       garPreexistenteExibir, garCondicionadaPreventiva, garObservacoes,
     ]
@@ -311,34 +350,21 @@ export const NovaProposta: React.FC<NovaPropostaProps> = ({ open, onClose, clien
             <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Composição interna (não vai ao PDF)</p>
               <div className="space-y-1 text-xs">
-                <CompRow label="Materiais" valor={composicao.materiais} />
-                {/* Mão de obra: valor calculado (regra 70/30) mas editável. */}
-                <div className="flex justify-between items-center text-slate-600">
-                  <span className="flex items-center gap-1.5">
-                    Mão de obra
-                    {maoDeObraManual !== null && (
-                      <button
-                        type="button"
-                        onClick={() => setMaoDeObraManual(null)}
-                        title="Voltar ao cálculo automático"
-                        className="text-[9px] font-bold uppercase text-[#1A1A72] bg-[#1A1A72]/10 hover:bg-[#1A1A72]/20 rounded px-1.5 py-0.5"
-                      >
-                        Auto
-                      </button>
-                    )}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="text-slate-400 text-[10px] font-data-mono">R$</span>
-                    <input
-                      type="number"
-                      min={0}
-                      value={composicao.maoDeObra}
-                      onChange={(e) => setMaoDeObraManual(e.target.value === '' ? null : Number(e.target.value))}
-                      className="w-24 border border-slate-200 rounded px-1.5 py-0.5 text-right font-data-mono text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#1A1A72]/30"
-                    />
-                  </span>
-                </div>
-                <CompRow label="Logística" valor={composicao.logistica} />
+                <EditRow
+                  label="Materiais"
+                  value={composicao.materiais}
+                  isManual={materiaisManual !== null}
+                  onAuto={() => setMateriaisManual(null)}
+                  onChange={setMateriaisManual}
+                />
+                <EditRow
+                  label="Mão de obra"
+                  value={composicao.maoDeObra}
+                  isManual={maoDeObraManual !== null}
+                  onAuto={() => setMaoDeObraManual(null)}
+                  onChange={setMaoDeObraManual}
+                />
+                <EditRow label="Logística" value={composicao.logistica} onChange={(v) => setLogistica(v ?? 0)} />
                 <div className="border-t border-slate-200 my-1" />
                 <CompRow label="Subtotal de custo" valor={composicao.subtotalCusto} bold />
                 <CompRow label={`Contingência (${contingenciaPct}%)`} valor={composicao.contingencia} />
