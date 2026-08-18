@@ -2,7 +2,19 @@
 
 import React from 'react';
 import { Pedido, CompanyProfile } from '@/lib/types';
-import { Download, Printer, ArrowLeft, Send, CheckCircle2, Building2, ShieldCheck, FileCheck2 } from 'lucide-react';
+import { ArrowLeft, Printer, Send, Building2 } from 'lucide-react';
+import {
+  CARTA_APRESENTACAO,
+  SERVICOS_OFERTADOS,
+  EMBALAGEM_TRANSPORTE,
+  SEGURANCA_TRABALHO,
+  LIMITACAO_RESPONSABILIDADE,
+  CONFIDENCIALIDADE,
+  TERMO_ACEITE,
+  CONDICOES_GERAIS,
+  PRECOS_OBS,
+  IMPOSTOS_OBS,
+} from '@/lib/propostaTextos';
 
 interface PdfDisplayOptions {
   showLogo: boolean;
@@ -18,6 +30,48 @@ interface CommercialProposalPDFViewProps {
   options?: PdfDisplayOptions;
 }
 
+const brl = (n: number) => `R$ ${(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+const naoVazio = (s?: string) => !!s && s.trim().length > 0;
+const listaNaoVazia = (a?: string[]) => Array.isArray(a) && a.filter((x) => naoVazio(x)).length > 0;
+
+/* --------------------------- subcomponentes --------------------------- */
+
+// Cabeçalho numerado de seção (padrão do documento).
+const SecHead: React.FC<{ n: string; titulo: string }> = ({ n, titulo }) => (
+  <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
+    <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded font-data-mono">{n}</span>
+    <h3 className="text-[15px] font-bold text-[#0B1E38] uppercase font-display tracking-wide">{titulo}</h3>
+  </div>
+);
+
+// Bloco de parágrafos justificados (cláusulas).
+const Paras: React.FC<{ paras: string[] }> = ({ paras }) => (
+  <div className="space-y-2 text-xs text-slate-700 leading-relaxed text-justify">
+    {paras.map((p, i) => (
+      <p key={i}>{p}</p>
+    ))}
+  </div>
+);
+
+// Lista com marcadores (bullets).
+const Bullets: React.FC<{ itens: string[] }> = ({ itens }) => (
+  <ul className="space-y-1.5 text-xs text-slate-700">
+    {itens
+      .filter((x) => naoVazio(x))
+      .map((item, i) => (
+        <li key={i} className="flex items-start gap-2">
+          <span className="text-[#E63946] font-bold leading-5">•</span>
+          <span className="text-justify">{item}</span>
+        </li>
+      ))}
+  </ul>
+);
+
+// Linha de assinatura com campo em branco.
+const linhaBranca = (largura = 'flex-1') => (
+  <span className={`inline-block border-b border-slate-400 ${largura} mx-1 align-baseline`} style={{ minWidth: 60 }} />
+);
+
 export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps> = ({
   pedido,
   companyProfile,
@@ -27,30 +81,81 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
 }) => {
   const { proposal } = pedido;
   const showLogo = options?.showLogo ?? true;
-  const detailedSubtotal = options?.detailedSubtotal ?? true;
-  const showBankData = options?.showBankData ?? false;
+  const detailed = options?.detailedSubtotal ?? true;
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handlePrint = () => window.print();
+
+  const razao = companyProfile.razaoSocial || 'Fireowl Controls';
+  const escopoTitulo = pedido.referencia || 'Fornecimento e Serviços de Engenharia';
+  const assinante = pedido.responsavelComercialNome || 'Responsável Comercial';
+
+  // Índice (numeração fixa do padrão completo).
+  const indice: string[] = [
+    'Carta de Apresentação',
+    'Histórico de Propostas',
+    'Visão Geral da Proposta',
+    'Escopo da Proposta',
+    'Materiais Ofertados',
+    'Premissas Adotadas',
+    'Descrição dos Serviços Ofertados',
+    'Embalagem, Transporte e Armazenamento',
+    'Segurança do Trabalho',
+    'Obrigações da Contratante',
+    'Preços',
+    'Informações para o Pedido de Compra',
+    'Impostos e Taxas',
+    'Condições de Pagamento',
+    'Limitação de Responsabilidade',
+    'Prazo de Fornecimento',
+    'Garantia',
+    'Confidencialidade',
+    'Termo de Aceite da Proposta',
+    'Condições Gerais',
+    'Validade da Proposta',
+    'Conclusão',
+    'Aceite da Proposta',
+  ];
+  const nn = (i: number) => String(i).padStart(2, '0');
+
+  const Rodape = (
+    <div className="pdf-footer">
+      <span>© {new Date().getFullYear()} {razao}. Todos os direitos reservados.</span>
+      <span className="font-data-mono">{pedido.numeroPedido}</span>
+    </div>
+  );
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md overflow-y-auto p-4 md:p-8 flex flex-col items-center print:p-0 print:bg-white print:fixed print:inset-0 print:z-[9999]">
-      {/* Top Controls Bar (Hidden in Print) */}
-      <div className="w-full max-w-4xl bg-slate-800 text-white rounded-xl p-4 mb-6 shadow-xl flex flex-wrap justify-between items-center gap-3 print:hidden">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-slate-700 rounded-lg text-slate-300 hover:text-white transition-colors flex items-center gap-1.5 text-xs font-semibold uppercase"
-          >
-            <ArrowLeft className="w-4 h-4" /> Voltar ao Sistema
-          </button>
-          <div className="h-4 w-px bg-slate-700 hidden sm:block" />
-          <span className="text-xs font-data-mono text-amber-400 font-bold hidden sm:inline">
-            PROPOSTA: {pedido.numeroPedido}
-          </span>
-        </div>
+    <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md overflow-y-auto p-4 md:p-8 flex flex-col items-center print:p-0 print:bg-white print:block">
+      {/* CSS de impressão: quebras de página + rodapé fixo em toda folha */}
+      <style>{`
+        .pdf-footer { display: none; }
+        @media print {
+          @page { size: A4; margin: 16mm 13mm 20mm 13mm; }
+          html, body { background: #fff !important; }
+          .no-print { display: none !important; }
+          .pdf-doc { box-shadow: none !important; border: none !important; padding: 0 !important; max-width: none !important; width: 100% !important; }
+          .pdf-break { break-after: page; page-break-after: always; }
+          .pdf-section { break-inside: avoid; page-break-inside: avoid; }
+          .pdf-footer {
+            display: flex; justify-content: space-between; align-items: center;
+            position: fixed; left: 0; right: 0; bottom: 4mm;
+            font-size: 8px; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em;
+            border-top: 1px solid #e2e8f0; padding-top: 3px;
+          }
+        }
+      `}</style>
 
+      {/* Barra de controles (não vai para o PDF) */}
+      <div className="no-print w-full max-w-4xl bg-slate-800 text-white rounded-xl p-4 mb-6 shadow-xl flex flex-wrap justify-between items-center gap-3">
+        <button
+          onClick={onClose}
+          className="p-2 hover:bg-slate-700 rounded-lg text-slate-300 hover:text-white transition-colors flex items-center gap-1.5 text-xs font-semibold uppercase"
+        >
+          <ArrowLeft className="w-4 h-4" /> Voltar ao Sistema
+        </button>
+        <span className="text-xs font-data-mono text-amber-400 font-bold hidden sm:inline">
+          PROPOSTA: {pedido.numeroPedido}
+        </span>
         <div className="flex items-center gap-2">
           {onSendEmail && (
             <button
@@ -69,163 +174,144 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
         </div>
       </div>
 
-      {/* Main Document Canvas */}
-      <div className="w-full max-w-4xl bg-white text-slate-800 shadow-2xl rounded-none border border-slate-200 p-8 md:p-12 font-body-md print:shadow-none print:border-none print:p-0 print:w-full print:max-w-none">
-        
-        {/* ==================== 1. CAPA ==================== */}
-        <div className="border-b-4 border-[#E63946] pb-8 mb-10">
-          {/* Navy Banner */}
-          <div className="bg-[#0B1E38] text-white p-6 md:p-8 rounded-t-xl mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              {showLogo && companyProfile.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={companyProfile.logoUrl} alt="Logo" className="h-12 object-contain mb-2" />
-              ) : (
-                <div className="flex items-center gap-2">
-                  <Building2 className="w-8 h-8 text-[#F2A900]" />
-                  <h1 className="text-2xl md:text-3xl font-black uppercase tracking-wider text-white font-display">
-                    FIREOWL CONTROLS
-                  </h1>
-                </div>
-              )}
-              <p className="text-[11px] md:text-xs text-slate-300 font-medium tracking-wide mt-1">
-                Segurança Eletrônica • Detecção e Alarme de Incêndio • CFTV • Automação
-              </p>
-            </div>
-            <div className="text-right md:border-l md:border-slate-700 md:pl-6">
-              <span className="text-[10px] uppercase font-bold text-[#F2A900] tracking-widest block">
-                DOCUMENTO TÉCNICO
-              </span>
-              <span className="text-xs font-data-mono text-slate-300">
-                Emissão: {pedido.dataEmissao}
-              </span>
+      {/* Documento */}
+      <div className="pdf-doc w-full max-w-4xl bg-white text-slate-800 shadow-2xl border border-slate-200 p-8 md:p-12 font-body-md">
+        {Rodape}
+
+        {/* ============================ CAPA ============================ */}
+        <div className="pdf-break min-h-[80vh] flex flex-col">
+          <div className="bg-[#0B1E38] text-white p-8 rounded-xl flex items-center justify-between gap-4">
+            {showLogo && companyProfile.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={companyProfile.logoUrl} alt="Logo" className="h-14 object-contain" />
+            ) : (
+              <div className="flex items-center gap-2">
+                <Building2 className="w-9 h-9 text-[#F2A900]" />
+                <h1 className="text-2xl font-black uppercase tracking-wider text-white font-display">FIREOWL CONTROLS</h1>
+              </div>
+            )}
+            <span className="text-[10px] uppercase font-bold text-[#F2A900] tracking-widest text-right">
+              Documento Técnico-Comercial
+            </span>
+          </div>
+
+          <div className="grow flex flex-col justify-center py-10">
+            <span className="text-[11px] font-bold text-[#E63946] uppercase tracking-[0.3em] mb-3">
+              Proposta Técnico-Comercial
+            </span>
+            <div className="border-l-4 border-[#E63946] pl-5 space-y-6">
+              <CapaCampo rotulo="Cliente" valor={pedido.clienteNome} destaque />
+              <CapaCampo rotulo="Número da Proposta" valor={pedido.numeroPedido} mono />
+              <CapaCampo rotulo="Escopo de Fornecimento" valor={escopoTitulo} />
+              <CapaCampo rotulo="Data" valor={pedido.dataEmissao} mono />
             </div>
           </div>
 
-          {/* Proposal Header Block */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-lg border border-slate-200">
-            <div>
-              <span className="text-[10px] font-bold text-[#E63946] uppercase tracking-widest block mb-1">
-                PROPOSTA COMERCIAL & TÉCNICA
-              </span>
-              <h2 className="text-3xl font-black text-slate-900 font-display">
-                {pedido.numeroPedido}
-              </h2>
-              <p className="text-sm font-bold text-slate-700 mt-2">
-                REF: <span className="text-slate-900">{pedido.referencia || 'Instalação e Manutenção de Engenharia'}</span>
-              </p>
-            </div>
-
-            <div className="space-y-1.5 text-xs text-slate-600 border-t md:border-t-0 md:border-l border-slate-200 pt-4 md:pt-0 md:pl-6">
-              <p><strong className="text-slate-900 uppercase">Cliente / Contratante:</strong> {pedido.clienteNome}</p>
-              <p><strong className="text-slate-900 uppercase">Fornecedor / Contratada:</strong> {pedido.fornecedor || companyProfile.razaoSocial}</p>
-              <p><strong className="text-slate-900 uppercase">Responsável Comercial:</strong> {pedido.responsavelComercialNome}</p>
-              <p className="pt-1">
-                <strong className="text-slate-900 uppercase">Status da Proposta:</strong>{' '}
-                <span className="uppercase font-bold text-[#E63946]">{pedido.status.replace('_', ' ')}</span>
-              </p>
-            </div>
+          <div className="border-t border-slate-200 pt-4 text-[10px] text-slate-500 uppercase tracking-wider flex justify-between">
+            <span>{razao} • CNPJ {companyProfile.cnpj}</span>
+            <span>{companyProfile.endereco}</span>
           </div>
         </div>
 
-        {/* ==================== 2. OBJETIVO ==================== */}
-        <section className="mb-8">
-          <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
-            <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">01</span>
-            <h3 className="text-base font-bold text-[#0B1E38] uppercase font-display tracking-wide">
-              OBJETIVO
-            </h3>
+        {/* ===================== 1. CARTA DE APRESENTAÇÃO ===================== */}
+        <section className="pdf-break pdf-section mb-8">
+          <SecHead n={nn(1)} titulo="Carta de Apresentação" />
+          <Paras paras={naoVazio(proposal.objetivo) ? [proposal.objetivo, ...CARTA_APRESENTACAO] : CARTA_APRESENTACAO} />
+          <div className="mt-6 text-xs text-slate-700">
+            <p className="mb-6">Atenciosamente,</p>
+            <p className="font-bold text-slate-900">{assinante}</p>
+            <p className="text-slate-600">Responsável Comercial — {razao}</p>
+            {naoVazio(companyProfile.telefone) && <p className="text-slate-500 font-data-mono">{companyProfile.telefone}</p>}
+            {naoVazio(companyProfile.email) && <p className="text-slate-500 font-data-mono">{companyProfile.email}</p>}
           </div>
-          <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-line text-justify">
-            {proposal.objetivo || 'Não especificado.'}
+        </section>
+
+        {/* ============================ ÍNDICE ============================ */}
+        <section className="pdf-break pdf-section mb-8">
+          <SecHead n="—" titulo="Índice" />
+          <ol className="space-y-1.5 text-xs text-slate-700">
+            {indice.map((t, i) => (
+              <li key={i} className="flex items-center gap-2">
+                <span className="font-data-mono font-bold text-[#0B1E38] w-6 shrink-0">{nn(i + 1)}</span>
+                <span className="flex-1">{t}</span>
+                <span className="flex-1 border-b border-dotted border-slate-300 mx-1" />
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        {/* ===================== 2. HISTÓRICO DE PROPOSTAS ===================== */}
+        <section className="pdf-section mb-8">
+          <SecHead n={nn(2)} titulo="Histórico de Propostas" />
+          <div className="overflow-x-auto border border-slate-200 rounded-lg">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-[#0B1E38] text-white font-bold uppercase text-[10px]">
+                <tr>
+                  <th className="p-2.5">Revisão / Número</th>
+                  <th className="p-2.5">Data</th>
+                  <th className="p-2.5">Elaborador</th>
+                  <th className="p-2.5">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 text-slate-700">
+                <tr>
+                  <td className="p-2.5 font-data-mono font-bold text-slate-900">{pedido.numeroPedido}</td>
+                  <td className="p-2.5 font-data-mono">{pedido.dataEmissao}</td>
+                  <td className="p-2.5">{assinante}</td>
+                  <td className="p-2.5 uppercase font-semibold text-[#E63946]">{pedido.status.replace(/_/g, ' ')}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* ===================== 3. VISÃO GERAL ===================== */}
+        <section className="pdf-section mb-8">
+          <SecHead n={nn(3)} titulo="Visão Geral da Proposta" />
+          <h4 className="font-bold text-[#0B1E38] uppercase text-[11px] mb-1">3.1. Introdução</h4>
+          <p className="text-xs text-slate-700 leading-relaxed text-justify whitespace-pre-line">
+            {naoVazio(proposal.objetivo)
+              ? proposal.objetivo
+              : `Apresentamos nossa proposta para o fornecimento e execução dos serviços referentes a ${escopoTitulo}, para ${pedido.clienteNome}.`}
+          </p>
+          {listaNaoVazia(proposal.diretrizesNormativas) && (
+            <div className="mt-3">
+              <h4 className="font-bold text-[#0B1E38] uppercase text-[11px] mb-1">Diretrizes normativas de referência</h4>
+              <Bullets itens={proposal.diretrizesNormativas} />
+            </div>
+          )}
+        </section>
+
+        {/* ===================== 4. ESCOPO ===================== */}
+        <section className="pdf-section mb-8">
+          <SecHead n={nn(4)} titulo="Escopo da Proposta" />
+          <h4 className="font-bold text-[#0B1E38] uppercase text-[11px] mb-1">4.1. Descrição do escopo proposto</h4>
+          <p className="text-xs text-slate-700 leading-relaxed text-justify whitespace-pre-line bg-slate-50 p-3 rounded border border-slate-200">
+            {naoVazio(proposal.escopoServico) ? proposal.escopoServico : 'Escopo conforme especificação técnica acordada com o cliente.'}
           </p>
         </section>
 
-        {/* ==================== 3. DIRETRIZES NORMATIVAS ==================== */}
-        <section className="mb-8">
-          <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
-            <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">02</span>
-            <h3 className="text-base font-bold text-[#0B1E38] uppercase font-display tracking-wide">
-              DIRETRIZES NORMATIVAS E REFERÊNCIAS
-            </h3>
-          </div>
-          <ul className="grid grid-cols-1 gap-2 text-xs text-slate-700">
-            {proposal.diretrizesNormativas && proposal.diretrizesNormativas.length > 0 ? (
-              proposal.diretrizesNormativas.map((item, idx) => (
-                <li key={idx} className="flex items-start gap-2 bg-slate-50 p-2 rounded border border-slate-200">
-                  <ShieldCheck className="w-4 h-4 text-[#E63946] shrink-0 mt-0.5" />
-                  <span>{item}</span>
-                </li>
-              ))
-            ) : (
-              <li className="text-slate-400 italic">Nenhuma norma especificada.</li>
-            )}
-          </ul>
-        </section>
-
-        {/* ==================== 4. DESCRIÇÃO DO SERVIÇO ==================== */}
-        <section className="mb-8">
-          <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
-            <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">03</span>
-            <h3 className="text-base font-bold text-[#0B1E38] uppercase font-display tracking-wide">
-              DESCRIÇÃO DOS SERVIÇOS & ENTREGÁVEIS
-            </h3>
-          </div>
-          
-          <div className="space-y-4 text-xs text-slate-700">
-            <div>
-              <h4 className="font-bold text-[#0B1E38] uppercase text-[11px] mb-1">Escopo Técnico dos Serviços:</h4>
-              <p className="whitespace-pre-line text-justify bg-slate-50 p-3 rounded border border-slate-200 leading-relaxed">
-                {proposal.escopoServico || 'Conforme especificação da equipe de engenharia.'}
-              </p>
-            </div>
-
-            <div>
-              <h4 className="font-bold text-[#0B1E38] uppercase text-[11px] mb-1">Entregáveis do Projeto:</h4>
-              <ul className="space-y-1.5">
-                {proposal.entregaveis && proposal.entregaveis.length > 0 ? (
-                  proposal.entregaveis.map((ent, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <FileCheck2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                      <span>{ent}</span>
-                    </li>
-                  ))
-                ) : (
-                  <li className="text-slate-400 italic">Relatório Diário de Obra e ART CREA.</li>
-                )}
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        {/* ==================== 5. EQUIPAMENTOS (detalhamento — opcional) ==================== */}
-        {detailedSubtotal && (
-        <section className="mb-8">
-          <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
-            <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">04</span>
-            <h3 className="text-base font-bold text-[#0B1E38] uppercase font-display tracking-wide">
-              ESPECIFICAÇÃO DOS EQUIPAMENTOS E MATERIAIS
-            </h3>
-          </div>
-
+        {/* ===================== 5. MATERIAIS OFERTADOS ===================== */}
+        <section className="pdf-section mb-8">
+          <SecHead n={nn(5)} titulo="Materiais Ofertados" />
           <div className="overflow-x-auto border border-slate-200 rounded-lg">
             <table className="w-full text-left text-xs">
               <thead className="bg-[#0B1E38] text-white font-bold uppercase text-[10px]">
                 <tr>
                   <th className="p-2.5 text-center w-12">Item</th>
-                  <th className="p-2.5">Descrição do Equipamento</th>
+                  <th className="p-2.5">Descrição</th>
                   <th className="p-2.5">Marca / Modelo</th>
-                  <th className="p-2.5 text-center w-16">Unid.</th>
-                  <th className="p-2.5 text-center w-16">Qtde.</th>
-                  <th className="p-2.5 text-right w-24">Unit. (R$)</th>
-                  <th className="p-2.5 text-right w-28">Total (R$)</th>
+                  <th className="p-2.5 text-center w-14">Unid.</th>
+                  <th className="p-2.5 text-center w-14">Qtd.</th>
+                  {detailed && <th className="p-2.5 text-right w-24">Unit. (R$)</th>}
+                  {detailed && <th className="p-2.5 text-right w-28">Total (R$)</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 font-medium text-slate-700">
                 {proposal.equipmentItems && proposal.equipmentItems.length > 0 ? (
                   proposal.equipmentItems.map((eq, i) => {
-                    const unitPrice = eq.precoUnitario || 0;
-                    const totalItem = unitPrice * eq.quantidade;
+                    const unit = eq.precoUnitario || 0;
+                    const tot = unit * eq.quantidade;
                     return (
                       <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                         <td className="p-2.5 text-center font-bold text-[#E63946] font-data-mono">{eq.itemNumero || i + 1}</td>
@@ -233,205 +319,248 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
                         <td className="p-2.5 text-slate-600">{eq.marcaModelo}</td>
                         <td className="p-2.5 text-center font-bold uppercase">{eq.unidade}</td>
                         <td className="p-2.5 text-center font-data-mono font-bold">{eq.quantidade}</td>
-                        <td className="p-2.5 text-right font-data-mono">
-                          {unitPrice > 0 ? unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}
-                        </td>
-                        <td className="p-2.5 text-right font-data-mono font-bold text-slate-900">
-                          {totalItem > 0 ? totalItem.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}
-                        </td>
+                        {detailed && (
+                          <td className="p-2.5 text-right font-data-mono">
+                            {unit > 0 ? unit.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}
+                          </td>
+                        )}
+                        {detailed && (
+                          <td className="p-2.5 text-right font-data-mono font-bold text-slate-900">
+                            {tot > 0 ? tot.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}
+                          </td>
+                        )}
                       </tr>
                     );
                   })
                 ) : (
                   <tr>
-                    <td colSpan={7} className="p-4 text-center text-slate-400 italic">
-                      Nenhum equipamento listado nesta proposta.
+                    <td colSpan={detailed ? 7 : 5} className="p-4 text-center text-slate-400 italic">
+                      Materiais conforme especificação técnica.
                     </td>
                   </tr>
                 )}
               </tbody>
+              {detailed && (
+                <tfoot>
+                  <tr className="bg-[#0B1E38] text-white font-bold">
+                    <td colSpan={6} className="p-2.5 text-right uppercase text-[11px]">Total</td>
+                    <td className="p-2.5 text-right font-data-mono">{brl(proposal.valorTotal)}</td>
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         </section>
-        )}
 
-        {/* ==================== 5. PREMISSAS ==================== */}
-        <section className="mb-8">
-          <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
-            <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">05</span>
-            <h3 className="text-base font-bold text-[#0B1E38] uppercase font-display tracking-wide">
-              PREMISSAS ADOTADAS
-            </h3>
-          </div>
-          <ul className="space-y-1.5 text-xs text-slate-700">
-            {proposal.premissas && proposal.premissas.length > 0 ? (
-              proposal.premissas.map((prem, idx) => (
-                <li key={idx} className="flex items-start gap-2">
-                  <span className="text-[#E63946] font-bold">•</span>
-                  <span>{prem}</span>
-                </li>
-              ))
-            ) : (
-              <li className="text-slate-400 italic">Conforme rotinas padrão do contratante.</li>
-            )}
-          </ul>
+        {/* ===================== 6. PREMISSAS ===================== */}
+        <section className="pdf-section mb-8">
+          <SecHead n={nn(6)} titulo="Premissas Adotadas" />
+          {listaNaoVazia(proposal.premissas) ? (
+            <Bullets itens={proposal.premissas} />
+          ) : (
+            <p className="text-xs text-slate-500 italic">Premissas conforme rotinas padrão de execução.</p>
+          )}
         </section>
 
-        {/* ==================== 6. RESPONSABILIDADES ==================== */}
-        <section className="mb-8">
-          <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
-            <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">06</span>
-            <h3 className="text-base font-bold text-[#0B1E38] uppercase font-display tracking-wide">
-              DIVISÃO DE RESPONSABILIDADES
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            {/* Contratada */}
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-              <h4 className="font-bold text-[#0B1E38] uppercase text-xs border-b border-slate-200 pb-2 mb-2 flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Responsabilidades da Contratada
-              </h4>
-              <ul className="space-y-2 text-slate-700">
-                {proposal.responsabilidadesContratada && proposal.responsabilidadesContratada.length > 0 ? (
-                  proposal.responsabilidadesContratada.map((item, idx) => (
-                    <li key={idx} className="flex items-start gap-1.5">
-                      <span className="text-emerald-600 font-bold">✓</span>
-                      <span>{item}</span>
-                    </li>
-                  ))
-                ) : (
-                  <li className="text-slate-400 italic">Mão de obra e ferramentas inclusas.</li>
-                )}
-              </ul>
-            </div>
-
-            {/* Contratante */}
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-              <h4 className="font-bold text-[#0B1E38] uppercase text-xs border-b border-slate-200 pb-2 mb-2 flex items-center gap-1.5">
-                <Building2 className="w-4 h-4 text-blue-600" /> Responsabilidades da Contratante
-              </h4>
-              <ul className="space-y-2 text-slate-700">
-                {proposal.responsabilidadesContratante && proposal.responsabilidadesContratante.length > 0 ? (
-                  proposal.responsabilidadesContratante.map((item, idx) => (
-                    <li key={idx} className="flex items-start gap-1.5">
-                      <span className="text-blue-600 font-bold">✓</span>
-                      <span>{item}</span>
-                    </li>
-                  ))
-                ) : (
-                  <li className="text-slate-400 italic">Liberação de acessos e pontos de energia.</li>
-                )}
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        {/* ==================== 7. CONDIÇÕES COMERCIAIS & PRAZO ==================== */}
-        <section className="mb-8">
-          <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
-            <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">07</span>
-            <h3 className="text-base font-bold text-[#0B1E38] uppercase font-display tracking-wide">
-              CONDIÇÕES COMERCIAIS & PRAZOS
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            {/* Value Card */}
-            <div className="bg-[#0B1E38] text-white p-5 rounded-lg border border-slate-800 col-span-1 md:col-span-1 flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-[#F2A900]">
-                  INVESTIMENTO TOTAL
-                </span>
-                <p className="text-2xl md:text-3xl font-black text-white font-data-mono mt-1">
-                  R$ {(proposal.valorTotal || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </p>
+        {/* ===================== 7. DESCRIÇÃO DOS SERVIÇOS ===================== */}
+        <section className="pdf-section mb-8">
+          <SecHead n={nn(7)} titulo="Descrição dos Serviços Ofertados" />
+          <div className="space-y-3">
+            {SERVICOS_OFERTADOS.map((s, i) => (
+              <div key={i}>
+                <h4 className="font-bold text-[#0B1E38] uppercase text-[11px] mb-1">7.{i + 1}. {s.titulo}</h4>
+                <Bullets itens={s.itens} />
               </div>
-              <p className="text-[10px] text-slate-300 mt-3 pt-2 border-t border-slate-700">
-                Impostos: {proposal.impostos || 'Simples Nacional Incluso'}
-              </p>
-            </div>
-
-            {/* Terms Details */}
-            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 col-span-1 md:col-span-2 space-y-2 text-xs">
-              {proposal.composicaoValor?.trim() && (
-                <p><strong className="text-slate-900 uppercase">Composição do Valor:</strong> {proposal.composicaoValor}</p>
-              )}
-              <p><strong className="text-slate-900 uppercase">Forma de Pagamento:</strong> {proposal.formaPagamento || 'A combinar'}</p>
-              <p><strong className="text-slate-900 uppercase">Faturamento:</strong> {proposal.faturamento || 'Por etapa'}</p>
-              <p><strong className="text-slate-900 uppercase">Prazo de Execução:</strong> {proposal.prazoExecucao || 'A definir'}</p>
-            </div>
+            ))}
+            {listaNaoVazia(proposal.entregaveis) && (
+              <div>
+                <h4 className="font-bold text-[#0B1E38] uppercase text-[11px] mb-1">Entregáveis do projeto</h4>
+                <Bullets itens={proposal.entregaveis} />
+              </div>
+            )}
+            {listaNaoVazia(proposal.responsabilidadesContratada) && (
+              <div>
+                <h4 className="font-bold text-[#0B1E38] uppercase text-[11px] mb-1">Responsabilidades da Contratada</h4>
+                <Bullets itens={proposal.responsabilidadesContratada} />
+              </div>
+            )}
           </div>
         </section>
 
-        {/* ==================== 11 & 12. GARANTIA & VALIDADE ==================== */}
-        <section className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-          <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-            <h4 className="font-bold text-[#0B1E38] uppercase text-xs mb-1">GARANTIA TÉCNICA</h4>
-            <p className="text-slate-700 leading-relaxed">{proposal.garantia || '90 dias para serviços / 12 meses para peças.'}</p>
-          </div>
+        {/* ===================== 8. EMBALAGEM ===================== */}
+        <section className="pdf-section mb-8">
+          <SecHead n={nn(8)} titulo="Embalagem, Transporte e Armazenamento" />
+          <Paras paras={EMBALAGEM_TRANSPORTE} />
+        </section>
 
-          <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
-            <h4 className="font-bold text-amber-900 uppercase text-xs mb-1">VALIDADE DA PROPOSTA</h4>
-            <p className="text-amber-800 font-bold font-data-mono">
-              {proposal.validadePropostaDias || 15} {proposal.validadePropostaComplemento || 'dias corridos a partir da emissão'}
-            </p>
+        {/* ===================== 9. SEGURANÇA DO TRABALHO ===================== */}
+        <section className="pdf-section mb-8">
+          <SecHead n={nn(9)} titulo="Segurança do Trabalho" />
+          <Bullets itens={SEGURANCA_TRABALHO} />
+        </section>
+
+        {/* ===================== 10. OBRIGAÇÕES DA CONTRATANTE ===================== */}
+        <section className="pdf-section mb-8">
+          <SecHead n={nn(10)} titulo="Obrigações da Contratante" />
+          {listaNaoVazia(proposal.responsabilidadesContratante) ? (
+            <Bullets itens={proposal.responsabilidadesContratante} />
+          ) : (
+            <Bullets
+              itens={[
+                'Liberação das frentes de trabalho e dos acessos necessários à equipe.',
+                'Fornecimento de ponto de energia elétrica 120/220 Vac para os serviços.',
+                'Local seguro e adequado para guarda de materiais e ferramentas.',
+              ]}
+            />
+          )}
+        </section>
+
+        {/* ===================== 11. PREÇOS ===================== */}
+        <section className="pdf-section mb-8">
+          <SecHead n={nn(11)} titulo="Preços" />
+          <div className="bg-[#0B1E38] text-white p-5 rounded-lg flex items-center justify-between mb-3">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[#F2A900]">Investimento Total</span>
+            <span className="text-2xl font-black font-data-mono">{brl(proposal.valorTotal)}</span>
+          </div>
+          <Paras paras={PRECOS_OBS} />
+        </section>
+
+        {/* ===================== 12. INFORMAÇÕES PARA PEDIDO DE COMPRA ===================== */}
+        <section className="pdf-section mb-8">
+          <SecHead n={nn(12)} titulo="Informações para o Pedido de Compra" />
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-xs text-slate-700 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <p><strong className="text-slate-900 uppercase">Razão Social:</strong> {razao}</p>
+            <p><strong className="text-slate-900 uppercase">CNPJ:</strong> <span className="font-data-mono">{companyProfile.cnpj}</span></p>
+            <p className="sm:col-span-2"><strong className="text-slate-900 uppercase">Endereço:</strong> {companyProfile.endereco}</p>
+            {naoVazio(companyProfile.telefone) && <p><strong className="text-slate-900 uppercase">Telefone:</strong> {companyProfile.telefone}</p>}
+            {naoVazio(companyProfile.email) && <p><strong className="text-slate-900 uppercase">E-mail:</strong> {companyProfile.email}</p>}
           </div>
         </section>
 
-        {/* ==================== DADOS PARA PAGAMENTO (opcional) ==================== */}
-        {showBankData && (
-          <section className="mb-8">
-            <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
-              <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">$</span>
-              <h3 className="text-base font-bold text-[#0B1E38] uppercase font-display tracking-wide">
-                DADOS PARA PAGAMENTO
-              </h3>
-            </div>
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-xs text-slate-700 grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <p><strong className="text-slate-900 uppercase">Beneficiário:</strong> {companyProfile.razaoSocial}</p>
-              <p><strong className="text-slate-900 uppercase">Chave PIX (CNPJ):</strong> <span className="font-data-mono">{companyProfile.cnpj}</span></p>
-              <p className="sm:col-span-2 text-[10px] text-slate-500">
-                Pagamento mediante emissão de nota fiscal. Confirme o comprovante junto ao responsável comercial.
-              </p>
-            </div>
-          </section>
-        )}
+        {/* ===================== 13. IMPOSTOS E TAXAS ===================== */}
+        <section className="pdf-section mb-8">
+          <SecHead n={nn(13)} titulo="Impostos e Taxas" />
+          <Paras paras={naoVazio(proposal.impostos) ? [`Regime/observação: ${proposal.impostos}`, ...IMPOSTOS_OBS] : IMPOSTOS_OBS} />
+        </section>
 
-        {/* ==================== 8. CONCLUSÃO ==================== */}
-        <section className="mb-12">
-          <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
-            <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">08</span>
-            <h3 className="text-base font-bold text-[#0B1E38] uppercase font-display tracking-wide">
-              CONCLUSÃO
-            </h3>
-          </div>
-          <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-line text-justify italic">
-            {proposal.conclusao || 'Permanecemos à inteira disposição para quaisquer esclarecimentos.'}
+        {/* ===================== 14. CONDIÇÕES DE PAGAMENTO ===================== */}
+        <section className="pdf-section mb-8">
+          <SecHead n={nn(14)} titulo="Condições de Pagamento" />
+          <p className="text-xs text-slate-700 leading-relaxed text-justify">
+            {naoVazio(proposal.formaPagamento) ? proposal.formaPagamento : 'A combinar entre as partes.'}
           </p>
         </section>
 
-        {/* ==================== ASSINATURAS ==================== */}
-        <div className="pt-10 border-t border-slate-200 grid grid-cols-2 gap-8 text-center text-xs mt-12">
-          <div>
-            <div className="border-b border-slate-400 h-12 mb-2" />
-            <p className="font-bold text-slate-900 uppercase">{pedido.fornecedor || companyProfile.razaoSocial}</p>
-            <p className="text-[10px] text-slate-500 uppercase">{pedido.responsavelComercialNome} — Engenharia</p>
+        {/* ===================== 15. LIMITAÇÃO DE RESPONSABILIDADE ===================== */}
+        <section className="pdf-section mb-8">
+          <SecHead n={nn(15)} titulo="Limitação de Responsabilidade" />
+          <Paras paras={LIMITACAO_RESPONSABILIDADE} />
+        </section>
+
+        {/* ===================== 16. PRAZO DE FORNECIMENTO ===================== */}
+        <section className="pdf-section mb-8">
+          <SecHead n={nn(16)} titulo="Prazo de Fornecimento" />
+          <p className="text-xs text-slate-700 leading-relaxed text-justify">
+            {naoVazio(proposal.prazoExecucao) ? proposal.prazoExecucao : 'Prazo a ser definido após confirmação do pedido.'}
+          </p>
+        </section>
+
+        {/* ===================== 17. GARANTIA ===================== */}
+        <section className="pdf-section mb-8">
+          <SecHead n={nn(17)} titulo="Garantia" />
+          <p className="text-xs text-slate-700 leading-relaxed text-justify whitespace-pre-line">
+            {naoVazio(proposal.garantia)
+              ? proposal.garantia
+              : 'Garantia de 90 (noventa) dias sobre os serviços de instalação e de 12 (doze) meses para os equipamentos fornecidos, contra defeitos de fabricação, a contar da entrega.'}
+          </p>
+        </section>
+
+        {/* ===================== 18. CONFIDENCIALIDADE ===================== */}
+        <section className="pdf-section mb-8">
+          <SecHead n={nn(18)} titulo="Confidencialidade" />
+          <Paras paras={CONFIDENCIALIDADE} />
+        </section>
+
+        {/* ===================== 19. TERMO DE ACEITE ===================== */}
+        <section className="pdf-section mb-8">
+          <SecHead n={nn(19)} titulo="Termo de Aceite da Proposta" />
+          <Paras paras={TERMO_ACEITE} />
+        </section>
+
+        {/* ===================== 20. CONDIÇÕES GERAIS ===================== */}
+        <section className="pdf-section mb-8">
+          <SecHead n={nn(20)} titulo="Condições Gerais" />
+          <Paras paras={CONDICOES_GERAIS} />
+        </section>
+
+        {/* ===================== 21. VALIDADE ===================== */}
+        <section className="pdf-section mb-8">
+          <SecHead n={nn(21)} titulo="Validade da Proposta" />
+          <p className="text-xs text-slate-700 leading-relaxed text-justify">
+            Os preços permanecem fixos dentro do período de validade desta proposta, que é de{' '}
+            <strong>{proposal.validadePropostaDias || 15} {proposal.validadePropostaComplemento || 'dias corridos a partir da emissão'}</strong>.
+            Após este período, eventuais variações na base de preços dos fabricantes poderão ser repactuadas.
+          </p>
+        </section>
+
+        {/* ===================== 22. CONCLUSÃO ===================== */}
+        <section className="pdf-section mb-8">
+          <SecHead n={nn(22)} titulo="Conclusão" />
+          <p className="text-xs text-slate-700 leading-relaxed text-justify italic whitespace-pre-line">
+            {naoVazio(proposal.conclusao)
+              ? proposal.conclusao
+              : 'Reiteramos nosso compromisso com a qualidade e a segurança, permanecendo à disposição para eventuais esclarecimentos e negociações. Aguardamos sua análise e retorno.'}
+          </p>
+        </section>
+
+        {/* ===================== 23. ACEITE DA PROPOSTA ===================== */}
+        <section className="pdf-section mb-8">
+          <SecHead n={nn(23)} titulo="Aceite da Proposta" />
+          <p className="text-xs text-slate-700 leading-relaxed text-justify mb-4">
+            O Cliente aceita as condições desta proposta, emitindo o seu &ldquo;de acordo&rdquo; para o fornecimento em tela.
+            O aceite é documento suficiente para que as Partes se obriguem nos termos e condições aqui previstos.
+          </p>
+          <div className="text-xs text-slate-800 leading-8 bg-slate-50 border border-slate-200 rounded-lg p-4">
+            Pelo presente, a empresa {linhaBranca('w-64')}, situada na {linhaBranca('w-64')}, nº {linhaBranca('w-16')},
+            CEP {linhaBranca('w-24')}, cidade {linhaBranca('w-40')}, inscrita no CNPJ {linhaBranca('w-40')}
+            IE {linhaBranca('w-28')}, representada legalmente pelo Sr.(a) {linhaBranca('w-56')},
+            CPF {linhaBranca('w-32')}, telefone {linhaBranca('w-36')}, e-mail {linhaBranca('w-56')},
+            aceita as condições desta proposta.
           </div>
 
-          <div>
-            <div className="border-b border-slate-400 h-12 mb-2" />
-            <p className="font-bold text-slate-900 uppercase">{pedido.clienteNome}</p>
-            <p className="text-[10px] text-slate-500 uppercase">De acordo & Aceite da Proposta</p>
+          <div className="pt-12 grid grid-cols-2 gap-8 text-center text-xs">
+            <div>
+              <div className="border-b border-slate-400 h-10 mb-2" />
+              <p className="font-bold text-slate-900 uppercase">{razao}</p>
+              <p className="text-[10px] text-slate-500 uppercase">{assinante}</p>
+            </div>
+            <div>
+              <div className="border-b border-slate-400 h-10 mb-2" />
+              <p className="font-bold text-slate-900 uppercase">{pedido.clienteNome}</p>
+              <p className="text-[10px] text-slate-500 uppercase">De acordo &amp; Aceite da Proposta</p>
+            </div>
           </div>
-        </div>
-
-        {/* ==================== FOOTER ==================== */}
-        <div className="mt-12 pt-4 border-t border-slate-200 text-center text-[10px] text-slate-400 uppercase tracking-wider flex justify-between items-center">
-          <span>{companyProfile.razaoSocial} • CNPJ {companyProfile.cnpj}</span>
-          <span>{companyProfile.endereco}</span>
-        </div>
+        </section>
       </div>
     </div>
   );
 };
+
+// Campo da capa (rótulo + valor).
+const CapaCampo: React.FC<{ rotulo: string; valor: string; destaque?: boolean; mono?: boolean }> = ({
+  rotulo,
+  valor,
+  destaque,
+  mono,
+}) => (
+  <div>
+    <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">{rotulo}</span>
+    <span
+      className={`block ${destaque ? 'text-2xl font-black text-slate-900' : 'text-lg font-bold text-slate-800'} ${
+        mono ? 'font-data-mono' : 'font-display'
+      }`}
+    >
+      {valor || '—'}
+    </span>
+  </div>
+);
