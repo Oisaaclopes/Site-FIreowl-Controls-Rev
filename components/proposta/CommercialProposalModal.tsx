@@ -1049,17 +1049,6 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                 </div>
 
                 <div className="col-span-1 md:col-span-2 space-y-3">
-                  <div>
-                    <label className="block font-bold text-slate-700 uppercase mb-1">Composição do Valor</label>
-                    <input
-                      type="text"
-                      value={composicaoValor}
-                      onChange={(e) => setComposicaoValor(e.target.value)}
-                      placeholder="Ex.: 70% mão de obra / 30% materiais"
-                      className="w-full border border-slate-300 rounded-lg p-2.5 text-slate-900"
-                    />
-                  </div>
-
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block font-bold text-slate-700 uppercase mb-1">Forma de Pagamento</label>

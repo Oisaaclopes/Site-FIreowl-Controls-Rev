@@ -255,46 +255,10 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
         </section>
         )}
 
-        {/* ==================== 6. MARCAS E FABRICANTES ==================== */}
+        {/* ==================== 5. PREMISSAS ==================== */}
         <section className="mb-8">
           <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
             <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">05</span>
-            <h3 className="text-base font-bold text-[#0B1E38] uppercase font-display tracking-wide">
-              MARCAS E FABRICANTES HOMOLOGADOS
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-            {proposal.marcas && proposal.marcas.length > 0 ? (
-              proposal.marcas.map((brand, idx) => (
-                <div
-                  key={idx}
-                  className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center gap-3 shadow-xs"
-                >
-                  {brand.marcaLogoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={brand.marcaLogoUrl} alt={brand.marcaNome} className="w-10 h-10 object-contain shrink-0" />
-                  ) : (
-                    <div className="w-9 h-9 bg-[#0B1E38] text-[#F2A900] rounded flex items-center justify-center font-bold text-xs shrink-0">
-                      {brand.marcaNome.slice(0, 2).toUpperCase()}
-                    </div>
-                  )}
-                  <div>
-                    <h5 className="font-bold text-slate-900 text-xs">{brand.marcaNome}</h5>
-                    <p className="text-[10px] text-slate-500 uppercase">{brand.marcaCategoria}</p>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-slate-400 italic text-xs col-span-3">Marcas e fabricantes homologados padrão Fireowl Controls.</p>
-            )}
-          </div>
-        </section>
-
-        {/* ==================== 7. PREMISSAS ==================== */}
-        <section className="mb-8">
-          <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
-            <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">06</span>
             <h3 className="text-base font-bold text-[#0B1E38] uppercase font-display tracking-wide">
               PREMISSAS ADOTADAS
             </h3>
@@ -313,10 +277,10 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
           </ul>
         </section>
 
-        {/* ==================== 8. RESPONSABILIDADES ==================== */}
+        {/* ==================== 6. RESPONSABILIDADES ==================== */}
         <section className="mb-8">
           <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
-            <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">07</span>
+            <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">06</span>
             <h3 className="text-base font-bold text-[#0B1E38] uppercase font-display tracking-wide">
               DIVISÃO DE RESPONSABILIDADES
             </h3>
@@ -363,10 +327,10 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
           </div>
         </section>
 
-        {/* ==================== 9 & 10. CONDIÇÕES COMERCIAIS & PRAZO ==================== */}
+        {/* ==================== 7. CONDIÇÕES COMERCIAIS & PRAZO ==================== */}
         <section className="mb-8">
           <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
-            <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">08</span>
+            <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">07</span>
             <h3 className="text-base font-bold text-[#0B1E38] uppercase font-display tracking-wide">
               CONDIÇÕES COMERCIAIS & PRAZOS
             </h3>
@@ -434,10 +398,10 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
           </section>
         )}
 
-        {/* ==================== 13. CONCLUSÃO ==================== */}
+        {/* ==================== 8. CONCLUSÃO ==================== */}
         <section className="mb-12">
           <div className="border-b-2 border-[#E63946] pb-1 mb-3 flex items-center gap-2">
-            <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">09</span>
+            <span className="bg-[#0B1E38] text-white text-[10px] font-bold px-2 py-0.5 rounded">08</span>
             <h3 className="text-base font-bold text-[#0B1E38] uppercase font-display tracking-wide">
               CONCLUSÃO
             </h3>
