@@ -257,7 +257,10 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const [faturamento, setFaturamento] = useState<string>(initialPedido?.proposal?.faturamento || '');
   const [impostos, setImpostos] = useState<string>(initialPedido?.proposal?.impostos || 'Inclusos, Simples Nacional (Anexo III)');
 
-  const [manualValorTotal, setManualValorTotal] = useState<number | null>(initialPedido?.proposal?.valorTotal || null);
+  const [maoDeObraManual, setMaoDeObraManual] = useState<number | null>(
+    initialPedido?.proposal?.maoDeObra ?? null
+  );
+  const [manualValorTotal, setManualValorTotal] = useState<number | null>(null);
 
   // Cadastro rápido de cliente (dialog sobreposto).
   const [newClientOpen, setNewClientOpen] = useState(false);
@@ -269,8 +272,14 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
 
   const selectedClient = clients.find((c) => c.id === clienteId) || clients[0];
 
-  const calculatedEquipTotal = equipmentItems.reduce((acc, item) => acc + (item.precoUnitario || 0) * item.quantidade, 0);
-  const effectiveValorTotal = manualValorTotal !== null ? manualValorTotal : calculatedEquipTotal;
+  const round2 = (n: number) => Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
+  // Materiais = soma dos itens de equipamento. Mão de obra sugerida pela regra
+  // 70/30 (mão de obra = 70% do total; materiais = 30% → M x 0,7/0,3), editável.
+  const materiais = round2(equipmentItems.reduce((acc, item) => acc + (item.precoUnitario || 0) * item.quantidade, 0));
+  const maoDeObraSugerida = round2(materiais > 0 ? materiais * (0.7 / 0.3) : 0);
+  const maoDeObra = maoDeObraManual !== null ? maoDeObraManual : maoDeObraSugerida;
+  const valorBase = round2(materiais + maoDeObra);
+  const effectiveValorTotal = manualValorTotal !== null ? manualValorTotal : valorBase;
 
   // ----------------- helpers de lista -----------------
   const addStr = (setter: React.Dispatch<React.SetStateAction<string[]>>, def = '') => setter((p) => [...p, def]);
@@ -379,6 +388,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         responsabilidadesContratada: respContratada,
         responsabilidadesContratante: respContratante,
         valorTotal: effectiveValorTotal,
+        maoDeObra,
         composicaoValor: '',
         formaPagamento,
         faturamento,
@@ -508,18 +518,69 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             </div>
           </div>
 
-          {/* ---- Valor da Proposta (sempre visível) ---- */}
-          <div className="bg-[#0B1E38] text-white p-5 rounded-xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <span className="text-[10px] font-bold text-[#F2A900] uppercase tracking-widest block">Valor Total da Proposta (R$)</span>
-              <p className="text-[10px] text-slate-300 mt-1">Soma dos equipamentos: R$ {calculatedEquipTotal.toLocaleString('pt-BR')}</p>
+          {/* ---- Composição do Valor (Materiais + Mão de Obra) ---- */}
+          <div className="bg-[#0B1E38] text-white p-5 rounded-xl shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-[#F2A900] uppercase tracking-widest">Composição do Valor</span>
+              <span className="text-[10px] text-slate-300">Mão de obra sugerida pela regra 70/30 — edite se precisar</span>
             </div>
-            <input
-              type="number"
-              value={effectiveValorTotal}
-              onChange={(e) => setManualValorTotal(Number(e.target.value))}
-              className="w-full sm:w-56 bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-2xl font-black text-amber-400 font-data-mono text-right"
-            />
+
+            {/* Materiais (soma dos itens) */}
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-300">Materiais (soma dos itens)</span>
+              <span className="font-data-mono font-bold">R$ {materiais.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            </div>
+
+            {/* Mão de obra / Serviços — editável */}
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-slate-300 text-sm flex items-center gap-1.5">
+                Mão de obra / Serviços
+                {maoDeObraManual !== null && (
+                  <button
+                    type="button"
+                    onClick={() => setMaoDeObraManual(null)}
+                    title="Voltar à sugestão 70/30"
+                    className="text-[9px] font-bold uppercase text-[#0B1E38] bg-[#F2A900] hover:bg-amber-400 rounded px-1.5 py-0.5"
+                  >
+                    Auto
+                  </button>
+                )}
+              </span>
+              <div className="flex items-center gap-1">
+                <span className="text-slate-400 text-xs font-data-mono">R$</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={maoDeObra}
+                  onChange={(e) => setMaoDeObraManual(e.target.value === '' ? null : Number(e.target.value))}
+                  className="w-32 bg-slate-900 border border-slate-700 rounded p-1.5 text-right font-data-mono font-bold text-amber-300"
+                />
+              </div>
+            </div>
+
+            {/* Valor total — editável (default = materiais + mão de obra) */}
+            <div className="border-t border-slate-700 pt-3 flex items-center justify-between gap-2">
+              <span className="text-[10px] font-bold text-[#F2A900] uppercase tracking-widest flex items-center gap-1.5">
+                Valor Total (R$)
+                {manualValorTotal !== null && (
+                  <button
+                    type="button"
+                    onClick={() => setManualValorTotal(null)}
+                    title="Voltar ao total calculado (Materiais + Mão de obra)"
+                    className="text-[9px] font-bold uppercase text-[#0B1E38] bg-[#F2A900] hover:bg-amber-400 rounded px-1.5 py-0.5"
+                  >
+                    Auto
+                  </button>
+                )}
+              </span>
+              <input
+                type="number"
+                min={0}
+                value={effectiveValorTotal}
+                onChange={(e) => setManualValorTotal(e.target.value === '' ? null : Number(e.target.value))}
+                className="w-44 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xl font-black text-amber-400 font-data-mono text-right"
+              />
+            </div>
           </div>
 
           {/* ---- Accordions de conteúdo ---- */}

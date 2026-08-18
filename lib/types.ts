@@ -60,6 +60,8 @@ export interface CommercialProposalData {
   responsabilidadesContratada: string[];
   responsabilidadesContratante: string[];
   valorTotal: number;
+  /** Valor de mão de obra / serviços (aparece como linha "Serviços" no PDF). */
+  maoDeObra?: number;
   composicaoValor: string;
   formaPagamento: string;
   faturamento: string;

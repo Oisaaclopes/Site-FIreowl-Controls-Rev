@@ -581,8 +581,8 @@ export const INITIAL_SERVICES: ServiceCatalogItem[] = [
 
 export const INITIAL_COMPANY_PROFILE: CompanyProfile = {
   razaoSocial: 'Fireowl Controls Ltda.',
-  cnpj: '38.492.102/0001-90',
-  endereco: 'Rua Professor João Cândido, 1200 - Centro, Londrina / PR - CEP 86010-001',
+  cnpj: '57.372.721/0001-40',
+  endereco: 'Av. Higienópolis, 70 - Centro, Londrina / PR',
   telefone: '(43) 98445-5979',
   email: 'comercial@fireowlcontrols.com.br',
   regimeTributario: 'Simples Nacional (Incluso Anexo III)',

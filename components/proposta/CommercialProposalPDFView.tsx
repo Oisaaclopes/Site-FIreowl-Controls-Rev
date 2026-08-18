@@ -348,6 +348,12 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
               </tbody>
               {detailed && (
                 <tfoot>
+                  {(proposal.maoDeObra || 0) > 0 && (
+                    <tr className="bg-slate-100 font-semibold text-slate-800">
+                      <td colSpan={6} className="p-2.5 text-right uppercase text-[11px]">Serviços / Mão de obra</td>
+                      <td className="p-2.5 text-right font-data-mono">{brl(proposal.maoDeObra || 0)}</td>
+                    </tr>
+                  )}
                   <tr className="bg-[#0B1E38] text-white font-bold">
                     <td colSpan={6} className="p-2.5 text-right uppercase text-[11px]">Total</td>
                     <td className="p-2.5 text-right font-data-mono">{brl(proposal.valorTotal)}</td>
