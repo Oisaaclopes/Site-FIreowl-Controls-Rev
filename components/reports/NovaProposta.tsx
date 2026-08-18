@@ -36,6 +36,7 @@ export const NovaProposta: React.FC<NovaPropostaProps> = ({ open, onClose, clien
   const [prazoDias, setPrazoDias] = useState(5);
   const [tecnicos, setTecnicos] = useState(2);
   const [logistica, setLogistica] = useState(0);
+  const [maoDeObraManual, setMaoDeObraManual] = useState<number | null>(null);
   const [selecionadas, setSelecionadas] = useState<Record<string, boolean>>({});
 
   // Garantia configurável por proposta (Parte 10)
@@ -87,6 +88,7 @@ export const NovaProposta: React.FC<NovaPropostaProps> = ({ open, onClose, clien
         contingenciaPct: contingenciaPct / 100,
         margemPct: margemPct / 100,
         precoItem,
+        maoDeObraOverride: maoDeObraManual,
         logistica,
         prazoDias,
         tecnicos,
@@ -95,7 +97,7 @@ export const NovaProposta: React.FC<NovaPropostaProps> = ({ open, onClose, clien
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
-      escolhidas, cliente, regime, contingenciaPct, margemPct, logistica, prazoDias, tecnicos,
+      escolhidas, cliente, regime, contingenciaPct, margemPct, logistica, prazoDias, tecnicos, maoDeObraManual,
       garServicoMeses, garServicoExibir, garMateriaisModo, garMateriaisMeses,
       garPreexistenteExibir, garCondicionadaPreventiva, garObservacoes,
     ]
@@ -310,7 +312,32 @@ export const NovaProposta: React.FC<NovaPropostaProps> = ({ open, onClose, clien
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Composição interna (não vai ao PDF)</p>
               <div className="space-y-1 text-xs">
                 <CompRow label="Materiais" valor={composicao.materiais} />
-                <CompRow label="Mão de obra (70/30)" valor={composicao.maoDeObra} />
+                {/* Mão de obra: valor calculado (regra 70/30) mas editável. */}
+                <div className="flex justify-between items-center text-slate-600">
+                  <span className="flex items-center gap-1.5">
+                    Mão de obra
+                    {maoDeObraManual !== null && (
+                      <button
+                        type="button"
+                        onClick={() => setMaoDeObraManual(null)}
+                        title="Voltar ao cálculo automático"
+                        className="text-[9px] font-bold uppercase text-[#1A1A72] bg-[#1A1A72]/10 hover:bg-[#1A1A72]/20 rounded px-1.5 py-0.5"
+                      >
+                        Auto
+                      </button>
+                    )}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="text-slate-400 text-[10px] font-data-mono">R$</span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={composicao.maoDeObra}
+                      onChange={(e) => setMaoDeObraManual(e.target.value === '' ? null : Number(e.target.value))}
+                      className="w-24 border border-slate-200 rounded px-1.5 py-0.5 text-right font-data-mono text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#1A1A72]/30"
+                    />
+                  </span>
+                </div>
                 <CompRow label="Logística" valor={composicao.logistica} />
                 <div className="border-t border-slate-200 my-1" />
                 <CompRow label="Subtotal de custo" valor={composicao.subtotalCusto} bold />

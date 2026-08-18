@@ -203,6 +203,8 @@ export interface MontarPropostaOpts {
   margemPct?: number; // markup comercial (default 0.25)
   precoItem?: (pendencia: Pendencia) => number; // preço unitário do catálogo (0 se a precificar)
   valorHora?: number; // usado quando não há como derivar mão de obra
+  /** Valor de mão de obra informado manualmente (sobrescreve a regra 70/30). */
+  maoDeObraOverride?: number | null;
   logistica?: number;
   prazoDias?: number;
   tecnicos?: number;
@@ -241,8 +243,15 @@ export function montarProposta(
   }));
 
   const materiais = round2(pendencias.reduce((acc, p) => acc + precoItem(p) * (p.quantidade || 1), 0));
-  // Regra 70/30 já praticada: material ~30% da execução, mão de obra ~70%.
-  const maoDeObra = round2(materiais > 0 ? materiais * (0.7 / 0.3) : (opts.valorHora || 0));
+  // Mão de obra: valor manual quando informado; senão a regra 70/30 já praticada
+  // (material ~30% da execução, mão de obra ~70%).
+  const maoDeObra = round2(
+    opts.maoDeObraOverride !== undefined && opts.maoDeObraOverride !== null
+      ? opts.maoDeObraOverride
+      : materiais > 0
+      ? materiais * (0.7 / 0.3)
+      : opts.valorHora || 0
+  );
   const logistica = round2(opts.logistica || 0);
   const subtotalCusto = round2(materiais + maoDeObra + logistica);
   const contingencia = round2(subtotalCusto * opts.contingenciaPct);

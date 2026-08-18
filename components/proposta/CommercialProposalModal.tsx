@@ -474,7 +474,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                 : 'bg-white text-slate-600 hover:bg-slate-200 border border-slate-200'
             }`}
           >
-            <Layers className="w-4 h-4" /> 3. Marcas &amp; Responsabilidades
+            <ShieldCheck className="w-4 h-4" /> 3. Premissas &amp; Responsabilidades
           </button>
 
           <button
@@ -825,102 +825,6 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           {/* ================= TAB 3: MARCAS & RESPONSABILIDADES ================= */}
           {activeTab === 'marcas_resp' && (
             <div className="space-y-6">
-              {/* Seção Marcas e Fabricantes */}
-              <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-4">
-                <div>
-                  <h3 className="font-bold text-[#0B1E38] uppercase text-sm flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-[#E63946]" /> Biblioteca de Marcas e Fabricantes Homologados
-                  </h3>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Selecione quais marcas da biblioteca corporativa aparecem na Proposta Comercial.
-                  </p>
-                </div>
-
-                {/* Grid Partner Brands Checkboxes */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
-                  {partnerBrands.map((pb) => {
-                    const isChecked = marcas.some((m) => m.marcaNome === pb.name);
-                    return (
-                      <label
-                        key={pb.id}
-                        className={`p-3 rounded-lg border flex items-center gap-2.5 cursor-pointer transition-all ${
-                          isChecked
-                            ? 'bg-blue-50 border-[#0B1E38] text-[#0B1E38] font-bold shadow-xs'
-                            : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => handleTogglePartnerBrand(pb)}
-                          className="rounded text-[#0B1E38] focus:ring-[#0B1E38]"
-                        />
-                        <div>
-                          <p className="text-xs font-bold leading-tight">{pb.name}</p>
-                          <p className="text-[10px] text-slate-500 uppercase">{pb.category}</p>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-
-                {/* Add Custom Brand */}
-                <div className="bg-slate-100 p-3 rounded-lg flex flex-wrap items-center gap-3 border border-slate-200">
-                  <span className="text-xs font-bold text-slate-700 uppercase">Adicionar Marca Avulsa:</span>
-                  <input
-                    type="text"
-                    placeholder="Nome da Marca (ex.: Siemens)"
-                    value={customBrandName}
-                    onChange={(e) => setCustomBrandName(e.target.value)}
-                    className="border border-slate-300 rounded-lg p-2 text-xs bg-white text-slate-900 flex-1 min-w-[150px]"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Categoria (ex.: CFTV e Alarmes)"
-                    value={customBrandCategory}
-                    onChange={(e) => setCustomBrandCategory(e.target.value)}
-                    className="border border-slate-300 rounded-lg p-2 text-xs bg-white text-slate-900 flex-1 min-w-[150px]"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddCustomBrand}
-                    className="px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold uppercase hover:bg-slate-800"
-                  >
-                    + Adicionar
-                  </button>
-                </div>
-
-                {/* Selected Brands List in Proposal */}
-                <div className="space-y-2">
-                  <h4 className="font-bold text-slate-800 text-xs uppercase">
-                    Marcas Selecionadas nesta Proposta ({marcas.length})
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                    {marcas.map((m, idx) => (
-                      <div
-                        key={idx}
-                        className="p-2.5 bg-white border border-slate-300 rounded-lg flex justify-between items-center"
-                      >
-                        <div className="flex items-center gap-2">
-                          <GripVertical className="w-4 h-4 text-slate-400" />
-                          <div>
-                            <p className="font-bold text-slate-900 text-xs">{m.marcaNome}</p>
-                            <p className="text-[10px] text-slate-500 uppercase">{m.marcaCategoria}</p>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveBrand(idx)}
-                          className="text-red-500 hover:text-red-700 p-1"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
               {/* Premissas Adotadas */}
               <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
                 <div className="flex justify-between items-center border-b border-slate-100 pb-2">
