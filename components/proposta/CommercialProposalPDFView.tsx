@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Pedido, CompanyProfile } from '@/lib/types';
+import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import { ArrowLeft, Printer, Send, Building2 } from 'lucide-react';
 import {
   CARTA_APRESENTACAO,
@@ -67,6 +67,71 @@ const Bullets: React.FC<{ itens: string[] }> = ({ itens }) => (
   </ul>
 );
 
+// Tabela de itens (Materiais ou Serviços) com subtotal.
+const ItensTable: React.FC<{
+  titulo: string;
+  itens: PedidoEquipmentItem[];
+  detailed: boolean;
+  showMarca?: boolean;
+  accent?: string;
+}> = ({ titulo, itens, detailed, showMarca = true, accent = '#0B1E38' }) => {
+  const subtotal = itens.reduce((a, e) => a + (e.precoUnitario || 0) * e.quantidade, 0);
+  const cols = 3 + (showMarca ? 1 : 0) + (detailed ? 2 : 0); // Item, Descr, [Marca], Unid, Qtd, [Unit, Total]
+  return (
+    <div className="mb-4">
+      <h4 className="font-bold text-[#0B1E38] uppercase text-[11px] mb-1">{titulo}</h4>
+      <div className="overflow-x-auto border border-slate-200 rounded-lg">
+        <table className="w-full text-left text-xs">
+          <thead className="text-white font-bold uppercase text-[10px]" style={{ backgroundColor: accent }}>
+            <tr>
+              <th className="p-2.5 text-center w-12">Item</th>
+              <th className="p-2.5">Descrição</th>
+              {showMarca && <th className="p-2.5">Marca / Modelo</th>}
+              <th className="p-2.5 text-center w-14">Unid.</th>
+              <th className="p-2.5 text-center w-14">Qtd.</th>
+              {detailed && <th className="p-2.5 text-right w-24">Unit. (R$)</th>}
+              {detailed && <th className="p-2.5 text-right w-28">Total (R$)</th>}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200 font-medium text-slate-700">
+            {itens.map((eq, i) => {
+              const unit = eq.precoUnitario || 0;
+              const tot = unit * eq.quantidade;
+              return (
+                <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                  <td className="p-2.5 text-center font-bold text-[#E63946] font-data-mono">{i + 1}</td>
+                  <td className="p-2.5 font-semibold text-slate-900">{eq.descricao}</td>
+                  {showMarca && <td className="p-2.5 text-slate-600">{eq.marcaModelo}</td>}
+                  <td className="p-2.5 text-center font-bold uppercase">{eq.unidade}</td>
+                  <td className="p-2.5 text-center font-data-mono font-bold">{eq.quantidade}</td>
+                  {detailed && (
+                    <td className="p-2.5 text-right font-data-mono">
+                      {unit > 0 ? unit.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}
+                    </td>
+                  )}
+                  {detailed && (
+                    <td className="p-2.5 text-right font-data-mono font-bold text-slate-900">
+                      {tot > 0 ? tot.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+          {detailed && (
+            <tfoot>
+              <tr className="bg-slate-100 font-bold text-slate-800">
+                <td colSpan={cols - 1} className="p-2.5 text-right uppercase text-[11px]">Subtotal {titulo}</td>
+                <td className="p-2.5 text-right font-data-mono">{brl(subtotal)}</td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+    </div>
+  );
+};
+
 // Linha de assinatura com campo em branco.
 const linhaBranca = (largura = 'flex-1') => (
   <span className={`inline-block border-b border-slate-400 ${largura} mx-1 align-baseline`} style={{ minWidth: 60 }} />
@@ -84,6 +149,10 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
   const detailed = options?.detailedSubtotal ?? true;
 
   const handlePrint = () => window.print();
+
+  const itensProposta = proposal.equipmentItems || [];
+  const materiaisPdf = itensProposta.filter((e) => e.tipo !== 'servico');
+  const servicosPdf = itensProposta.filter((e) => e.tipo === 'servico');
 
   const razao = companyProfile.razaoSocial || 'Fireowl Controls';
   const escopoTitulo = pedido.referencia || 'Fornecimento e Serviços de Engenharia';
@@ -300,68 +369,30 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
         {/* ===================== 5. MATERIAIS OFERTADOS ===================== */}
         <section className="pdf-section mb-8">
           <SecHead n={nn(5)} titulo="Materiais e Serviços Ofertados" />
-          <div className="overflow-x-auto border border-slate-200 rounded-lg">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#0B1E38] text-white font-bold uppercase text-[10px]">
-                <tr>
-                  <th className="p-2.5 text-center w-12">Item</th>
-                  <th className="p-2.5">Descrição</th>
-                  <th className="p-2.5">Marca / Modelo</th>
-                  <th className="p-2.5 text-center w-14">Unid.</th>
-                  <th className="p-2.5 text-center w-14">Qtd.</th>
-                  {detailed && <th className="p-2.5 text-right w-24">Unit. (R$)</th>}
-                  {detailed && <th className="p-2.5 text-right w-28">Total (R$)</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 font-medium text-slate-700">
-                {proposal.equipmentItems && proposal.equipmentItems.length > 0 ? (
-                  proposal.equipmentItems.map((eq, i) => {
-                    const unit = eq.precoUnitario || 0;
-                    const tot = unit * eq.quantidade;
-                    return (
-                      <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                        <td className="p-2.5 text-center font-bold text-[#E63946] font-data-mono">{eq.itemNumero || i + 1}</td>
-                        <td className="p-2.5 font-semibold text-slate-900">{eq.descricao}</td>
-                        <td className="p-2.5 text-slate-600">{eq.marcaModelo}</td>
-                        <td className="p-2.5 text-center font-bold uppercase">{eq.unidade}</td>
-                        <td className="p-2.5 text-center font-data-mono font-bold">{eq.quantidade}</td>
-                        {detailed && (
-                          <td className="p-2.5 text-right font-data-mono">
-                            {unit > 0 ? unit.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}
-                          </td>
-                        )}
-                        {detailed && (
-                          <td className="p-2.5 text-right font-data-mono font-bold text-slate-900">
-                            {tot > 0 ? tot.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={detailed ? 7 : 5} className="p-4 text-center text-slate-400 italic">
-                      Materiais conforme especificação técnica.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-              {detailed && (
-                <tfoot>
-                  {(proposal.maoDeObra || 0) > 0 && (
-                    <tr className="bg-slate-100 font-semibold text-slate-800">
-                      <td colSpan={6} className="p-2.5 text-right uppercase text-[11px]">Serviços / Mão de obra</td>
-                      <td className="p-2.5 text-right font-data-mono">{brl(proposal.maoDeObra || 0)}</td>
-                    </tr>
-                  )}
-                  <tr className="bg-[#0B1E38] text-white font-bold">
-                    <td colSpan={6} className="p-2.5 text-right uppercase text-[11px]">Total</td>
-                    <td className="p-2.5 text-right font-data-mono">{brl(proposal.valorTotal)}</td>
-                  </tr>
-                </tfoot>
+
+          {materiaisPdf.length > 0 && <ItensTable titulo="Materiais" itens={materiaisPdf} detailed={detailed} showMarca />}
+          {servicosPdf.length > 0 && (
+            <ItensTable titulo="Serviços" itens={servicosPdf} detailed={detailed} showMarca={false} accent="#047857" />
+          )}
+          {materiaisPdf.length === 0 && servicosPdf.length === 0 && (
+            <p className="text-xs text-slate-400 italic">Itens conforme especificação técnica acordada.</p>
+          )}
+
+          {/* Fecho de valores */}
+          {detailed && (
+            <div className="mt-1 border border-slate-200 rounded-lg overflow-hidden">
+              {(proposal.maoDeObra || 0) > 0 && (
+                <div className="flex items-center justify-between px-3 py-2 bg-slate-100 text-slate-800 text-xs font-semibold">
+                  <span className="uppercase">Mão de obra / Serviços adicionais</span>
+                  <span className="font-data-mono">{brl(proposal.maoDeObra || 0)}</span>
+                </div>
               )}
-            </table>
-          </div>
+              <div className="flex items-center justify-between px-3 py-2.5 bg-[#0B1E38] text-white">
+                <span className="text-[11px] font-bold uppercase tracking-widest text-[#F2A900]">Valor Total</span>
+                <span className="text-lg font-black font-data-mono">{brl(proposal.valorTotal)}</span>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* ===================== 6. PREMISSAS ===================== */}
