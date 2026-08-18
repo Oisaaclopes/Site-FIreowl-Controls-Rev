@@ -32,6 +32,10 @@ export interface PedidoEquipmentItem {
   unidade: string;
   quantidade: number;
   vinculoEstoqueId?: string;
+  /** Serviço vinculado ao catálogo de Serviços (quando tipo = 'servico'). */
+  vinculoServicoId?: string;
+  /** Classificação do item na proposta. Ausente = material (compatibilidade). */
+  tipo?: 'material' | 'servico';
   precoUnitario?: number;
 }
 

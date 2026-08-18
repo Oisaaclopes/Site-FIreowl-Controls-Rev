@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { PedidoOS, Client, Pedido, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole } from '@/lib/types';
+import { PedidoOS, Client, Pedido, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem } from '@/lib/types';
 import { CommercialProposalModal } from '@/components/proposta/CommercialProposalModal';
 import { CommercialProposalPDFView } from '@/components/proposta/CommercialProposalPDFView';
 import { DataListRow, RowMeta, Badge } from '@/components/DataListRow';
@@ -28,6 +28,7 @@ interface PedidosViewProps {
   inventory: InventoryItem[];
   partnerBrands: PartnerBrand[];
   templates: PedidoTemplate[];
+  services?: ServiceCatalogItem[];
   companyProfile: any;
   onAddOS: (os: PedidoOS) => void;
   onSavePedido: (pedido: Pedido) => void;
@@ -71,6 +72,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   inventory,
   partnerBrands,
   templates,
+  services = [],
   companyProfile,
   onAddOS,
   onSavePedido,
@@ -751,6 +753,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
         inventory={inventory}
         partnerBrands={partnerBrands}
         templates={templates}
+        services={services}
         onAddClient={onAddClient}
         onPreviewPDF={(ped) => setPdfPreviewPedido(ped)}
       />

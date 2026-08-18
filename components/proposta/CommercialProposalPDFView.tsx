@@ -95,7 +95,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
     'Histórico de Propostas',
     'Visão Geral da Proposta',
     'Escopo da Proposta',
-    'Materiais Ofertados',
+    'Materiais e Serviços Ofertados',
     'Premissas Adotadas',
     'Descrição dos Serviços Ofertados',
     'Embalagem, Transporte e Armazenamento',
@@ -299,7 +299,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
 
         {/* ===================== 5. MATERIAIS OFERTADOS ===================== */}
         <section className="pdf-section mb-8">
-          <SecHead n={nn(5)} titulo="Materiais Ofertados" />
+          <SecHead n={nn(5)} titulo="Materiais e Serviços Ofertados" />
           <div className="overflow-x-auto border border-slate-200 rounded-lg">
             <table className="w-full text-left text-xs">
               <thead className="bg-[#0B1E38] text-white font-bold uppercase text-[10px]">

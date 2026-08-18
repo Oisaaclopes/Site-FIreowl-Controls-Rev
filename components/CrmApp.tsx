@@ -766,6 +766,7 @@ export function CrmApp({
               inventory={inventory}
               partnerBrands={partnerBrands}
               templates={templates}
+              services={services}
               companyProfile={companyProfile}
               onAddOS={handleAddOS}
               onSavePedido={handleSavePedido}
