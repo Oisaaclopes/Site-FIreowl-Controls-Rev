@@ -628,6 +628,58 @@ export const INITIAL_TEMPLATES: PedidoTemplate[] = [
     garantia: 'Garantia de 90 (noventa) dias sobre os serviços de mão de obra prestados e garantia de 12 (doze) meses para peças e componentes novos fornecidos.',
     conclusao: 'Permanecemos à inteira disposição para quaisquer esclarecimentos técnicos ou comerciais necessários. Renovamos nossos protestos de elevada estima e consideração.',
   },
+  {
+    id: 'tmpl-catuai-integracao',
+    name: 'Modelo — Integração SDAI dos Lojistas (Catuaí Maringá)',
+    objetivo:
+      'Realizar a adequação das centrais de detecção e alarme de incêndio dos lojistas para permitir a comunicação das condições de alarme e falha com a central de supervisão do Shopping. A solução permite identificar de forma centralizada qual loja apresenta condição de alarme ou falha, proporcionando maior controle operacional e agilidade no atendimento das ocorrências. A central do Shopping indica a loja em condição anormal; o detalhamento da ocorrência (detector em falha, detector removido, falha de bateria, falha de alimentação ou falha de laço) é verificado diretamente na central de incêndio da respectiva loja.',
+    diretrizesNormativas: [
+      'ABNT NBR 17240 — Sistemas de detecção e alarme de incêndio (projeto, instalação, comissionamento e manutenção)',
+      'NPT 019 — Sistema de Detecção e Alarme de Incêndio (Corpo de Bombeiros Militar do Paraná)',
+      'ABNT NBR 5410, quando aplicável às instalações elétricas relacionadas ao sistema',
+      'Observação: esta contratação refere-se à integração/comunicação das centrais existentes, não constituindo projeto ou retrofit completo dos sistemas de detecção e alarme de incêndio das lojas.',
+    ],
+    escopoServico:
+      'Para cada loja: verificação da central existente; adequação para comunicação; instalação e/ou configuração da interface necessária; interligação pela infraestrutura de comunicação disponível; configuração da identificação da loja; configuração do sistema de supervisão; testes de alarme, de falha e de retorno à condição normal; e comissionamento da comunicação. A central do Shopping identifica a loja (ex.: "LOJA 015 — SDAI — FALHA"); a central do lojista identifica a origem detalhada do evento. A integração é garantida para os modelos de centrais Intelbras compatíveis; centrais de outros fabricantes serão avaliadas individualmente em campo. Será utilizada a infraestrutura de comunicação existente (rede/cabo de rede). NÃO fazem parte do escopo: lançamento de novos cabos; correção/substituição do cabeamento existente; instalação de switches; adequações da rede de TI; obras civis; eletrodutos/eletrocalhas; retrofit do sistema de incêndio; substituição de centrais, detectores, acionadores ou sirenes.',
+    entregaveis: [
+      'Centrais dos lojistas adequadas e configuradas para comunicação, conforme escopo',
+      'Identificação individual das lojas na central de supervisão',
+      'Comunicação de condição de alarme e de condição de falha',
+      'Testes funcionais: alarme, falha e normalização',
+      'Comissionamento da integração (conclusão por loja após confirmação da comunicação com a central do Shopping)',
+    ],
+    premissas: [
+      'O Shopping disponibilizará acesso às 173 lojas durante o período de execução',
+      'As centrais estarão em condições de funcionamento no momento da intervenção',
+      'Será utilizada a infraestrutura existente sempre que tecnicamente possível',
+      'A infraestrutura de comunicação necessária estará disponível',
+      'A integração será garantida para centrais Intelbras compatíveis',
+      'Centrais de outros fabricantes estarão sujeitas à avaliação técnica em campo',
+      'Não serão realizadas correções no sistema de detecção e alarme existente das lojas',
+      'Não será realizada substituição de cabeamento existente',
+      'Problemas encontrados na infraestrutura/equipamentos existentes serão comunicados ao contratante',
+      'Serviços não previstos nesta proposta serão considerados adicionais',
+    ],
+    responsabilidadesContratada: [
+      'Realizar o levantamento necessário para a integração',
+      'Executar a adequação das centrais contempladas e fornecer os equipamentos de integração previstos',
+      'Realizar a instalação e configuração e configurar a identificação das lojas',
+      'Realizar a comunicação com a central do Shopping e executar os testes de alarme e falha',
+      'Realizar o comissionamento e orientar o responsável do Shopping quanto ao funcionamento da solução',
+      'Informar eventuais incompatibilidades ou problemas encontrados',
+    ],
+    responsabilidadesContratante: [
+      'Disponibilizar acesso às lojas, áreas técnicas, centrais de incêndio e à central de supervisão do Shopping',
+      'Disponibilizar a infraestrutura de comunicação existente e os pontos de rede e energia necessários',
+      'Fornecer a relação e identificação oficial das lojas',
+      'Disponibilizar responsável para acompanhamento e autorizar a realização dos testes',
+      'Informar previamente eventuais restrições de acesso e providenciar as autorizações junto aos lojistas',
+      'Garantir que as lojas estejam disponíveis para execução dentro do cronograma estabelecido',
+    ],
+    garantia: 'Garantia de 90 (noventa) dias sobre os serviços de integração executados. Não abrange falhas preexistentes nas centrais, cabeamento, infraestrutura elétrica ou de comunicação das lojas.',
+    conclusao:
+      'Eventuais adequações de infraestrutura, substituição de equipamentos, integração de centrais não compatíveis ou serviços adicionais serão previamente apresentados para aprovação. Permanecemos à disposição para os esclarecimentos necessários.',
+  },
 ];
 
 export const INITIAL_PEDIDOS: Pedido[] = [

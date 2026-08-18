@@ -257,9 +257,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const [faturamento, setFaturamento] = useState<string>(initialPedido?.proposal?.faturamento || '');
   const [impostos, setImpostos] = useState<string>(initialPedido?.proposal?.impostos || 'Inclusos, Simples Nacional (Anexo III)');
 
-  const [maoDeObraManual, setMaoDeObraManual] = useState<number | null>(
-    initialPedido?.proposal?.maoDeObra ?? null
-  );
+  const [maoDeObra, setMaoDeObra] = useState<number>(initialPedido?.proposal?.maoDeObra ?? 0);
   const [manualValorTotal, setManualValorTotal] = useState<number | null>(null);
 
   // Cadastro rápido de cliente (dialog sobreposto).
@@ -273,13 +271,13 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const selectedClient = clients.find((c) => c.id === clienteId) || clients[0];
 
   const round2 = (n: number) => Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
-  // Materiais = soma dos itens de equipamento. Mão de obra sugerida pela regra
-  // 70/30 (mão de obra = 70% do total; materiais = 30% → M x 0,7/0,3), editável.
-  const materiais = round2(equipmentItems.reduce((acc, item) => acc + (item.precoUnitario || 0) * item.quantidade, 0));
-  const maoDeObraSugerida = round2(materiais > 0 ? materiais * (0.7 / 0.3) : 0);
-  const maoDeObra = maoDeObraManual !== null ? maoDeObraManual : maoDeObraSugerida;
-  const valorBase = round2(materiais + maoDeObra);
+  // Subtotal = soma dos itens (materiais e/ou serviços). Mão de obra é opcional
+  // (0 por padrão); o botão "Sugerir 70/30" preenche pela regra material 30% /
+  // mão de obra 70% quando a proposta for de fornecimento com instalação.
+  const subtotalItens = round2(equipmentItems.reduce((acc, item) => acc + (item.precoUnitario || 0) * item.quantidade, 0));
+  const valorBase = round2(subtotalItens + (Number(maoDeObra) || 0));
   const effectiveValorTotal = manualValorTotal !== null ? manualValorTotal : valorBase;
+  const sugerir7030 = () => setMaoDeObra(round2(subtotalItens > 0 ? subtotalItens * (0.7 / 0.3) : 0));
 
   // ----------------- helpers de lista -----------------
   const addStr = (setter: React.Dispatch<React.SetStateAction<string[]>>, def = '') => setter((p) => [...p, def]);
@@ -421,6 +419,65 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
 
   if (!isOpen) return null;
 
+  // Card de valores (renderizado logo após os itens).
+  const valorCard = (
+    <div className="bg-[#0B1E38] text-white p-5 rounded-xl shadow-sm space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] font-bold text-[#F2A900] uppercase tracking-widest">Valores da Proposta</span>
+        <span className="text-[10px] text-slate-300 text-right">Serviço puro: use só os itens. Fornecimento + instalação: clique em Sugerir 70/30.</span>
+      </div>
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-slate-300">Subtotal dos itens</span>
+        <span className="font-data-mono font-bold">R$ {subtotalItens.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-slate-300 text-sm flex items-center gap-1.5">
+          Mão de obra / Serviços adicionais
+          <button
+            type="button"
+            onClick={sugerir7030}
+            title="Preencher pela regra 70/30 (sobre o subtotal dos itens)"
+            className="text-[9px] font-bold uppercase text-[#0B1E38] bg-[#F2A900] hover:bg-amber-400 rounded px-1.5 py-0.5"
+          >
+            Sugerir 70/30
+          </button>
+        </span>
+        <div className="flex items-center gap-1">
+          <span className="text-slate-400 text-xs font-data-mono">R$</span>
+          <input
+            type="number"
+            min={0}
+            value={maoDeObra}
+            onChange={(e) => setMaoDeObra(e.target.value === '' ? 0 : Number(e.target.value))}
+            className="w-32 bg-slate-900 border border-slate-700 rounded p-1.5 text-right font-data-mono font-bold text-amber-300"
+          />
+        </div>
+      </div>
+      <div className="border-t border-slate-700 pt-3 flex items-center justify-between gap-2">
+        <span className="text-[10px] font-bold text-[#F2A900] uppercase tracking-widest flex items-center gap-1.5">
+          Valor Total (R$)
+          {manualValorTotal !== null && (
+            <button
+              type="button"
+              onClick={() => setManualValorTotal(null)}
+              title="Voltar ao total calculado (itens + mão de obra)"
+              className="text-[9px] font-bold uppercase text-[#0B1E38] bg-[#F2A900] hover:bg-amber-400 rounded px-1.5 py-0.5"
+            >
+              Auto
+            </button>
+          )}
+        </span>
+        <input
+          type="number"
+          min={0}
+          value={effectiveValorTotal}
+          onChange={(e) => setManualValorTotal(e.target.value === '' ? null : Number(e.target.value))}
+          className="w-44 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xl font-black text-amber-400 font-data-mono text-right"
+        />
+      </div>
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       <div className="bg-slate-50 max-w-4xl w-full rounded-2xl border border-slate-200 shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
@@ -518,70 +575,89 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             </div>
           </div>
 
-          {/* ---- Composição do Valor (Materiais + Mão de Obra) ---- */}
-          <div className="bg-[#0B1E38] text-white p-5 rounded-xl shadow-sm space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-[#F2A900] uppercase tracking-widest">Composição do Valor</span>
-              <span className="text-[10px] text-slate-300">Mão de obra sugerida pela regra 70/30 — edite se precisar</span>
+          {/* ---- Itens (materiais e serviços) ---- */}
+          <Accordion
+            title="Itens da Proposta (Materiais e Serviços)"
+            icon={<Wrench className="w-4 h-4 text-[#E63946]" />}
+            open={!!open.equipamentos}
+            onToggle={() => toggle('equipamentos')}
+            badge={<span className="text-[10px] font-bold bg-slate-100 text-slate-600 rounded-full px-2 py-0.5">{equipmentItems.length}</span>}
+          >
+            <p className="text-[11px] text-slate-500 mb-2">
+              Descreva cada material ou serviço, com quantidade e valor unitário — o subtotal (qtd × unitário) é calculado
+              automaticamente. Ex.: &ldquo;Integração SDAI do lojista com o sistema do shopping&rdquo; · Qtd 173 · R$ 400,00.
+            </p>
+            <div className="overflow-x-auto border border-slate-200 rounded-lg">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#0B1E38] text-white font-bold uppercase text-[10px]">
+                  <tr>
+                    <th className="p-2 text-center w-8">#</th>
+                    <th className="p-2 w-40">Vincular do Estoque</th>
+                    <th className="p-2">Descrição do item / serviço</th>
+                    <th className="p-2 w-32">Marca/Modelo</th>
+                    <th className="p-2 text-center w-14">Unid.</th>
+                    <th className="p-2 text-center w-16">Qtd.</th>
+                    <th className="p-2 text-right w-24">Unit. (R$)</th>
+                    <th className="p-2 text-right w-24">Subtotal</th>
+                    <th className="p-2 text-center w-8" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 font-medium text-slate-700">
+                  {equipmentItems.map((item, idx) => {
+                    const subtotal = (item.precoUnitario || 0) * item.quantidade;
+                    return (
+                      <tr key={idx} className="hover:bg-slate-50">
+                        <td className="p-2 text-center font-bold font-data-mono text-[#E63946]">{idx + 1}</td>
+                        <td className="p-2">
+                          <select value={item.vinculoEstoqueId || ''} onChange={(e) => handleSelectInventoryItem(idx, e.target.value)} className="w-full border border-slate-300 rounded p-1.5 text-[11px] bg-slate-50">
+                            <option value="">Selecione...</option>
+                            {inventory.map((inv) => (
+                              <option key={inv.id} value={inv.id}>
+                                {inv.code} - {inv.name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="p-2">
+                          <input type="text" value={item.descricao} onChange={(e) => handleUpdateEquipment(idx, 'descricao', e.target.value)} placeholder="Ex.: Integração SDAI do lojista..." className="w-full border border-slate-300 rounded p-1.5 text-slate-900 font-semibold" />
+                        </td>
+                        <td className="p-2">
+                          <input type="text" value={item.marcaModelo} onChange={(e) => handleUpdateEquipment(idx, 'marcaModelo', e.target.value)} placeholder="(opcional)" className="w-full border border-slate-300 rounded p-1.5" />
+                        </td>
+                        <td className="p-2 text-center">
+                          <input type="text" value={item.unidade} onChange={(e) => handleUpdateEquipment(idx, 'unidade', e.target.value)} className="w-full border border-slate-300 rounded p-1.5 text-center font-bold uppercase" />
+                        </td>
+                        <td className="p-2 text-center">
+                          <input type="number" min={1} value={item.quantidade} onChange={(e) => handleUpdateEquipment(idx, 'quantidade', Number(e.target.value))} className="w-full border border-slate-300 rounded p-1.5 text-center font-data-mono font-bold" />
+                        </td>
+                        <td className="p-2 text-right">
+                          <input type="number" value={item.precoUnitario || 0} onChange={(e) => handleUpdateEquipment(idx, 'precoUnitario', Number(e.target.value))} className="w-full border border-slate-300 rounded p-1.5 text-right font-data-mono" />
+                        </td>
+                        <td className="p-2 text-right font-data-mono font-bold text-slate-900">
+                          {subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="p-2 text-center">
+                          <button type="button" onClick={() => handleRemoveEquipment(idx)} className="p-1 text-slate-400 hover:text-[#E63946] hover:bg-red-50 rounded">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {equipmentItems.length === 0 && (
+                    <tr>
+                      <td colSpan={9} className="p-4 text-center text-slate-400 italic">Nenhum item. Adicione materiais ou serviços abaixo.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
+            <button type="button" onClick={handleAddEquipment} className="mt-3 w-full py-2 rounded-lg border border-dashed border-[#E63946]/50 text-[11px] font-semibold text-[#E63946] hover:bg-red-50 transition-colors flex items-center justify-center gap-1 uppercase">
+              <Plus className="w-3.5 h-3.5" /> Adicionar item (material ou serviço)
+            </button>
+          </Accordion>
 
-            {/* Materiais (soma dos itens) */}
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-300">Materiais (soma dos itens)</span>
-              <span className="font-data-mono font-bold">R$ {materiais.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-            </div>
-
-            {/* Mão de obra / Serviços — editável */}
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-slate-300 text-sm flex items-center gap-1.5">
-                Mão de obra / Serviços
-                {maoDeObraManual !== null && (
-                  <button
-                    type="button"
-                    onClick={() => setMaoDeObraManual(null)}
-                    title="Voltar à sugestão 70/30"
-                    className="text-[9px] font-bold uppercase text-[#0B1E38] bg-[#F2A900] hover:bg-amber-400 rounded px-1.5 py-0.5"
-                  >
-                    Auto
-                  </button>
-                )}
-              </span>
-              <div className="flex items-center gap-1">
-                <span className="text-slate-400 text-xs font-data-mono">R$</span>
-                <input
-                  type="number"
-                  min={0}
-                  value={maoDeObra}
-                  onChange={(e) => setMaoDeObraManual(e.target.value === '' ? null : Number(e.target.value))}
-                  className="w-32 bg-slate-900 border border-slate-700 rounded p-1.5 text-right font-data-mono font-bold text-amber-300"
-                />
-              </div>
-            </div>
-
-            {/* Valor total — editável (default = materiais + mão de obra) */}
-            <div className="border-t border-slate-700 pt-3 flex items-center justify-between gap-2">
-              <span className="text-[10px] font-bold text-[#F2A900] uppercase tracking-widest flex items-center gap-1.5">
-                Valor Total (R$)
-                {manualValorTotal !== null && (
-                  <button
-                    type="button"
-                    onClick={() => setManualValorTotal(null)}
-                    title="Voltar ao total calculado (Materiais + Mão de obra)"
-                    className="text-[9px] font-bold uppercase text-[#0B1E38] bg-[#F2A900] hover:bg-amber-400 rounded px-1.5 py-0.5"
-                  >
-                    Auto
-                  </button>
-                )}
-              </span>
-              <input
-                type="number"
-                min={0}
-                value={effectiveValorTotal}
-                onChange={(e) => setManualValorTotal(e.target.value === '' ? null : Number(e.target.value))}
-                className="w-44 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xl font-black text-amber-400 font-data-mono text-right"
-              />
-            </div>
-          </div>
+          {valorCard}
 
           {/* ---- Accordions de conteúdo ---- */}
           <Accordion title="Objetivo da Proposta" icon={<FileText className="w-4 h-4 text-[#E63946]" />} open={!!open.objetivo} onToggle={() => toggle('objetivo')}>
@@ -609,83 +685,6 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
 
           <Accordion title="Entregáveis do Projeto" icon={<CheckCircle className="w-4 h-4 text-emerald-600" />} open={!!open.entregaveis} onToggle={() => toggle('entregaveis')}>
             <ListEditor items={entregaveis} onAdd={() => addStr(setEntregaveis, 'Documento de entregável')} onUpdate={(i, v) => updStr(setEntregaveis, i, v)} onRemove={(i) => rmStr(setEntregaveis, i)} addLabel="Adicionar entregável" />
-          </Accordion>
-
-          <Accordion
-            title="Equipamentos e Materiais"
-            icon={<Wrench className="w-4 h-4 text-[#E63946]" />}
-            open={!!open.equipamentos}
-            onToggle={() => toggle('equipamentos')}
-            badge={<span className="text-[10px] font-bold bg-slate-100 text-slate-600 rounded-full px-2 py-0.5">{equipmentItems.length}</span>}
-          >
-            <div className="overflow-x-auto border border-slate-200 rounded-lg">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-[#0B1E38] text-white font-bold uppercase text-[10px]">
-                  <tr>
-                    <th className="p-2 text-center w-8">#</th>
-                    <th className="p-2 w-40">Vincular do Estoque</th>
-                    <th className="p-2">Descrição</th>
-                    <th className="p-2 w-32">Marca/Modelo</th>
-                    <th className="p-2 text-center w-14">Unid.</th>
-                    <th className="p-2 text-center w-16">Qtd.</th>
-                    <th className="p-2 text-right w-24">Unit. (R$)</th>
-                    <th className="p-2 text-right w-24">Subtotal</th>
-                    <th className="p-2 text-center w-8" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 font-medium text-slate-700">
-                  {equipmentItems.map((item, idx) => {
-                    const subtotal = (item.precoUnitario || 0) * item.quantidade;
-                    return (
-                      <tr key={idx} className="hover:bg-slate-50">
-                        <td className="p-2 text-center font-bold font-data-mono text-[#E63946]">{idx + 1}</td>
-                        <td className="p-2">
-                          <select value={item.vinculoEstoqueId || ''} onChange={(e) => handleSelectInventoryItem(idx, e.target.value)} className="w-full border border-slate-300 rounded p-1.5 text-[11px] bg-slate-50">
-                            <option value="">Selecione...</option>
-                            {inventory.map((inv) => (
-                              <option key={inv.id} value={inv.id}>
-                                {inv.code} - {inv.name}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="p-2">
-                          <input type="text" value={item.descricao} onChange={(e) => handleUpdateEquipment(idx, 'descricao', e.target.value)} placeholder="Descrição..." className="w-full border border-slate-300 rounded p-1.5 text-slate-900 font-semibold" />
-                        </td>
-                        <td className="p-2">
-                          <input type="text" value={item.marcaModelo} onChange={(e) => handleUpdateEquipment(idx, 'marcaModelo', e.target.value)} className="w-full border border-slate-300 rounded p-1.5" />
-                        </td>
-                        <td className="p-2 text-center">
-                          <input type="text" value={item.unidade} onChange={(e) => handleUpdateEquipment(idx, 'unidade', e.target.value)} className="w-full border border-slate-300 rounded p-1.5 text-center font-bold uppercase" />
-                        </td>
-                        <td className="p-2 text-center">
-                          <input type="number" min={1} value={item.quantidade} onChange={(e) => handleUpdateEquipment(idx, 'quantidade', Number(e.target.value))} className="w-full border border-slate-300 rounded p-1.5 text-center font-data-mono font-bold" />
-                        </td>
-                        <td className="p-2 text-right">
-                          <input type="number" value={item.precoUnitario || 0} onChange={(e) => handleUpdateEquipment(idx, 'precoUnitario', Number(e.target.value))} className="w-full border border-slate-300 rounded p-1.5 text-right font-data-mono" />
-                        </td>
-                        <td className="p-2 text-right font-data-mono font-bold text-slate-900">
-                          {subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="p-2 text-center">
-                          <button type="button" onClick={() => handleRemoveEquipment(idx)} className="p-1 text-slate-400 hover:text-[#E63946] hover:bg-red-50 rounded">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {equipmentItems.length === 0 && (
-                    <tr>
-                      <td colSpan={9} className="p-4 text-center text-slate-400 italic">Nenhum item. Adicione abaixo.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <button type="button" onClick={handleAddEquipment} className="mt-3 w-full py-2 rounded-lg border border-dashed border-[#E63946]/50 text-[11px] font-semibold text-[#E63946] hover:bg-red-50 transition-colors flex items-center justify-center gap-1 uppercase">
-              <Plus className="w-3.5 h-3.5" /> Adicionar item de equipamento
-            </button>
           </Accordion>
 
           <Accordion title="Premissas Adotadas" icon={<ShieldCheck className="w-4 h-4 text-[#0B1E38]" />} open={!!open.premissas} onToggle={() => toggle('premissas')}>
