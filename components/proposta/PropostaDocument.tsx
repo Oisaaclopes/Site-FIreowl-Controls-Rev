@@ -1,5 +1,5 @@
 import React from 'react';
-import { Document, Page, View, Text, StyleSheet, Svg, Path } from '@react-pdf/renderer';
+import { Document, Page, View, Text, StyleSheet, Svg, Path, Font } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import {
   CARTA_APRESENTACAO,
@@ -22,6 +22,10 @@ export interface PropostaPdfOptions {
   showHistorico?: boolean;
   showCarta?: boolean;
 }
+
+// Quebra de linha apenas nos espaços (não corta palavras no meio). Corrige o
+// "encavalado" de nomes longos do cliente na capa e nos textos justificados.
+Font.registerHyphenationCallback((word) => [word]);
 
 const C = {
   navy: '#0B1E38',
@@ -206,10 +210,12 @@ const ItensTable = ({
   );
 };
 
-const CoverField = ({ label, value, big }: { label: string; value: string; big?: boolean }) => (
-  <View>
+const CoverField = ({ label, value, big, size }: { label: string; value: string; big?: boolean; size?: number }) => (
+  <View style={{ width: '100%' }}>
     <Text style={styles.coverLabel}>{label}</Text>
-    <Text style={big ? styles.coverValueBig : styles.coverValue}>{value || '—'}</Text>
+    <Text style={[big ? styles.coverValueBig : styles.coverValue, size ? { fontSize: size, lineHeight: 1.25 } : {}]}>
+      {value || '—'}
+    </Text>
   </View>
 );
 
@@ -233,6 +239,11 @@ export function PropostaDocument({
   const showIndice = options?.showIndice !== false;
   const showHistorico = options?.showHistorico !== false;
   const showCarta = options?.showCarta !== false;
+
+  // Fonte do nome do cliente reduz conforme o comprimento (nomes muito longos
+  // acomodam com elegância, sem estourar a largura da capa).
+  const clienteNome = pedido.clienteNome || '';
+  const clienteFont = clienteNome.length > 60 ? 13 : clienteNome.length > 44 ? 15 : clienteNome.length > 30 ? 18 : 22;
 
   const itens = p.equipmentItems || [];
   const materiais = itens.filter((e) => e.tipo !== 'servico');
@@ -309,7 +320,7 @@ export function PropostaDocument({
           <Text style={{ color: C.red, fontSize: 9, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10 }}>
             Proposta Técnico-Comercial
           </Text>
-          <CoverField label="Cliente" value={pedido.clienteNome} big />
+          <CoverField label="Cliente" value={pedido.clienteNome} big size={clienteFont} />
           <CoverField label="Número da Proposta" value={numero} />
           <CoverField label="Escopo de Fornecimento" value={escopoTitulo} />
           <CoverField label="Data" value={pedido.dataEmissao} />
