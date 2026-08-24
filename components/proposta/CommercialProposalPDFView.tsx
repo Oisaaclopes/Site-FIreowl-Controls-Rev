@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
-import { ArrowLeft, Printer, Send, Building2 } from 'lucide-react';
+import { ArrowLeft, Printer, Send } from 'lucide-react';
+import { OfficialLogo } from '@/components/OfficialLogo';
 import {
   CARTA_APRESENTACAO,
   SERVICOS_OFERTADOS,
@@ -204,22 +205,40 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
   );
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md overflow-y-auto p-4 md:p-8 flex flex-col items-center print:p-0 print:bg-white print:block">
-      {/* CSS de impressão: quebras de página + rodapé fixo em toda folha */}
+    <div className="pdf-print-root fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md overflow-y-auto p-4 md:p-8 flex flex-col items-center">
+      {/* CSS de impressão: isola SÓ o documento (o resto do app fica oculto),
+          força as cores dos blocos e trata as quebras de página. */}
       <style>{`
         .pdf-footer { display: none; }
         @media print {
-          @page { size: A4; margin: 16mm 13mm 20mm 13mm; }
-          html, body { background: #fff !important; }
-          .no-print { display: none !important; }
-          .pdf-doc { box-shadow: none !important; border: none !important; padding: 0 !important; max-width: none !important; width: 100% !important; }
+          @page { size: A4; margin: 14mm 12mm 16mm 12mm; }
+          html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
+          /* Imprime só o documento: esconde todo o resto do app */
+          body * { visibility: hidden !important; }
+          .pdf-print-root, .pdf-print-root * { visibility: visible !important; }
+          .no-print, .no-print * { visibility: hidden !important; display: none !important; }
+          /* Força a impressão das cores de fundo (banners, tabelas, cabeçalhos) */
+          .pdf-print-root, .pdf-print-root * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .pdf-print-root {
+            position: absolute !important; left: 0 !important; top: 0 !important; right: auto !important; bottom: auto !important;
+            width: 100% !important; background: #fff !important; backdrop-filter: none !important;
+            padding: 0 !important; margin: 0 !important; display: block !important; overflow: visible !important; z-index: auto !important;
+          }
+          .pdf-doc {
+            box-shadow: none !important; border: none !important; padding: 0 !important;
+            margin: 0 !important; max-width: none !important; width: 100% !important;
+          }
+          .pdf-cover { min-height: 82vh !important; }
           .pdf-break { break-after: page; page-break-after: always; }
           .pdf-section { break-inside: avoid; page-break-inside: avoid; }
           .pdf-footer {
-            display: flex; justify-content: space-between; align-items: center;
+            display: flex !important; justify-content: space-between; align-items: center;
             position: fixed; left: 0; right: 0; bottom: 4mm;
             font-size: 8px; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em;
-            border-top: 1px solid #e2e8f0; padding-top: 3px;
+            border-top: 1px solid #e2e8f0; padding-top: 3px; background: #fff;
           }
         }
       `}</style>
@@ -258,17 +277,20 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
         {Rodape}
 
         {/* ============================ CAPA ============================ */}
-        <div className="pdf-break min-h-[80vh] flex flex-col">
+        <div className="pdf-break pdf-cover min-h-[80vh] flex flex-col">
           <div className="bg-[#0B1E38] text-white p-8 rounded-xl flex items-center justify-between gap-4">
-            {showLogo && companyProfile.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={companyProfile.logoUrl} alt="Logo" className="h-14 object-contain" />
-            ) : (
-              <div className="flex items-center gap-2">
-                <Building2 className="w-9 h-9 text-[#F2A900]" />
-                <h1 className="text-2xl font-black uppercase tracking-wider text-white font-display">FIREOWL CONTROLS</h1>
-              </div>
-            )}
+            {showLogo &&
+              (companyProfile.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={companyProfile.logoUrl} alt="Logo" className="h-14 object-contain" />
+              ) : (
+                <div className="flex items-center gap-3">
+                  <span className="bg-white rounded-xl p-1.5 shrink-0 inline-flex">
+                    <OfficialLogo className="w-11 h-11" />
+                  </span>
+                  <h1 className="text-2xl font-black uppercase tracking-wider text-white font-display">FIREOWL CONTROLS</h1>
+                </div>
+              ))}
             <span className="text-[10px] uppercase font-bold text-[#F2A900] tracking-widest text-right">
               Documento Técnico-Comercial
             </span>
