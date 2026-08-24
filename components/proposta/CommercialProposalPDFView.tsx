@@ -383,10 +383,20 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 text-slate-700">
-                <tr>
+                {(proposal.revisoes || []).map((rev, i) => (
+                  <tr key={i}>
+                    <td className="p-2.5 font-data-mono font-bold text-slate-900">{rev.numero}</td>
+                    <td className="p-2.5 font-data-mono">{rev.data}</td>
+                    <td className="p-2.5">{rev.elaborador}{rev.motivo ? ` — ${rev.motivo}` : ''}</td>
+                    <td className="p-2.5 uppercase font-semibold text-slate-500">{(rev.status || '').replace(/_/g, ' ')}</td>
+                  </tr>
+                ))}
+                <tr className="bg-amber-50">
                   <td className="p-2.5 font-data-mono font-bold text-slate-900">{pedido.numeroPedido}</td>
                   <td className="p-2.5 font-data-mono">{pedido.dataEmissao}</td>
-                  <td className="p-2.5">{assinante}</td>
+                  <td className="p-2.5">
+                    {assinante} <span className="text-[9px] uppercase font-bold text-amber-700">(versão atual)</span>
+                  </td>
                   <td className="p-2.5 uppercase font-semibold text-[#E63946]">{pedido.status.replace(/_/g, ' ')}</td>
                 </tr>
               </tbody>

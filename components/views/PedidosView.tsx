@@ -19,6 +19,7 @@ import {
   Settings,
   Pencil,
   Trash2,
+  History,
 } from 'lucide-react';
 
 interface PedidosViewProps {
@@ -237,6 +238,32 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     setEditingPedido(ped);
     setIsProposalModalOpen(true);
   };
+  // Revisão: registra a versão atual no histórico, incrementa o número (-R01,
+  // -R02…) e reabre a proposta para edição. Ao salvar, entra no histórico.
+  const handleRevisar = (ped: Pedido) => {
+    const motivo = window.prompt('Motivo da revisão (ex.: ajuste solicitado pelo cliente):', 'Revisão solicitada pelo cliente');
+    if (motivo === null) return;
+    const hoje = new Date().toLocaleDateString('pt-BR');
+    const entradaAtual = {
+      numero: ped.numeroPedido,
+      data: ped.dataEmissao || hoje,
+      elaborador: ped.responsavelComercialNome || '',
+      motivo: motivo.trim() || undefined,
+      status: ped.status,
+    };
+    const revisoes = [...(ped.proposal?.revisoes || []), entradaAtual];
+    const base = ped.numeroPedido.replace(/-R\d+$/, '');
+    const novoNumero = `${base}-R${String(revisoes.length).padStart(2, '0')}`;
+    const revisado: Pedido = {
+      ...ped,
+      numeroPedido: novoNumero,
+      dataEmissao: new Date().toISOString().split('T')[0],
+      status: 'em_revisao',
+      proposal: { ...ped.proposal, revisoes },
+    };
+    setEditingPedido(revisado);
+    setIsProposalModalOpen(true);
+  };
   const handleDelete = (ped: Pedido) => {
     if (!onDeletePedido) return;
     if (window.confirm(`Excluir a proposta ${ped.numeroPedido} de ${ped.clienteNome}? Esta ação não pode ser desfeita.`))
@@ -370,6 +397,13 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
             className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-[#1A1A72] hover:bg-slate-100 transition-colors"
           >
             <Pencil className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => handleRevisar(ped)}
+            title="Revisar proposta (nova revisão no histórico)"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+          >
+            <History className="w-4 h-4" />
           </button>
           {onDeletePedido && (
             <button

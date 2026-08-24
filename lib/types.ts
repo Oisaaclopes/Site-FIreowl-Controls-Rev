@@ -50,6 +50,8 @@ export interface CommercialProposalData {
   objetivo: string;
   /** Carta de apresentação (opcional). Vazio → usa o texto institucional padrão. */
   cartaApresentacao?: string;
+  /** Histórico de revisões da proposta (aparece na seção "Histórico de Propostas"). */
+  revisoes?: { numero: string; data: string; elaborador: string; motivo?: string; status?: string }[];
   diretrizesNormativas: string[];
   escopoServico: string;
   entregaveis: string[];

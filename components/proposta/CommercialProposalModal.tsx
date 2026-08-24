@@ -391,6 +391,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
       proposal: {
         objetivo,
         cartaApresentacao,
+        revisoes: initialPedido?.proposal?.revisoes,
         diretrizesNormativas: diretrizes,
         escopoServico,
         entregaveis,
