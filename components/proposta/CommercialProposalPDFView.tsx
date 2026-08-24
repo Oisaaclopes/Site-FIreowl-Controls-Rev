@@ -9,6 +9,7 @@ import {
   SERVICOS_OFERTADOS,
   EMBALAGEM_TRANSPORTE,
   SEGURANCA_TRABALHO,
+  MULTAS_ATRASO,
   LIMITACAO_RESPONSABILIDADE,
   CONFIDENCIALIDADE,
   TERMO_ACEITE,
@@ -158,8 +159,13 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
   const showIndice = options?.showIndice !== false;
   const showHistorico = options?.showHistorico !== false;
   const showCarta = options?.showCarta !== false;
-  const showClausulas = options?.showClausulas !== false;
-  const showTermoAceite = options?.showTermoAceite !== false;
+  // Cláusulas jurídicas: controladas por proposta (chaves no painel de criação).
+  const incMultas = proposal.incluirMultas !== false;
+  const incLimitacao = proposal.incluirLimitacao !== false;
+  const incConfid = proposal.incluirConfidencialidade !== false;
+  const incCondGerais = proposal.incluirCondicoesGerais !== false;
+  const incSeguranca = proposal.incluirSeguranca !== false;
+  const incTermoAceite = proposal.incluirTermoAceite !== false;
 
   const handlePrint = () => window.print();
 
@@ -185,18 +191,19 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
     { key: 'premissas', titulo: 'Premissas Adotadas', visible: true },
     { key: 'servicos', titulo: 'Descrição dos Serviços Ofertados', visible: true },
     { key: 'embalagem', titulo: 'Embalagem, Transporte e Armazenamento', visible: embalagemVisivel },
-    { key: 'seguranca', titulo: 'Segurança do Trabalho', visible: showClausulas },
+    { key: 'seguranca', titulo: 'Segurança do Trabalho', visible: incSeguranca },
     { key: 'obrigacoes', titulo: 'Obrigações da Contratante', visible: true },
     { key: 'precos', titulo: 'Preços', visible: true },
     { key: 'infoCompra', titulo: 'Informações para o Pedido de Compra', visible: true },
     { key: 'impostos', titulo: 'Impostos e Taxas', visible: true },
     { key: 'pagamento', titulo: 'Condições de Pagamento', visible: true },
-    { key: 'limitacao', titulo: 'Limitação de Responsabilidade', visible: showClausulas },
+    { key: 'multas', titulo: 'Multas por Atraso de Pagamento', visible: incMultas },
+    { key: 'limitacao', titulo: 'Limitação de Responsabilidade', visible: incLimitacao },
     { key: 'prazo', titulo: 'Prazo de Fornecimento', visible: true },
     { key: 'garantia', titulo: 'Garantia', visible: true },
-    { key: 'confidencialidade', titulo: 'Confidencialidade', visible: showClausulas },
-    { key: 'termoAceite', titulo: 'Termo de Aceite da Proposta', visible: showTermoAceite },
-    { key: 'condicoesGerais', titulo: 'Condições Gerais', visible: showClausulas },
+    { key: 'confidencialidade', titulo: 'Confidencialidade', visible: incConfid },
+    { key: 'termoAceite', titulo: 'Termo de Aceite da Proposta', visible: incTermoAceite },
+    { key: 'condicoesGerais', titulo: 'Condições Gerais', visible: incCondGerais },
     { key: 'validade', titulo: 'Validade da Proposta', visible: true },
     { key: 'conclusao', titulo: 'Conclusão', visible: true },
     { key: 'aceite', titulo: 'Aceite da Proposta', visible: true },
@@ -228,7 +235,11 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
       <style>{`
         .pdf-footer { display: none; }
         @media print {
-          @page { size: A4; margin: 14mm 12mm 16mm 12mm; }
+          @page {
+            size: A4; margin: 14mm 12mm 16mm 12mm;
+            /* Paginação automática (motores que suportam margin box: Firefox, wkhtmltopdf, Prince) */
+            @bottom-center { content: "Página " counter(page) " de " counter(pages); font-size: 8px; color: #64748b; }
+          }
           html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
           /* Imprime só o documento: esconde todo o resto do app */
           body * { visibility: hidden !important; }
@@ -557,28 +568,60 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
 
         {/* ===================== 14. CONDIÇÕES DE PAGAMENTO ===================== */}
         <section className="pdf-section mb-8">
-          <SecHead n={nn(14)} titulo="Condições de Pagamento" />
-          <p className="text-xs text-slate-700 leading-relaxed text-justify">
-            {naoVazio(proposal.formaPagamento) ? proposal.formaPagamento : 'A combinar entre as partes.'}
-          </p>
+          <SecHead n={num('pagamento')} titulo="Condições de Pagamento" />
+          {proposal.formasPagamento?.length || proposal.condicoesPagamento?.length ? (
+            <div className="text-xs text-slate-700 space-y-2">
+              {proposal.formasPagamento && proposal.formasPagamento.length > 0 && (
+                <p>
+                  <strong className="text-slate-900 uppercase">Formas de pagamento aceitas:</strong>{' '}
+                  {proposal.formasPagamento.join(', ')}.
+                </p>
+              )}
+              {proposal.condicoesPagamento && proposal.condicoesPagamento.length > 0 && (
+                <div>
+                  <strong className="text-slate-900 uppercase">Condições:</strong>
+                  <ul className="mt-1 space-y-1">
+                    {proposal.condicoesPagamento.map((c, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="text-[#E63946] font-bold">•</span>
+                        <span>{c}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-700 leading-relaxed text-justify">
+              {naoVazio(proposal.formaPagamento) ? proposal.formaPagamento : 'A combinar entre as partes.'}
+            </p>
+          )}
           {naoVazio(proposal.faturamento) && (
-            <p className="text-xs text-slate-700 leading-relaxed text-justify mt-1">
+            <p className="text-xs text-slate-700 leading-relaxed text-justify mt-2">
               <strong className="text-slate-900 uppercase">Faturamento:</strong> {proposal.faturamento}
             </p>
           )}
         </section>
 
-        {/* ===================== 15. LIMITAÇÃO DE RESPONSABILIDADE ===================== */}
+        {/* ===================== MULTAS POR ATRASO ===================== */}
+        {vis('multas') && (
+        <section className="pdf-section mb-8">
+          <SecHead n={num('multas')} titulo="Multas por Atraso de Pagamento" />
+          <Paras paras={MULTAS_ATRASO} />
+        </section>
+        )}
+
+        {/* ===================== LIMITAÇÃO DE RESPONSABILIDADE ===================== */}
         {vis('limitacao') && (
         <section className="pdf-section mb-8">
-          <SecHead n={nn(15)} titulo="Limitação de Responsabilidade" />
+          <SecHead n={num('limitacao')} titulo="Limitação de Responsabilidade" />
           <Paras paras={LIMITACAO_RESPONSABILIDADE} />
         </section>
         )}
 
-        {/* ===================== 16. PRAZO DE FORNECIMENTO ===================== */}
+        {/* ===================== PRAZO DE FORNECIMENTO ===================== */}
         <section className="pdf-section mb-8">
-          <SecHead n={nn(16)} titulo="Prazo de Fornecimento" />
+          <SecHead n={num('prazo')} titulo="Prazo de Fornecimento" />
           <p className="text-xs text-slate-700 leading-relaxed text-justify">
             {naoVazio(proposal.prazoExecucao) ? proposal.prazoExecucao : 'Prazo a ser definido após confirmação do pedido.'}
           </p>
@@ -586,7 +629,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
 
         {/* ===================== 17. GARANTIA ===================== */}
         <section className="pdf-section mb-8">
-          <SecHead n={nn(17)} titulo="Garantia" />
+          <SecHead n={num('garantia')} titulo="Garantia" />
           <p className="text-xs text-slate-700 leading-relaxed text-justify whitespace-pre-line">
             {naoVazio(proposal.garantia)
               ? proposal.garantia
@@ -597,7 +640,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
         {/* ===================== 18. CONFIDENCIALIDADE ===================== */}
         {vis('confidencialidade') && (
         <section className="pdf-section mb-8">
-          <SecHead n={nn(18)} titulo="Confidencialidade" />
+          <SecHead n={num('confidencialidade')} titulo="Confidencialidade" />
           <Paras paras={CONFIDENCIALIDADE} />
         </section>
         )}
@@ -605,7 +648,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
         {/* ===================== 19. TERMO DE ACEITE ===================== */}
         {vis('termoAceite') && (
         <section className="pdf-section mb-8">
-          <SecHead n={nn(19)} titulo="Termo de Aceite da Proposta" />
+          <SecHead n={num('termoAceite')} titulo="Termo de Aceite da Proposta" />
           <Paras paras={TERMO_ACEITE} />
         </section>
         )}
@@ -613,14 +656,14 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
         {/* ===================== 20. CONDIÇÕES GERAIS ===================== */}
         {vis('condicoesGerais') && (
         <section className="pdf-section mb-8">
-          <SecHead n={nn(20)} titulo="Condições Gerais" />
+          <SecHead n={num('condicoesGerais')} titulo="Condições Gerais" />
           <Paras paras={CONDICOES_GERAIS} />
         </section>
         )}
 
         {/* ===================== 21. VALIDADE ===================== */}
         <section className="pdf-section mb-8">
-          <SecHead n={nn(21)} titulo="Validade da Proposta" />
+          <SecHead n={num('validade')} titulo="Validade da Proposta" />
           <p className="text-xs text-slate-700 leading-relaxed text-justify">
             Os preços permanecem fixos dentro do período de validade desta proposta, que é de{' '}
             <strong>{proposal.validadePropostaDias || 15} {proposal.validadePropostaComplemento || 'dias corridos a partir da emissão'}</strong>.
@@ -630,7 +673,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
 
         {/* ===================== 22. CONCLUSÃO ===================== */}
         <section className="pdf-section mb-8">
-          <SecHead n={nn(22)} titulo="Conclusão" />
+          <SecHead n={num('conclusao')} titulo="Conclusão" />
           <p className="text-xs text-slate-700 leading-relaxed text-justify italic whitespace-pre-line">
             {naoVazio(proposal.conclusao)
               ? proposal.conclusao
@@ -640,7 +683,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
 
         {/* ===================== 23. ACEITE DA PROPOSTA ===================== */}
         <section className="pdf-section mb-8">
-          <SecHead n={nn(23)} titulo="Aceite da Proposta" />
+          <SecHead n={num('aceite')} titulo="Aceite da Proposta" />
           <p className="text-xs text-slate-700 leading-relaxed text-justify mb-4">
             O Cliente aceita as condições desta proposta, emitindo o seu &ldquo;de acordo&rdquo; para o fornecimento em tela.
             O aceite é documento suficiente para que as Partes se obriguem nos termos e condições aqui previstos.

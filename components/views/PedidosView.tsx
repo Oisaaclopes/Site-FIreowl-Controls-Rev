@@ -833,16 +833,10 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                   <Toggle checked={(pdfOptions as any)[opt.key]} onChange={(v) => setPdfOptions((prev) => ({ ...prev, [opt.key]: v }))} />
                 </div>
               ))}
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 pt-1">Cláusulas jurídicas</p>
-              {[
-                { key: 'showClausulas', label: 'Segurança, responsabilidade, sigilo e condições gerais' },
-                { key: 'showTermoAceite', label: 'Termo de aceite' },
-              ].map((opt) => (
-                <div key={opt.key} className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
-                  <span className="font-semibold text-slate-700">{opt.label}</span>
-                  <Toggle checked={(pdfOptions as any)[opt.key]} onChange={(v) => setPdfOptions((prev) => ({ ...prev, [opt.key]: v }))} />
-                </div>
-              ))}
+              <p className="text-[10px] text-slate-400 pt-1">
+                As cláusulas jurídicas (multas, responsabilidade, sigilo, condições gerais, termo de aceite) são
+                ligadas/desligadas na própria proposta, em <strong>&ldquo;Cláusulas Jurídicas&rdquo;</strong>.
+              </p>
             </div>
             <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2">
               <button

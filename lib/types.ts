@@ -70,8 +70,19 @@ export interface CommercialProposalData {
   maoDeObra?: number;
   composicaoValor: string;
   formaPagamento: string;
+  /** Formas de pagamento selecionadas (tags): Pix, Boleto, TED/DOC, Cartão. */
+  formasPagamento?: string[];
+  /** Condições de pagamento selecionadas (tags pré-formatadas). */
+  condicoesPagamento?: string[];
   faturamento: string;
   impostos: string;
+  /** Chaves de ativação dos blocos jurídicos (undefined = incluído por padrão). */
+  incluirMultas?: boolean;
+  incluirLimitacao?: boolean;
+  incluirConfidencialidade?: boolean;
+  incluirCondicoesGerais?: boolean;
+  incluirSeguranca?: boolean;
+  incluirTermoAceite?: boolean;
 }
 
 export interface Pedido {

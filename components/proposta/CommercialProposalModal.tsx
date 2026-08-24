@@ -28,6 +28,9 @@ import {
   Sparkles,
   ChevronDown,
   UserPlus,
+  Check,
+  Scale,
+  CreditCard,
 } from 'lucide-react';
 
 interface CommercialProposalModalProps {
@@ -159,6 +162,71 @@ const BasicInfoRow: React.FC<{
   );
 };
 
+// Opções pré-formatadas de pagamento (tags clicáveis).
+const FORMAS_PAGAMENTO = ['Pix', 'Boleto Bancário', 'Transferência (TED/DOC)', 'Cartão de Crédito'];
+const CONDICOES_PAGAMENTO = [
+  '30% no aceite / 70% na entrega e laudo',
+  'À vista',
+  'Faturado 30 dias',
+  'Parcelado em até 3x',
+  'Parcelado em até 5x (com juros)',
+];
+
+// Multiseleção por tags: clicar liga/desliga a opção.
+const TagSelect: React.FC<{ options: string[]; selected: string[]; onToggle: (v: string) => void }> = ({
+  options,
+  selected,
+  onToggle,
+}) => (
+  <div className="flex flex-wrap gap-2">
+    {options.map((o) => {
+      const on = selected.includes(o);
+      return (
+        <button
+          key={o}
+          type="button"
+          onClick={() => onToggle(o)}
+          className={`px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-colors flex items-center gap-1 ${
+            on ? 'bg-[#0B1E38] text-white border-[#0B1E38]' : 'bg-white text-slate-600 border-slate-300 hover:border-[#0B1E38]'
+          }`}
+        >
+          {on && <Check className="w-3 h-3" />}
+          {o}
+        </button>
+      );
+    })}
+  </div>
+);
+
+// Chave de ativação de um bloco jurídico (checkbox).
+const ClauseRow: React.FC<{ label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }> = ({
+  label,
+  hint,
+  checked,
+  onChange,
+}) => (
+  <button
+    type="button"
+    onClick={() => onChange(!checked)}
+    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-left transition-colors"
+  >
+    <span
+      className={`w-5 h-5 rounded flex items-center justify-center shrink-0 border-2 ${
+        checked ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 text-transparent'
+      }`}
+    >
+      <Check className="w-3.5 h-3.5" />
+    </span>
+    <span className="flex-1">
+      <span className="text-xs font-semibold text-slate-800 block">{label}</span>
+      {hint && <span className="text-[10px] text-slate-400">{hint}</span>}
+    </span>
+    <span className={`text-[10px] font-bold uppercase ${checked ? 'text-emerald-600' : 'text-slate-400'}`}>
+      {checked ? 'Incluído' : 'Omitido'}
+    </span>
+  </button>
+);
+
 export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = ({
   isOpen,
   onClose,
@@ -254,11 +322,28 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     initialPedido?.proposal?.conclusao ||
       'Permanecemos à disposição para eventuais esclarecimentos adicionais e renovamos nossos votos de estima.'
   );
-  const [formaPagamento, setFormaPagamento] = useState<string>(
-    initialPedido?.proposal?.formaPagamento || '30% no aceite / 70% na entrega e emissão do laudo'
-  );
   const [faturamento, setFaturamento] = useState<string>(initialPedido?.proposal?.faturamento || '');
   const [impostos, setImpostos] = useState<string>(initialPedido?.proposal?.impostos || 'Inclusos, Simples Nacional (Anexo III)');
+
+  // Pagamento por tags pré-formatadas.
+  const [formasPagamento, setFormasPagamento] = useState<string[]>(initialPedido?.proposal?.formasPagamento || ['Pix']);
+  const [condicoesPagamento, setCondicoesPagamento] = useState<string[]>(
+    initialPedido?.proposal?.condicoesPagamento || ['30% no aceite / 70% na entrega e laudo']
+  );
+  const toggleTag = (setter: React.Dispatch<React.SetStateAction<string[]>>, v: string) =>
+    setter((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]));
+
+  // Chaves de ativação dos blocos jurídicos (default: incluídos).
+  const [incluirMultas, setIncluirMultas] = useState<boolean>(initialPedido?.proposal?.incluirMultas !== false);
+  const [incluirLimitacao, setIncluirLimitacao] = useState<boolean>(initialPedido?.proposal?.incluirLimitacao !== false);
+  const [incluirConfidencialidade, setIncluirConfidencialidade] = useState<boolean>(
+    initialPedido?.proposal?.incluirConfidencialidade !== false
+  );
+  const [incluirCondicoesGerais, setIncluirCondicoesGerais] = useState<boolean>(
+    initialPedido?.proposal?.incluirCondicoesGerais !== false
+  );
+  const [incluirSeguranca, setIncluirSeguranca] = useState<boolean>(initialPedido?.proposal?.incluirSeguranca !== false);
+  const [incluirTermoAceite, setIncluirTermoAceite] = useState<boolean>(initialPedido?.proposal?.incluirTermoAceite !== false);
 
   const [maoDeObra, setMaoDeObra] = useState<number>(initialPedido?.proposal?.maoDeObra ?? 0);
   const [manualValorTotal, setManualValorTotal] = useState<number | null>(null);
@@ -408,9 +493,18 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         valorTotal: effectiveValorTotal,
         maoDeObra,
         composicaoValor: '',
-        formaPagamento,
+        // Texto legado composto das tags (compatibilidade).
+        formaPagamento: [formasPagamento.join(', '), condicoesPagamento.join(' · ')].filter(Boolean).join(' — '),
+        formasPagamento,
+        condicoesPagamento,
         faturamento,
         impostos,
+        incluirMultas,
+        incluirLimitacao,
+        incluirConfidencialidade,
+        incluirCondicoesGerais,
+        incluirSeguranca,
+        incluirTermoAceite,
       },
     };
   };
@@ -759,12 +853,39 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             <textarea rows={3} value={conclusao} onChange={(e) => setConclusao(e.target.value)} className={inputCls} />
           </Accordion>
 
+          {/* ---- Condições de Pagamento (tags pré-formatadas) ---- */}
+          <Accordion title="Condições de Pagamento" icon={<CreditCard className="w-4 h-4 text-emerald-600" />} open={!!open.pagamento} onToggle={() => toggle('pagamento')}>
+            <div className="space-y-4">
+              <div>
+                <label className={labelCls}>Formas de Pagamento</label>
+                <TagSelect options={FORMAS_PAGAMENTO} selected={formasPagamento} onToggle={(v) => toggleTag(setFormasPagamento, v)} />
+              </div>
+              <div>
+                <label className={labelCls}>Condições de Pagamento</label>
+                <TagSelect options={CONDICOES_PAGAMENTO} selected={condicoesPagamento} onToggle={(v) => toggleTag(setCondicoesPagamento, v)} />
+              </div>
+              <p className="text-[10px] text-slate-400">Clique nas opções para marcar. O texto no PDF é montado automaticamente.</p>
+            </div>
+          </Accordion>
+
+          {/* ---- Cláusulas Jurídicas (chaves de ativação) ---- */}
+          <Accordion title="Cláusulas Jurídicas" icon={<Scale className="w-4 h-4 text-[#E63946]" />} open={!!open.clausulas} onToggle={() => toggle('clausulas')}>
+            <p className="text-[11px] text-slate-500 mb-2">Marque os blocos que devem sair no PDF. Desmarcado = título e texto totalmente omitidos.</p>
+            <div className="space-y-2">
+              <ClauseRow label="Multas por atraso de pagamento" hint="Juros de mora e multa por inadimplência" checked={incluirMultas} onChange={setIncluirMultas} />
+              <ClauseRow label="Limitação de responsabilidade" checked={incluirLimitacao} onChange={setIncluirLimitacao} />
+              <ClauseRow label="Confidencialidade e sigilo" checked={incluirConfidencialidade} onChange={setIncluirConfidencialidade} />
+              <ClauseRow label="Condições Gerais" checked={incluirCondicoesGerais} onChange={setIncluirCondicoesGerais} />
+              <ClauseRow label="Segurança do Trabalho" checked={incluirSeguranca} onChange={setIncluirSeguranca} />
+              <ClauseRow label="Termo de Aceite da Proposta" checked={incluirTermoAceite} onChange={setIncluirTermoAceite} />
+            </div>
+          </Accordion>
+
           {/* ---- Informações Básicas (colapsável com +/lixeira) ---- */}
           <Accordion title="Informações Básicas" icon={<DollarSign className="w-4 h-4 text-emerald-600" />} open={!!open.basicas} onToggle={() => toggle('basicas')}>
             <div className="space-y-2.5">
               <BasicInfoRow label="Garantia Técnica" value={garantia} onChange={setGarantia} placeholder="Ex.: 90 dias serviços / 12 meses equipamentos" multiline />
               <BasicInfoRow label="Prazo de Execução" value={prazoExecucao} onChange={setPrazoExecucao} placeholder="Ex.: 10 dias úteis após liberação" />
-              <BasicInfoRow label="Forma de Pagamento" value={formaPagamento} onChange={setFormaPagamento} placeholder="Ex.: 30% no aceite / 70% na entrega" />
               <BasicInfoRow label="Faturamento" value={faturamento} onChange={setFaturamento} placeholder="Ex.: Nota Fiscal de Serviços" />
               <BasicInfoRow label="Impostos" value={impostos} onChange={setImpostos} placeholder="Ex.: Inclusos, Simples Nacional" />
               <div className="flex items-end gap-2 pt-1">

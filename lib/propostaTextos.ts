@@ -61,6 +61,12 @@ export const LIMITACAO_RESPONSABILIDADE: string[] = [
   'Fica expressamente excluída qualquer responsabilidade por perdas e danos indiretos, tais como, mas não se limitando a, perda de receita, de produção e/ou lucros cessantes, inclusive perante terceiros.',
 ];
 
+/** Multas por atraso de pagamento (juros de mora e multa por inadimplência). */
+export const MULTAS_ATRASO: string[] = [
+  'Em caso de atraso no pagamento por motivo não imputável à Fireowl Controls, incidirá multa de 2% (dois por cento) sobre o valor em atraso, acrescida de juros de mora de 1% (um por cento) ao mês, calculados pro rata die até a data da efetiva quitação.',
+  'A persistência da inadimplência poderá ensejar a suspensão dos serviços em andamento e a cobrança dos encargos previstos, sem prejuízo das demais medidas legais cabíveis.',
+];
+
 /** Confidencialidade. */
 export const CONFIDENCIALIDADE: string[] = [
   'Todas as informações contidas nesta proposta técnica e comercial, de natureza negocial, operacional e/ou financeira, devem ser tratadas como confidenciais e mantidas em sigilo pelo Cliente, seus funcionários, diretores, parceiros, agentes e/ou subcontratados, evitando-se, por qualquer meio, o seu conhecimento por pessoas alheias a esta relação.',
