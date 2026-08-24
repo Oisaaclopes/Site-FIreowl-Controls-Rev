@@ -21,6 +21,13 @@ interface PdfDisplayOptions {
   showLogo: boolean;
   detailedSubtotal: boolean;
   showBankData: boolean;
+  /** Seções opcionais do documento (default: incluídas). */
+  showIndice?: boolean;
+  showHistorico?: boolean;
+  showCarta?: boolean;
+  /** Cláusulas jurídicas: Segurança, Limitação de Responsabilidade, Confidencialidade, Condições Gerais. */
+  showClausulas?: boolean;
+  showTermoAceite?: boolean;
 }
 
 interface CommercialProposalPDFViewProps {
@@ -148,6 +155,11 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
   const { proposal } = pedido;
   const showLogo = options?.showLogo ?? true;
   const detailed = options?.detailedSubtotal ?? true;
+  const showIndice = options?.showIndice !== false;
+  const showHistorico = options?.showHistorico !== false;
+  const showCarta = options?.showCarta !== false;
+  const showClausulas = options?.showClausulas !== false;
+  const showTermoAceite = options?.showTermoAceite !== false;
 
   const handlePrint = () => window.print();
 
@@ -163,38 +175,43 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
   // Seções do documento com numeração DINÂMICA: seções não visíveis (ex.:
   // Embalagem/Transporte quando não há materiais ofertados) são omitidas e não
   // deixam buraco no número nem no índice.
+  const embalagemVisivel = materiaisPdf.length > 0;
   const secoes = [
-    { key: 'carta', titulo: 'Carta de Apresentação', visible: true },
-    { key: 'historico', titulo: 'Histórico de Propostas', visible: true },
+    { key: 'carta', titulo: 'Carta de Apresentação', visible: showCarta },
+    { key: 'historico', titulo: 'Histórico de Propostas', visible: showHistorico },
     { key: 'visao', titulo: 'Visão Geral da Proposta', visible: true },
     { key: 'escopo', titulo: 'Escopo da Proposta', visible: true },
     { key: 'itens', titulo: 'Materiais e Serviços Ofertados', visible: true },
     { key: 'premissas', titulo: 'Premissas Adotadas', visible: true },
     { key: 'servicos', titulo: 'Descrição dos Serviços Ofertados', visible: true },
-    { key: 'embalagem', titulo: 'Embalagem, Transporte e Armazenamento', visible: materiaisPdf.length > 0 },
-    { key: 'seguranca', titulo: 'Segurança do Trabalho', visible: true },
+    { key: 'embalagem', titulo: 'Embalagem, Transporte e Armazenamento', visible: embalagemVisivel },
+    { key: 'seguranca', titulo: 'Segurança do Trabalho', visible: showClausulas },
     { key: 'obrigacoes', titulo: 'Obrigações da Contratante', visible: true },
     { key: 'precos', titulo: 'Preços', visible: true },
     { key: 'infoCompra', titulo: 'Informações para o Pedido de Compra', visible: true },
     { key: 'impostos', titulo: 'Impostos e Taxas', visible: true },
     { key: 'pagamento', titulo: 'Condições de Pagamento', visible: true },
-    { key: 'limitacao', titulo: 'Limitação de Responsabilidade', visible: true },
+    { key: 'limitacao', titulo: 'Limitação de Responsabilidade', visible: showClausulas },
     { key: 'prazo', titulo: 'Prazo de Fornecimento', visible: true },
     { key: 'garantia', titulo: 'Garantia', visible: true },
-    { key: 'confidencialidade', titulo: 'Confidencialidade', visible: true },
-    { key: 'termoAceite', titulo: 'Termo de Aceite da Proposta', visible: true },
-    { key: 'condicoesGerais', titulo: 'Condições Gerais', visible: true },
+    { key: 'confidencialidade', titulo: 'Confidencialidade', visible: showClausulas },
+    { key: 'termoAceite', titulo: 'Termo de Aceite da Proposta', visible: showTermoAceite },
+    { key: 'condicoesGerais', titulo: 'Condições Gerais', visible: showClausulas },
     { key: 'validade', titulo: 'Validade da Proposta', visible: true },
     { key: 'conclusao', titulo: 'Conclusão', visible: true },
     { key: 'aceite', titulo: 'Aceite da Proposta', visible: true },
   ];
   const visibleSecoes = secoes.filter((s) => s.visible);
-  // Numeração dinâmica das seções. A única seção condicional é "Embalagem"
-  // (posição fixa 8): quando omitida, as seções seguintes sobem uma posição.
-  const embalagemVisivel = materiaisPdf.length > 0;
+  // Numeração dinâmica por chave: seções omitidas não deixam buraco no número.
+  const num = (key: string) => {
+    const i = visibleSecoes.findIndex((s) => s.key === key);
+    return i >= 0 ? String(i + 1).padStart(2, '0') : '';
+  };
+  const vis = (key: string) => visibleSecoes.some((s) => s.key === key);
+  // Mapeia o número fixo (ordem original) para o número dinâmico da seção.
   const nn = (fixed: number) => {
-    const n = !embalagemVisivel && fixed > 8 ? fixed - 1 : fixed;
-    return String(n).padStart(2, '0');
+    const key = secoes[fixed - 1]?.key;
+    return key ? num(key) : String(fixed).padStart(2, '0');
   };
 
   const Rodape = (
@@ -315,6 +332,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
         </div>
 
         {/* ===================== 1. CARTA DE APRESENTAÇÃO ===================== */}
+        {vis('carta') && (
         <section className="pdf-break pdf-section mb-8">
           <SecHead n={nn(1)} titulo="Carta de Apresentação" />
           <Paras
@@ -332,8 +350,10 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
             {naoVazio(companyProfile.email) && <p className="text-slate-500 font-data-mono">{companyProfile.email}</p>}
           </div>
         </section>
+        )}
 
         {/* ============================ ÍNDICE ============================ */}
+        {showIndice && (
         <section className="pdf-break pdf-section mb-8">
           <SecHead n="—" titulo="Índice" />
           <ol className="space-y-1.5 text-xs text-slate-700">
@@ -346,8 +366,10 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
             ))}
           </ol>
         </section>
+        )}
 
         {/* ===================== 2. HISTÓRICO DE PROPOSTAS ===================== */}
+        {vis('historico') && (
         <section className="pdf-section mb-8">
           <SecHead n={nn(2)} titulo="Histórico de Propostas" />
           <div className="overflow-x-auto border border-slate-200 rounded-lg">
@@ -371,11 +393,12 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
             </table>
           </div>
         </section>
+        )}
 
         {/* ===================== 3. VISÃO GERAL ===================== */}
         <section className="pdf-section mb-8">
           <SecHead n={nn(3)} titulo="Visão Geral da Proposta" />
-          <h4 className="font-bold text-[#0B1E38] uppercase text-[11px] mb-1">3.1. Introdução</h4>
+          <h4 className="font-bold text-[#0B1E38] uppercase text-[11px] mb-1">{nn(3)}.1. Introdução</h4>
           <p className="text-xs text-slate-700 leading-relaxed text-justify whitespace-pre-line">
             {naoVazio(proposal.objetivo)
               ? proposal.objetivo
@@ -392,7 +415,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
         {/* ===================== 4. ESCOPO ===================== */}
         <section className="pdf-section mb-8">
           <SecHead n={nn(4)} titulo="Escopo da Proposta" />
-          <h4 className="font-bold text-[#0B1E38] uppercase text-[11px] mb-1">4.1. Descrição do escopo proposto</h4>
+          <h4 className="font-bold text-[#0B1E38] uppercase text-[11px] mb-1">{nn(4)}.1. Descrição do escopo proposto</h4>
           <p className="text-xs text-slate-700 leading-relaxed text-justify whitespace-pre-line bg-slate-50 p-3 rounded border border-slate-200">
             {naoVazio(proposal.escopoServico) ? proposal.escopoServico : 'Escopo conforme especificação técnica acordada com o cliente.'}
           </p>
@@ -443,7 +466,7 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
           <div className="space-y-3">
             {SERVICOS_OFERTADOS.map((s, i) => (
               <div key={i}>
-                <h4 className="font-bold text-[#0B1E38] uppercase text-[11px] mb-1">7.{i + 1}. {s.titulo}</h4>
+                <h4 className="font-bold text-[#0B1E38] uppercase text-[11px] mb-1">{nn(7)}.{i + 1}. {s.titulo}</h4>
                 <Bullets itens={s.itens} />
               </div>
             ))}
@@ -471,10 +494,12 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
         )}
 
         {/* ===================== 9. SEGURANÇA DO TRABALHO ===================== */}
+        {vis('seguranca') && (
         <section className="pdf-section mb-8">
           <SecHead n={nn(9)} titulo="Segurança do Trabalho" />
           <Bullets itens={SEGURANCA_TRABALHO} />
         </section>
+        )}
 
         {/* ===================== 10. OBRIGAÇÕES DA CONTRATANTE ===================== */}
         <section className="pdf-section mb-8">
@@ -534,10 +559,12 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
         </section>
 
         {/* ===================== 15. LIMITAÇÃO DE RESPONSABILIDADE ===================== */}
+        {vis('limitacao') && (
         <section className="pdf-section mb-8">
           <SecHead n={nn(15)} titulo="Limitação de Responsabilidade" />
           <Paras paras={LIMITACAO_RESPONSABILIDADE} />
         </section>
+        )}
 
         {/* ===================== 16. PRAZO DE FORNECIMENTO ===================== */}
         <section className="pdf-section mb-8">
@@ -558,22 +585,28 @@ export const CommercialProposalPDFView: React.FC<CommercialProposalPDFViewProps>
         </section>
 
         {/* ===================== 18. CONFIDENCIALIDADE ===================== */}
+        {vis('confidencialidade') && (
         <section className="pdf-section mb-8">
           <SecHead n={nn(18)} titulo="Confidencialidade" />
           <Paras paras={CONFIDENCIALIDADE} />
         </section>
+        )}
 
         {/* ===================== 19. TERMO DE ACEITE ===================== */}
+        {vis('termoAceite') && (
         <section className="pdf-section mb-8">
           <SecHead n={nn(19)} titulo="Termo de Aceite da Proposta" />
           <Paras paras={TERMO_ACEITE} />
         </section>
+        )}
 
         {/* ===================== 20. CONDIÇÕES GERAIS ===================== */}
+        {vis('condicoesGerais') && (
         <section className="pdf-section mb-8">
           <SecHead n={nn(20)} titulo="Condições Gerais" />
           <Paras paras={CONDICOES_GERAIS} />
         </section>
+        )}
 
         {/* ===================== 21. VALIDADE ===================== */}
         <section className="pdf-section mb-8">

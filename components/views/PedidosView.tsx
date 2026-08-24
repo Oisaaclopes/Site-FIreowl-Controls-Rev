@@ -122,6 +122,11 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     showLogo: pdfPrefs.showLogo,
     detailedSubtotal: pdfPrefs.detailedSubtotal,
     showBankData: pdfPrefs.showBankData,
+    showCarta: true,
+    showIndice: true,
+    showHistorico: true,
+    showClausulas: true,
+    showTermoAceite: true,
   });
   const [pdfConfigPedido, setPdfConfigPedido] = useState<Pedido | null>(null);
 
@@ -130,6 +135,11 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
       showLogo: pdfPrefs.showLogo,
       detailedSubtotal: pdfPrefs.detailedSubtotal,
       showBankData: pdfPrefs.showBankData,
+      showCarta: true,
+      showIndice: true,
+      showHistorico: true,
+      showClausulas: true,
+      showTermoAceite: true,
     };
     setPdfOptions(base);
     if (pdfPrefs.configBeforeGenerate) setPdfConfigPedido(ped);
@@ -775,10 +785,24 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
               <p className="text-slate-500">
                 Proposta <span className="font-data-mono font-bold text-slate-700">{pdfConfigPedido.numeroPedido}</span> — ajuste o que incluir no documento.
               </p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Elementos do documento</p>
               {[
-                { key: 'showLogo', label: 'Incluir logotipo no cabeçalho' },
+                { key: 'showLogo', label: 'Logotipo no cabeçalho' },
+                { key: 'showCarta', label: 'Carta de apresentação' },
+                { key: 'showIndice', label: 'Índice' },
+                { key: 'showHistorico', label: 'Histórico de propostas' },
                 { key: 'detailedSubtotal', label: 'Detalhar itens e subtotais' },
-                { key: 'showBankData', label: 'Mostrar dados para pagamento' },
+                { key: 'showBankData', label: 'Dados para pagamento' },
+              ].map((opt) => (
+                <div key={opt.key} className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
+                  <span className="font-semibold text-slate-700">{opt.label}</span>
+                  <Toggle checked={(pdfOptions as any)[opt.key]} onChange={(v) => setPdfOptions((prev) => ({ ...prev, [opt.key]: v }))} />
+                </div>
+              ))}
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 pt-1">Cláusulas jurídicas</p>
+              {[
+                { key: 'showClausulas', label: 'Segurança, responsabilidade, sigilo e condições gerais' },
+                { key: 'showTermoAceite', label: 'Termo de aceite' },
               ].map((opt) => (
                 <div key={opt.key} className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
                   <span className="font-semibold text-slate-700">{opt.label}</span>
