@@ -29,6 +29,26 @@ export interface PropostaPdfOptions {
   capaImagemUrl?: string;
 }
 
+// Tipografia de marca (guia Fireowl): corpo em Roboto, títulos em Poppins.
+// Fontes self-hosted em /public/fonts (Roboto: Apache-2.0; Poppins: OFL-1.1).
+// Este componente só carrega no navegador (dynamic ssr:false), então o fetch
+// das fontes por caminho de mesma origem é seguro.
+Font.register({
+  family: 'Roboto',
+  fonts: [
+    { src: '/fonts/Roboto-Regular.ttf' },
+    { src: '/fonts/Roboto-Bold.ttf', fontWeight: 700 },
+    { src: '/fonts/Roboto-Italic.ttf', fontStyle: 'italic' },
+  ],
+});
+Font.register({
+  family: 'Poppins',
+  fonts: [
+    { src: '/fonts/Poppins-SemiBold.ttf', fontWeight: 600 },
+    { src: '/fonts/Poppins-Bold.ttf', fontWeight: 700 },
+  ],
+});
+
 // Quebra de linha apenas nos espaços (não corta palavras no meio). Corrige o
 // "encavalado" de nomes longos do cliente na capa e nos textos justificados.
 Font.registerHyphenationCallback((word) => [word]);
@@ -69,9 +89,9 @@ const LOGO_PATHS = [
 
 const styles = StyleSheet.create({
   // Página de conteúdo (fundo claro) — paddingTop maior por causa do cabeçalho fixo.
-  page: { paddingTop: 62, paddingBottom: 54, paddingHorizontal: 40, fontSize: 9, fontFamily: 'Helvetica', color: C.s700, lineHeight: 1.5 },
+  page: { paddingTop: 62, paddingBottom: 54, paddingHorizontal: 40, fontSize: 9, fontFamily: 'Roboto', color: C.s700, lineHeight: 1.5 },
   // Página institucional (fundo marinho)
-  darkPage: { paddingTop: 46, paddingBottom: 46, paddingHorizontal: 44, fontSize: 9, fontFamily: 'Helvetica', color: C.white, backgroundColor: C.navy, lineHeight: 1.5 },
+  darkPage: { paddingTop: 46, paddingBottom: 46, paddingHorizontal: 44, fontSize: 9, fontFamily: 'Roboto', color: C.white, backgroundColor: C.navy, lineHeight: 1.5 },
 
   // Cabeçalho fixo (páginas de conteúdo)
   header: {
@@ -79,7 +99,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     borderBottomWidth: 1, borderBottomColor: C.s200, paddingBottom: 6,
   },
-  headerBrand: { fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: C.navy, letterSpacing: 1 },
+  headerBrand: { fontSize: 8.5, fontFamily: 'Poppins', fontWeight: 600, color: C.navy, letterSpacing: 1 },
   headerRight: { fontSize: 7, color: C.s500, textTransform: 'uppercase', letterSpacing: 0.8 },
 
   // Rodapé fixo (páginas de conteúdo)
@@ -89,7 +109,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1, borderTopColor: C.s200, paddingTop: 5,
   },
   footerText: { fontSize: 7, color: C.s500, textTransform: 'uppercase', letterSpacing: 0.4 },
-  footerMono: { fontSize: 7, color: C.s500, fontFamily: 'Helvetica-Bold' },
+  footerMono: { fontSize: 7, color: C.s500, fontFamily: 'Roboto', fontWeight: 700 },
   footerDark: {
     position: 'absolute', bottom: 20, left: 44, right: 44,
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
@@ -101,74 +121,74 @@ const styles = StyleSheet.create({
   coverContent: { flex: 1, justifyContent: 'flex-start' },
   coverTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   coverLogoBox: { backgroundColor: C.white, borderRadius: 8, padding: 5, width: 50, height: 50, alignItems: 'center', justifyContent: 'center' },
-  coverBrand: { color: C.white, fontFamily: 'Helvetica-Bold', fontSize: 17, letterSpacing: 1.5 },
-  coverKicker: { color: C.gold, fontSize: 8, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', letterSpacing: 1.4 },
+  coverBrand: { color: C.white, fontFamily: 'Poppins', fontWeight: 700, fontSize: 17, letterSpacing: 1.5 },
+  coverKicker: { color: C.gold, fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.4 },
   coverImage: { width: '100%', height: 150, borderRadius: 6, marginTop: 26, objectFit: 'cover' },
-  coverTitle: { color: C.white, fontSize: 30, fontFamily: 'Helvetica-Bold', letterSpacing: 0.5, lineHeight: 1.15 },
+  coverTitle: { color: C.white, fontSize: 30, fontFamily: 'Poppins', fontWeight: 700, letterSpacing: 0.5, lineHeight: 1.15 },
   coverTitleBar: { width: 64, height: 5, backgroundColor: C.red, borderRadius: 2, marginTop: 12, marginBottom: 4 },
   // Blocos de informação da capa
   coverBlock: { backgroundColor: C.navy2, borderLeftWidth: 3, borderLeftColor: C.red, borderRadius: 4, paddingVertical: 9, paddingHorizontal: 12, marginBottom: 8 },
-  coverBlockLabel: { color: C.gold, fontSize: 7.5, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 3 },
-  coverBlockValue: { color: C.white, fontSize: 13, fontFamily: 'Helvetica-Bold', lineHeight: 1.2 },
+  coverBlockLabel: { color: C.gold, fontSize: 7.5, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 3 },
+  coverBlockValue: { color: C.white, fontSize: 13, fontFamily: 'Roboto', fontWeight: 700, lineHeight: 1.2 },
   coverFooter: { borderTopWidth: 1, borderTopColor: C.navy2, paddingTop: 10, marginTop: 6 },
-  coverFooterStrong: { color: C.white, fontSize: 8.5, fontFamily: 'Helvetica-Bold', letterSpacing: 0.4 },
+  coverFooterStrong: { color: C.white, fontSize: 8.5, fontFamily: 'Roboto', fontWeight: 700, letterSpacing: 0.4 },
   coverFooterText: { color: C.s400, fontSize: 7.5, marginTop: 2, letterSpacing: 0.3 },
 
   // ===== Áreas de Atuação =====
-  areasTitle: { color: C.white, fontSize: 22, fontFamily: 'Helvetica-Bold', letterSpacing: 0.5 },
+  areasTitle: { color: C.white, fontSize: 22, fontFamily: 'Poppins', fontWeight: 700, letterSpacing: 0.5 },
   areasBar: { width: 54, height: 4, backgroundColor: C.red, borderRadius: 2, marginTop: 8, marginBottom: 10 },
   areasIntro: { color: C.s300, fontSize: 9.5, lineHeight: 1.6, marginBottom: 18, maxWidth: 440 },
   areasGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   areaCard: { width: '48.5%', backgroundColor: C.navy2, borderTopWidth: 3, borderTopColor: C.red, borderRadius: 6, padding: 14, marginBottom: 14 },
-  areaCardTitle: { color: C.white, fontSize: 11, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 8 },
+  areaCardTitle: { color: C.white, fontSize: 11, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 8 },
   areaCardDesc: { color: C.s300, fontSize: 8, lineHeight: 1.55, marginTop: 4 },
 
   // ===== Fechamento =====
-  closeTitle: { color: C.white, fontSize: 24, fontFamily: 'Helvetica-Bold', lineHeight: 1.2, letterSpacing: 0.3, maxWidth: 420 },
+  closeTitle: { color: C.white, fontSize: 24, fontFamily: 'Poppins', fontWeight: 700, lineHeight: 1.2, letterSpacing: 0.3, maxWidth: 420 },
   closeBar: { width: 54, height: 4, backgroundColor: C.red, borderRadius: 2, marginTop: 14, marginBottom: 18 },
   closeRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 },
   closeItem: { width: '50%', marginBottom: 16, paddingRight: 12 },
-  closeLabel: { color: C.gold, fontSize: 7.5, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', letterSpacing: 1.1, marginBottom: 3 },
-  closeValue: { color: C.white, fontSize: 10, fontFamily: 'Helvetica-Bold', lineHeight: 1.35 },
+  closeLabel: { color: C.gold, fontSize: 7.5, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.1, marginBottom: 3 },
+  closeValue: { color: C.white, fontSize: 10, fontFamily: 'Roboto', fontWeight: 700, lineHeight: 1.35 },
 
   // ===== Seções (conteúdo) =====
   section: { marginBottom: 16 },
   secHead: { flexDirection: 'row', alignItems: 'center', borderLeftWidth: 3, borderLeftColor: C.red, borderBottomWidth: 1.5, borderBottomColor: C.s200, paddingLeft: 8, paddingBottom: 4, marginBottom: 8 },
-  secNum: { backgroundColor: C.navy, color: C.white, fontSize: 8, fontFamily: 'Helvetica-Bold', paddingVertical: 1.5, paddingHorizontal: 5, borderRadius: 2, marginRight: 7 },
-  secTitle: { color: C.navy, fontSize: 12, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', letterSpacing: 0.3 },
-  subTitle: { color: C.navy, fontSize: 9, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', marginBottom: 3, marginTop: 4 },
+  secNum: { backgroundColor: C.navy, color: C.white, fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, paddingVertical: 1.5, paddingHorizontal: 5, borderRadius: 2, marginRight: 7 },
+  secTitle: { color: C.navy, fontSize: 12, fontFamily: 'Poppins', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.3 },
+  subTitle: { color: C.navy, fontSize: 9, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3, marginTop: 4 },
   para: { fontSize: 9, color: C.s700, textAlign: 'justify', marginBottom: 5 },
   bulletRow: { flexDirection: 'row', marginBottom: 3 },
-  bulletDot: { color: C.red, fontFamily: 'Helvetica-Bold', marginRight: 5 },
+  bulletDot: { color: C.red, fontFamily: 'Roboto', fontWeight: 700, marginRight: 5 },
   bulletText: { flex: 1, fontSize: 9, color: C.s700, textAlign: 'justify' },
 
   // ===== Tabelas =====
   th: { flexDirection: 'row', backgroundColor: C.navy },
-  thCell: { color: C.white, fontSize: 7.5, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', padding: 5 },
+  thCell: { color: C.white, fontSize: 7.5, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', padding: 5 },
   tr: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: C.s200 },
   trAlt: { backgroundColor: C.s50 },
   td: { fontSize: 8, color: C.s700, padding: 5 },
   tfoot: { flexDirection: 'row', backgroundColor: C.s100 },
-  tfootCell: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: C.ink, padding: 5 },
+  tfootCell: { fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, color: C.ink, padding: 5 },
 
   // ===== Totais =====
   totalWrap: { marginTop: 2, borderWidth: 1, borderColor: C.s200, borderRadius: 4, overflow: 'hidden' },
   totalRowLight: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: C.s100, paddingVertical: 5, paddingHorizontal: 8 },
   totalRowNavy: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: C.navy, paddingVertical: 8, paddingHorizontal: 10, borderTopWidth: 3, borderTopColor: C.red },
-  totalLabelGold: { color: C.gold, fontSize: 8, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', letterSpacing: 0.8 },
-  totalValue: { color: C.white, fontSize: 15, fontFamily: 'Helvetica-Bold' },
+  totalLabelGold: { color: C.gold, fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8 },
+  totalValue: { color: C.white, fontSize: 15, fontFamily: 'Roboto', fontWeight: 700 },
 
   // ===== Blocos =====
   infoBox: { backgroundColor: C.s50, borderWidth: 1, borderColor: C.s200, borderRadius: 5, padding: 10 },
   scenarioCard: { backgroundColor: C.s50, borderWidth: 1, borderColor: C.s200, borderLeftWidth: 4, borderLeftColor: C.red, borderRadius: 5, padding: 12 },
   // Cartão/insígnia "positivo" (verde de marca) — garantia, itens inclusos.
   greenCard: { backgroundColor: '#f0f7f3', borderWidth: 1, borderColor: '#cfe6da', borderLeftWidth: 4, borderLeftColor: C.green, borderRadius: 5, padding: 12 },
-  greenBadge: { alignSelf: 'flex-start', backgroundColor: C.green, color: C.white, fontSize: 7, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', letterSpacing: 0.8, paddingVertical: 2, paddingHorizontal: 7, borderRadius: 3, marginBottom: 6 },
+  greenBadge: { alignSelf: 'flex-start', backgroundColor: C.green, color: C.white, fontSize: 7, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, paddingVertical: 2, paddingHorizontal: 7, borderRadius: 3, marginBottom: 6 },
   precoCard: { backgroundColor: C.navy, borderRadius: 6, borderLeftWidth: 4, borderLeftColor: C.gold, padding: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
 
   // ===== Índice =====
   idxRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  idxNum: { fontFamily: 'Helvetica-Bold', color: C.navy, width: 22, fontSize: 9 },
+  idxNum: { fontFamily: 'Roboto', fontWeight: 700, color: C.navy, width: 22, fontSize: 9 },
 
   // ===== Assinaturas =====
   signRow: { flexDirection: 'row', marginTop: 34, gap: 30 },
@@ -297,7 +317,7 @@ const FooterDark = ({ razao, numero }: { razao: string; numero: string }) => (
   <View fixed style={styles.footerDark}>
     <Text style={styles.footerDarkText}>{`© ${new Date().getFullYear()} ${razao}`}</Text>
     <Text style={styles.footerDarkText} render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`} />
-    <Text style={[styles.footerDarkText, { fontFamily: 'Helvetica-Bold', color: C.gold }]}>{numero}</Text>
+    <Text style={[styles.footerDarkText, { fontFamily: 'Roboto', fontWeight: 700, color: C.gold }]}>{numero}</Text>
   </View>
 );
 
@@ -327,7 +347,7 @@ const Bullets = ({ itens }: { itens: string[] }) => (
   </>
 );
 
-// Check verde (SVG — a Helvetica embutida não possui o glifo ✓) para listas
+// Check verde (SVG — independe de a fonte ter o glifo ✓) para listas
 // de sentido "positivo/incluso" (entregáveis, itens contemplados).
 const CheckIcon = () => (
   <Svg viewBox="0 0 12 12" style={{ width: 9, height: 9 }}>
@@ -379,13 +399,13 @@ const ItensTable = ({
           const tot = unit * eq.quantidade;
           return (
             <View key={i} style={[styles.tr, i % 2 === 1 ? styles.trAlt : {}]} wrap={false}>
-              <Text style={[styles.td, { width: 26, textAlign: 'center', color: C.red, fontFamily: 'Helvetica-Bold' }]}>{i + 1}</Text>
-              <Text style={[styles.td, { flex: 1, color: C.ink, fontFamily: 'Helvetica-Bold' }]}>{eq.descricao}</Text>
+              <Text style={[styles.td, { width: 26, textAlign: 'center', color: C.red, fontFamily: 'Roboto', fontWeight: 700 }]}>{i + 1}</Text>
+              <Text style={[styles.td, { flex: 1, color: C.ink, fontFamily: 'Roboto', fontWeight: 700 }]}>{eq.descricao}</Text>
               {showMarca && <Text style={[styles.td, { width: 90 }]}>{eq.marcaModelo}</Text>}
               <Text style={[styles.td, { width: 34, textAlign: 'center', textTransform: 'uppercase' }]}>{eq.unidade}</Text>
-              <Text style={[styles.td, { width: 34, textAlign: 'center', fontFamily: 'Helvetica-Bold' }]}>{eq.quantidade}</Text>
+              <Text style={[styles.td, { width: 34, textAlign: 'center', fontFamily: 'Roboto', fontWeight: 700 }]}>{eq.quantidade}</Text>
               {detailed && <Text style={[styles.td, { width: 60, textAlign: 'right' }]}>{unit > 0 ? unit.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}</Text>}
-              {detailed && <Text style={[styles.td, { width: 66, textAlign: 'right', fontFamily: 'Helvetica-Bold', color: C.ink }]}>{tot > 0 ? tot.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}</Text>}
+              {detailed && <Text style={[styles.td, { width: 66, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.ink }]}>{tot > 0 ? tot.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}</Text>}
             </View>
           );
         })}
@@ -570,7 +590,7 @@ export function PropostaDocument({
             <Paras paras={nv(p.cartaApresentacao) ? p.cartaApresentacao!.split('\n').map((x) => x.trim()).filter(Boolean) : CARTA_APRESENTACAO} />
             <View style={{ marginTop: 12 }}>
               <Text style={{ marginBottom: 14, fontSize: 9 }}>Atenciosamente,</Text>
-              <Text style={{ fontFamily: 'Helvetica-Bold', color: C.ink, fontSize: 9 }}>{assinante}</Text>
+              <Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink, fontSize: 9 }}>{assinante}</Text>
               <Text style={{ color: C.s600, fontSize: 9 }}>{`Responsável Comercial — ${razao}`}</Text>
               {nv(companyProfile.telefone) && <Text style={{ color: C.s500, fontSize: 9 }}>{companyProfile.telefone}</Text>}
               {nv(companyProfile.email) && <Text style={{ color: C.s500, fontSize: 9 }}>{companyProfile.email}</Text>}
@@ -601,17 +621,17 @@ export function PropostaDocument({
               </View>
               {(p.revisoes || []).map((rev, i) => (
                 <View key={i} style={[styles.tr, i % 2 === 1 ? styles.trAlt : {}]}>
-                  <Text style={[styles.td, { width: 120, fontFamily: 'Helvetica-Bold', color: C.ink }]}>{rev.numero}</Text>
+                  <Text style={[styles.td, { width: 120, fontFamily: 'Roboto', fontWeight: 700, color: C.ink }]}>{rev.numero}</Text>
                   <Text style={[styles.td, { width: 70 }]}>{rev.data}</Text>
                   <Text style={[styles.td, { flex: 1 }]}>{rev.elaborador}{rev.motivo ? ` — ${rev.motivo}` : ''}</Text>
                   <Text style={[styles.td, { width: 80, textTransform: 'uppercase' }]}>{(rev.status || '').replace(/_/g, ' ')}</Text>
                 </View>
               ))}
               <View style={[styles.tr, { backgroundColor: '#fffbeb' }]}>
-                <Text style={[styles.td, { width: 120, fontFamily: 'Helvetica-Bold', color: C.ink }]}>{numero}</Text>
+                <Text style={[styles.td, { width: 120, fontFamily: 'Roboto', fontWeight: 700, color: C.ink }]}>{numero}</Text>
                 <Text style={[styles.td, { width: 70 }]}>{pedido.dataEmissao}</Text>
                 <Text style={[styles.td, { flex: 1 }]}>{`${assinante} (versão atual)`}</Text>
-                <Text style={[styles.td, { width: 80, textTransform: 'uppercase', color: C.red, fontFamily: 'Helvetica-Bold' }]}>{pedido.status.replace(/_/g, ' ')}</Text>
+                <Text style={[styles.td, { width: 80, textTransform: 'uppercase', color: C.red, fontFamily: 'Roboto', fontWeight: 700 }]}>{pedido.status.replace(/_/g, ' ')}</Text>
               </View>
             </View>
           </Sec>
@@ -645,8 +665,8 @@ export function PropostaDocument({
             <View style={styles.totalWrap} wrap={false}>
               {(p.maoDeObra || 0) > 0 && (
                 <View style={styles.totalRowLight}>
-                  <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: C.ink, textTransform: 'uppercase' }}>Mão de obra / Serviços adicionais</Text>
-                  <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: C.ink }}>{brl(p.maoDeObra || 0)}</Text>
+                  <Text style={{ fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, color: C.ink, textTransform: 'uppercase' }}>Mão de obra / Serviços adicionais</Text>
+                  <Text style={{ fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>{brl(p.maoDeObra || 0)}</Text>
                 </View>
               )}
               <View style={styles.totalRowNavy}>
@@ -707,11 +727,11 @@ export function PropostaDocument({
 
         <Sec k="infoCompra">
           <View style={styles.infoBox}>
-            <Text style={{ fontSize: 9, marginBottom: 3 }}><Text style={{ fontFamily: 'Helvetica-Bold', color: C.ink }}>Razão Social: </Text>{razao}</Text>
-            <Text style={{ fontSize: 9, marginBottom: 3 }}><Text style={{ fontFamily: 'Helvetica-Bold', color: C.ink }}>CNPJ: </Text>{companyProfile.cnpj}</Text>
-            <Text style={{ fontSize: 9, marginBottom: 3 }}><Text style={{ fontFamily: 'Helvetica-Bold', color: C.ink }}>Endereço: </Text>{companyProfile.endereco}</Text>
-            {nv(companyProfile.telefone) && <Text style={{ fontSize: 9, marginBottom: 3 }}><Text style={{ fontFamily: 'Helvetica-Bold', color: C.ink }}>Telefone: </Text>{companyProfile.telefone}</Text>}
-            {nv(companyProfile.email) && <Text style={{ fontSize: 9 }}><Text style={{ fontFamily: 'Helvetica-Bold', color: C.ink }}>E-mail: </Text>{companyProfile.email}</Text>}
+            <Text style={{ fontSize: 9, marginBottom: 3 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Razão Social: </Text>{razao}</Text>
+            <Text style={{ fontSize: 9, marginBottom: 3 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>CNPJ: </Text>{companyProfile.cnpj}</Text>
+            <Text style={{ fontSize: 9, marginBottom: 3 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Endereço: </Text>{companyProfile.endereco}</Text>
+            {nv(companyProfile.telefone) && <Text style={{ fontSize: 9, marginBottom: 3 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Telefone: </Text>{companyProfile.telefone}</Text>}
+            {nv(companyProfile.email) && <Text style={{ fontSize: 9 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>E-mail: </Text>{companyProfile.email}</Text>}
           </View>
         </Sec>
 
@@ -723,11 +743,11 @@ export function PropostaDocument({
           {p.formasPagamento?.length || p.condicoesPagamento?.length ? (
             <>
               {p.formasPagamento && p.formasPagamento.length > 0 && (
-                <Text style={{ fontSize: 9, marginBottom: 4 }}><Text style={{ fontFamily: 'Helvetica-Bold', color: C.ink, textTransform: 'uppercase' }}>Formas de pagamento aceitas: </Text>{p.formasPagamento.join(', ')}.</Text>
+                <Text style={{ fontSize: 9, marginBottom: 4 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink, textTransform: 'uppercase' }}>Formas de pagamento aceitas: </Text>{p.formasPagamento.join(', ')}.</Text>
               )}
               {p.condicoesPagamento && p.condicoesPagamento.length > 0 && (
                 <>
-                  <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: C.ink, textTransform: 'uppercase', marginBottom: 3 }}>Condições:</Text>
+                  <Text style={{ fontSize: 9, fontFamily: 'Roboto', fontWeight: 700, color: C.ink, textTransform: 'uppercase', marginBottom: 3 }}>Condições:</Text>
                   <Bullets itens={p.condicoesPagamento} />
                 </>
               )}
@@ -736,7 +756,7 @@ export function PropostaDocument({
             <Text style={styles.para}>{nv(p.formaPagamento) ? p.formaPagamento : 'A combinar entre as partes.'}</Text>
           )}
           {nv(p.faturamento) && (
-            <Text style={{ fontSize: 9, marginTop: 4 }}><Text style={{ fontFamily: 'Helvetica-Bold', color: C.ink, textTransform: 'uppercase' }}>Faturamento: </Text>{p.faturamento}</Text>
+            <Text style={{ fontSize: 9, marginTop: 4 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink, textTransform: 'uppercase' }}>Faturamento: </Text>{p.faturamento}</Text>
           )}
         </Sec>
 
@@ -780,12 +800,12 @@ export function PropostaDocument({
           <View style={styles.signRow}>
             <View style={styles.signCol}>
               <View style={styles.signLine} />
-              <Text style={{ fontFamily: 'Helvetica-Bold', color: C.ink, fontSize: 8, textTransform: 'uppercase' }}>{razao}</Text>
+              <Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink, fontSize: 8, textTransform: 'uppercase' }}>{razao}</Text>
               <Text style={{ fontSize: 7.5, color: C.s500, textTransform: 'uppercase' }}>{assinante}</Text>
             </View>
             <View style={styles.signCol}>
               <View style={styles.signLine} />
-              <Text style={{ fontFamily: 'Helvetica-Bold', color: C.ink, fontSize: 8, textTransform: 'uppercase' }}>{pedido.clienteNome}</Text>
+              <Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink, fontSize: 8, textTransform: 'uppercase' }}>{pedido.clienteNome}</Text>
               <Text style={{ fontSize: 7.5, color: C.s500, textTransform: 'uppercase' }}>De acordo &amp; Aceite da Proposta</Text>
             </View>
           </View>
