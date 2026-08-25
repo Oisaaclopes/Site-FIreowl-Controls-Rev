@@ -128,6 +128,8 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     showHistorico: true,
     showClausulas: true,
     showTermoAceite: true,
+    showAreasAtuacao: true,
+    showFechamento: true,
   });
   const [pdfConfigPedido, setPdfConfigPedido] = useState<Pedido | null>(null);
 
@@ -141,6 +143,8 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
       showHistorico: true,
       showClausulas: true,
       showTermoAceite: true,
+      showAreasAtuacao: true,
+      showFechamento: true,
     };
     setPdfOptions(base);
     if (pdfPrefs.configBeforeGenerate) setPdfConfigPedido(ped);
@@ -825,6 +829,8 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                 { key: 'showCarta', label: 'Carta de apresentação' },
                 { key: 'showIndice', label: 'Índice' },
                 { key: 'showHistorico', label: 'Histórico de propostas' },
+                { key: 'showAreasAtuacao', label: 'Página "Áreas de Atuação"' },
+                { key: 'showFechamento', label: 'Página de fechamento (contatos)' },
                 { key: 'detailedSubtotal', label: 'Detalhar itens e subtotais' },
                 { key: 'showBankData', label: 'Dados para pagamento' },
               ].map((opt) => (

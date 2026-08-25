@@ -19,6 +19,9 @@ interface PdfDisplayOptions {
   showCarta?: boolean;
   showClausulas?: boolean;
   showTermoAceite?: boolean;
+  showAreasAtuacao?: boolean;
+  showFechamento?: boolean;
+  capaImagemUrl?: string;
 }
 
 interface CommercialProposalPDFViewProps {

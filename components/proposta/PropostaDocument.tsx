@@ -1,5 +1,5 @@
 import React from 'react';
-import { Document, Page, View, Text, StyleSheet, Svg, Path, Font } from '@react-pdf/renderer';
+import { Document, Page, View, Text, StyleSheet, Svg, Path, Line, Rect, Circle, Image, Font } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import {
   CARTA_APRESENTACAO,
@@ -21,6 +21,12 @@ export interface PropostaPdfOptions {
   showIndice?: boolean;
   showHistorico?: boolean;
   showCarta?: boolean;
+  /** Página institucional "Áreas de Atuação" (padrão: exibir). */
+  showAreasAtuacao?: boolean;
+  /** Página de fechamento com contatos/endereço (padrão: exibir). */
+  showFechamento?: boolean;
+  /** Imagem opcional da capa (URL ou data URI). Sem ela, usa o grafismo blueprint. */
+  capaImagemUrl?: string;
 }
 
 // Quebra de linha apenas nos espaços (não corta palavras no meio). Corrige o
@@ -28,10 +34,12 @@ export interface PropostaPdfOptions {
 Font.registerHyphenationCallback((word) => [word]);
 
 const C = {
-  navy: '#0B1E38',
-  brand: '#1A1A72',
-  red: '#E63946',
-  gold: '#F2A900',
+  navy: '#0B2545',      // azul-marinho institucional (blueprint)
+  navy2: '#13315C',     // bloco/realce sobre o marinho
+  navyLine: '#5B7DB1',  // linhas do grafismo blueprint
+  brand: '#1A1A72',     // escudo da logo
+  red: '#E63946',       // vermelho de destaque
+  gold: '#F2A900',      // âmbar (rótulos/realces)
   green: '#047857',
   ink: '#0f172a',
   s700: '#334155',
@@ -45,6 +53,9 @@ const C = {
   white: '#ffffff',
 };
 
+// A4 em pontos (react-pdf) — usado para o grafismo de fundo em página inteira.
+const A4 = { w: 595.28, h: 841.89 };
+
 // Logo oficial Fireowl (paths reaproveitados do componente OfficialLogo).
 const LOGO_PATHS = [
   { d: 'M49 147.168C49 116.147 74.1471 91 105.168 91L358.832 91C389.853 91 415 116.147 415 147.168L415 371.832C415 402.853 389.853 428 358.832 428L105.168 428C74.1471 428 49 402.853 49 371.832Z', fill: C.brand },
@@ -55,8 +66,21 @@ const LOGO_PATHS = [
 ];
 
 const styles = StyleSheet.create({
-  page: { paddingTop: 40, paddingBottom: 54, paddingHorizontal: 40, fontSize: 9, fontFamily: 'Helvetica', color: C.s700, lineHeight: 1.5 },
-  // Rodapé fixo
+  // Página de conteúdo (fundo claro) — paddingTop maior por causa do cabeçalho fixo.
+  page: { paddingTop: 62, paddingBottom: 54, paddingHorizontal: 40, fontSize: 9, fontFamily: 'Helvetica', color: C.s700, lineHeight: 1.5 },
+  // Página institucional (fundo marinho)
+  darkPage: { paddingTop: 46, paddingBottom: 46, paddingHorizontal: 44, fontSize: 9, fontFamily: 'Helvetica', color: C.white, backgroundColor: C.navy, lineHeight: 1.5 },
+
+  // Cabeçalho fixo (páginas de conteúdo)
+  header: {
+    position: 'absolute', top: 22, left: 40, right: 40,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    borderBottomWidth: 1, borderBottomColor: C.s200, paddingBottom: 6,
+  },
+  headerBrand: { fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: C.navy, letterSpacing: 1 },
+  headerRight: { fontSize: 7, color: C.s500, textTransform: 'uppercase', letterSpacing: 0.8 },
+
+  // Rodapé fixo (páginas de conteúdo)
   footer: {
     position: 'absolute', bottom: 22, left: 40, right: 40,
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
@@ -64,28 +88,59 @@ const styles = StyleSheet.create({
   },
   footerText: { fontSize: 7, color: C.s500, textTransform: 'uppercase', letterSpacing: 0.4 },
   footerMono: { fontSize: 7, color: C.s500, fontFamily: 'Helvetica-Bold' },
-  // Capa
-  coverBanner: { backgroundColor: C.navy, borderRadius: 10, padding: 22, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  logoBox: { backgroundColor: C.white, borderRadius: 8, padding: 5, width: 46, height: 46, alignItems: 'center', justifyContent: 'center' },
-  brandName: { color: C.white, fontFamily: 'Helvetica-Bold', fontSize: 16, letterSpacing: 1 },
+  footerDark: {
+    position: 'absolute', bottom: 20, left: 44, right: 44,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    borderTopWidth: 1, borderTopColor: C.navy2, paddingTop: 5,
+  },
+  footerDarkText: { fontSize: 7, color: C.s400, textTransform: 'uppercase', letterSpacing: 0.5 },
+
+  // ===== Capa =====
+  coverContent: { flex: 1, justifyContent: 'flex-start' },
+  coverTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  coverLogoBox: { backgroundColor: C.white, borderRadius: 8, padding: 5, width: 50, height: 50, alignItems: 'center', justifyContent: 'center' },
+  coverBrand: { color: C.white, fontFamily: 'Helvetica-Bold', fontSize: 17, letterSpacing: 1.5 },
   coverKicker: { color: C.gold, fontSize: 8, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', letterSpacing: 1.4 },
-  coverMid: { marginTop: 60, borderLeftWidth: 4, borderLeftColor: C.red, paddingLeft: 16 },
-  coverLabel: { fontSize: 8, color: C.s400, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 2 },
-  coverValueBig: { fontSize: 22, color: C.ink, fontFamily: 'Helvetica-Bold', marginBottom: 18 },
-  coverValue: { fontSize: 13, color: C.s700, fontFamily: 'Helvetica-Bold', marginBottom: 18 },
-  coverFooter: { marginTop: 'auto', borderTopWidth: 1, borderTopColor: C.s200, paddingTop: 8, flexDirection: 'row', justifyContent: 'space-between' },
-  coverFooterText: { fontSize: 7.5, color: C.s500, textTransform: 'uppercase', letterSpacing: 0.4 },
-  // Seções
+  coverImage: { width: '100%', height: 150, borderRadius: 6, marginTop: 26, objectFit: 'cover' },
+  coverTitle: { color: C.white, fontSize: 30, fontFamily: 'Helvetica-Bold', letterSpacing: 0.5, lineHeight: 1.15 },
+  coverTitleBar: { width: 64, height: 5, backgroundColor: C.red, borderRadius: 2, marginTop: 12, marginBottom: 4 },
+  // Blocos de informação da capa
+  coverBlock: { backgroundColor: C.navy2, borderLeftWidth: 3, borderLeftColor: C.red, borderRadius: 4, paddingVertical: 9, paddingHorizontal: 12, marginBottom: 8 },
+  coverBlockLabel: { color: C.gold, fontSize: 7.5, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 3 },
+  coverBlockValue: { color: C.white, fontSize: 13, fontFamily: 'Helvetica-Bold', lineHeight: 1.2 },
+  coverFooter: { borderTopWidth: 1, borderTopColor: C.navy2, paddingTop: 10, marginTop: 6 },
+  coverFooterStrong: { color: C.white, fontSize: 8.5, fontFamily: 'Helvetica-Bold', letterSpacing: 0.4 },
+  coverFooterText: { color: C.s400, fontSize: 7.5, marginTop: 2, letterSpacing: 0.3 },
+
+  // ===== Áreas de Atuação =====
+  areasTitle: { color: C.white, fontSize: 22, fontFamily: 'Helvetica-Bold', letterSpacing: 0.5 },
+  areasBar: { width: 54, height: 4, backgroundColor: C.red, borderRadius: 2, marginTop: 8, marginBottom: 10 },
+  areasIntro: { color: C.s300, fontSize: 9.5, lineHeight: 1.6, marginBottom: 18, maxWidth: 440 },
+  areasGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  areaCard: { width: '48.5%', backgroundColor: C.navy2, borderTopWidth: 3, borderTopColor: C.red, borderRadius: 6, padding: 14, marginBottom: 14 },
+  areaCardTitle: { color: C.white, fontSize: 11, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 8 },
+  areaCardDesc: { color: C.s300, fontSize: 8, lineHeight: 1.55, marginTop: 4 },
+
+  // ===== Fechamento =====
+  closeTitle: { color: C.white, fontSize: 24, fontFamily: 'Helvetica-Bold', lineHeight: 1.2, letterSpacing: 0.3, maxWidth: 420 },
+  closeBar: { width: 54, height: 4, backgroundColor: C.red, borderRadius: 2, marginTop: 14, marginBottom: 18 },
+  closeRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 },
+  closeItem: { width: '50%', marginBottom: 16, paddingRight: 12 },
+  closeLabel: { color: C.gold, fontSize: 7.5, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', letterSpacing: 1.1, marginBottom: 3 },
+  closeValue: { color: C.white, fontSize: 10, fontFamily: 'Helvetica-Bold', lineHeight: 1.35 },
+
+  // ===== Seções (conteúdo) =====
   section: { marginBottom: 16 },
-  secHead: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1.5, borderBottomColor: C.red, paddingBottom: 3, marginBottom: 7 },
-  secNum: { backgroundColor: C.navy, color: C.white, fontSize: 8, fontFamily: 'Helvetica-Bold', paddingVertical: 1.5, paddingHorizontal: 5, borderRadius: 2, marginRight: 6 },
+  secHead: { flexDirection: 'row', alignItems: 'center', borderLeftWidth: 3, borderLeftColor: C.red, borderBottomWidth: 1.5, borderBottomColor: C.s200, paddingLeft: 8, paddingBottom: 4, marginBottom: 8 },
+  secNum: { backgroundColor: C.navy, color: C.white, fontSize: 8, fontFamily: 'Helvetica-Bold', paddingVertical: 1.5, paddingHorizontal: 5, borderRadius: 2, marginRight: 7 },
   secTitle: { color: C.navy, fontSize: 12, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', letterSpacing: 0.3 },
   subTitle: { color: C.navy, fontSize: 9, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', marginBottom: 3, marginTop: 4 },
   para: { fontSize: 9, color: C.s700, textAlign: 'justify', marginBottom: 5 },
   bulletRow: { flexDirection: 'row', marginBottom: 3 },
   bulletDot: { color: C.red, fontFamily: 'Helvetica-Bold', marginRight: 5 },
   bulletText: { flex: 1, fontSize: 9, color: C.s700, textAlign: 'justify' },
-  // Tabelas
+
+  // ===== Tabelas =====
   th: { flexDirection: 'row', backgroundColor: C.navy },
   thCell: { color: C.white, fontSize: 7.5, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', padding: 5 },
   tr: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: C.s200 },
@@ -93,19 +148,24 @@ const styles = StyleSheet.create({
   td: { fontSize: 8, color: C.s700, padding: 5 },
   tfoot: { flexDirection: 'row', backgroundColor: C.s100 },
   tfootCell: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: C.ink, padding: 5 },
-  // Totais
+
+  // ===== Totais =====
   totalWrap: { marginTop: 2, borderWidth: 1, borderColor: C.s200, borderRadius: 4, overflow: 'hidden' },
   totalRowLight: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: C.s100, paddingVertical: 5, paddingHorizontal: 8 },
-  totalRowNavy: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: C.navy, paddingVertical: 6, paddingHorizontal: 8 },
+  totalRowNavy: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: C.navy, paddingVertical: 8, paddingHorizontal: 10, borderTopWidth: 3, borderTopColor: C.red },
   totalLabelGold: { color: C.gold, fontSize: 8, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', letterSpacing: 0.8 },
-  totalValue: { color: C.white, fontSize: 14, fontFamily: 'Helvetica-Bold' },
-  // Blocos
+  totalValue: { color: C.white, fontSize: 15, fontFamily: 'Helvetica-Bold' },
+
+  // ===== Blocos =====
   infoBox: { backgroundColor: C.s50, borderWidth: 1, borderColor: C.s200, borderRadius: 5, padding: 10 },
-  precoCard: { backgroundColor: C.navy, borderRadius: 6, padding: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  // Índice
+  scenarioCard: { backgroundColor: C.s50, borderWidth: 1, borderColor: C.s200, borderLeftWidth: 4, borderLeftColor: C.red, borderRadius: 5, padding: 12 },
+  precoCard: { backgroundColor: C.navy, borderRadius: 6, borderLeftWidth: 4, borderLeftColor: C.gold, padding: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+
+  // ===== Índice =====
   idxRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   idxNum: { fontFamily: 'Helvetica-Bold', color: C.navy, width: 22, fontSize: 9 },
-  // Assinaturas
+
+  // ===== Assinaturas =====
   signRow: { flexDirection: 'row', marginTop: 34, gap: 30 },
   signCol: { flex: 1, alignItems: 'center' },
   signLine: { borderBottomWidth: 1, borderBottomColor: C.s400, width: '100%', height: 28, marginBottom: 5 },
@@ -115,12 +175,109 @@ const brl = (n: number) => `R$ ${(n || 0).toLocaleString('pt-BR', { minimumFract
 const nv = (s?: string) => !!s && s.trim().length > 0;
 const lnv = (a?: string[]) => Array.isArray(a) && a.filter((x) => nv(x)).length > 0;
 
-const Logo = () => (
-  <Svg viewBox="0 0 503 503" style={{ width: 36, height: 36 }}>
+const Logo = ({ size = 36 }: { size?: number }) => (
+  <Svg viewBox="0 0 503 503" style={{ width: size, height: size }}>
     {LOGO_PATHS.map((p, i) => (
       <Path key={i} d={p.d} fill={p.fill} stroke="#0C0C0C" strokeWidth={4} fillRule="evenodd" />
     ))}
   </Svg>
+);
+
+// Grafismo "planta baixa" (blueprint) para fundos marinhos — grade tênue + acentos.
+const BlueprintBg = ({ w = A4.w, h = A4.h }: { w?: number; h?: number }) => {
+  const step = 28;
+  const vs = Math.ceil(w / step);
+  const hs = Math.ceil(h / step);
+  return (
+    <Svg style={{ position: 'absolute', top: 0, left: 0 }} width={w} height={h}>
+      {Array.from({ length: vs }).map((_, i) => (
+        <Line key={`v${i}`} x1={i * step} y1={0} x2={i * step} y2={h} stroke={C.navyLine} strokeOpacity={0.14} strokeWidth={0.5} />
+      ))}
+      {Array.from({ length: hs }).map((_, i) => (
+        <Line key={`h${i}`} x1={0} y1={i * step} x2={w} y2={i * step} stroke={C.navyLine} strokeOpacity={0.14} strokeWidth={0.5} />
+      ))}
+      {/* Acentos vermelhos nos cantos */}
+      <Line x1={0} y1={h * 0.18} x2={w * 0.28} y2={0} stroke={C.red} strokeOpacity={0.22} strokeWidth={1.2} />
+      <Line x1={w} y1={h * 0.82} x2={w * 0.72} y2={h} stroke={C.red} strokeOpacity={0.22} strokeWidth={1.2} />
+    </Svg>
+  );
+};
+
+// Ícones lineares originais para as Áreas de Atuação (viewBox 24x24).
+const AreaIcon = ({ kind }: { kind: string }) => {
+  const S = 30;
+  const sw = 1.6;
+  const p = (d: string, extra?: object) => <Path d={d} stroke={C.red} strokeWidth={sw} fill="none" {...extra} />;
+  return (
+    <Svg viewBox="0 0 24 24" style={{ width: S, height: S }}>
+      {kind === 'sdai' && (
+        // Chama estilizada (detecção de incêndio)
+        p('M12 2 C12 7 16 8 14 13 C13 16 10 16 9 13 C8 15 9 16.5 9 18 C6 16 6.5 10.5 10 8 C10 10.5 12 10.5 12 8 C12 5.5 12 3.5 12 2 Z')
+      )}
+      {kind === 'cftv' && (
+        <>
+          <Rect x={3} y={7} width={13} height={10} rx={1.5} stroke={C.red} strokeWidth={sw} fill="none" />
+          <Circle cx={9.5} cy={12} r={3} stroke={C.red} strokeWidth={sw} fill="none" />
+          {p('M16 10 L21 7 L21 17 L16 14 Z')}
+        </>
+      )}
+      {kind === 'acesso' && (
+        <>
+          <Rect x={4} y={4} width={16} height={11} rx={1.5} stroke={C.red} strokeWidth={sw} fill="none" />
+          <Circle cx={12} cy={9} r={2.2} stroke={C.red} strokeWidth={sw} fill="none" />
+          {p('M8.5 15 C8.5 12.5 15.5 12.5 15.5 15')}
+          {p('M9 19 L15 19')}
+        </>
+      )}
+      {kind === 'alarme' && (
+        <>
+          {p('M12 3 C8.5 3 7 6 7 10 L6 15 L18 15 L17 10 C17 6 15.5 3 12 3 Z')}
+          {p('M10 18 C10 20 14 20 14 18')}
+          <Circle cx={12} cy={3} r={0.8} stroke={C.red} strokeWidth={sw} fill="none" />
+        </>
+      )}
+      {kind === 'bms' && (
+        <>
+          <Rect x={3} y={4} width={18} height={12} rx={1.5} stroke={C.red} strokeWidth={sw} fill="none" />
+          <Circle cx={12} cy={10} r={3} stroke={C.red} strokeWidth={sw} fill="none" />
+          {p('M12 6 L12 4.5')}
+          {p('M12 14 L12 15.5')}
+          {p('M8 10 L6.5 10')}
+          {p('M16 10 L17.5 10')}
+          {p('M9 20 L15 20')}
+        </>
+      )}
+      {kind === 'integracao' && (
+        <>
+          <Circle cx={5} cy={6} r={2} stroke={C.red} strokeWidth={sw} fill="none" />
+          <Circle cx={19} cy={6} r={2} stroke={C.red} strokeWidth={sw} fill="none" />
+          <Circle cx={12} cy={19} r={2} stroke={C.red} strokeWidth={sw} fill="none" />
+          {p('M6.5 7.5 L11 17.5')}
+          {p('M17.5 7.5 L13 17.5')}
+          {p('M7 6 L17 6')}
+        </>
+      )}
+    </Svg>
+  );
+};
+
+const AREAS = [
+  { kind: 'sdai', titulo: 'Detecção e Alarme (SDAI)', desc: 'Projeto, instalação e manutenção de sistemas de detecção e alarme de incêndio conforme NBR 17240 e NPT 019.' },
+  { kind: 'cftv', titulo: 'CFTV / Videomonitoramento', desc: 'Câmeras IP e analíticos de vídeo para monitoramento, gravação e supervisão remota de perímetros e ambientes.' },
+  { kind: 'acesso', titulo: 'Controle de Acesso', desc: 'Controle de portas, catracas e biometria com gestão de credenciais, níveis de acesso e trilha de auditoria.' },
+  { kind: 'alarme', titulo: 'Alarme de Intrusão', desc: 'Sensores, centrais e comunicação para proteção perimetral e detecção de intrusão com notificação em tempo real.' },
+  { kind: 'bms', titulo: 'Automação Predial (BMS)', desc: 'Supervisão e automação de utilidades prediais, integrando climatização, energia e iluminação em uma central.' },
+  { kind: 'integracao', titulo: 'Integração de Sistemas', desc: 'Convergência de SDAI, CFTV, acesso e alarme em plataforma unificada, com dashboards e resposta coordenada.' },
+];
+
+const Header = ({ razao }: { razao: string }) => (
+  <View fixed style={styles.header}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <Logo size={16} />
+      <Text style={styles.headerBrand}>{(razao || 'FIREOWL CONTROLS').toUpperCase()}</Text>
+    </View>
+    <Text style={styles.headerRight}>Proposta Técnico-Comercial</Text>
+  </View>
 );
 
 const Footer = ({ razao, numero }: { razao: string; numero: string }) => (
@@ -128,6 +285,14 @@ const Footer = ({ razao, numero }: { razao: string; numero: string }) => (
     <Text style={styles.footerText}>{`© ${new Date().getFullYear()} ${razao}`}</Text>
     <Text style={styles.footerText} render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`} />
     <Text style={styles.footerMono}>{numero}</Text>
+  </View>
+);
+
+const FooterDark = ({ razao, numero }: { razao: string; numero: string }) => (
+  <View fixed style={styles.footerDark}>
+    <Text style={styles.footerDarkText}>{`© ${new Date().getFullYear()} ${razao}`}</Text>
+    <Text style={styles.footerDarkText} render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`} />
+    <Text style={[styles.footerDarkText, { fontFamily: 'Helvetica-Bold', color: C.gold }]}>{numero}</Text>
   </View>
 );
 
@@ -211,12 +376,10 @@ const ItensTable = ({
   );
 };
 
-const CoverField = ({ label, value, big, size }: { label: string; value: string; big?: boolean; size?: number }) => (
-  <View style={{ width: '100%' }}>
-    <Text style={styles.coverLabel}>{label}</Text>
-    <Text style={[big ? styles.coverValueBig : styles.coverValue, size ? { fontSize: size, lineHeight: 1.25 } : {}]}>
-      {value || '—'}
-    </Text>
+const CoverBlock = ({ label, value }: { label: string; value: string }) => (
+  <View style={styles.coverBlock}>
+    <Text style={styles.coverBlockLabel}>{label}</Text>
+    <Text style={styles.coverBlockValue}>{value || '—'}</Text>
   </View>
 );
 
@@ -240,11 +403,9 @@ export function PropostaDocument({
   const showIndice = options?.showIndice !== false;
   const showHistorico = options?.showHistorico !== false;
   const showCarta = options?.showCarta !== false;
-
-  // Fonte do nome do cliente reduz conforme o comprimento (nomes muito longos
-  // acomodam com elegância, sem estourar a largura da capa).
-  const clienteNome = pedido.clienteNome || '';
-  const clienteFont = clienteNome.length > 60 ? 13 : clienteNome.length > 44 ? 15 : clienteNome.length > 30 ? 18 : 22;
+  const showAreas = options?.showAreasAtuacao !== false;
+  const showFechamento = options?.showFechamento !== false;
+  const capaImagemUrl = options?.capaImagemUrl;
 
   const itens = p.equipmentItems || [];
   const materiais = itens.filter((e) => e.tipo !== 'servico');
@@ -293,7 +454,7 @@ export function PropostaDocument({
   const on = (key: string) => vis.some((s) => s.key === key);
 
   const Sec = ({ k, children }: { k: string; children: React.ReactNode }) => (
-    <View style={styles.section}>
+    <View style={styles.section} {...({ bookmark: `${num(k)}. ${secoes.find((s) => s.key === k)!.titulo}` } as object)}>
       <SecHead n={num(k)} titulo={secoes.find((s) => s.key === k)!.titulo} />
       {children}
     </View>
@@ -301,39 +462,83 @@ export function PropostaDocument({
 
   return (
     <Document title={`Proposta ${numero}`} author={razao}>
-      {/* ===== CAPA ===== */}
-      <Page size="A4" style={styles.page}>
-        <Footer razao={razao} numero={numero} />
-        <View style={styles.coverBanner}>
-          {showLogo ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View style={styles.logoBox}>
-                <Logo />
-              </View>
-              <Text style={styles.brandName}>FIREOWL CONTROLS</Text>
+      {/* ===================== CAPA (marinho, blueprint) ===================== */}
+      <Page size="A4" style={styles.darkPage}>
+        <BlueprintBg />
+        <View style={styles.coverContent}>
+          {/* Topo: logo + marca */}
+          <View style={styles.coverTopRow}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              {showLogo && (
+                <View style={styles.coverLogoBox}>
+                  <Logo size={40} />
+                </View>
+              )}
+              <Text style={styles.coverBrand}>FIREOWL CONTROLS</Text>
             </View>
-          ) : (
-            <Text style={styles.brandName}>FIREOWL CONTROLS</Text>
-          )}
-          <Text style={styles.coverKicker}>Documento Técnico-Comercial</Text>
-        </View>
-        <View style={styles.coverMid}>
-          <Text style={{ color: C.red, fontSize: 9, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10 }}>
-            Proposta Técnico-Comercial
-          </Text>
-          <CoverField label="Cliente" value={pedido.clienteNome} big size={clienteFont} />
-          <CoverField label="Número da Proposta" value={numero} />
-          <CoverField label="Escopo de Fornecimento" value={escopoTitulo} />
-          <CoverField label="Data" value={pedido.dataEmissao} />
-        </View>
-        <View style={styles.coverFooter}>
-          <Text style={styles.coverFooterText}>{`${razao} • CNPJ ${companyProfile.cnpj}`}</Text>
-          <Text style={styles.coverFooterText}>{companyProfile.endereco}</Text>
+            <Text style={styles.coverKicker}>Engenharia de Segurança{'\n'}& Detecção de Incêndio</Text>
+          </View>
+
+          {/* Imagem opcional do cliente/edifício, ou grafismo (blueprint de fundo) */}
+          {nv(capaImagemUrl) && <Image src={capaImagemUrl!} style={styles.coverImage} />}
+
+          {/* Título */}
+          <View style={{ marginTop: nv(capaImagemUrl) ? 26 : 70 }}>
+            <Text style={styles.coverKicker}>Documento Técnico-Comercial</Text>
+            <View style={styles.coverTitleBar} />
+            <Text style={styles.coverTitle}>Proposta{'\n'}Técnico-Comercial</Text>
+          </View>
+
+          {/* Blocos de informação */}
+          <View style={{ marginTop: 24 }}>
+            <CoverBlock label="Cliente" value={pedido.clienteNome} />
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <View style={{ flex: 1 }}><CoverBlock label="Número da Proposta" value={numero} /></View>
+              <View style={{ flex: 1 }}><CoverBlock label="Data de Emissão" value={pedido.dataEmissao} /></View>
+            </View>
+            <CoverBlock label="Escopo de Fornecimento" value={escopoTitulo} />
+          </View>
+
+          {/* Rodapé institucional da capa */}
+          <View style={{ marginTop: 'auto' }}>
+            <View style={styles.coverFooter}>
+              <Text style={styles.coverFooterStrong}>{`${razao} — CNPJ ${companyProfile.cnpj}`}</Text>
+              <Text style={styles.coverFooterText}>{companyProfile.endereco}</Text>
+              {(nv(companyProfile.telefone) || nv(companyProfile.email)) && (
+                <Text style={styles.coverFooterText}>{[companyProfile.telefone, companyProfile.email].filter(nv).join('  •  ')}</Text>
+              )}
+            </View>
+          </View>
         </View>
       </Page>
 
-      {/* ===== CONTEÚDO ===== */}
+      {/* ===================== ÁREAS DE ATUAÇÃO (marinho) ===================== */}
+      {showAreas && (
+        <Page size="A4" style={styles.darkPage}>
+          <BlueprintBg />
+          <FooterDark razao={razao} numero={numero} />
+          <Text style={styles.coverKicker}>Quem é a Fireowl Controls</Text>
+          <Text style={[styles.areasTitle, { marginTop: 6 }]}>Áreas de Atuação</Text>
+          <View style={styles.areasBar} />
+          <Text style={styles.areasIntro}>
+            Somos uma engenharia especializada em sistemas de segurança eletrônica e proteção contra incêndio.
+            Projetamos, instalamos, comissionamos e mantemos soluções integradas — do sensor à central de supervisão.
+          </Text>
+          <View style={styles.areasGrid}>
+            {AREAS.map((a) => (
+              <View key={a.kind} style={styles.areaCard} wrap={false}>
+                <AreaIcon kind={a.kind} />
+                <Text style={styles.areaCardTitle}>{a.titulo}</Text>
+                <Text style={styles.areaCardDesc}>{a.desc}</Text>
+              </View>
+            ))}
+          </View>
+        </Page>
+      )}
+
+      {/* ===================== CONTEÚDO (claro) ===================== */}
       <Page size="A4" style={styles.page}>
+        <Header razao={razao} />
         <Footer razao={razao} numero={numero} />
 
         {on('carta') && (
@@ -401,7 +606,7 @@ export function PropostaDocument({
 
         <Sec k="escopo">
           <Text style={styles.subTitle}>{`${num('escopo')}.1. Descrição do escopo proposto`}</Text>
-          <View style={[styles.infoBox]}>
+          <View style={styles.scenarioCard}>
             <Text style={{ fontSize: 9, color: C.s700, textAlign: 'justify' }}>{nv(p.escopoServico) ? p.escopoServico : 'Escopo conforme especificação técnica acordada com o cliente.'}</Text>
           </View>
         </Sec>
@@ -559,6 +764,58 @@ export function PropostaDocument({
           </View>
         </View>
       </Page>
+
+      {/* ===================== FECHAMENTO (marinho) ===================== */}
+      {showFechamento && (
+        <Page size="A4" style={styles.darkPage}>
+          <BlueprintBg />
+          <FooterDark razao={razao} numero={numero} />
+          <View style={{ flex: 1, justifyContent: 'center' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 30 }}>
+              {showLogo && (
+                <View style={styles.coverLogoBox}>
+                  <Logo size={40} />
+                </View>
+              )}
+              <Text style={styles.coverBrand}>FIREOWL CONTROLS</Text>
+            </View>
+            <Text style={styles.coverKicker}>Obrigado pela oportunidade</Text>
+            <Text style={[styles.closeTitle, { marginTop: 8 }]}>Vamos proteger o seu patrimônio com engenharia de verdade.</Text>
+            <View style={styles.closeBar} />
+            <Text style={{ color: C.s300, fontSize: 9.5, lineHeight: 1.6, maxWidth: 440, marginBottom: 26 }}>
+              Nossa equipe está à disposição para esclarecer qualquer ponto desta proposta, ajustar escopos e agendar
+              a visita técnica. Fale com a gente pelos canais abaixo.
+            </Text>
+            <View style={styles.closeRow}>
+              <View style={styles.closeItem}>
+                <Text style={styles.closeLabel}>Empresa</Text>
+                <Text style={styles.closeValue}>{razao}</Text>
+                <Text style={{ color: C.s400, fontSize: 8, marginTop: 2 }}>{`CNPJ ${companyProfile.cnpj}`}</Text>
+              </View>
+              <View style={styles.closeItem}>
+                <Text style={styles.closeLabel}>Endereço</Text>
+                <Text style={styles.closeValue}>{companyProfile.endereco}</Text>
+              </View>
+              {nv(companyProfile.telefone) && (
+                <View style={styles.closeItem}>
+                  <Text style={styles.closeLabel}>Telefone</Text>
+                  <Text style={styles.closeValue}>{companyProfile.telefone}</Text>
+                </View>
+              )}
+              {nv(companyProfile.email) && (
+                <View style={styles.closeItem}>
+                  <Text style={styles.closeLabel}>E-mail</Text>
+                  <Text style={styles.closeValue}>{companyProfile.email}</Text>
+                </View>
+              )}
+              <View style={styles.closeItem}>
+                <Text style={styles.closeLabel}>Referência desta Proposta</Text>
+                <Text style={styles.closeValue}>{numero}</Text>
+              </View>
+            </View>
+          </View>
+        </Page>
+      )}
     </Document>
   );
 }
