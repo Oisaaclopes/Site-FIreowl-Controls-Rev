@@ -1192,24 +1192,24 @@ export function PropostaDocument({
           <Sec k="historico">
             <View style={{ borderWidth: 1, borderColor: C.s200, borderRadius: 4, overflow: 'hidden' }}>
               <View style={styles.th}>
-                <Text style={[styles.thCell, { width: 120 }]}>Revisão / Número</Text>
-                <Text style={[styles.thCell, { width: 70 }]}>Data</Text>
-                <Text style={[styles.thCell, { flex: 1 }]}>Elaborador</Text>
-                <Text style={[styles.thCell, { width: 80 }]}>Status</Text>
+                <Text style={[styles.thCell, { width: 100 }]}>Revisão / Número</Text>
+                <Text style={[styles.thCell, { width: 64 }]}>Data</Text>
+                <Text style={[styles.thCell, { width: 108 }]}>Elaborador</Text>
+                <Text style={[styles.thCell, { flex: 1 }]}>Motivo da Revisão</Text>
               </View>
               {(p.revisoes || []).map((rev, i) => (
                 <View key={i} style={[styles.tr, i % 2 === 1 ? styles.trAlt : {}]} wrap={false}>
-                  <Text style={[styles.td, { width: 120, fontFamily: 'Roboto', fontWeight: 700, color: C.ink }]}>{rev.numero}</Text>
-                  <Text style={[styles.td, { width: 70 }]}>{rev.data}</Text>
-                  <Text style={[styles.td, { flex: 1 }]}>{rev.elaborador}{rev.motivo ? ` — ${rev.motivo}` : ''}</Text>
-                  <Text style={[styles.td, { width: 80, textTransform: 'uppercase' }]}>{(rev.status || '').replace(/_/g, ' ')}</Text>
+                  <Text style={[styles.td, { width: 100, fontFamily: 'Roboto', fontWeight: 700, color: C.ink }]}>{rev.numero}</Text>
+                  <Text style={[styles.td, { width: 64 }]}>{rev.data}</Text>
+                  <Text style={[styles.td, { width: 108 }]}>{rev.elaborador}</Text>
+                  <Text style={[styles.td, { flex: 1 }]}>{nv(rev.motivo) ? rev.motivo : '—'}</Text>
                 </View>
               ))}
               <View style={[styles.tr, { backgroundColor: '#fffbeb' }]} wrap={false}>
-                <Text style={[styles.td, { width: 120, fontFamily: 'Roboto', fontWeight: 700, color: C.ink }]}>{numero}</Text>
-                <Text style={[styles.td, { width: 70 }]}>{pedido.dataEmissao}</Text>
-                <Text style={[styles.td, { flex: 1 }]}>{`${assinante} (versão atual)`}</Text>
-                <Text style={[styles.td, { width: 80, textTransform: 'uppercase', color: C.red, fontFamily: 'Roboto', fontWeight: 700 }]}>{pedido.status.replace(/_/g, ' ')}</Text>
+                <Text style={[styles.td, { width: 100, fontFamily: 'Roboto', fontWeight: 700, color: C.ink }]}>{numero}</Text>
+                <Text style={[styles.td, { width: 64 }]}>{pedido.dataEmissao}</Text>
+                <Text style={[styles.td, { width: 108 }]}>{assinante}</Text>
+                <Text style={[styles.td, { flex: 1, color: C.ink, fontFamily: 'Roboto', fontWeight: 700 }]}>{(p.revisoes && p.revisoes.length > 0) ? 'Versão vigente' : 'Emissão inicial'}</Text>
               </View>
             </View>
           </Sec>
