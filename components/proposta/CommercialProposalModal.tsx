@@ -477,6 +477,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         objetivo,
         cartaApresentacao,
         revisoes: initialPedido?.proposal?.revisoes,
+        capaImagemPath: initialPedido?.proposal?.capaImagemPath,
         diretrizesNormativas: diretrizes,
         escopoServico,
         entregaveis,

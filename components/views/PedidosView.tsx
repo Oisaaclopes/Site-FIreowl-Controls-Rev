@@ -866,7 +866,14 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
       )}
 
       {/* Commercial Proposal Form Modal */}
+      {/*
+        key força o modal a remontar a cada abertura (e ao trocar de proposta),
+        para que os campos sejam recarregados de initialPedido. Sem isso, o
+        useState inicializa só na 1ª montagem e a edição mostra dados velhos —
+        salvando por cima e "perdendo" objetivo, premissas, etc.
+      */}
       <CommercialProposalModal
+        key={`${isProposalModalOpen ? 'open' : 'closed'}:${editingPedido?.id ?? 'new'}`}
         isOpen={isProposalModalOpen}
         onClose={() => setIsProposalModalOpen(false)}
         onSave={onSavePedido}
