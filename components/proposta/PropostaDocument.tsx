@@ -82,6 +82,9 @@ const LOGO_PATHS = [
 
 const styles = StyleSheet.create({
   // Página de conteúdo (fundo claro): paddingTop 54, paddingBottom 68 para dar respiro de 3cm antes do rodapé
+  // IMPORTANTE: sem lineHeight aqui. lineHeight herdado (ou explícito) num
+  // <Text fixed render> zera a pintura do rodapé no @react-pdf/renderer. O
+  // espaçamento de linha é definido por estilo de texto (para, bulletText etc.).
   page: {
     paddingTop: 54,
     paddingBottom: 68,
@@ -89,7 +92,6 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontFamily: 'Roboto',
     color: C.s700,
-    lineHeight: 1.3,
   },
   // Página institucional (fundo marinho) — SEM PADDING no Page para que BlueprintBg e layout não estourem a altura A4
   darkPage: {
@@ -98,7 +100,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Roboto',
     color: C.white,
     backgroundColor: C.navy,
-    lineHeight: 1.3,
   },
 
   // Cabeçalho fixo (páginas de conteúdo) — Fundo branco limpo, alinhamento vertical perfeito
@@ -133,26 +134,22 @@ const styles = StyleSheet.create({
     lineHeight: 1,
   },
 
-  // Rodapé fixo com Bloco Azul Marinho Sólido + Filete Vermelho no topo, CENTRALIZADO HORIZONTALMENTE
+  // Rodapé fixo: um único <Text fixed render> estilizado como barra marinho com
+  // filete vermelho no topo. Padrão canônico do react-pdf para "Página X de Y"
+  // (render + fixed no MESMO elemento Text). Texto centralizado.
   footerBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 28,
     backgroundColor: C.navy,
     borderTopWidth: 2,
     borderTopColor: C.red,
+    paddingVertical: 8,
     paddingHorizontal: 20,
-    flexDirection: 'row',
-    justify: 'center',
-    alignItems: 'center',
-  },
-  footerTextCentered: {
     fontSize: 7.5,
     color: C.white,
     fontFamily: 'Roboto',
-    fontWeight: 400,
     textAlign: 'center',
     letterSpacing: 0.4,
   },
@@ -160,7 +157,7 @@ const styles = StyleSheet.create({
   // ===== Capa =====
   coverTopRow: {
     flexDirection: 'row',
-    justify: 'space-between',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
   coverLogoBox: {
@@ -170,7 +167,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
   },
   coverBrand: {
     color: C.white,
@@ -258,65 +255,119 @@ const styles = StyleSheet.create({
   },
 
   // ===== Áreas de Atuação (Grade 2x3 limpa com ótimo espaçamento e UI) =====
+  areasEyebrow: {
+    color: C.gold,
+    fontSize: 8,
+    fontFamily: 'Roboto',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: 1.6,
+  },
   areasTitle: {
     color: C.white,
-    fontSize: 20,
+    fontSize: 24,
     fontFamily: 'Poppins',
     fontWeight: 700,
-    letterSpacing: 0.4,
-    lineHeight: 1.2,
+    letterSpacing: 0.3,
+    marginTop: 5,
   },
   areasBar: {
-    width: 48,
+    width: 52,
     height: 4,
     backgroundColor: C.red,
     borderRadius: 2,
-    marginTop: 6,
-    marginBottom: 8,
+    marginTop: 8,
+    marginBottom: 10,
   },
   areasIntro: {
     color: C.s300,
     fontSize: 9,
-    lineHeight: 1.45,
-    marginBottom: 14,
-    maxWidth: 460,
+    lineHeight: 1.5,
+    marginBottom: 18,
+    maxWidth: 470,
   },
   areasGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justify: 'space-between',
-    marginTop: 4,
+    justifyContent: 'space-between',
   },
   areaCard: {
-    width: '47.5%',
+    width: '48%',
     backgroundColor: C.navy2,
-    borderTopWidth: 3,
-    borderTopColor: C.red,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#22406B',
+    padding: 14,
+    marginBottom: 12,
+    minHeight: 116,
   },
-  iconWrap: {
-    backgroundColor: '#1E3A63',
-    borderRadius: 6,
-    padding: 5,
-    alignSelf: 'flex-start',
-    marginBottom: 6,
+  areaCardHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 9,
+  },
+  iconBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#0E2647',
+    borderWidth: 1,
+    borderColor: '#2A4A78',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  areaIndex: {
+    fontSize: 18,
+    fontFamily: 'Poppins',
+    fontWeight: 700,
+    color: '#31507F',
   },
   areaCardTitle: {
     color: C.white,
-    fontSize: 9.5,
+    fontSize: 10,
     fontFamily: 'Poppins',
-    fontWeight: 700,
+    fontWeight: 600,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    lineHeight: 1.2,
+    letterSpacing: 0.5,
+  },
+  areaDivider: {
+    width: 22,
+    height: 2,
+    backgroundColor: C.red,
+    borderRadius: 1,
+    marginTop: 5,
+    marginBottom: 6,
   },
   areaCardDesc: {
     color: C.s300,
     fontSize: 7.8,
     lineHeight: 1.45,
+  },
+  chainStrip: {
     marginTop: 4,
+    backgroundColor: '#0E2647',
+    borderLeftWidth: 3,
+    borderLeftColor: C.gold,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  chainLabel: {
+    color: C.s400,
+    fontSize: 7,
+    fontFamily: 'Roboto',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 3,
+  },
+  chainText: {
+    color: C.white,
+    fontSize: 8.5,
+    fontFamily: 'Poppins',
+    fontWeight: 600,
+    letterSpacing: 0.6,
   },
 
   // ===== Fechamento =====
@@ -486,7 +537,7 @@ const styles = StyleSheet.create({
   },
   totalRowLight: {
     flexDirection: 'row',
-    justify: 'space-between',
+    justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: C.s100,
     paddingVertical: 6,
@@ -494,7 +545,7 @@ const styles = StyleSheet.create({
   },
   totalRowNavy: {
     flexDirection: 'row',
-    justify: 'space-between',
+    justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: C.navy,
     paddingVertical: 9,
@@ -641,9 +692,10 @@ const Logo = ({ size = 36 }: { size?: number }) => (
   </Svg>
 );
 
-// BlueprintBg com position absolute explicito para NAO aumentar a altura do fluxo da pagina
+// BlueprintBg: fundo ancorado à página (fixed) — fora do fluxo, para não ser
+// medido como conteúdo e gerar páginas em branco antes das páginas marinhas.
 const BlueprintBg = () => (
-  <Svg style={{ position: 'absolute', top: 0, left: 0 }} width={A4.w} height={A4.h}>
+  <Svg fixed style={{ position: 'absolute', top: 0, left: 0 }} width={A4.w} height={A4.h}>
     {Array.from({ length: Math.ceil(A4.w / 28) }).map((_, i) => (
       <Line key={`v${i}`} x1={i * 28} y1={0} x2={i * 28} y2={A4.h} stroke={C.navyLine} strokeOpacity={0.14} strokeWidth={0.5} />
     ))}
@@ -734,14 +786,13 @@ const Header = ({ razao }: { razao: string }) => (
 );
 
 const Footer = ({ cliente, numero, data }: { cliente: string; numero: string; data: string }) => (
-  <View fixed style={styles.footerBar}>
-    <Text
-      style={styles.footerTextCentered}
-      render={({ pageNumber, totalPages }) =>
-        `${numero}   •   ${data}   •   ${cliente}   •   Página ${pageNumber} de ${totalPages}`
-      }
-    />
-  </View>
+  <Text
+    fixed
+    style={styles.footerBar}
+    render={({ pageNumber, totalPages }) =>
+      `${numero}   •   ${data}   •   ${cliente}   •   Página ${pageNumber} de ${totalPages}`
+    }
+  />
 );
 
 const SecHead = ({ n, titulo }: { n: string; titulo: string }) => (
@@ -924,7 +975,7 @@ export function PropostaDocument({
       {/* ===================== 01. CAPA (marinho, sem padding no Page para 0 overflow) ===================== */}
       <Page size="A4" style={styles.darkPage}>
         <BlueprintBg />
-        <View style={{ padding: 40, width: '100%', height: '100%', justifyContent: 'space-between' }}>
+        <View style={{ flex: 1, padding: 40, justifyContent: 'space-between' }}>
           <View style={styles.coverTopRow}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               {showLogo && (
@@ -983,24 +1034,32 @@ export function PropostaDocument({
         <Page size="A4" style={styles.darkPage}>
           <BlueprintBg />
           <Footer cliente={clienteNome} numero={numero} data={dataEmissao} />
-          <View style={{ padding: 40, width: '100%', height: '100%' }}>
-            <Text style={styles.coverKicker}>QUEM É A FIREOWL CONTROLS</Text>
-            <Text style={[styles.areasTitle, { marginTop: 4 }]}>Áreas de Atuação</Text>
+          <View style={{ flex: 1, paddingTop: 40, paddingHorizontal: 40, paddingBottom: 40 }}>
+            <Text style={styles.areasEyebrow}>QUEM É A FIREOWL CONTROLS</Text>
+            <Text style={styles.areasTitle}>Áreas de Atuação</Text>
             <View style={styles.areasBar} />
             <Text style={styles.areasIntro}>
-              Somos uma engenharia especializada em sistemas de segurança eletrônica e proteção contra incêndio.
-              Projetamos, instalamos, comissionamos e mantemos soluções integradas — do sensor à central de supervisão.
+              Engenharia especializada em segurança eletrônica e proteção contra incêndio. Projetamos, instalamos,
+              comissionamos e mantemos soluções integradas — do sensor de campo à central de supervisão.
             </Text>
             <View style={styles.areasGrid}>
-              {AREAS.map((a) => (
+              {AREAS.map((a, i) => (
                 <View key={a.kind} style={styles.areaCard} wrap={false}>
-                  <View style={styles.iconWrap}>
-                    <AreaIcon kind={a.kind} />
+                  <View style={styles.areaCardHead}>
+                    <View style={styles.iconBadge}>
+                      <AreaIcon kind={a.kind} />
+                    </View>
+                    <Text style={styles.areaIndex}>{String(i + 1).padStart(2, '0')}</Text>
                   </View>
                   <Text style={styles.areaCardTitle}>{a.titulo}</Text>
+                  <View style={styles.areaDivider} />
                   <Text style={styles.areaCardDesc}>{a.desc}</Text>
                 </View>
               ))}
+            </View>
+            <View style={styles.chainStrip}>
+              <Text style={styles.chainLabel}>Ciclo completo de engenharia</Text>
+              <Text style={styles.chainText}>Projeto   ·   Instalação   ·   Comissionamento   ·   Manutenção   ·   Suporte</Text>
             </View>
           </View>
         </Page>
@@ -1262,7 +1321,7 @@ export function PropostaDocument({
         <Page size="A4" style={styles.darkPage}>
           <BlueprintBg />
           <Footer cliente={clienteNome} numero={numero} data={dataEmissao} />
-          <View style={{ padding: 40, width: '100%', height: '100%', justifyContent: 'center' }}>
+          <View style={{ paddingHorizontal: 40, marginTop: 'auto', marginBottom: 'auto' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 }}>
               {showLogo && (
                 <View style={styles.coverLogoBox}>
