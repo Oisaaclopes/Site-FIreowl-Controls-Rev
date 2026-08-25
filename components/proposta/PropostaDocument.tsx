@@ -91,11 +91,9 @@ const styles = StyleSheet.create({
     color: C.s700,
     lineHeight: 1.3,
   },
-  // Página institucional (fundo marinho) — sem padding no container principal para evitar quebra de página espúria
+  // Página institucional (fundo marinho) — SEM PADDING no Page para que BlueprintBg e layout não estourem a altura A4
   darkPage: {
-    paddingTop: 36,
-    paddingBottom: 44,
-    paddingHorizontal: 40,
+    padding: 0,
     fontSize: 9,
     fontFamily: 'Roboto',
     color: C.white,
@@ -115,7 +113,6 @@ const styles = StyleSheet.create({
     borderBottomColor: C.red,
     paddingHorizontal: 40,
     flexDirection: 'row',
-    justify: 'space-between',
     alignItems: 'center',
   },
   headerBrand: {
@@ -123,7 +120,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins',
     fontWeight: 600,
     color: C.navy,
-    letterSpacing: 1,
+    letterSpacing: 0.8,
     lineHeight: 1,
   },
   headerRight: {
@@ -137,12 +134,12 @@ const styles = StyleSheet.create({
   },
 
   // Rodapé fixo com Bloco Azul Marinho Sólido + Filete Vermelho no topo, CENTRALIZADO HORIZONTALMENTE
-  footerContainer: {
+  footerBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 30,
+    height: 28,
     backgroundColor: C.navy,
     borderTopWidth: 2,
     borderTopColor: C.red,
@@ -155,6 +152,7 @@ const styles = StyleSheet.create({
     fontSize: 7.5,
     color: C.white,
     fontFamily: 'Roboto',
+    fontWeight: 400,
     textAlign: 'center',
     letterSpacing: 0.4,
   },
@@ -266,6 +264,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins',
     fontWeight: 700,
     letterSpacing: 0.4,
+    lineHeight: 1.2,
   },
   areasBar: {
     width: 48,
@@ -289,7 +288,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   areaCard: {
-    width: '48%',
+    width: '47.5%',
     backgroundColor: C.navy2,
     borderTopWidth: 3,
     borderTopColor: C.red,
@@ -311,6 +310,7 @@ const styles = StyleSheet.create({
     fontWeight: 700,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
+    lineHeight: 1.2,
   },
   areaCardDesc: {
     color: C.s300,
@@ -501,25 +501,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderTopWidth: 3,
     borderTopColor: C.red,
+    width: '100%',
   },
   totalLabelGold: {
     color: C.gold,
-    fontSize: 8.5,
-    fontFamily: 'Roboto',
+    fontSize: 9,
+    fontFamily: 'Poppins',
     fontWeight: 700,
     textTransform: 'uppercase',
-    letterSpacing: 0.9,
+    letterSpacing: 1,
     lineHeight: 1,
   },
   totalValue: {
     color: C.white,
     fontSize: 16,
-    fontFamily: 'Roboto',
+    fontFamily: 'Poppins',
     fontWeight: 700,
     lineHeight: 1,
   },
 
-  // Card de Preço Destacado (Investimento Total em Bloco com alinhamento vertical perfeito)
+  // Card de Preço Destacado (Investimento Total em Bloco de 2 Linhas perfeitamente alinhadas)
   precoCardBlock: {
     backgroundColor: C.navy,
     borderRadius: 6,
@@ -527,25 +528,27 @@ const styles = StyleSheet.create({
     borderLeftColor: C.red,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    marginBottom: 10,
-    flexDirection: 'row',
-    justify: 'space-between',
-    alignItems: 'center',
+    marginBottom: 12,
+    width: '100%',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
   },
   precoCardLabel: {
     color: C.gold,
-    fontSize: 9,
+    fontSize: 8.5,
     fontFamily: 'Roboto',
     fontWeight: 700,
     textTransform: 'uppercase',
-    letterSpacing: 1.1,
+    letterSpacing: 1.2,
+    marginBottom: 4,
     lineHeight: 1,
   },
   precoCardValue: {
     color: C.white,
-    fontSize: 18,
-    fontFamily: 'Roboto',
+    fontSize: 20,
+    fontFamily: 'Poppins',
     fontWeight: 700,
+    letterSpacing: 0.5,
     lineHeight: 1,
   },
 
@@ -638,23 +641,19 @@ const Logo = ({ size = 36 }: { size?: number }) => (
   </Svg>
 );
 
-const BlueprintBg = ({ w = A4.w, h = A4.h }: { w?: number; h?: number }) => {
-  const step = 28;
-  const vs = Math.ceil(w / step);
-  const hs = Math.ceil(h / step);
-  return (
-    <Svg style={{ position: 'absolute', top: 0, left: 0 }} width={w} height={h}>
-      {Array.from({ length: vs }).map((_, i) => (
-        <Line key={`v${i}`} x1={i * step} y1={0} x2={i * step} y2={h} stroke={C.navyLine} strokeOpacity={0.14} strokeWidth={0.5} />
-      ))}
-      {Array.from({ length: hs }).map((_, i) => (
-        <Line key={`h${i}`} x1={0} y1={i * step} x2={w} y2={i * step} stroke={C.navyLine} strokeOpacity={0.14} strokeWidth={0.5} />
-      ))}
-      <Line x1={0} y1={h * 0.18} x2={w * 0.28} y2={0} stroke={C.red} strokeOpacity={0.22} strokeWidth={1.2} />
-      <Line x1={w} y1={h * 0.82} x2={w * 0.72} y2={h} stroke={C.red} strokeOpacity={0.22} strokeWidth={1.2} />
-    </Svg>
-  );
-};
+// BlueprintBg com position absolute explicito para NAO aumentar a altura do fluxo da pagina
+const BlueprintBg = () => (
+  <Svg style={{ position: 'absolute', top: 0, left: 0 }} width={A4.w} height={A4.h}>
+    {Array.from({ length: Math.ceil(A4.w / 28) }).map((_, i) => (
+      <Line key={`v${i}`} x1={i * 28} y1={0} x2={i * 28} y2={A4.h} stroke={C.navyLine} strokeOpacity={0.14} strokeWidth={0.5} />
+    ))}
+    {Array.from({ length: Math.ceil(A4.h / 28) }).map((_, i) => (
+      <Line key={`h${i}`} x1={0} y1={i * 28} x2={A4.w} y2={i * 28} stroke={C.navyLine} strokeOpacity={0.14} strokeWidth={0.5} />
+    ))}
+    <Line x1={0} y1={A4.h * 0.18} x2={A4.w * 0.28} y2={0} stroke={C.red} strokeOpacity={0.22} strokeWidth={1.2} />
+    <Line x1={A4.w} y1={A4.h * 0.82} x2={A4.w * 0.72} y2={A4.h} stroke={C.red} strokeOpacity={0.22} strokeWidth={1.2} />
+  </Svg>
+);
 
 const AreaIcon = ({ kind }: { kind: string }) => {
   const S = 22;
@@ -727,6 +726,7 @@ const Header = ({ razao }: { razao: string }) => (
       <Logo size={18} />
       <Text style={styles.headerBrand}>{(razao || 'FIREOWL CONTROLS').toUpperCase()}</Text>
     </View>
+    <View style={{ flex: 1 }} />
     <View style={{ justifyContent: 'center', alignItems: 'center' }}>
       <Text style={styles.headerRight}>DOCUMENTO TÉCNICO-COMERCIAL</Text>
     </View>
@@ -734,7 +734,7 @@ const Header = ({ razao }: { razao: string }) => (
 );
 
 const Footer = ({ cliente, numero, data }: { cliente: string; numero: string; data: string }) => (
-  <View fixed style={styles.footerContainer}>
+  <View fixed style={styles.footerBar}>
     <Text
       style={styles.footerTextCentered}
       render={({ pageNumber, totalPages }) =>
@@ -787,7 +787,7 @@ const Checks = ({ itens }: { itens: string[] }) => (
   </>
 );
 
-// Tabela de itens zebrada, sem bordas verticais internas
+// Tabela de itens zebrada
 const ItensTable = ({
   titulo,
   itens,
@@ -921,69 +921,70 @@ export function PropostaDocument({
 
   return (
     <Document title={`Proposta ${numero}`} author={razao}>
-      {/* ===================== 01. CAPA (marinho, blueprint, sem estouro de altura) ===================== */}
+      {/* ===================== 01. CAPA (marinho, sem padding no Page para 0 overflow) ===================== */}
       <Page size="A4" style={styles.darkPage}>
         <BlueprintBg />
-        {/* Topo: logo + marca */}
-        <View style={styles.coverTopRow}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            {showLogo && (
-              <View style={styles.coverLogoBox}>
-                <Logo size={36} />
+        <View style={{ padding: 40, width: '100%', height: '100%', justifyContent: 'space-between' }}>
+          <View style={styles.coverTopRow}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              {showLogo && (
+                <View style={styles.coverLogoBox}>
+                  <Logo size={36} />
+                </View>
+              )}
+              <Text style={styles.coverBrand}>FIREOWL CONTROLS</Text>
+            </View>
+            <Text style={styles.coverKicker}>Engenharia de Segurança{'\n'}& Detecção de Incêndio</Text>
+          </View>
+
+          {nv(capaImagemUrl) && <Image src={capaImagemUrl!} style={styles.coverImage} />}
+
+          <View style={{ marginTop: nv(capaImagemUrl) ? 10 : 28 }}>
+            <Text style={styles.coverKicker}>Documento Técnico-Comercial</Text>
+            <View style={styles.coverTitleBar} />
+            <Text style={styles.coverTitle}>Proposta{'\n'}Técnico-Comercial</Text>
+          </View>
+
+          <View style={styles.coverBlockContainer}>
+            <View style={styles.coverBlockItem}>
+              <Text style={styles.coverBlockLabel}>CLIENTE</Text>
+              <Text style={styles.coverBlockValue}>{clienteNome || '—'}</Text>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <View style={{ flex: 1, marginBottom: 6 }}>
+                <Text style={styles.coverBlockLabel}>NÚMERO DA PROPOSTA</Text>
+                <Text style={styles.coverBlockValue}>{numero || '—'}</Text>
               </View>
+              <View style={{ flex: 1, marginBottom: 6 }}>
+                <Text style={styles.coverBlockLabel}>DATA DE EMISSÃO</Text>
+                <Text style={styles.coverBlockValue}>{dataEmissao || '—'}</Text>
+              </View>
+            </View>
+
+            <View style={{ marginBottom: 0 }}>
+              <Text style={styles.coverBlockLabel}>ESCOPO DE FORNECIMENTO</Text>
+              <Text style={styles.coverBlockValue}>{escopoTitulo || '—'}</Text>
+            </View>
+          </View>
+
+          <View style={styles.coverFooter}>
+            <Text style={styles.coverFooterStrong}>{`${razao} — CNPJ ${companyProfile.cnpj}`}</Text>
+            <Text style={styles.coverFooterText}>{companyProfile.endereco}</Text>
+            {(nv(companyProfile.telefone) || nv(companyProfile.email)) && (
+              <Text style={styles.coverFooterText}>{[companyProfile.telefone, companyProfile.email].filter(nv).join('  •  ')}</Text>
             )}
-            <Text style={styles.coverBrand}>FIREOWL CONTROLS</Text>
           </View>
-          <Text style={styles.coverKicker}>Engenharia de Segurança{'\n'}& Detecção de Incêndio</Text>
-        </View>
-
-        {nv(capaImagemUrl) && <Image src={capaImagemUrl!} style={styles.coverImage} />}
-
-        <View style={{ marginTop: nv(capaImagemUrl) ? 12 : 36 }}>
-          <Text style={styles.coverKicker}>Documento Técnico-Comercial</Text>
-          <View style={styles.coverTitleBar} />
-          <Text style={styles.coverTitle}>Proposta{'\n'}Técnico-Comercial</Text>
-        </View>
-
-        <View style={styles.coverBlockContainer}>
-          <View style={styles.coverBlockItem}>
-            <Text style={styles.coverBlockLabel}>CLIENTE</Text>
-            <Text style={styles.coverBlockValue}>{clienteNome || '—'}</Text>
-          </View>
-
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <View style={{ flex: 1, marginBottom: 6 }}>
-              <Text style={styles.coverBlockLabel}>NÚMERO DA PROPOSTA</Text>
-              <Text style={styles.coverBlockValue}>{numero || '—'}</Text>
-            </View>
-            <View style={{ flex: 1, marginBottom: 6 }}>
-              <Text style={styles.coverBlockLabel}>DATA DE EMISSÃO</Text>
-              <Text style={styles.coverBlockValue}>{dataEmissao || '—'}</Text>
-            </View>
-          </View>
-
-          <View style={{ marginBottom: 0 }}>
-            <Text style={styles.coverBlockLabel}>ESCOPO DE FORNECIMENTO</Text>
-            <Text style={styles.coverBlockValue}>{escopoTitulo || '—'}</Text>
-          </View>
-        </View>
-
-        <View style={styles.coverFooter}>
-          <Text style={styles.coverFooterStrong}>{`${razao} — CNPJ ${companyProfile.cnpj}`}</Text>
-          <Text style={styles.coverFooterText}>{companyProfile.endereco}</Text>
-          {(nv(companyProfile.telefone) || nv(companyProfile.email)) && (
-            <Text style={styles.coverFooterText}>{[companyProfile.telefone, companyProfile.email].filter(nv).join('  •  ')}</Text>
-          )}
         </View>
       </Page>
 
-      {/* ===================== 02. ÁREAS DE ATUAÇÃO (Grade 2x3 limpa com UI moderna) ===================== */}
+      {/* ===================== 02. ÁREAS DE ATUAÇÃO (Grade 2x3 sem estouro de altura) ===================== */}
       {showAreas && (
         <Page size="A4" style={styles.darkPage}>
           <BlueprintBg />
           <Footer cliente={clienteNome} numero={numero} data={dataEmissao} />
-          <View>
-            <Text style={styles.coverKicker}>Quem é a Fireowl Controls</Text>
+          <View style={{ padding: 40, width: '100%', height: '100%' }}>
+            <Text style={styles.coverKicker}>QUEM É A FIREOWL CONTROLS</Text>
             <Text style={[styles.areasTitle, { marginTop: 4 }]}>Áreas de Atuação</Text>
             <View style={styles.areasBar} />
             <Text style={styles.areasIntro}>
@@ -1094,10 +1095,10 @@ export function PropostaDocument({
           </View>
         </Sec>
 
-        {/* Item 05 - Materiais e Serviços Ofertados com garantia de vinculação do título às tabelas */}
-        <View style={styles.section} minPresenceAhead={160}>
+        {/* Item 05 - Materiais e Serviços Ofertados VINCULADO com minPresenceAhead={200} para nunca ficar um título sozinho na página 8 */}
+        <View style={styles.section} minPresenceAhead={200}>
           <SecHead n={num('itens')} titulo={secoes.find((s) => s.key === 'itens')!.titulo} />
-          <View minPresenceAhead={140}>
+          <View minPresenceAhead={160}>
             {materiais.length > 0 && <ItensTable titulo="Materiais" itens={materiais} detailed={detailed} showMarca />}
             {servicos.length > 0 && <ItensTable titulo="Serviços" itens={servicos} detailed={detailed} showMarca={false} accent={C.green} />}
             {materiais.length === 0 && servicos.length === 0 && (
@@ -1160,7 +1161,7 @@ export function PropostaDocument({
           )}
         </Sec>
 
-        {/* Item 09 - Preços com alinhamento vertical perfeito entre rótulo e valor */}
+        {/* Item 09 - Preços em 2 Linhas limpas (Rótulo no topo, valor em baixo) */}
         <Sec k="precos">
           <View style={styles.precoCardBlock} wrap={false}>
             <Text style={styles.precoCardLabel}>INVESTIMENTO TOTAL</Text>
@@ -1256,12 +1257,12 @@ export function PropostaDocument({
         </View>
       </Page>
 
-      {/* ===================== FECHAMENTO (marinho, sem estouro de altura) ===================== */}
+      {/* ===================== FECHAMENTO (marinho) ===================== */}
       {showFechamento && (
         <Page size="A4" style={styles.darkPage}>
           <BlueprintBg />
           <Footer cliente={clienteNome} numero={numero} data={dataEmissao} />
-          <View style={{ flex: 1, justifyContent: 'center' }}>
+          <View style={{ padding: 40, width: '100%', height: '100%', justifyContent: 'center' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 }}>
               {showLogo && (
                 <View style={styles.coverLogoBox}>
