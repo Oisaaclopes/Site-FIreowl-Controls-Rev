@@ -30,9 +30,6 @@ export interface PropostaPdfOptions {
 }
 
 // Tipografia de marca (guia Fireowl): corpo em Roboto, títulos em Poppins.
-// Fontes self-hosted em /public/fonts (Roboto: Apache-2.0; Poppins: OFL-1.1).
-// Este componente só carrega no navegador (dynamic ssr:false), então o fetch
-// das fontes por caminho de mesma origem é seguro.
 Font.register({
   family: 'Roboto',
   fonts: [
@@ -49,8 +46,7 @@ Font.register({
   ],
 });
 
-// Quebra de linha apenas nos espaços (não corta palavras no meio). Corrige o
-// "encavalado" de nomes longos do cliente na capa e nos textos justificados.
+// Quebra de linha apenas nos espaços (não corta palavras no meio).
 Font.registerHyphenationCallback((word) => [word]);
 
 // Paleta institucional Fireowl (guia de identidade visual).
@@ -59,10 +55,10 @@ const C = {
   navy2: '#13315C',     // bloco/realce sobre o marinho
   navyLine: '#5B7DB1',  // linhas do grafismo blueprint
   brand: '#1A1A72',     // escudo da logo (asset oficial)
-  logoRed: '#E63946',   // vermelho do asset oficial da logo (mantém idêntico ao site)
+  logoRed: '#E63946',   // vermelho da logo
   red: '#C1272D',       // vermelho de marca (acentos: barras, valor total)
   gold: '#F2A900',      // âmbar de marca (rótulos/realces)
-  green: '#2E7D5B',     // verde de marca (positivo/incluso: serviços, entregáveis, garantia)
+  green: '#2E7D5B',     // verde de marca (positivo/incluso)
   ink: '#0f172a',
   s700: '#334155',
   s600: '#475569',
@@ -75,7 +71,7 @@ const C = {
   white: '#ffffff',
 };
 
-// A4 em pontos (react-pdf) — usado para o grafismo de fundo em página inteira.
+// A4 em pontos (react-pdf)
 const A4 = { w: 595.28, h: 841.89 };
 
 // Logo oficial Fireowl (paths reaproveitados do componente OfficialLogo).
@@ -88,112 +84,548 @@ const LOGO_PATHS = [
 ];
 
 const styles = StyleSheet.create({
-  // Página de conteúdo (fundo claro) — paddingTop maior por causa do cabeçalho fixo.
-  page: { paddingTop: 62, paddingBottom: 54, paddingHorizontal: 40, fontSize: 9, fontFamily: 'Roboto', color: C.s700, lineHeight: 1.5 },
-  // Página institucional (fundo marinho)
-  darkPage: { paddingTop: 46, paddingBottom: 46, paddingHorizontal: 44, fontSize: 9, fontFamily: 'Roboto', color: C.white, backgroundColor: C.navy, lineHeight: 1.5 },
+  // Página de conteúdo (fundo claro) — paddingTop e paddingBottom exatos para cabeçalho e rodapé fixos
+  page: {
+    paddingTop: 54,
+    paddingBottom: 48,
+    paddingHorizontal: 40,
+    fontSize: 9,
+    fontFamily: 'Roboto',
+    color: C.s700,
+    lineHeight: 1.25,
+  },
+  // Página institucional (fundo marinho) — sem padding no container principal para evitar quebra de página espúria
+  darkPage: {
+    padding: 0,
+    fontSize: 9,
+    fontFamily: 'Roboto',
+    color: C.white,
+    backgroundColor: C.navy,
+    lineHeight: 1.25,
+  },
+  darkPageInner: {
+    paddingTop: 36,
+    paddingBottom: 36,
+    paddingHorizontal: 40,
+    width: '100%',
+    height: '100%',
+    justifyContent: 'space-between',
+  },
 
   // Cabeçalho fixo (páginas de conteúdo)
   header: {
-    position: 'absolute', top: 22, left: 40, right: 40,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    borderBottomWidth: 1, borderBottomColor: C.s200, paddingBottom: 6,
+    position: 'absolute',
+    top: 20,
+    left: 40,
+    right: 40,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: C.s200,
+    paddingBottom: 6,
   },
-  headerBrand: { fontSize: 8.5, fontFamily: 'Poppins', fontWeight: 600, color: C.navy, letterSpacing: 1 },
-  headerRight: { fontSize: 7, color: C.s500, textTransform: 'uppercase', letterSpacing: 0.8 },
+  headerBrand: {
+    fontSize: 8.5,
+    fontFamily: 'Poppins',
+    fontWeight: 600,
+    color: C.navy,
+    letterSpacing: 1,
+  },
+  headerRight: {
+    fontSize: 7,
+    color: C.s500,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
 
   // Rodapé fixo (páginas de conteúdo)
   footer: {
-    position: 'absolute', bottom: 22, left: 40, right: 40,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    borderTopWidth: 1, borderTopColor: C.s200, paddingTop: 5,
+    position: 'absolute',
+    bottom: 18,
+    left: 40,
+    right: 40,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: C.s200,
+    paddingTop: 5,
   },
-  footerText: { fontSize: 7, color: C.s500, textTransform: 'uppercase', letterSpacing: 0.4 },
-  footerMono: { fontSize: 7, color: C.s500, fontFamily: 'Roboto', fontWeight: 700 },
+  footerText: {
+    fontSize: 7,
+    color: C.s500,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  footerTextRight: {
+    fontSize: 7,
+    color: C.s600,
+    fontFamily: 'Roboto',
+    fontWeight: 700,
+  },
   footerDark: {
-    position: 'absolute', bottom: 20, left: 44, right: 44,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    borderTopWidth: 1, borderTopColor: C.navy2, paddingTop: 5,
+    position: 'absolute',
+    bottom: 18,
+    left: 40,
+    right: 40,
+    flexDirection: 'row',
+    justify: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: C.navy2,
+    paddingTop: 5,
   },
-  footerDarkText: { fontSize: 7, color: C.s400, textTransform: 'uppercase', letterSpacing: 0.5 },
+  footerDarkText: {
+    fontSize: 7,
+    color: C.s400,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  footerDarkTextRight: {
+    fontSize: 7,
+    color: C.gold,
+    fontFamily: 'Roboto',
+    fontWeight: 700,
+  },
 
   // ===== Capa =====
-  coverContent: { flex: 1, justifyContent: 'flex-start' },
-  coverTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  coverLogoBox: { backgroundColor: C.white, borderRadius: 8, padding: 5, width: 50, height: 50, alignItems: 'center', justifyContent: 'center' },
-  coverBrand: { color: C.white, fontFamily: 'Poppins', fontWeight: 700, fontSize: 17, letterSpacing: 1.5 },
-  coverKicker: { color: C.gold, fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.4 },
-  coverImage: { width: '100%', height: 150, borderRadius: 6, marginTop: 26, objectFit: 'cover' },
-  coverTitle: { color: C.white, fontSize: 30, fontFamily: 'Poppins', fontWeight: 700, letterSpacing: 0.5, lineHeight: 1.15 },
-  coverTitleBar: { width: 64, height: 5, backgroundColor: C.red, borderRadius: 2, marginTop: 12, marginBottom: 4 },
-  // Blocos de informação da capa
-  coverBlock: { backgroundColor: C.navy2, borderLeftWidth: 3, borderLeftColor: C.red, borderRadius: 4, paddingVertical: 9, paddingHorizontal: 12, marginBottom: 8 },
-  coverBlockLabel: { color: C.gold, fontSize: 7.5, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 3 },
-  coverBlockValue: { color: C.white, fontSize: 13, fontFamily: 'Roboto', fontWeight: 700, lineHeight: 1.2 },
-  coverFooter: { borderTopWidth: 1, borderTopColor: C.navy2, paddingTop: 10, marginTop: 6 },
-  coverFooterStrong: { color: C.white, fontSize: 8.5, fontFamily: 'Roboto', fontWeight: 700, letterSpacing: 0.4 },
-  coverFooterText: { color: C.s400, fontSize: 7.5, marginTop: 2, letterSpacing: 0.3 },
+  coverTopRow: {
+    flexDirection: 'row',
+    justify: 'space-between',
+    alignItems: 'center',
+  },
+  coverLogoBox: {
+    backgroundColor: C.white,
+    borderRadius: 8,
+    padding: 4,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justify: 'center',
+  },
+  coverBrand: {
+    color: C.white,
+    fontFamily: 'Poppins',
+    fontWeight: 700,
+    fontSize: 16,
+    letterSpacing: 1.2,
+  },
+  coverKicker: {
+    color: C.gold,
+    fontSize: 8,
+    fontFamily: 'Roboto',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: 1.3,
+  },
+  coverImage: {
+    width: '100%',
+    height: 135,
+    borderRadius: 6,
+    marginTop: 14,
+    objectFit: 'cover',
+  },
+  coverTitle: {
+    color: C.white,
+    fontSize: 28,
+    fontFamily: 'Poppins',
+    fontWeight: 700,
+    letterSpacing: 0.4,
+    lineHeight: 1.1,
+  },
+  coverTitleBar: {
+    width: 56,
+    height: 4,
+    backgroundColor: C.red,
+    borderRadius: 2,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  // Bloco de informações da capa (alto contraste)
+  coverBlockContainer: {
+    backgroundColor: C.navy2,
+    borderLeftWidth: 4,
+    borderLeftColor: C.red,
+    borderRadius: 6,
+    padding: 12,
+    marginTop: 14,
+  },
+  coverBlockItem: {
+    marginBottom: 8,
+  },
+  coverBlockLabel: {
+    color: C.gold,
+    fontSize: 7.5,
+    fontFamily: 'Roboto',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: 1.1,
+    marginBottom: 2,
+  },
+  coverBlockValue: {
+    color: C.white,
+    fontSize: 12,
+    fontFamily: 'Roboto',
+    fontWeight: 700,
+    lineHeight: 1.2,
+  },
+  coverFooter: {
+    borderTopWidth: 1,
+    borderTopColor: C.navy2,
+    paddingTop: 8,
+    marginTop: 6,
+  },
+  coverFooterStrong: {
+    color: C.white,
+    fontSize: 8.5,
+    fontFamily: 'Roboto',
+    fontWeight: 700,
+    letterSpacing: 0.4,
+  },
+  coverFooterText: {
+    color: C.s400,
+    fontSize: 7.5,
+    marginTop: 2,
+    letterSpacing: 0.3,
+  },
 
   // ===== Áreas de Atuação =====
-  areasTitle: { color: C.white, fontSize: 22, fontFamily: 'Poppins', fontWeight: 700, letterSpacing: 0.5 },
-  areasBar: { width: 54, height: 4, backgroundColor: C.red, borderRadius: 2, marginTop: 8, marginBottom: 10 },
-  areasIntro: { color: C.s300, fontSize: 9.5, lineHeight: 1.6, marginBottom: 18, maxWidth: 440 },
-  areasGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  areaCard: { width: '48.5%', backgroundColor: C.navy2, borderTopWidth: 3, borderTopColor: C.red, borderRadius: 6, padding: 14, marginBottom: 14 },
-  areaCardTitle: { color: C.white, fontSize: 11, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 8 },
-  areaCardDesc: { color: C.s300, fontSize: 8, lineHeight: 1.55, marginTop: 4 },
+  areasTitle: {
+    color: C.white,
+    fontSize: 20,
+    fontFamily: 'Poppins',
+    fontWeight: 700,
+    letterSpacing: 0.4,
+  },
+  areasBar: {
+    width: 48,
+    height: 4,
+    backgroundColor: C.red,
+    borderRadius: 2,
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  areasIntro: {
+    color: C.s300,
+    fontSize: 9,
+    lineHeight: 1.45,
+    marginBottom: 12,
+    maxWidth: 460,
+  },
+  areasGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justify: 'space-between',
+  },
+  areaCard: {
+    width: '48.5%',
+    backgroundColor: C.navy2,
+    borderTopWidth: 3,
+    borderTopColor: C.red,
+    borderRadius: 6,
+    padding: 10,
+    marginBottom: 10,
+  },
+  areaCardTitle: {
+    color: C.white,
+    fontSize: 10,
+    fontFamily: 'Roboto',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: 6,
+  },
+  areaCardDesc: {
+    color: C.s300,
+    fontSize: 7.8,
+    lineHeight: 1.4,
+    marginTop: 3,
+  },
 
   // ===== Fechamento =====
-  closeTitle: { color: C.white, fontSize: 24, fontFamily: 'Poppins', fontWeight: 700, lineHeight: 1.2, letterSpacing: 0.3, maxWidth: 420 },
-  closeBar: { width: 54, height: 4, backgroundColor: C.red, borderRadius: 2, marginTop: 14, marginBottom: 18 },
-  closeRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 },
-  closeItem: { width: '50%', marginBottom: 16, paddingRight: 12 },
-  closeLabel: { color: C.gold, fontSize: 7.5, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.1, marginBottom: 3 },
-  closeValue: { color: C.white, fontSize: 10, fontFamily: 'Roboto', fontWeight: 700, lineHeight: 1.35 },
+  closeTitle: {
+    color: C.white,
+    fontSize: 22,
+    fontFamily: 'Poppins',
+    fontWeight: 700,
+    lineHeight: 1.15,
+    letterSpacing: 0.3,
+    maxWidth: 420,
+  },
+  closeBar: {
+    width: 48,
+    height: 4,
+    backgroundColor: C.red,
+    borderRadius: 2,
+    marginTop: 10,
+    marginBottom: 14,
+  },
+  closeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 6,
+  },
+  closeItem: {
+    width: '50%',
+    marginBottom: 12,
+    paddingRight: 12,
+  },
+  closeLabel: {
+    color: C.gold,
+    fontSize: 7.5,
+    fontFamily: 'Roboto',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: 1.1,
+    marginBottom: 2,
+  },
+  closeValue: {
+    color: C.white,
+    fontSize: 9.5,
+    fontFamily: 'Roboto',
+    fontWeight: 700,
+    lineHeight: 1.3,
+  },
 
   // ===== Seções (conteúdo) =====
-  section: { marginBottom: 16 },
-  secHead: { flexDirection: 'row', alignItems: 'center', borderLeftWidth: 3, borderLeftColor: C.red, borderBottomWidth: 1.5, borderBottomColor: C.s200, paddingLeft: 8, paddingBottom: 4, marginBottom: 8 },
-  secNum: { backgroundColor: C.navy, color: C.white, fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, paddingVertical: 1.5, paddingHorizontal: 5, borderRadius: 2, marginRight: 7 },
-  secTitle: { color: C.navy, fontSize: 12, fontFamily: 'Poppins', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.3 },
-  subTitle: { color: C.navy, fontSize: 9, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3, marginTop: 4 },
-  para: { fontSize: 9, color: C.s700, textAlign: 'justify', marginBottom: 5 },
-  bulletRow: { flexDirection: 'row', marginBottom: 3 },
-  bulletDot: { color: C.red, fontFamily: 'Roboto', fontWeight: 700, marginRight: 5 },
-  bulletText: { flex: 1, fontSize: 9, color: C.s700, textAlign: 'justify' },
+  section: {
+    marginBottom: 14,
+  },
+  secHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderLeftWidth: 3,
+    borderLeftColor: C.red,
+    borderBottomWidth: 1.5,
+    borderBottomColor: C.s200,
+    paddingLeft: 8,
+    paddingBottom: 4,
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  secNum: {
+    backgroundColor: C.navy,
+    color: C.white,
+    fontSize: 8.5,
+    fontFamily: 'Roboto',
+    fontWeight: 700,
+    paddingVertical: 1.5,
+    paddingHorizontal: 5,
+    borderRadius: 2,
+    marginRight: 7,
+  },
+  secTitle: {
+    color: C.navy,
+    fontSize: 12,
+    fontFamily: 'Poppins',
+    fontWeight: 600,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  subTitle: {
+    color: C.navy,
+    fontSize: 9.5,
+    fontFamily: 'Roboto',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+    marginTop: 6,
+  },
+  para: {
+    fontSize: 9,
+    color: C.s700,
+    textAlign: 'justify',
+    marginBottom: 6,
+    lineHeight: 1.35,
+  },
+  bulletRow: {
+    flexDirection: 'row',
+    marginBottom: 3.5,
+  },
+  bulletDot: {
+    color: C.red,
+    fontFamily: 'Roboto',
+    fontWeight: 700,
+    marginRight: 6,
+  },
+  bulletText: {
+    flex: 1,
+    fontSize: 8.8,
+    color: C.s700,
+    textAlign: 'justify',
+    lineHeight: 1.3,
+  },
 
-  // ===== Tabelas =====
-  th: { flexDirection: 'row', backgroundColor: C.navy },
-  thCell: { color: C.white, fontSize: 7.5, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', padding: 5 },
-  tr: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: C.s200 },
-  trAlt: { backgroundColor: C.s50 },
-  td: { fontSize: 8, color: C.s700, padding: 5 },
-  tfoot: { flexDirection: 'row', backgroundColor: C.s100 },
-  tfootCell: { fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, color: C.ink, padding: 5 },
+  // ===== Tabelas Zebradas =====
+  th: {
+    flexDirection: 'row',
+    backgroundColor: C.navy,
+  },
+  thCell: {
+    color: C.white,
+    fontSize: 7.5,
+    fontFamily: 'Roboto',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+  },
+  tr: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: C.s200,
+  },
+  trAlt: {
+    backgroundColor: C.s50,
+  },
+  td: {
+    fontSize: 8,
+    color: C.s700,
+    paddingVertical: 5,
+    paddingHorizontal: 6,
+  },
+  tfoot: {
+    flexDirection: 'row',
+    backgroundColor: C.s100,
+    borderTopWidth: 1,
+    borderTopColor: C.s300,
+  },
+  tfootCell: {
+    fontSize: 8,
+    fontFamily: 'Roboto',
+    fontWeight: 700,
+    color: C.ink,
+    paddingVertical: 5,
+    paddingHorizontal: 6,
+  },
 
-  // ===== Totais =====
-  totalWrap: { marginTop: 2, borderWidth: 1, borderColor: C.s200, borderRadius: 4, overflow: 'hidden' },
-  totalRowLight: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: C.s100, paddingVertical: 5, paddingHorizontal: 8 },
-  totalRowNavy: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: C.navy, paddingVertical: 8, paddingHorizontal: 10, borderTopWidth: 3, borderTopColor: C.red },
-  totalLabelGold: { color: C.gold, fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8 },
-  totalValue: { color: C.white, fontSize: 15, fontFamily: 'Roboto', fontWeight: 700 },
+  // ===== Totais (Seção 05) =====
+  totalWrap: {
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: C.s200,
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  totalRowLight: {
+    flexDirection: 'row',
+    justify: 'space-between',
+    backgroundColor: C.s100,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  totalRowNavy: {
+    flexDirection: 'row',
+    justify: 'space-between',
+    alignItems: 'center',
+    backgroundColor: C.navy,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderTopWidth: 3,
+    borderTopColor: C.red,
+  },
+  totalLabelGold: {
+    color: C.gold,
+    fontSize: 8.5,
+    fontFamily: 'Roboto',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: 0.9,
+  },
+  totalValue: {
+    color: C.white,
+    fontSize: 16,
+    fontFamily: 'Roboto',
+    fontWeight: 700,
+  },
 
   // ===== Blocos =====
-  infoBox: { backgroundColor: C.s50, borderWidth: 1, borderColor: C.s200, borderRadius: 5, padding: 10 },
-  scenarioCard: { backgroundColor: C.s50, borderWidth: 1, borderColor: C.s200, borderLeftWidth: 4, borderLeftColor: C.red, borderRadius: 5, padding: 12 },
-  // Cartão/insígnia "positivo" (verde de marca) — garantia, itens inclusos.
-  greenCard: { backgroundColor: '#f0f7f3', borderWidth: 1, borderColor: '#cfe6da', borderLeftWidth: 4, borderLeftColor: C.green, borderRadius: 5, padding: 12 },
-  greenBadge: { alignSelf: 'flex-start', backgroundColor: C.green, color: C.white, fontSize: 7, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, paddingVertical: 2, paddingHorizontal: 7, borderRadius: 3, marginBottom: 6 },
-  precoCard: { backgroundColor: C.navy, borderRadius: 6, borderLeftWidth: 4, borderLeftColor: C.gold, padding: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  infoBox: {
+    backgroundColor: C.s50,
+    borderWidth: 1,
+    borderColor: C.s200,
+    borderRadius: 5,
+    padding: 10,
+  },
+  scenarioCard: {
+    backgroundColor: C.s50,
+    borderWidth: 1,
+    borderColor: C.s200,
+    borderLeftWidth: 4,
+    borderLeftColor: C.red,
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 8,
+  },
+  greenCard: {
+    backgroundColor: '#f0f7f3',
+    borderWidth: 1,
+    borderColor: '#cfe6da',
+    borderLeftWidth: 4,
+    borderLeftColor: C.green,
+    borderRadius: 5,
+    padding: 10,
+  },
+  greenBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: C.green,
+    color: C.white,
+    fontSize: 7,
+    fontFamily: 'Roboto',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    paddingVertical: 2,
+    paddingHorizontal: 7,
+    borderRadius: 3,
+    marginBottom: 5,
+  },
+  precoCard: {
+    backgroundColor: C.navy,
+    borderRadius: 6,
+    borderLeftWidth: 4,
+    borderLeftColor: C.gold,
+    padding: 12,
+    flexDirection: 'row',
+    justify: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
 
   // ===== Índice =====
-  idxRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  idxNum: { fontFamily: 'Roboto', fontWeight: 700, color: C.navy, width: 22, fontSize: 9 },
+  idxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: C.s100,
+  },
+  idxNum: {
+    fontFamily: 'Roboto',
+    fontWeight: 700,
+    color: C.navy,
+    width: 28,
+    fontSize: 9,
+  },
 
   // ===== Assinaturas =====
-  signRow: { flexDirection: 'row', marginTop: 34, gap: 30 },
-  signCol: { flex: 1, alignItems: 'center' },
-  signLine: { borderBottomWidth: 1, borderBottomColor: C.s400, width: '100%', height: 28, marginBottom: 5 },
+  signRow: {
+    flexDirection: 'row',
+    marginTop: 32,
+    gap: 28,
+  },
+  signCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  signLine: {
+    borderBottomWidth: 1,
+    borderBottomColor: C.s400,
+    width: '100%',
+    height: 26,
+    marginBottom: 5,
+  },
 });
 
 const brl = (n: number) => `R$ ${(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -221,22 +653,20 @@ const BlueprintBg = ({ w = A4.w, h = A4.h }: { w?: number; h?: number }) => {
       {Array.from({ length: hs }).map((_, i) => (
         <Line key={`h${i}`} x1={0} y1={i * step} x2={w} y2={i * step} stroke={C.navyLine} strokeOpacity={0.14} strokeWidth={0.5} />
       ))}
-      {/* Acentos vermelhos nos cantos */}
       <Line x1={0} y1={h * 0.18} x2={w * 0.28} y2={0} stroke={C.red} strokeOpacity={0.22} strokeWidth={1.2} />
       <Line x1={w} y1={h * 0.82} x2={w * 0.72} y2={h} stroke={C.red} strokeOpacity={0.22} strokeWidth={1.2} />
     </Svg>
   );
 };
 
-// Ícones lineares originais para as Áreas de Atuação (viewBox 24x24).
+// Ícones lineares para as Áreas de Atuação (viewBox 24x24).
 const AreaIcon = ({ kind }: { kind: string }) => {
-  const S = 30;
+  const S = 28;
   const sw = 1.6;
   const p = (d: string, extra?: object) => <Path d={d} stroke={C.red} strokeWidth={sw} fill="none" {...extra} />;
   return (
     <Svg viewBox="0 0 24 24" style={{ width: S, height: S }}>
       {kind === 'sdai' && (
-        // Chama estilizada (detecção de incêndio)
         p('M12 2 C12 7 16 8 14 13 C13 16 10 16 9 13 C8 15 9 16.5 9 18 C6 16 6.5 10.5 10 8 C10 10.5 12 10.5 12 8 C12 5.5 12 3.5 12 2 Z')
       )}
       {kind === 'cftv' && (
@@ -301,28 +731,36 @@ const Header = ({ razao }: { razao: string }) => (
       <Logo size={16} />
       <Text style={styles.headerBrand}>{(razao || 'FIREOWL CONTROLS').toUpperCase()}</Text>
     </View>
-    <Text style={styles.headerRight}>Proposta Técnico-Comercial</Text>
+    <Text style={styles.headerRight}>DOCUMENTO TÉCNICO-COMERCIAL</Text>
   </View>
 );
 
-const Footer = ({ razao, numero }: { razao: string; numero: string }) => (
+const Footer = ({ cliente, numero, data }: { cliente: string; numero: string; data: string }) => (
   <View fixed style={styles.footer}>
-    <Text style={styles.footerText}>{`© ${new Date().getFullYear()} ${razao}`}</Text>
-    <Text style={styles.footerText} render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`} />
-    <Text style={styles.footerMono}>{numero}</Text>
+    <Text style={styles.footerText}>
+      {[numero, data, cliente].filter(Boolean).join('  •  ')}
+    </Text>
+    <Text
+      style={styles.footerTextRight}
+      render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`}
+    />
   </View>
 );
 
-const FooterDark = ({ razao, numero }: { razao: string; numero: string }) => (
+const FooterDark = ({ cliente, numero, data }: { cliente: string; numero: string; data: string }) => (
   <View fixed style={styles.footerDark}>
-    <Text style={styles.footerDarkText}>{`© ${new Date().getFullYear()} ${razao}`}</Text>
-    <Text style={styles.footerDarkText} render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`} />
-    <Text style={[styles.footerDarkText, { fontFamily: 'Roboto', fontWeight: 700, color: C.gold }]}>{numero}</Text>
+    <Text style={styles.footerDarkText}>
+      {[numero, data, cliente].filter(Boolean).join('  •  ')}
+    </Text>
+    <Text
+      style={styles.footerDarkTextRight}
+      render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`}
+    />
   </View>
 );
 
 const SecHead = ({ n, titulo }: { n: string; titulo: string }) => (
-  <View style={styles.secHead} minPresenceAhead={44}>
+  <View style={styles.secHead} minPresenceAhead={60}>
     {n ? <Text style={styles.secNum}>{n}</Text> : null}
     <Text style={styles.secTitle}>{titulo}</Text>
   </View>
@@ -347,8 +785,6 @@ const Bullets = ({ itens }: { itens: string[] }) => (
   </>
 );
 
-// Check verde (SVG — independe de a fonte ter o glifo ✓) para listas
-// de sentido "positivo/incluso" (entregáveis, itens contemplados).
 const CheckIcon = () => (
   <Svg viewBox="0 0 12 12" style={{ width: 9, height: 9 }}>
     <Path d="M2 6.4 L4.7 9 L10 2.6" stroke={C.green} strokeWidth={1.8} fill="none" />
@@ -366,7 +802,7 @@ const Checks = ({ itens }: { itens: string[] }) => (
   </>
 );
 
-// Tabela de itens (Materiais/Serviços) com zebra e subtotal.
+// Tabela de itens (Materiais/Serviços) zebrada, sem bordas verticais internas.
 const ItensTable = ({
   titulo,
   itens,
@@ -382,7 +818,7 @@ const ItensTable = ({
 }) => {
   const subtotal = itens.reduce((a, e) => a + (e.precoUnitario || 0) * e.quantidade, 0);
   return (
-    <View style={{ marginBottom: 8 }}>
+    <View style={{ marginBottom: 10 }}>
       <Text style={styles.subTitle}>{titulo}</Text>
       <View style={{ borderWidth: 1, borderColor: C.s200, borderRadius: 4, overflow: 'hidden' }}>
         <View style={[styles.th, { backgroundColor: accent }]} fixed>
@@ -391,8 +827,8 @@ const ItensTable = ({
           {showMarca && <Text style={[styles.thCell, { width: 90 }]}>Marca / Modelo</Text>}
           <Text style={[styles.thCell, { width: 34, textAlign: 'center' }]}>Un.</Text>
           <Text style={[styles.thCell, { width: 34, textAlign: 'center' }]}>Qtd</Text>
-          {detailed && <Text style={[styles.thCell, { width: 60, textAlign: 'right' }]}>Unit.</Text>}
-          {detailed && <Text style={[styles.thCell, { width: 66, textAlign: 'right' }]}>Total</Text>}
+          {detailed && <Text style={[styles.thCell, { width: 64, textAlign: 'right' }]}>Unit.</Text>}
+          {detailed && <Text style={[styles.thCell, { width: 70, textAlign: 'right' }]}>Total</Text>}
         </View>
         {itens.map((eq, i) => {
           const unit = eq.precoUnitario || 0;
@@ -404,28 +840,21 @@ const ItensTable = ({
               {showMarca && <Text style={[styles.td, { width: 90 }]}>{eq.marcaModelo}</Text>}
               <Text style={[styles.td, { width: 34, textAlign: 'center', textTransform: 'uppercase' }]}>{eq.unidade}</Text>
               <Text style={[styles.td, { width: 34, textAlign: 'center', fontFamily: 'Roboto', fontWeight: 700 }]}>{eq.quantidade}</Text>
-              {detailed && <Text style={[styles.td, { width: 60, textAlign: 'right' }]}>{unit > 0 ? unit.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}</Text>}
-              {detailed && <Text style={[styles.td, { width: 66, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.ink }]}>{tot > 0 ? tot.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}</Text>}
+              {detailed && <Text style={[styles.td, { width: 64, textAlign: 'right' }]}>{unit > 0 ? unit.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}</Text>}
+              {detailed && <Text style={[styles.td, { width: 70, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.ink }]}>{tot > 0 ? tot.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}</Text>}
             </View>
           );
         })}
         {detailed && (
           <View style={styles.tfoot}>
             <Text style={[styles.tfootCell, { flex: 1, textAlign: 'right', textTransform: 'uppercase' }]}>{`Subtotal ${titulo}`}</Text>
-            <Text style={[styles.tfootCell, { width: 66, textAlign: 'right' }]}>{brl(subtotal)}</Text>
+            <Text style={[styles.tfootCell, { width: 70, textAlign: 'right' }]}>{brl(subtotal)}</Text>
           </View>
         )}
       </View>
     </View>
   );
 };
-
-const CoverBlock = ({ label, value }: { label: string; value: string }) => (
-  <View style={styles.coverBlock}>
-    <Text style={styles.coverBlockLabel}>{label}</Text>
-    <Text style={styles.coverBlockValue}>{value || '—'}</Text>
-  </View>
-);
 
 export function PropostaDocument({
   pedido,
@@ -439,6 +868,8 @@ export function PropostaDocument({
   const p = pedido.proposal;
   const razao = companyProfile.razaoSocial || 'Fireowl Controls';
   const numero = pedido.numeroPedido;
+  const dataEmissao = pedido.dataEmissao || '';
+  const clienteNome = pedido.clienteNome || '';
   const assinante = pedido.responsavelComercialNome || 'Responsável Comercial';
   const escopoTitulo = pedido.referencia || 'Fornecimento e Serviços de Engenharia';
 
@@ -455,7 +886,6 @@ export function PropostaDocument({
   const materiais = itens.filter((e) => e.tipo !== 'servico');
   const servicos = itens.filter((e) => e.tipo === 'servico');
 
-  // Cláusulas controladas pela proposta.
   const incMultas = p.incluirMultas !== false;
   const incLimitacao = p.incluirLimitacao !== false;
   const incConfid = p.incluirConfidencialidade !== false;
@@ -498,7 +928,7 @@ export function PropostaDocument({
   const on = (key: string) => vis.some((s) => s.key === key);
 
   const Sec = ({ k, children }: { k: string; children: React.ReactNode }) => (
-    <View style={styles.section} {...({ bookmark: `${num(k)}. ${secoes.find((s) => s.key === k)!.titulo}` } as object)}>
+    <View style={styles.section} minPresenceAhead={60}>
       <SecHead n={num(k)} titulo={secoes.find((s) => s.key === k)!.titulo} />
       {children}
     </View>
@@ -506,16 +936,16 @@ export function PropostaDocument({
 
   return (
     <Document title={`Proposta ${numero}`} author={razao}>
-      {/* ===================== CAPA (marinho, blueprint) ===================== */}
+      {/* ===================== 01. CAPA (marinho, blueprint, sem overflow) ===================== */}
       <Page size="A4" style={styles.darkPage}>
         <BlueprintBg />
-        <View style={styles.coverContent}>
+        <View style={styles.darkPageInner}>
           {/* Topo: logo + marca */}
           <View style={styles.coverTopRow}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               {showLogo && (
                 <View style={styles.coverLogoBox}>
-                  <Logo size={40} />
+                  <Logo size={36} />
                 </View>
               )}
               <Text style={styles.coverBrand}>FIREOWL CONTROLS</Text>
@@ -523,92 +953,122 @@ export function PropostaDocument({
             <Text style={styles.coverKicker}>Engenharia de Segurança{'\n'}& Detecção de Incêndio</Text>
           </View>
 
-          {/* Imagem opcional do cliente/edifício, ou grafismo (blueprint de fundo) */}
+          {/* Imagem opcional do cliente/edifício */}
           {nv(capaImagemUrl) && <Image src={capaImagemUrl!} style={styles.coverImage} />}
 
-          {/* Título */}
-          <View style={{ marginTop: nv(capaImagemUrl) ? 26 : 70 }}>
+          {/* Título principal */}
+          <View style={{ marginTop: nv(capaImagemUrl) ? 14 : 40 }}>
             <Text style={styles.coverKicker}>Documento Técnico-Comercial</Text>
             <View style={styles.coverTitleBar} />
             <Text style={styles.coverTitle}>Proposta{'\n'}Técnico-Comercial</Text>
           </View>
 
-          {/* Blocos de informação */}
-          <View style={{ marginTop: 24 }}>
-            <CoverBlock label="Cliente" value={pedido.clienteNome} />
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <View style={{ flex: 1 }}><CoverBlock label="Número da Proposta" value={numero} /></View>
-              <View style={{ flex: 1 }}><CoverBlock label="Data de Emissão" value={pedido.dataEmissao} /></View>
+          {/* Bloco de Informações com alto contraste */}
+          <View style={styles.coverBlockContainer}>
+            <View style={styles.coverBlockItem}>
+              <Text style={styles.coverBlockLabel}>CLIENTE</Text>
+              <Text style={styles.coverBlockValue}>{clienteNome || '—'}</Text>
             </View>
-            <CoverBlock label="Escopo de Fornecimento" value={escopoTitulo} />
+
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <View style={{ flex: 1, marginBottom: 8 }}>
+                <Text style={styles.coverBlockLabel}>NÚMERO DA PROPOSTA</Text>
+                <Text style={styles.coverBlockValue}>{numero || '—'}</Text>
+              </View>
+              <View style={{ flex: 1, marginBottom: 8 }}>
+                <Text style={styles.coverBlockLabel}>DATA DE EMISSÃO</Text>
+                <Text style={styles.coverBlockValue}>{dataEmissao || '—'}</Text>
+              </View>
+            </View>
+
+            <View style={{ marginBottom: 0 }}>
+              <Text style={styles.coverBlockLabel}>ESCOPO DE FORNECIMENTO</Text>
+              <Text style={styles.coverBlockValue}>{escopoTitulo || '—'}</Text>
+            </View>
           </View>
 
           {/* Rodapé institucional da capa */}
-          <View style={{ marginTop: 'auto' }}>
-            <View style={styles.coverFooter}>
-              <Text style={styles.coverFooterStrong}>{`${razao} — CNPJ ${companyProfile.cnpj}`}</Text>
-              <Text style={styles.coverFooterText}>{companyProfile.endereco}</Text>
-              {(nv(companyProfile.telefone) || nv(companyProfile.email)) && (
-                <Text style={styles.coverFooterText}>{[companyProfile.telefone, companyProfile.email].filter(nv).join('  •  ')}</Text>
-              )}
-            </View>
+          <View style={styles.coverFooter}>
+            <Text style={styles.coverFooterStrong}>{`${razao} — CNPJ ${companyProfile.cnpj}`}</Text>
+            <Text style={styles.coverFooterText}>{companyProfile.endereco}</Text>
+            {(nv(companyProfile.telefone) || nv(companyProfile.email)) && (
+              <Text style={styles.coverFooterText}>{[companyProfile.telefone, companyProfile.email].filter(nv).join('  •  ')}</Text>
+            )}
           </View>
         </View>
       </Page>
 
-      {/* ===================== ÁREAS DE ATUAÇÃO (marinho) ===================== */}
+      {/* ===================== 02. ÁREAS DE ATUAÇÃO (marinho) ===================== */}
       {showAreas && (
         <Page size="A4" style={styles.darkPage}>
           <BlueprintBg />
-          <FooterDark razao={razao} numero={numero} />
-          <Text style={styles.coverKicker}>Quem é a Fireowl Controls</Text>
-          <Text style={[styles.areasTitle, { marginTop: 6 }]}>Áreas de Atuação</Text>
-          <View style={styles.areasBar} />
-          <Text style={styles.areasIntro}>
-            Somos uma engenharia especializada em sistemas de segurança eletrônica e proteção contra incêndio.
-            Projetamos, instalamos, comissionamos e mantemos soluções integradas — do sensor à central de supervisão.
-          </Text>
-          <View style={styles.areasGrid}>
-            {AREAS.map((a) => (
-              <View key={a.kind} style={styles.areaCard} wrap={false}>
-                <AreaIcon kind={a.kind} />
-                <Text style={styles.areaCardTitle}>{a.titulo}</Text>
-                <Text style={styles.areaCardDesc}>{a.desc}</Text>
+          <FooterDark cliente={clienteNome} numero={numero} data={dataEmissao} />
+          <View style={styles.darkPageInner}>
+            <View>
+              <Text style={styles.coverKicker}>Quem é a Fireowl Controls</Text>
+              <Text style={[styles.areasTitle, { marginTop: 4 }]}>Áreas de Atuação</Text>
+              <View style={styles.areasBar} />
+              <Text style={styles.areasIntro}>
+                Somos uma engenharia especializada em sistemas de segurança eletrônica e proteção contra incêndio.
+                Projetamos, instalamos, comissionamos e mantemos soluções integradas — do sensor à central de supervisão.
+              </Text>
+              <View style={styles.areasGrid}>
+                {AREAS.map((a) => (
+                  <View key={a.kind} style={styles.areaCard} wrap={false}>
+                    <AreaIcon kind={a.kind} />
+                    <Text style={styles.areaCardTitle}>{a.titulo}</Text>
+                    <Text style={styles.areaCardDesc}>{a.desc}</Text>
+                  </View>
+                ))}
               </View>
-            ))}
+            </View>
           </View>
         </Page>
       )}
 
-      {/* ===================== CONTEÚDO (claro) ===================== */}
-      <Page size="A4" style={styles.page}>
-        <Header razao={razao} />
-        <Footer razao={razao} numero={numero} />
+      {/* ===================== 03. CARTA DE APRESENTAÇÃO (Página Exclusiva) ===================== */}
+      {on('carta') && (
+        <Page size="A4" style={styles.page}>
+          <Header razao={razao} />
+          <Footer cliente={clienteNome} numero={numero} data={dataEmissao} />
 
-        {on('carta') && (
           <Sec k="carta">
             <Paras paras={nv(p.cartaApresentacao) ? p.cartaApresentacao!.split('\n').map((x) => x.trim()).filter(Boolean) : CARTA_APRESENTACAO} />
-            <View style={{ marginTop: 12 }}>
+            <View style={{ marginTop: 18 }} wrap={false}>
               <Text style={{ marginBottom: 14, fontSize: 9 }}>Atenciosamente,</Text>
-              <Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink, fontSize: 9 }}>{assinante}</Text>
+              <Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink, fontSize: 9.5 }}>{assinante}</Text>
               <Text style={{ color: C.s600, fontSize: 9 }}>{`Responsável Comercial — ${razao}`}</Text>
-              {nv(companyProfile.telefone) && <Text style={{ color: C.s500, fontSize: 9 }}>{companyProfile.telefone}</Text>}
-              {nv(companyProfile.email) && <Text style={{ color: C.s500, fontSize: 9 }}>{companyProfile.email}</Text>}
+              {nv(companyProfile.telefone) && <Text style={{ color: C.s500, fontSize: 8.5, marginTop: 2 }}>{companyProfile.telefone}</Text>}
+              {nv(companyProfile.email) && <Text style={{ color: C.s500, fontSize: 8.5 }}>{companyProfile.email}</Text>}
             </View>
           </Sec>
-        )}
+        </Page>
+      )}
 
-        {showIndice && (
+      {/* ===================== 04. ÍNDICE (Página Exclusiva) ===================== */}
+      {showIndice && (
+        <Page size="A4" style={styles.page}>
+          <Header razao={razao} />
+          <Footer cliente={clienteNome} numero={numero} data={dataEmissao} />
+
           <View style={styles.section}>
-            <SecHead n="" titulo="Índice" />
-            {vis.map((s, i) => (
-              <View key={s.key} style={styles.idxRow}>
-                <Text style={styles.idxNum}>{String(i + 1).padStart(2, '0')}</Text>
-                <Text style={{ fontSize: 9, color: C.s700 }}>{s.titulo}</Text>
-              </View>
-            ))}
+            <SecHead n="" titulo="ÍNDICE" />
+            <View style={{ marginTop: 8 }}>
+              {vis.map((s, i) => (
+                <View key={s.key} style={styles.idxRow}>
+                  <Text style={styles.idxNum}>{String(i + 1).padStart(2, '0')}</Text>
+                  <Text style={{ fontSize: 9, color: C.s700, fontFamily: 'Roboto', fontWeight: 700 }}>{s.titulo}</Text>
+                </View>
+              ))}
+            </View>
           </View>
-        )}
+        </Page>
+      )}
+
+      {/* ===================== 05. DEMAIS SEÇÕES DO CORPO DA PROPOSTA ===================== */}
+      <Page size="A4" style={styles.page}>
+        <Header razao={razao} />
+        <Footer cliente={clienteNome} numero={numero} data={dataEmissao} />
 
         {on('historico') && (
           <Sec k="historico">
@@ -639,7 +1099,7 @@ export function PropostaDocument({
 
         <Sec k="visao">
           <Text style={styles.subTitle}>{`${num('visao')}.1. Introdução`}</Text>
-          <Text style={styles.para}>{nv(p.objetivo) ? p.objetivo : `Apresentamos nossa proposta para o fornecimento e execução dos serviços referentes a ${escopoTitulo}, para ${pedido.clienteNome}.`}</Text>
+          <Text style={styles.para}>{nv(p.objetivo) ? p.objetivo : `Apresentamos nossa proposta para o fornecimento e execução dos serviços referentes a ${escopoTitulo}, para ${clienteNome}.`}</Text>
           {lnv(p.diretrizesNormativas) && (
             <>
               <Text style={styles.subTitle}>Diretrizes normativas de referência</Text>
@@ -651,7 +1111,7 @@ export function PropostaDocument({
         <Sec k="escopo">
           <Text style={styles.subTitle}>{`${num('escopo')}.1. Descrição do escopo proposto`}</Text>
           <View style={styles.scenarioCard}>
-            <Text style={{ fontSize: 9, color: C.s700, textAlign: 'justify' }}>{nv(p.escopoServico) ? p.escopoServico : 'Escopo conforme especificação técnica acordada com o cliente.'}</Text>
+            <Text style={{ fontSize: 9, color: C.s700, textAlign: 'justify', lineHeight: 1.35 }}>{nv(p.escopoServico) ? p.escopoServico : 'Escopo conforme especificação técnica acordada com o cliente.'}</Text>
           </View>
         </Sec>
 
@@ -670,7 +1130,7 @@ export function PropostaDocument({
                 </View>
               )}
               <View style={styles.totalRowNavy}>
-                <Text style={styles.totalLabelGold}>Valor Total</Text>
+                <Text style={styles.totalLabelGold}>VALOR TOTAL</Text>
                 <Text style={styles.totalValue}>{brl(p.valorTotal)}</Text>
               </View>
             </View>
@@ -683,22 +1143,22 @@ export function PropostaDocument({
 
         <Sec k="servicos">
           {SERVICOS_OFERTADOS.map((s, i) => (
-            <View key={i}>
+            <View key={i} minPresenceAhead={40}>
               <Text style={styles.subTitle}>{`${num('servicos')}.${i + 1}. ${s.titulo}`}</Text>
               <Bullets itens={s.itens} />
             </View>
           ))}
           {lnv(p.entregaveis) && (
-            <>
+            <View minPresenceAhead={40}>
               <Text style={styles.subTitle}>Entregáveis do projeto</Text>
               <Checks itens={p.entregaveis} />
-            </>
+            </View>
           )}
           {lnv(p.responsabilidadesContratada) && (
-            <>
+            <View minPresenceAhead={40}>
               <Text style={styles.subTitle}>Responsabilidades da Contratada</Text>
               <Bullets itens={p.responsabilidadesContratada} />
-            </>
+            </View>
           )}
         </Sec>
 
@@ -770,7 +1230,7 @@ export function PropostaDocument({
         <Sec k="garantia">
           <View style={styles.greenCard} wrap={false}>
             <Text style={styles.greenBadge}>Garantia Assegurada</Text>
-            <Text style={{ fontSize: 9, color: C.s700, textAlign: 'justify' }}>{nv(p.garantia) ? p.garantia : 'Garantia de 90 (noventa) dias sobre os serviços de instalação e de 12 (doze) meses para os equipamentos fornecidos, contra defeitos de fabricação, a contar da entrega.'}</Text>
+            <Text style={{ fontSize: 9, color: C.s700, textAlign: 'justify', lineHeight: 1.35 }}>{nv(p.garantia) ? p.garantia : 'Garantia de 90 (noventa) dias sobre os serviços de instalação e de 12 (doze) meses para os equipamentos fornecidos, contra defeitos de fabricação, a contar da entrega.'}</Text>
           </View>
         </Sec>
 
@@ -805,7 +1265,7 @@ export function PropostaDocument({
             </View>
             <View style={styles.signCol}>
               <View style={styles.signLine} />
-              <Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink, fontSize: 8, textTransform: 'uppercase' }}>{pedido.clienteNome}</Text>
+              <Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink, fontSize: 8, textTransform: 'uppercase' }}>{clienteNome}</Text>
               <Text style={{ fontSize: 7.5, color: C.s500, textTransform: 'uppercase' }}>De acordo &amp; Aceite da Proposta</Text>
             </View>
           </View>
@@ -816,48 +1276,50 @@ export function PropostaDocument({
       {showFechamento && (
         <Page size="A4" style={styles.darkPage}>
           <BlueprintBg />
-          <FooterDark razao={razao} numero={numero} />
-          <View style={{ flex: 1, justifyContent: 'center' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 30 }}>
-              {showLogo && (
-                <View style={styles.coverLogoBox}>
-                  <Logo size={40} />
-                </View>
-              )}
-              <Text style={styles.coverBrand}>FIREOWL CONTROLS</Text>
-            </View>
-            <Text style={styles.coverKicker}>Obrigado pela oportunidade</Text>
-            <Text style={[styles.closeTitle, { marginTop: 8 }]}>Vamos proteger o seu patrimônio com engenharia de verdade.</Text>
-            <View style={styles.closeBar} />
-            <Text style={{ color: C.s300, fontSize: 9.5, lineHeight: 1.6, maxWidth: 440, marginBottom: 26 }}>
-              Nossa equipe está à disposição para esclarecer qualquer ponto desta proposta, ajustar escopos e agendar
-              a visita técnica. Fale com a gente pelos canais abaixo.
-            </Text>
-            <View style={styles.closeRow}>
-              <View style={styles.closeItem}>
-                <Text style={styles.closeLabel}>Empresa</Text>
-                <Text style={styles.closeValue}>{razao}</Text>
-                <Text style={{ color: C.s400, fontSize: 8, marginTop: 2 }}>{`CNPJ ${companyProfile.cnpj}`}</Text>
+          <FooterDark cliente={clienteNome} numero={numero} data={dataEmissao} />
+          <View style={styles.darkPageInner}>
+            <View style={{ flex: 1, justifyContent: 'center' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 }}>
+                {showLogo && (
+                  <View style={styles.coverLogoBox}>
+                    <Logo size={36} />
+                  </View>
+                )}
+                <Text style={styles.coverBrand}>FIREOWL CONTROLS</Text>
               </View>
-              <View style={styles.closeItem}>
-                <Text style={styles.closeLabel}>Endereço</Text>
-                <Text style={styles.closeValue}>{companyProfile.endereco}</Text>
-              </View>
-              {nv(companyProfile.telefone) && (
+              <Text style={styles.coverKicker}>Obrigado pela oportunidade</Text>
+              <Text style={[styles.closeTitle, { marginTop: 6 }]}>Vamos proteger o seu patrimônio com engenharia de verdade.</Text>
+              <View style={styles.closeBar} />
+              <Text style={{ color: C.s300, fontSize: 9, lineHeight: 1.5, maxWidth: 440, marginBottom: 24 }}>
+                Nossa equipe está à disposição para esclarecer qualquer ponto desta proposta, ajustar escopos e agendar
+                a visita técnica. Fale com a gente pelos canais abaixo.
+              </Text>
+              <View style={styles.closeRow}>
                 <View style={styles.closeItem}>
-                  <Text style={styles.closeLabel}>Telefone</Text>
-                  <Text style={styles.closeValue}>{companyProfile.telefone}</Text>
+                  <Text style={styles.closeLabel}>Empresa</Text>
+                  <Text style={styles.closeValue}>{razao}</Text>
+                  <Text style={{ color: C.s400, fontSize: 8, marginTop: 2 }}>{`CNPJ ${companyProfile.cnpj}`}</Text>
                 </View>
-              )}
-              {nv(companyProfile.email) && (
                 <View style={styles.closeItem}>
-                  <Text style={styles.closeLabel}>E-mail</Text>
-                  <Text style={styles.closeValue}>{companyProfile.email}</Text>
+                  <Text style={styles.closeLabel}>Endereço</Text>
+                  <Text style={styles.closeValue}>{companyProfile.endereco}</Text>
                 </View>
-              )}
-              <View style={styles.closeItem}>
-                <Text style={styles.closeLabel}>Referência desta Proposta</Text>
-                <Text style={styles.closeValue}>{numero}</Text>
+                {nv(companyProfile.telefone) && (
+                  <View style={styles.closeItem}>
+                    <Text style={styles.closeLabel}>Telefone</Text>
+                    <Text style={styles.closeValue}>{companyProfile.telefone}</Text>
+                  </View>
+                )}
+                {nv(companyProfile.email) && (
+                  <View style={styles.closeItem}>
+                    <Text style={styles.closeLabel}>E-mail</Text>
+                    <Text style={styles.closeValue}>{companyProfile.email}</Text>
+                  </View>
+                )}
+                <View style={styles.closeItem}>
+                  <Text style={styles.closeLabel}>Referência desta Proposta</Text>
+                  <Text style={styles.closeValue}>{numero}</Text>
+                </View>
               </View>
             </View>
           </View>

@@ -7,9 +7,9 @@
 
 /** Parágrafos da Carta de Apresentação (institucional). */
 export const CARTA_APRESENTACAO: string[] = [
-  'A Fireowl Controls é uma empresa de engenharia especializada em sistemas de segurança eletrônica e proteção contra incêndio, atuando no fornecimento, instalação, manutenção e comissionamento de Sistemas de Detecção e Alarme de Incêndio (SDAI), CFTV, Controle de Acesso, Alarme e Automação Predial.',
-  'Nosso compromisso é entregar soluções tecnicamente corretas, aderentes às normas vigentes (em especial a ABNT NBR 17240) e às Instruções Técnicas do Corpo de Bombeiros, com rastreabilidade, responsabilidade técnica registrada (ART) e foco na segurança de pessoas e do patrimônio.',
-  'Contamos com equipe qualificada e processos padronizados de execução, testes e documentação, garantindo previsibilidade de prazo e qualidade na entrega.',
+  'A Fireowl Controls é uma empresa de engenharia especializada em soluções completas de segurança eletrônica, proteção contra incêndio e tecnologia predial. Atuamos de ponta a ponta no fornecimento, instalação, manutenção e comissionamento de Sistemas de Detecção e Alarme de Incêndio (SDAI), CFTV e Videomonitoramento, Controle de Acesso, Alarmes de Intrusão e Automação Predial (BMS).',
+  'Nosso compromisso é entregar soluções tecnicamente precisas, totalmente integradas e aderentes às normas rigorosas de cada setor — englobando desde as diretrizes do Corpo de Bombeiros para prevenção de incêndios até os mais altos protocolos de segurança cibernética e patrimonial para sistemas de acesso e monitoramento. Atuamos com rastreabilidade, responsabilidade técnica registrada (ART) e foco absoluto na proteção de pessoas, operações e do patrimônio.',
+  'Contamos com uma equipe multidisciplinar qualificada e processos padronizados de execução, testes e documentação. Isso nos permite garantir previsibilidade de prazo, excelência técnica e qualidade na entrega de todas as disciplinas tecnológicas que compõem o nosso portfólio.',
   'É com satisfação que a Fireowl Controls apresenta sua proposta técnica e comercial para o fornecimento e execução dos serviços do empreendimento em referência.',
   'Desde já, colocamo-nos à sua inteira disposição para prestar quaisquer esclarecimentos que se façam necessários.',
 ];
