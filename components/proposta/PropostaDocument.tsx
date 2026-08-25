@@ -46,19 +46,19 @@ Font.register({
   ],
 });
 
-// Quebra de linha apenas nos espaços (não corta palavras no meio).
+// Quebra de linha apenas nos espaços.
 Font.registerHyphenationCallback((word) => [word]);
 
-// Paleta institucional Fireowl (guia de identidade visual).
+// Paleta institucional Fireowl
 const C = {
-  navy: '#0B1E38',      // azul-marinho de marca (fundo capa/áreas/fechamento)
+  navy: '#0B1E38',      // azul-marinho principal
   navy2: '#13315C',     // bloco/realce sobre o marinho
-  navyLine: '#5B7DB1',  // linhas do grafismo blueprint
-  brand: '#1A1A72',     // escudo da logo (asset oficial)
+  navyLine: '#5B7DB1',  // linhas blueprint
+  brand: '#1A1A72',     // escudo da logo
   logoRed: '#E63946',   // vermelho da logo
-  red: '#C1272D',       // vermelho de marca (acentos: barras, valor total)
-  gold: '#F2A900',      // âmbar de marca (rótulos/realces)
-  green: '#2E7D5B',     // verde de marca (positivo/incluso)
+  red: '#C1272D',       // vermelho acentos/filetes
+  gold: '#F2A900',      // âmbar/dourado de marca
+  green: '#2E7D5B',     // verde de marca
   ink: '#0f172a',
   s700: '#334155',
   s600: '#475569',
@@ -71,59 +71,59 @@ const C = {
   white: '#ffffff',
 };
 
-// A4 em pontos (react-pdf)
 const A4 = { w: 595.28, h: 841.89 };
 
-// Logo oficial Fireowl (paths reaproveitados do componente OfficialLogo).
 const LOGO_PATHS = [
   { d: 'M49 147.168C49 116.147 74.1471 91 105.168 91L358.832 91C389.853 91 415 116.147 415 147.168L415 371.832C415 402.853 389.853 428 358.832 428L105.168 428C74.1471 428 49 402.853 49 371.832Z', fill: C.brand },
   { d: 'M107.082 128.023 380.116 128.023 380.358 128.42 380.116 129.808 381.082 130.601 378.427 135.954 375.288 142.299 371.667 149.635 367.804 157.368 363.701 165.498 360.321 172.239 357.665 177.593 354.044 184.73 351.147 190.282 348.009 196.627 347.526 197.024 176.125 197.024 173.228 194.644 171.297 193.256 167.917 190.481 165.986 189.093 164.055 187.506 162.123 186.118 157.778 182.549 155.847 181.161 152.467 178.386 150.536 176.998 147.639 174.817 143.535 171.644 141.121 169.662 139.189 168.273 136.292 165.894 134.361 164.506 131.464 162.127 129.533 160.739 126.395 158.161 124.463 156.773 121.566 154.394 119.635 153.006 117.704 151.42 115.773 150.032 111.91 147.058 107.565 143.489 107.082 142.498Z', fill: C.logoRed },
   { d: 'M105.448 156.05 106.416 156.249 111.252 160.225 113.187 161.616 118.023 165.592 119.958 166.983 126.004 171.953 127.938 173.344 130.84 175.73 132.775 177.121 139.546 182.687 141.481 184.078 145.592 187.259 148.494 189.445 150.428 191.036 152.363 192.427 155.265 194.812 157.2 196.204 161.311 199.385 163.729 201.173 165.664 202.565 166.148 203.161 166.389 231.388 166.389 285.059 166.148 285.655 165.664 285.854 159.618 285.854 153.814 284.86 136.644 281.481 124.795 279.294 111.252 276.71 107.141 275.915 106.174 275.319 105.69 273.728 105.448 270.349 105.206 231.786 104.964 230.593 103.03 231.984 100.853 233.773 98.9189 235.761 96.2586 238.743 93.115 242.719 89.0038 248.284 87.3108 251.266 85.86 254.844 84.8927 259.019 84.8927 262.199 85.6181 265.976 86.8273 269.157 88.7619 272.337 91.1801 275.12 93.3566 277.108 95.0496 278.698 97.7097 280.686 100.612 282.475 104.481 284.463 110.043 286.848 115.847 288.836 121.651 290.426 128.906 292.016 138.095 293.606 146.318 294.6 155.991 295.395 165.664 295.793 179.448 295.793 190.331 295.395 206.049 294.203 218.625 292.811 230.233 291.221 243.05 289.034 256.108 286.45 266.507 284.065 273.762 282.276 282.952 279.692 294.318 276.313 301.089 274.126 307.618 271.741 314.389 269.355 322.37 266.374 329.141 263.789 341.233 258.82 344.618 257.23 348.488 255.639 354.533 252.857 367.35 246.694 371.945 244.309 381.377 239.141 385.246 236.954 388.873 234.966 389.84 234.966 390.082 235.96 388.389 237.749 385.487 240.134 383.553 241.526 380.893 243.514 377.507 245.7 373.638 248.284 370.252 250.471 365.899 253.254 361.788 255.838 357.435 258.422 353.566 260.609 348.971 263.193 343.651 266.175 335.671 270.548 329.867 273.53 322.854 276.909 317.775 279.294 310.037 282.674 305.442 284.661 298.912 287.444 293.108 289.631 289.481 291.022 284.403 293.01 275.938 295.992 266.749 298.974 259.01 301.359 244.501 305.335 238.455 306.925 226.605 309.708 213.305 312.491 206.049 313.882 194.925 315.472 187.671 316.466 177.514 317.46 163.487 318.653 155.991 319.05 142.932 319.05 132.291 318.653 122.86 317.858 113.429 316.864 105.448 315.671 101.821 314.677 97.4678 313.286 93.5985 312.491 85.3762 309.708 79.3304 307.322 75.4612 305.335 72.5592 303.545 69.4156 301.359 65.788 298.377 62.8861 294.998 60.226 290.824 58.5332 287.047 57.324 282.276 57.0822 280.686 57.0822 276.71 58.2914 270.945 60.226 266.175 62.4025 262.199 65.5461 257.826 68.4481 254.447 71.5919 251.266 73.5265 249.278 75.9449 247.092 77.6377 245.502 83.6835 240.532 85.6181 239.141 88.52 236.954 91.6639 234.767 99.8862 229.599 103.514 227.413 105.206 226.419ZM104.723 227.81 104.481 228.605 104.964 228.605Z', fill: C.logoRed },
   { d: 'M176.153 206.099 207.881 206.099 287.08 206.298 339.152 206.298 338.91 208.089 339.152 209.482 338.91 211.87 330.433 225.801 325.589 234.955 322.199 241.323 319.292 247.094 315.417 254.656 311.058 263.014 308.151 268.786 307.424 269.383 297.494 269.781 277.876 270.378 258.742 271.174 240.578 271.771 220.959 272.567 218.295 272.567 218.295 282.517 218.053 284.507 217.811 284.706 197.95 285.502 179.059 286.099 176.637 286.099 176.395 285.104 176.153 281.124Z', fill: C.logoRed },
-  { d: 'M216.992 319.209 218.186 319.409 216.276 322.202 214.844 323.798 208.876 328.786 206.967 330.182 204.341 332.177 201.715 333.973 198.851 335.968 194.793 338.562 190.496 341.355 186.438 344.148 183.335 346.343 179.992 348.937 178.083 350.333 175.457 352.328 173.547 353.725 170.205 356.119 164.954 359.71 161.851 361.905 159.225 363.701 157.554 365.097 155.644 366.494 152.064 369.088 149.676 370.883 147.767 372.28 144.425 374.674 142.038 376.47 140.128 377.866 137.741 379.662 135.115 381.457 132.967 383.253 131.057 384.65 127.954 387.044 122.702 390.635 118.883 393.229 116.257 395.024 112.915 397.418 109.335 400.012 107.664 401.209 107.425 401.209 107.186 395.623 107.186 388.64 107.664 349.934 107.902 334.971 108.141 328.187 108.857 327.988 121.031 328.586 136.547 328.586 146.096 328.187 157.315 327.589 173.309 326.192 186.676 324.596 195.986 323.199 208.399 321.005Z', fill: C.logoRed },
+  { d: 'M216.992 319.209 218.186 319.409 216.276 322.202 214.844 323.798 208.876 328.786 206.967 330.182 204.341 332.177 201.715 333.973 198.851 335.968 194.793 338.562 190.496 341.355 186.438 344.148 183.335 346.343 179.992 348.937 178.083 350.333 175.457 352.328 173.547 353.725 170.205 356.119 164.954 359.71 161.851 361.905 159.225 363.701 157.554 366.494 152.064 369.088 149.676 370.883 147.767 372.28 144.425 374.674 142.038 376.47 140.128 377.866 137.741 379.662 135.115 381.457 132.967 383.253 131.057 384.65 127.954 387.044 122.702 390.635 118.883 393.229 116.257 395.024 112.915 397.418 109.335 400.012 107.664 401.209 107.425 401.209 107.186 395.623 107.186 388.64 107.664 349.934 107.902 334.971 108.141 328.187 108.857 327.988 121.031 328.586 136.547 328.586 146.096 328.187 157.315 327.589 173.309 326.192 186.676 324.596 195.986 323.199 208.399 321.005Z', fill: C.logoRed },
 ];
 
 const styles = StyleSheet.create({
-  // Página de conteúdo (fundo claro) — paddingTop e paddingBottom exatos para cabeçalho e rodapé fixos
+  // Página de conteúdo (fundo claro): paddingBottom 68 para dar respiro de 3cm antes do rodapé
   page: {
     paddingTop: 54,
-    paddingBottom: 48,
+    paddingBottom: 68,
     paddingHorizontal: 40,
     fontSize: 9,
     fontFamily: 'Roboto',
     color: C.s700,
-    lineHeight: 1.25,
+    lineHeight: 1.3,
   },
-  // Página institucional (fundo marinho) — sem padding no container principal para evitar quebra de página espúria
+  // Página institucional (fundo marinho)
   darkPage: {
     padding: 0,
     fontSize: 9,
     fontFamily: 'Roboto',
     color: C.white,
     backgroundColor: C.navy,
-    lineHeight: 1.25,
+    lineHeight: 1.3,
   },
   darkPageInner: {
     paddingTop: 36,
-    paddingBottom: 36,
+    paddingBottom: 48,
     paddingHorizontal: 40,
     width: '100%',
     height: '100%',
-    justifyContent: 'space-between',
+    justify: 'space-between',
   },
 
-  // Cabeçalho fixo (páginas de conteúdo)
+  // Cabeçalho fixo (páginas de conteúdo) — Fundo branco limpo, linha fina vermelha na parte inferior
   header: {
     position: 'absolute',
-    top: 20,
-    left: 40,
-    right: 40,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 44,
+    backgroundColor: C.white,
+    borderBottomWidth: 1.5,
+    borderBottomColor: C.red,
+    paddingHorizontal: 40,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justify: 'space-between',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: C.s200,
-    paddingBottom: 6,
   },
   headerBrand: {
     fontSize: 8.5,
@@ -139,51 +139,29 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
 
-  // Rodapé fixo (páginas de conteúdo)
-  footer: {
+  // Rodapé fixo com Bloco Azul Marinho Sólido + Filete Vermelho no topo
+  footerContainer: {
     position: 'absolute',
-    bottom: 18,
-    left: 40,
-    right: 40,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 32,
+    backgroundColor: C.navy,
+    borderTopWidth: 2,
+    borderTopColor: C.red,
+    paddingHorizontal: 40,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justify: 'space-between',
     alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: C.s200,
-    paddingTop: 5,
   },
-  footerText: {
+  footerTextLeft: {
     fontSize: 7,
-    color: C.s500,
+    color: C.white,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
   footerTextRight: {
-    fontSize: 7,
-    color: C.s600,
-    fontFamily: 'Roboto',
-    fontWeight: 700,
-  },
-  footerDark: {
-    position: 'absolute',
-    bottom: 18,
-    left: 40,
-    right: 40,
-    flexDirection: 'row',
-    justify: 'space-between',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: C.navy2,
-    paddingTop: 5,
-  },
-  footerDarkText: {
-    fontSize: 7,
-    color: C.s400,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  footerDarkTextRight: {
-    fontSize: 7,
+    fontSize: 7.5,
     color: C.gold,
     fontFamily: 'Roboto',
     fontWeight: 700,
@@ -221,7 +199,7 @@ const styles = StyleSheet.create({
   },
   coverImage: {
     width: '100%',
-    height: 135,
+    height: 130,
     borderRadius: 6,
     marginTop: 14,
     objectFit: 'cover',
@@ -242,7 +220,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 4,
   },
-  // Bloco de informações da capa (alto contraste)
   coverBlockContainer: {
     backgroundColor: C.navy2,
     borderLeftWidth: 4,
@@ -290,7 +267,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
 
-  // ===== Áreas de Atuação =====
+  // ===== Áreas de Atuação (Grade 2x3 limpa) =====
   areasTitle: {
     color: C.white,
     fontSize: 20,
@@ -310,7 +287,7 @@ const styles = StyleSheet.create({
     color: C.s300,
     fontSize: 9,
     lineHeight: 1.45,
-    marginBottom: 12,
+    marginBottom: 14,
     maxWidth: 460,
   },
   areasGrid: {
@@ -329,7 +306,7 @@ const styles = StyleSheet.create({
   },
   areaCardTitle: {
     color: C.white,
-    fontSize: 10,
+    fontSize: 9.5,
     fontFamily: 'Roboto',
     fontWeight: 700,
     textTransform: 'uppercase',
@@ -388,7 +365,7 @@ const styles = StyleSheet.create({
     lineHeight: 1.3,
   },
 
-  // ===== Seções (conteúdo) =====
+  // ===== Seções =====
   section: {
     marginBottom: 14,
   },
@@ -437,7 +414,7 @@ const styles = StyleSheet.create({
     color: C.s700,
     textAlign: 'justify',
     marginBottom: 6,
-    lineHeight: 1.35,
+    lineHeight: 1.4,
   },
   bulletRow: {
     flexDirection: 'row',
@@ -457,7 +434,7 @@ const styles = StyleSheet.create({
     lineHeight: 1.3,
   },
 
-  // ===== Tabelas Zebradas =====
+  // ===== Tabelas Zebradas Limpas =====
   th: {
     flexDirection: 'row',
     backgroundColor: C.navy,
@@ -500,7 +477,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
 
-  // ===== Totais (Seção 05) =====
+  // ===== Totais (Seção 05 / 09) =====
   totalWrap: {
     marginTop: 6,
     borderWidth: 1,
@@ -536,6 +513,32 @@ const styles = StyleSheet.create({
   totalValue: {
     color: C.white,
     fontSize: 16,
+    fontFamily: 'Roboto',
+    fontWeight: 700,
+  },
+
+  // Card de Preço Destacado (Investimento Total em Bloco)
+  precoCardBlock: {
+    backgroundColor: C.navy,
+    borderRadius: 6,
+    borderLeftWidth: 4,
+    borderLeftColor: C.red,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+  },
+  precoCardLabel: {
+    color: C.gold,
+    fontSize: 8.5,
+    fontFamily: 'Roboto',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: 1.1,
+    marginBottom: 3,
+  },
+  precoCardValue: {
+    color: C.white,
+    fontSize: 18,
     fontFamily: 'Roboto',
     fontWeight: 700,
   },
@@ -580,17 +583,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     borderRadius: 3,
     marginBottom: 5,
-  },
-  precoCard: {
-    backgroundColor: C.navy,
-    borderRadius: 6,
-    borderLeftWidth: 4,
-    borderLeftColor: C.gold,
-    padding: 12,
-    flexDirection: 'row',
-    justify: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
   },
 
   // ===== Índice =====
@@ -640,7 +632,6 @@ const Logo = ({ size = 36 }: { size?: number }) => (
   </Svg>
 );
 
-// Grafismo "planta baixa" (blueprint) para fundos marinhos — grade tênue + acentos.
 const BlueprintBg = ({ w = A4.w, h = A4.h }: { w?: number; h?: number }) => {
   const step = 28;
   const vs = Math.ceil(w / step);
@@ -659,9 +650,8 @@ const BlueprintBg = ({ w = A4.w, h = A4.h }: { w?: number; h?: number }) => {
   );
 };
 
-// Ícones lineares para as Áreas de Atuação (viewBox 24x24).
 const AreaIcon = ({ kind }: { kind: string }) => {
-  const S = 28;
+  const S = 26;
   const sw = 1.6;
   const p = (d: string, extra?: object) => <Path d={d} stroke={C.red} strokeWidth={sw} fill="none" {...extra} />;
   return (
@@ -728,7 +718,7 @@ const AREAS = [
 const Header = ({ razao }: { razao: string }) => (
   <View fixed style={styles.header}>
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-      <Logo size={16} />
+      <Logo size={18} />
       <Text style={styles.headerBrand}>{(razao || 'FIREOWL CONTROLS').toUpperCase()}</Text>
     </View>
     <Text style={styles.headerRight}>DOCUMENTO TÉCNICO-COMERCIAL</Text>
@@ -736,8 +726,8 @@ const Header = ({ razao }: { razao: string }) => (
 );
 
 const Footer = ({ cliente, numero, data }: { cliente: string; numero: string; data: string }) => (
-  <View fixed style={styles.footer}>
-    <Text style={styles.footerText}>
+  <View fixed style={styles.footerContainer}>
+    <Text style={styles.footerTextLeft}>
       {[numero, data, cliente].filter(Boolean).join('  •  ')}
     </Text>
     <Text
@@ -747,20 +737,8 @@ const Footer = ({ cliente, numero, data }: { cliente: string; numero: string; da
   </View>
 );
 
-const FooterDark = ({ cliente, numero, data }: { cliente: string; numero: string; data: string }) => (
-  <View fixed style={styles.footerDark}>
-    <Text style={styles.footerDarkText}>
-      {[numero, data, cliente].filter(Boolean).join('  •  ')}
-    </Text>
-    <Text
-      style={styles.footerDarkTextRight}
-      render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`}
-    />
-  </View>
-);
-
 const SecHead = ({ n, titulo }: { n: string; titulo: string }) => (
-  <View style={styles.secHead} minPresenceAhead={60}>
+  <View style={styles.secHead} minPresenceAhead={80}>
     {n ? <Text style={styles.secNum}>{n}</Text> : null}
     <Text style={styles.secTitle}>{titulo}</Text>
   </View>
@@ -802,7 +780,7 @@ const Checks = ({ itens }: { itens: string[] }) => (
   </>
 );
 
-// Tabela de itens (Materiais/Serviços) zebrada, sem bordas verticais internas.
+// Tabela de itens zebrada, sem bordas verticais internas
 const ItensTable = ({
   titulo,
   itens,
@@ -818,7 +796,7 @@ const ItensTable = ({
 }) => {
   const subtotal = itens.reduce((a, e) => a + (e.precoUnitario || 0) * e.quantidade, 0);
   return (
-    <View style={{ marginBottom: 10 }}>
+    <View style={{ marginBottom: 10 }} minPresenceAhead={90}>
       <Text style={styles.subTitle}>{titulo}</Text>
       <View style={{ borderWidth: 1, borderColor: C.s200, borderRadius: 4, overflow: 'hidden' }}>
         <View style={[styles.th, { backgroundColor: accent }]} fixed>
@@ -846,7 +824,7 @@ const ItensTable = ({
           );
         })}
         {detailed && (
-          <View style={styles.tfoot}>
+          <View style={styles.tfoot} wrap={false}>
             <Text style={[styles.tfootCell, { flex: 1, textAlign: 'right', textTransform: 'uppercase' }]}>{`Subtotal ${titulo}`}</Text>
             <Text style={[styles.tfootCell, { width: 70, textAlign: 'right' }]}>{brl(subtotal)}</Text>
           </View>
@@ -928,7 +906,7 @@ export function PropostaDocument({
   const on = (key: string) => vis.some((s) => s.key === key);
 
   const Sec = ({ k, children }: { k: string; children: React.ReactNode }) => (
-    <View style={styles.section} minPresenceAhead={60}>
+    <View style={styles.section} minPresenceAhead={80}>
       <SecHead n={num(k)} titulo={secoes.find((s) => s.key === k)!.titulo} />
       {children}
     </View>
@@ -936,11 +914,10 @@ export function PropostaDocument({
 
   return (
     <Document title={`Proposta ${numero}`} author={razao}>
-      {/* ===================== 01. CAPA (marinho, blueprint, sem overflow) ===================== */}
+      {/* ===================== 01. CAPA (marinho, blueprint) ===================== */}
       <Page size="A4" style={styles.darkPage}>
         <BlueprintBg />
         <View style={styles.darkPageInner}>
-          {/* Topo: logo + marca */}
           <View style={styles.coverTopRow}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               {showLogo && (
@@ -953,17 +930,14 @@ export function PropostaDocument({
             <Text style={styles.coverKicker}>Engenharia de Segurança{'\n'}& Detecção de Incêndio</Text>
           </View>
 
-          {/* Imagem opcional do cliente/edifício */}
           {nv(capaImagemUrl) && <Image src={capaImagemUrl!} style={styles.coverImage} />}
 
-          {/* Título principal */}
           <View style={{ marginTop: nv(capaImagemUrl) ? 14 : 40 }}>
             <Text style={styles.coverKicker}>Documento Técnico-Comercial</Text>
             <View style={styles.coverTitleBar} />
             <Text style={styles.coverTitle}>Proposta{'\n'}Técnico-Comercial</Text>
           </View>
 
-          {/* Bloco de Informações com alto contraste */}
           <View style={styles.coverBlockContainer}>
             <View style={styles.coverBlockItem}>
               <Text style={styles.coverBlockLabel}>CLIENTE</Text>
@@ -987,7 +961,6 @@ export function PropostaDocument({
             </View>
           </View>
 
-          {/* Rodapé institucional da capa */}
           <View style={styles.coverFooter}>
             <Text style={styles.coverFooterStrong}>{`${razao} — CNPJ ${companyProfile.cnpj}`}</Text>
             <Text style={styles.coverFooterText}>{companyProfile.endereco}</Text>
@@ -998,11 +971,11 @@ export function PropostaDocument({
         </View>
       </Page>
 
-      {/* ===================== 02. ÁREAS DE ATUAÇÃO (marinho) ===================== */}
+      {/* ===================== 02. ÁREAS DE ATUAÇÃO (Grade 2x3 sem grifos ruidosos) ===================== */}
       {showAreas && (
         <Page size="A4" style={styles.darkPage}>
           <BlueprintBg />
-          <FooterDark cliente={clienteNome} numero={numero} data={dataEmissao} />
+          <Footer cliente={clienteNome} numero={numero} data={dataEmissao} />
           <View style={styles.darkPageInner}>
             <View>
               <Text style={styles.coverKicker}>Quem é a Fireowl Controls</Text>
@@ -1065,7 +1038,7 @@ export function PropostaDocument({
         </Page>
       )}
 
-      {/* ===================== 05. DEMAIS SEÇÕES DO CORPO DA PROPOSTA ===================== */}
+      {/* ===================== 05. CORPO DA PROPOSTA ===================== */}
       <Page size="A4" style={styles.page}>
         <Header razao={razao} />
         <Footer cliente={clienteNome} numero={numero} data={dataEmissao} />
@@ -1080,14 +1053,14 @@ export function PropostaDocument({
                 <Text style={[styles.thCell, { width: 80 }]}>Status</Text>
               </View>
               {(p.revisoes || []).map((rev, i) => (
-                <View key={i} style={[styles.tr, i % 2 === 1 ? styles.trAlt : {}]}>
+                <View key={i} style={[styles.tr, i % 2 === 1 ? styles.trAlt : {}]} wrap={false}>
                   <Text style={[styles.td, { width: 120, fontFamily: 'Roboto', fontWeight: 700, color: C.ink }]}>{rev.numero}</Text>
                   <Text style={[styles.td, { width: 70 }]}>{rev.data}</Text>
                   <Text style={[styles.td, { flex: 1 }]}>{rev.elaborador}{rev.motivo ? ` — ${rev.motivo}` : ''}</Text>
                   <Text style={[styles.td, { width: 80, textTransform: 'uppercase' }]}>{(rev.status || '').replace(/_/g, ' ')}</Text>
                 </View>
               ))}
-              <View style={[styles.tr, { backgroundColor: '#fffbeb' }]}>
+              <View style={[styles.tr, { backgroundColor: '#fffbeb' }]} wrap={false}>
                 <Text style={[styles.td, { width: 120, fontFamily: 'Roboto', fontWeight: 700, color: C.ink }]}>{numero}</Text>
                 <Text style={[styles.td, { width: 70 }]}>{pedido.dataEmissao}</Text>
                 <Text style={[styles.td, { flex: 1 }]}>{`${assinante} (versão atual)`}</Text>
@@ -1111,7 +1084,7 @@ export function PropostaDocument({
         <Sec k="escopo">
           <Text style={styles.subTitle}>{`${num('escopo')}.1. Descrição do escopo proposto`}</Text>
           <View style={styles.scenarioCard}>
-            <Text style={{ fontSize: 9, color: C.s700, textAlign: 'justify', lineHeight: 1.35 }}>{nv(p.escopoServico) ? p.escopoServico : 'Escopo conforme especificação técnica acordada com o cliente.'}</Text>
+            <Text style={{ fontSize: 9, color: C.s700, textAlign: 'justify', lineHeight: 1.4 }}>{nv(p.escopoServico) ? p.escopoServico : 'Escopo conforme especificação técnica acordada com o cliente.'}</Text>
           </View>
         </Sec>
 
@@ -1177,10 +1150,11 @@ export function PropostaDocument({
           )}
         </Sec>
 
+        {/* Item 09 - Preços com Bloco de Investimento Total bem alinhado em 2 linhas */}
         <Sec k="precos">
-          <View style={styles.precoCard} wrap={false}>
-            <Text style={styles.totalLabelGold}>Investimento Total</Text>
-            <Text style={styles.totalValue}>{brl(p.valorTotal)}</Text>
+          <View style={styles.precoCardBlock} wrap={false}>
+            <Text style={styles.precoCardLabel}>INVESTIMENTO TOTAL</Text>
+            <Text style={styles.precoCardValue}>{brl(p.valorTotal)}</Text>
           </View>
           <Paras paras={PRECOS_OBS} />
         </Sec>
@@ -1230,7 +1204,7 @@ export function PropostaDocument({
         <Sec k="garantia">
           <View style={styles.greenCard} wrap={false}>
             <Text style={styles.greenBadge}>Garantia Assegurada</Text>
-            <Text style={{ fontSize: 9, color: C.s700, textAlign: 'justify', lineHeight: 1.35 }}>{nv(p.garantia) ? p.garantia : 'Garantia de 90 (noventa) dias sobre os serviços de instalação e de 12 (doze) meses para os equipamentos fornecidos, contra defeitos de fabricação, a contar da entrega.'}</Text>
+            <Text style={{ fontSize: 9, color: C.s700, textAlign: 'justify', lineHeight: 1.4 }}>{nv(p.garantia) ? p.garantia : 'Garantia de 90 (noventa) dias sobre os serviços de instalação e de 12 (doze) meses para os equipamentos fornecidos, contra defeitos de fabricação, a contar da entrega.'}</Text>
           </View>
         </Sec>
 
@@ -1276,7 +1250,7 @@ export function PropostaDocument({
       {showFechamento && (
         <Page size="A4" style={styles.darkPage}>
           <BlueprintBg />
-          <FooterDark cliente={clienteNome} numero={numero} data={dataEmissao} />
+          <Footer cliente={clienteNome} numero={numero} data={dataEmissao} />
           <View style={styles.darkPageInner}>
             <View style={{ flex: 1, justifyContent: 'center' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 }}>
