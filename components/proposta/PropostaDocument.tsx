@@ -253,6 +253,45 @@ const styles = StyleSheet.create({
     marginTop: 2,
     letterSpacing: 0.3,
   },
+  // Filete "letterhead": tick dourado + linha fina (capa)
+  coverTopRule: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 14,
+  },
+  coverTopRuleGold: {
+    width: 40,
+    height: 2,
+    backgroundColor: C.gold,
+    borderRadius: 1,
+  },
+  coverTopRuleLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#22406B',
+    marginLeft: 8,
+  },
+  coverBlockDivider: {
+    height: 1,
+    backgroundColor: '#22406B',
+    marginVertical: 8,
+  },
+  coverTagline: {
+    color: C.s400,
+    fontSize: 7,
+    fontFamily: 'Roboto',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: 2,
+    marginTop: 3,
+  },
+  coverGoldDot: {
+    width: 6,
+    height: 6,
+    backgroundColor: C.gold,
+    borderRadius: 1,
+    marginRight: 6,
+  },
 
   // ===== Áreas de Atuação (Grade 2x3 limpa com ótimo espaçamento e UI) =====
   areasEyebrow: {
@@ -419,17 +458,35 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 14,
   },
-  secHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  // Abertura de seção premium: barra vermelha lateral + chip do número +
+  // título, e um "fio dourado" que se estende numa linha fina (letterhead).
+  secHeadWrap: {
+    marginTop: 4,
+    marginBottom: 8,
     borderLeftWidth: 3,
     borderLeftColor: C.red,
-    borderBottomWidth: 1.5,
-    borderBottomColor: C.s200,
     paddingLeft: 8,
-    paddingBottom: 4,
-    marginBottom: 8,
-    marginTop: 4,
+  },
+  secHeadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 5,
+  },
+  secRule: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  secRuleGold: {
+    width: 34,
+    height: 2,
+    backgroundColor: C.gold,
+    borderRadius: 1,
+  },
+  secRuleLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: C.s200,
+    marginLeft: 6,
   },
   secNum: {
     backgroundColor: C.navy,
@@ -796,9 +853,15 @@ const Footer = ({ cliente, numero, data }: { cliente: string; numero: string; da
 );
 
 const SecHead = ({ n, titulo }: { n: string; titulo: string }) => (
-  <View style={styles.secHead} minPresenceAhead={140}>
-    {n ? <Text style={styles.secNum}>{n}</Text> : null}
-    <Text style={styles.secTitle}>{titulo}</Text>
+  <View style={styles.secHeadWrap} minPresenceAhead={140}>
+    <View style={styles.secHeadRow}>
+      {n ? <Text style={styles.secNum}>{n}</Text> : null}
+      <Text style={styles.secTitle}>{titulo}</Text>
+    </View>
+    <View style={styles.secRule}>
+      <View style={styles.secRuleGold} />
+      <View style={styles.secRuleLine} />
+    </View>
   </View>
 );
 
@@ -976,16 +1039,25 @@ export function PropostaDocument({
       <Page size="A4" style={styles.darkPage}>
         <BlueprintBg />
         <View style={{ flex: 1, padding: 40, justifyContent: 'space-between' }}>
-          <View style={styles.coverTopRow}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              {showLogo && (
-                <View style={styles.coverLogoBox}>
-                  <Logo size={36} />
+          <View>
+            <View style={styles.coverTopRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                {showLogo && (
+                  <View style={styles.coverLogoBox}>
+                    <Logo size={36} />
+                  </View>
+                )}
+                <View>
+                  <Text style={styles.coverBrand}>FIREOWL CONTROLS</Text>
+                  <Text style={styles.coverTagline}>Sistemas Integrados de Proteção</Text>
                 </View>
-              )}
-              <Text style={styles.coverBrand}>FIREOWL CONTROLS</Text>
+              </View>
+              <Text style={styles.coverKicker}>Engenharia de Segurança{'\n'}& Detecção de Incêndio</Text>
             </View>
-            <Text style={styles.coverKicker}>Engenharia de Segurança{'\n'}& Detecção de Incêndio</Text>
+            <View style={styles.coverTopRule}>
+              <View style={styles.coverTopRuleGold} />
+              <View style={styles.coverTopRuleLine} />
+            </View>
           </View>
 
           {nv(capaImagemUrl) && <Image src={capaImagemUrl!} style={styles.coverImage} />}
@@ -997,30 +1069,37 @@ export function PropostaDocument({
           </View>
 
           <View style={styles.coverBlockContainer}>
-            <View style={styles.coverBlockItem}>
+            <View>
               <Text style={styles.coverBlockLabel}>CLIENTE</Text>
               <Text style={styles.coverBlockValue}>{clienteNome || '—'}</Text>
             </View>
 
+            <View style={styles.coverBlockDivider} />
+
             <View style={{ flexDirection: 'row', gap: 12 }}>
-              <View style={{ flex: 1, marginBottom: 6 }}>
+              <View style={{ flex: 1 }}>
                 <Text style={styles.coverBlockLabel}>NÚMERO DA PROPOSTA</Text>
                 <Text style={styles.coverBlockValue}>{numero || '—'}</Text>
               </View>
-              <View style={{ flex: 1, marginBottom: 6 }}>
+              <View style={{ flex: 1 }}>
                 <Text style={styles.coverBlockLabel}>DATA DE EMISSÃO</Text>
                 <Text style={styles.coverBlockValue}>{dataEmissao || '—'}</Text>
               </View>
             </View>
 
-            <View style={{ marginBottom: 0 }}>
+            <View style={styles.coverBlockDivider} />
+
+            <View>
               <Text style={styles.coverBlockLabel}>ESCOPO DE FORNECIMENTO</Text>
               <Text style={styles.coverBlockValue}>{escopoTitulo || '—'}</Text>
             </View>
           </View>
 
           <View style={styles.coverFooter}>
-            <Text style={styles.coverFooterStrong}>{`${razao} — CNPJ ${companyProfile.cnpj}`}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={styles.coverGoldDot} />
+              <Text style={styles.coverFooterStrong}>{`${razao} — CNPJ ${companyProfile.cnpj}`}</Text>
+            </View>
             <Text style={styles.coverFooterText}>{companyProfile.endereco}</Text>
             {(nv(companyProfile.telefone) || nv(companyProfile.email)) && (
               <Text style={styles.coverFooterText}>{[companyProfile.telefone, companyProfile.email].filter(nv).join('  •  ')}</Text>
