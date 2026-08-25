@@ -56,7 +56,7 @@ export function FuncionariosGate({ initialTab }: { initialTab?: TabPath }) {
     if (loading) return;
     setErro('');
     if (!isSupabaseConfigured()) {
-      setErro('Supabase não configurado. Verifique as variáveis de ambiente.');
+      setErro('Serviço de autenticação indisponível no momento. Tente novamente mais tarde.');
       return;
     }
     setLoading(true);
@@ -194,14 +194,6 @@ export function FuncionariosGate({ initialTab }: { initialTab?: TabPath }) {
               </div>
             )}
 
-            <div className="flex items-center gap-2">
-              <div className="h-px bg-[#c5c6ce] flex-1" />
-              <span className="font-data-mono text-[10px] text-[#75777e] uppercase">
-                Auth &middot; Supabase
-              </span>
-              <div className="h-px bg-[#c5c6ce] flex-1" />
-            </div>
-
             <button
               type="submit"
               disabled={loading}
@@ -215,7 +207,7 @@ export function FuncionariosGate({ initialTab }: { initialTab?: TabPath }) {
           </form>
 
           <p className="text-[10px] font-data-mono text-[#75777e] text-center leading-relaxed">
-            Acesso restrito a funcionários. As credenciais são fornecidas pelo administrador do sistema.
+            Acesso restrito a funcionários.
           </p>
         </div>
       </div>

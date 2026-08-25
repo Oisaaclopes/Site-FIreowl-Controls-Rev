@@ -1581,14 +1581,6 @@ export default function Home() {
           {/* Call to Action Button */}
           <div className="hidden lg:flex items-center gap-4" id="desktop-cta-container">
             <a
-              href="/funcionarios"
-              className="text-primary-blue font-bold py-3 px-4 rounded-lg text-sm transition-all hover:bg-slate-100 flex items-center gap-2 border border-slate-200"
-              id="employee-access-button"
-            >
-              <Fingerprint className="w-4 h-4" />
-              Área do Funcionário
-            </a>
-            <a
               href="#contato"
               className="bg-action-red text-white font-bold py-3 px-6 rounded-lg text-sm transition-all hover:bg-red-650 hover:-translate-y-0.5 active:translate-y-0 shadow-lg shadow-action-red/10 flex items-center gap-2.5"
               id="cta-nav-button"
@@ -1638,14 +1630,6 @@ export default function Home() {
                 </a>
                 <a href="#contato" onClick={() => setIsMobileMenuOpen(false)} className="py-2 hover:text-blue-600 border-b border-slate-100 flex justify-between items-center text-slate-800">
                   <span>Contato</span>
-                  <ChevronRight className="w-4 h-4 text-slate-400" />
-                </a>
-                <a
-                  href="/funcionarios"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="py-2 hover:text-blue-600 border-b border-slate-100 flex justify-between items-center text-slate-800"
-                >
-                  <span className="flex items-center gap-2"><Fingerprint className="w-4 h-4" /> Área do Funcionário</span>
                   <ChevronRight className="w-4 h-4 text-slate-400" />
                 </a>
                 <a
