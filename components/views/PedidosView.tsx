@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { PedidoOS, Client, Pedido, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem } from '@/lib/types';
+import { uploadPropostaCapa, removePropostaCapa, propostaCapaDataUrl, blobToDataUrl, readImageSize } from '@/lib/propostaCapa';
 import { CommercialProposalModal } from '@/components/proposta/CommercialProposalModal';
 import { CommercialProposalPDFView } from '@/components/proposta/CommercialProposalPDFView';
 import { DataListRow, RowMeta, Badge } from '@/components/DataListRow';
@@ -130,8 +131,23 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     showTermoAceite: true,
     showAreasAtuacao: true,
     showFechamento: true,
+    capaImagemUrl: undefined as string | undefined,
   });
   const [pdfConfigPedido, setPdfConfigPedido] = useState<Pedido | null>(null);
+  const [capaBusy, setCapaBusy] = useState(false);
+  const capaInputRef = useRef<HTMLInputElement>(null);
+
+  // Carrega (assíncrono) a imagem de capa persistida na proposta como data URI.
+  const loadCapaIntoOptions = async (ped: Pedido) => {
+    const path = ped.proposal?.capaImagemPath;
+    if (!path) return;
+    try {
+      const dataUrl = await propostaCapaDataUrl(path);
+      setPdfOptions((prev) => ({ ...prev, capaImagemUrl: dataUrl }));
+    } catch {
+      /* Sem imagem acessível → o PDF usa o grafismo blueprint. */
+    }
+  };
 
   const openPdf = (ped: Pedido) => {
     const base = {
@@ -145,10 +161,68 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
       showTermoAceite: true,
       showAreasAtuacao: true,
       showFechamento: true,
+      capaImagemUrl: undefined as string | undefined,
     };
     setPdfOptions(base);
+    loadCapaIntoOptions(ped);
     if (pdfPrefs.configBeforeGenerate) setPdfConfigPedido(ped);
     else setPdfPreviewPedido(ped);
+  };
+
+  // Upload da imagem de capa (JPG/PNG) no modal de opções do PDF.
+  const handleCapaFile = async (file: File | undefined) => {
+    if (!file || !pdfConfigPedido) return;
+    if (!/^image\/(jpe?g|png)$/i.test(file.type)) {
+      alert('Envie uma imagem JPG ou PNG.');
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      alert('Imagem muito grande (máximo 8 MB).');
+      return;
+    }
+    setCapaBusy(true);
+    try {
+      // Pré-visualização imediata (funciona mesmo se o Storage falhar).
+      const dataUrl = await blobToDataUrl(file);
+      setPdfOptions((prev) => ({ ...prev, capaImagemUrl: dataUrl }));
+      // Recomendação de proporção/resolução (não bloqueia).
+      try {
+        const { width, height } = await readImageSize(file);
+        if (width < 1000 || width < height) {
+          alert('Dica: para a capa, prefira uma imagem em paisagem e com boa resolução (largura ≥ 1000px). A imagem atual pode ficar pixelizada ou ser cortada.');
+        }
+      } catch {
+        /* ignore */
+      }
+      // Persistência no Storage + na proposta.
+      const prevPath = pdfConfigPedido.proposal?.capaImagemPath;
+      const path = await uploadPropostaCapa(file, pdfConfigPedido.id);
+      const updated: Pedido = { ...pdfConfigPedido, proposal: { ...pdfConfigPedido.proposal, capaImagemPath: path } };
+      onSavePedido(updated);
+      setPdfConfigPedido(updated);
+      if (prevPath && prevPath !== path) {
+        try { await removePropostaCapa(prevPath); } catch { /* best-effort */ }
+      }
+    } catch (e) {
+      console.error('Falha ao salvar a imagem da capa:', e);
+      alert('A imagem foi aplicada nesta pré-visualização, mas não pôde ser salva no servidor. Ela não ficará guardada para a próxima vez.');
+    } finally {
+      setCapaBusy(false);
+      if (capaInputRef.current) capaInputRef.current.value = '';
+    }
+  };
+
+  const handleCapaRemove = async () => {
+    setPdfOptions((prev) => ({ ...prev, capaImagemUrl: undefined }));
+    if (!pdfConfigPedido) return;
+    const prevPath = pdfConfigPedido.proposal?.capaImagemPath;
+    if (prevPath) {
+      const updated: Pedido = { ...pdfConfigPedido, proposal: { ...pdfConfigPedido.proposal } };
+      delete (updated.proposal as { capaImagemPath?: string }).capaImagemPath;
+      onSavePedido(updated);
+      setPdfConfigPedido(updated);
+      try { await removePropostaCapa(prevPath); } catch { /* best-effort */ }
+    }
   };
 
   // Data parseável da proposta (para período e agrupamento)
@@ -839,6 +913,58 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                   <Toggle checked={(pdfOptions as any)[opt.key]} onChange={(v) => setPdfOptions((prev) => ({ ...prev, [opt.key]: v }))} />
                 </div>
               ))}
+
+              {/* Imagem da capa (opcional) */}
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 pt-2">Imagem da capa (opcional)</p>
+              <input
+                ref={capaInputRef}
+                type="file"
+                accept="image/jpeg,image/png"
+                className="hidden"
+                onChange={(e) => handleCapaFile(e.target.files?.[0])}
+              />
+              {pdfOptions.capaImagemUrl ? (
+                <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg p-2.5">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={pdfOptions.capaImagemUrl}
+                    alt="Pré-visualização da capa"
+                    className="w-24 h-16 object-cover rounded-md border border-slate-300 bg-white shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-semibold text-slate-700">Imagem aplicada à capa</p>
+                    <p className="text-[10px] text-slate-400">Aparece no topo da capa; sem imagem, usa o grafismo.</p>
+                    <div className="flex gap-2 mt-1.5">
+                      <button
+                        type="button"
+                        onClick={() => capaInputRef.current?.click()}
+                        disabled={capaBusy}
+                        className="text-[10px] font-bold uppercase tracking-wider text-[#1A1A72] hover:underline disabled:opacity-50"
+                      >
+                        {capaBusy ? 'Enviando…' : 'Trocar'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCapaRemove}
+                        disabled={capaBusy}
+                        className="text-[10px] font-bold uppercase tracking-wider text-red-600 hover:underline disabled:opacity-50"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => capaInputRef.current?.click()}
+                  disabled={capaBusy}
+                  className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-slate-300 hover:border-[#1A1A72] hover:bg-slate-50 rounded-lg py-3 text-[11px] font-semibold text-slate-500 hover:text-[#1A1A72] transition-colors disabled:opacity-60"
+                >
+                  <Plus className="w-4 h-4" /> {capaBusy ? 'Enviando…' : 'Adicionar imagem (JPG/PNG)'}
+                </button>
+              )}
+
               <p className="text-[10px] text-slate-400 pt-1">
                 As cláusulas jurídicas (multas, responsabilidade, sigilo, condições gerais, termo de aceite) são
                 ligadas/desligadas na própria proposta, em <strong>&ldquo;Cláusulas Jurídicas&rdquo;</strong>.

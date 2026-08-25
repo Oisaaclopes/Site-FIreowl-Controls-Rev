@@ -52,6 +52,8 @@ export interface CommercialProposalData {
   cartaApresentacao?: string;
   /** Histórico de revisões da proposta (aparece na seção "Histórico de Propostas"). */
   revisoes?: { numero: string; data: string; elaborador: string; motivo?: string; status?: string }[];
+  /** Caminho no Storage (bucket report-media) da imagem opcional da capa do PDF. */
+  capaImagemPath?: string;
   diretrizesNormativas: string[];
   escopoServico: string;
   entregaveis: string[];
