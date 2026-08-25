@@ -29,7 +29,7 @@ export interface PropostaPdfOptions {
   capaImagemUrl?: string;
 }
 
-// Tipografia de marca (guia Fireowl): corpo em Roboto, títulos em Poppins.
+// Tipografia de marca: corpo em Roboto, títulos em Poppins.
 Font.register({
   family: 'Roboto',
   fonts: [
@@ -46,7 +46,6 @@ Font.register({
   ],
 });
 
-// Quebra de linha apenas nos espaços.
 Font.registerHyphenationCallback((word) => [word]);
 
 // Paleta institucional Fireowl
@@ -82,7 +81,7 @@ const LOGO_PATHS = [
 ];
 
 const styles = StyleSheet.create({
-  // Página de conteúdo (fundo claro): paddingBottom 68 para dar respiro de 3cm antes do rodapé
+  // Página de conteúdo (fundo claro): paddingTop 54, paddingBottom 68 para dar respiro de 3cm antes do rodapé
   page: {
     paddingTop: 54,
     paddingBottom: 68,
@@ -92,25 +91,19 @@ const styles = StyleSheet.create({
     color: C.s700,
     lineHeight: 1.3,
   },
-  // Página institucional (fundo marinho)
+  // Página institucional (fundo marinho) — sem padding no container principal para evitar quebra de página espúria
   darkPage: {
-    padding: 0,
+    paddingTop: 36,
+    paddingBottom: 44,
+    paddingHorizontal: 40,
     fontSize: 9,
     fontFamily: 'Roboto',
     color: C.white,
     backgroundColor: C.navy,
     lineHeight: 1.3,
   },
-  darkPageInner: {
-    paddingTop: 36,
-    paddingBottom: 48,
-    paddingHorizontal: 40,
-    width: '100%',
-    height: '100%',
-    justify: 'space-between',
-  },
 
-  // Cabeçalho fixo (páginas de conteúdo) — Fundo branco limpo, linha fina vermelha na parte inferior
+  // Cabeçalho fixo (páginas de conteúdo) — Fundo branco limpo, alinhamento vertical perfeito
   header: {
     position: 'absolute',
     top: 0,
@@ -131,40 +124,39 @@ const styles = StyleSheet.create({
     fontWeight: 600,
     color: C.navy,
     letterSpacing: 1,
+    lineHeight: 1,
   },
   headerRight: {
     fontSize: 7,
     color: C.s500,
+    fontFamily: 'Roboto',
+    fontWeight: 700,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
+    lineHeight: 1,
   },
 
-  // Rodapé fixo com Bloco Azul Marinho Sólido + Filete Vermelho no topo
+  // Rodapé fixo com Bloco Azul Marinho Sólido + Filete Vermelho no topo, CENTRALIZADO HORIZONTALMENTE
   footerContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 32,
+    height: 30,
     backgroundColor: C.navy,
     borderTopWidth: 2,
     borderTopColor: C.red,
-    paddingHorizontal: 40,
+    paddingHorizontal: 20,
     flexDirection: 'row',
-    justify: 'space-between',
+    justify: 'center',
     alignItems: 'center',
   },
-  footerTextLeft: {
-    fontSize: 7,
-    color: C.white,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  footerTextRight: {
+  footerTextCentered: {
     fontSize: 7.5,
-    color: C.gold,
+    color: C.white,
     fontFamily: 'Roboto',
-    fontWeight: 700,
+    textAlign: 'center',
+    letterSpacing: 0.4,
   },
 
   // ===== Capa =====
@@ -199,14 +191,14 @@ const styles = StyleSheet.create({
   },
   coverImage: {
     width: '100%',
-    height: 130,
+    height: 120,
     borderRadius: 6,
-    marginTop: 14,
+    marginTop: 12,
     objectFit: 'cover',
   },
   coverTitle: {
     color: C.white,
-    fontSize: 28,
+    fontSize: 26,
     fontFamily: 'Poppins',
     fontWeight: 700,
     letterSpacing: 0.4,
@@ -217,7 +209,7 @@ const styles = StyleSheet.create({
     height: 4,
     backgroundColor: C.red,
     borderRadius: 2,
-    marginTop: 8,
+    marginTop: 6,
     marginBottom: 4,
   },
   coverBlockContainer: {
@@ -225,11 +217,11 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: C.red,
     borderRadius: 6,
-    padding: 12,
-    marginTop: 14,
+    padding: 10,
+    marginTop: 12,
   },
   coverBlockItem: {
-    marginBottom: 8,
+    marginBottom: 6,
   },
   coverBlockLabel: {
     color: C.gold,
@@ -242,7 +234,7 @@ const styles = StyleSheet.create({
   },
   coverBlockValue: {
     color: C.white,
-    fontSize: 12,
+    fontSize: 11.5,
     fontFamily: 'Roboto',
     fontWeight: 700,
     lineHeight: 1.2,
@@ -251,7 +243,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: C.navy2,
     paddingTop: 8,
-    marginTop: 6,
+    marginTop: 14,
   },
   coverFooterStrong: {
     color: C.white,
@@ -267,7 +259,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
 
-  // ===== Áreas de Atuação (Grade 2x3 limpa) =====
+  // ===== Áreas de Atuação (Grade 2x3 limpa com ótimo espaçamento e UI) =====
   areasTitle: {
     color: C.white,
     fontSize: 20,
@@ -294,30 +286,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justify: 'space-between',
+    marginTop: 4,
   },
   areaCard: {
-    width: '48.5%',
+    width: '48%',
     backgroundColor: C.navy2,
     borderTopWidth: 3,
     borderTopColor: C.red,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 14,
+  },
+  iconWrap: {
+    backgroundColor: '#1E3A63',
     borderRadius: 6,
-    padding: 10,
-    marginBottom: 10,
+    padding: 5,
+    alignSelf: 'flex-start',
+    marginBottom: 6,
   },
   areaCardTitle: {
     color: C.white,
     fontSize: 9.5,
-    fontFamily: 'Roboto',
+    fontFamily: 'Poppins',
     fontWeight: 700,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginTop: 6,
+    letterSpacing: 0.4,
   },
   areaCardDesc: {
     color: C.s300,
     fontSize: 7.8,
-    lineHeight: 1.4,
-    marginTop: 3,
+    lineHeight: 1.45,
+    marginTop: 4,
   },
 
   // ===== Fechamento =====
@@ -488,6 +487,7 @@ const styles = StyleSheet.create({
   totalRowLight: {
     flexDirection: 'row',
     justify: 'space-between',
+    alignItems: 'center',
     backgroundColor: C.s100,
     paddingVertical: 6,
     paddingHorizontal: 10,
@@ -509,38 +509,44 @@ const styles = StyleSheet.create({
     fontWeight: 700,
     textTransform: 'uppercase',
     letterSpacing: 0.9,
+    lineHeight: 1,
   },
   totalValue: {
     color: C.white,
     fontSize: 16,
     fontFamily: 'Roboto',
     fontWeight: 700,
+    lineHeight: 1,
   },
 
-  // Card de Preço Destacado (Investimento Total em Bloco)
+  // Card de Preço Destacado (Investimento Total em Bloco com alinhamento vertical perfeito)
   precoCardBlock: {
     backgroundColor: C.navy,
     borderRadius: 6,
     borderLeftWidth: 4,
     borderLeftColor: C.red,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     marginBottom: 10,
+    flexDirection: 'row',
+    justify: 'space-between',
+    alignItems: 'center',
   },
   precoCardLabel: {
     color: C.gold,
-    fontSize: 8.5,
+    fontSize: 9,
     fontFamily: 'Roboto',
     fontWeight: 700,
     textTransform: 'uppercase',
     letterSpacing: 1.1,
-    marginBottom: 3,
+    lineHeight: 1,
   },
   precoCardValue: {
     color: C.white,
     fontSize: 18,
     fontFamily: 'Roboto',
     fontWeight: 700,
+    lineHeight: 1,
   },
 
   // ===== Blocos =====
@@ -651,7 +657,7 @@ const BlueprintBg = ({ w = A4.w, h = A4.h }: { w?: number; h?: number }) => {
 };
 
 const AreaIcon = ({ kind }: { kind: string }) => {
-  const S = 26;
+  const S = 22;
   const sw = 1.6;
   const p = (d: string, extra?: object) => <Path d={d} stroke={C.red} strokeWidth={sw} fill="none" {...extra} />;
   return (
@@ -717,28 +723,29 @@ const AREAS = [
 
 const Header = ({ razao }: { razao: string }) => (
   <View fixed style={styles.header}>
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
       <Logo size={18} />
       <Text style={styles.headerBrand}>{(razao || 'FIREOWL CONTROLS').toUpperCase()}</Text>
     </View>
-    <Text style={styles.headerRight}>DOCUMENTO TÉCNICO-COMERCIAL</Text>
+    <View style={{ justifyContent: 'center', alignItems: 'center' }}>
+      <Text style={styles.headerRight}>DOCUMENTO TÉCNICO-COMERCIAL</Text>
+    </View>
   </View>
 );
 
 const Footer = ({ cliente, numero, data }: { cliente: string; numero: string; data: string }) => (
   <View fixed style={styles.footerContainer}>
-    <Text style={styles.footerTextLeft}>
-      {[numero, data, cliente].filter(Boolean).join('  •  ')}
-    </Text>
     <Text
-      style={styles.footerTextRight}
-      render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`}
+      style={styles.footerTextCentered}
+      render={({ pageNumber, totalPages }) =>
+        `${numero}   •   ${data}   •   ${cliente}   •   Página ${pageNumber} de ${totalPages}`
+      }
     />
   </View>
 );
 
 const SecHead = ({ n, titulo }: { n: string; titulo: string }) => (
-  <View style={styles.secHead} minPresenceAhead={80}>
+  <View style={styles.secHead} minPresenceAhead={140}>
     {n ? <Text style={styles.secNum}>{n}</Text> : null}
     <Text style={styles.secTitle}>{titulo}</Text>
   </View>
@@ -796,7 +803,7 @@ const ItensTable = ({
 }) => {
   const subtotal = itens.reduce((a, e) => a + (e.precoUnitario || 0) * e.quantidade, 0);
   return (
-    <View style={{ marginBottom: 10 }} minPresenceAhead={90}>
+    <View style={{ marginBottom: 10 }} minPresenceAhead={140}>
       <Text style={styles.subTitle}>{titulo}</Text>
       <View style={{ borderWidth: 1, borderColor: C.s200, borderRadius: 4, overflow: 'hidden' }}>
         <View style={[styles.th, { backgroundColor: accent }]} fixed>
@@ -906,7 +913,7 @@ export function PropostaDocument({
   const on = (key: string) => vis.some((s) => s.key === key);
 
   const Sec = ({ k, children }: { k: string; children: React.ReactNode }) => (
-    <View style={styles.section} minPresenceAhead={80}>
+    <View style={styles.section} minPresenceAhead={140}>
       <SecHead n={num(k)} titulo={secoes.find((s) => s.key === k)!.titulo} />
       {children}
     </View>
@@ -914,86 +921,85 @@ export function PropostaDocument({
 
   return (
     <Document title={`Proposta ${numero}`} author={razao}>
-      {/* ===================== 01. CAPA (marinho, blueprint) ===================== */}
+      {/* ===================== 01. CAPA (marinho, blueprint, sem estouro de altura) ===================== */}
       <Page size="A4" style={styles.darkPage}>
         <BlueprintBg />
-        <View style={styles.darkPageInner}>
-          <View style={styles.coverTopRow}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              {showLogo && (
-                <View style={styles.coverLogoBox}>
-                  <Logo size={36} />
-                </View>
-              )}
-              <Text style={styles.coverBrand}>FIREOWL CONTROLS</Text>
-            </View>
-            <Text style={styles.coverKicker}>Engenharia de Segurança{'\n'}& Detecção de Incêndio</Text>
-          </View>
-
-          {nv(capaImagemUrl) && <Image src={capaImagemUrl!} style={styles.coverImage} />}
-
-          <View style={{ marginTop: nv(capaImagemUrl) ? 14 : 40 }}>
-            <Text style={styles.coverKicker}>Documento Técnico-Comercial</Text>
-            <View style={styles.coverTitleBar} />
-            <Text style={styles.coverTitle}>Proposta{'\n'}Técnico-Comercial</Text>
-          </View>
-
-          <View style={styles.coverBlockContainer}>
-            <View style={styles.coverBlockItem}>
-              <Text style={styles.coverBlockLabel}>CLIENTE</Text>
-              <Text style={styles.coverBlockValue}>{clienteNome || '—'}</Text>
-            </View>
-
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <View style={{ flex: 1, marginBottom: 8 }}>
-                <Text style={styles.coverBlockLabel}>NÚMERO DA PROPOSTA</Text>
-                <Text style={styles.coverBlockValue}>{numero || '—'}</Text>
+        {/* Topo: logo + marca */}
+        <View style={styles.coverTopRow}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            {showLogo && (
+              <View style={styles.coverLogoBox}>
+                <Logo size={36} />
               </View>
-              <View style={{ flex: 1, marginBottom: 8 }}>
-                <Text style={styles.coverBlockLabel}>DATA DE EMISSÃO</Text>
-                <Text style={styles.coverBlockValue}>{dataEmissao || '—'}</Text>
-              </View>
-            </View>
-
-            <View style={{ marginBottom: 0 }}>
-              <Text style={styles.coverBlockLabel}>ESCOPO DE FORNECIMENTO</Text>
-              <Text style={styles.coverBlockValue}>{escopoTitulo || '—'}</Text>
-            </View>
-          </View>
-
-          <View style={styles.coverFooter}>
-            <Text style={styles.coverFooterStrong}>{`${razao} — CNPJ ${companyProfile.cnpj}`}</Text>
-            <Text style={styles.coverFooterText}>{companyProfile.endereco}</Text>
-            {(nv(companyProfile.telefone) || nv(companyProfile.email)) && (
-              <Text style={styles.coverFooterText}>{[companyProfile.telefone, companyProfile.email].filter(nv).join('  •  ')}</Text>
             )}
+            <Text style={styles.coverBrand}>FIREOWL CONTROLS</Text>
           </View>
+          <Text style={styles.coverKicker}>Engenharia de Segurança{'\n'}& Detecção de Incêndio</Text>
+        </View>
+
+        {nv(capaImagemUrl) && <Image src={capaImagemUrl!} style={styles.coverImage} />}
+
+        <View style={{ marginTop: nv(capaImagemUrl) ? 12 : 36 }}>
+          <Text style={styles.coverKicker}>Documento Técnico-Comercial</Text>
+          <View style={styles.coverTitleBar} />
+          <Text style={styles.coverTitle}>Proposta{'\n'}Técnico-Comercial</Text>
+        </View>
+
+        <View style={styles.coverBlockContainer}>
+          <View style={styles.coverBlockItem}>
+            <Text style={styles.coverBlockLabel}>CLIENTE</Text>
+            <Text style={styles.coverBlockValue}>{clienteNome || '—'}</Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <View style={{ flex: 1, marginBottom: 6 }}>
+              <Text style={styles.coverBlockLabel}>NÚMERO DA PROPOSTA</Text>
+              <Text style={styles.coverBlockValue}>{numero || '—'}</Text>
+            </View>
+            <View style={{ flex: 1, marginBottom: 6 }}>
+              <Text style={styles.coverBlockLabel}>DATA DE EMISSÃO</Text>
+              <Text style={styles.coverBlockValue}>{dataEmissao || '—'}</Text>
+            </View>
+          </View>
+
+          <View style={{ marginBottom: 0 }}>
+            <Text style={styles.coverBlockLabel}>ESCOPO DE FORNECIMENTO</Text>
+            <Text style={styles.coverBlockValue}>{escopoTitulo || '—'}</Text>
+          </View>
+        </View>
+
+        <View style={styles.coverFooter}>
+          <Text style={styles.coverFooterStrong}>{`${razao} — CNPJ ${companyProfile.cnpj}`}</Text>
+          <Text style={styles.coverFooterText}>{companyProfile.endereco}</Text>
+          {(nv(companyProfile.telefone) || nv(companyProfile.email)) && (
+            <Text style={styles.coverFooterText}>{[companyProfile.telefone, companyProfile.email].filter(nv).join('  •  ')}</Text>
+          )}
         </View>
       </Page>
 
-      {/* ===================== 02. ÁREAS DE ATUAÇÃO (Grade 2x3 sem grifos ruidosos) ===================== */}
+      {/* ===================== 02. ÁREAS DE ATUAÇÃO (Grade 2x3 limpa com UI moderna) ===================== */}
       {showAreas && (
         <Page size="A4" style={styles.darkPage}>
           <BlueprintBg />
           <Footer cliente={clienteNome} numero={numero} data={dataEmissao} />
-          <View style={styles.darkPageInner}>
-            <View>
-              <Text style={styles.coverKicker}>Quem é a Fireowl Controls</Text>
-              <Text style={[styles.areasTitle, { marginTop: 4 }]}>Áreas de Atuação</Text>
-              <View style={styles.areasBar} />
-              <Text style={styles.areasIntro}>
-                Somos uma engenharia especializada em sistemas de segurança eletrônica e proteção contra incêndio.
-                Projetamos, instalamos, comissionamos e mantemos soluções integradas — do sensor à central de supervisão.
-              </Text>
-              <View style={styles.areasGrid}>
-                {AREAS.map((a) => (
-                  <View key={a.kind} style={styles.areaCard} wrap={false}>
+          <View>
+            <Text style={styles.coverKicker}>Quem é a Fireowl Controls</Text>
+            <Text style={[styles.areasTitle, { marginTop: 4 }]}>Áreas de Atuação</Text>
+            <View style={styles.areasBar} />
+            <Text style={styles.areasIntro}>
+              Somos uma engenharia especializada em sistemas de segurança eletrônica e proteção contra incêndio.
+              Projetamos, instalamos, comissionamos e mantemos soluções integradas — do sensor à central de supervisão.
+            </Text>
+            <View style={styles.areasGrid}>
+              {AREAS.map((a) => (
+                <View key={a.kind} style={styles.areaCard} wrap={false}>
+                  <View style={styles.iconWrap}>
                     <AreaIcon kind={a.kind} />
-                    <Text style={styles.areaCardTitle}>{a.titulo}</Text>
-                    <Text style={styles.areaCardDesc}>{a.desc}</Text>
                   </View>
-                ))}
-              </View>
+                  <Text style={styles.areaCardTitle}>{a.titulo}</Text>
+                  <Text style={styles.areaCardDesc}>{a.desc}</Text>
+                </View>
+              ))}
             </View>
           </View>
         </Page>
@@ -1088,27 +1094,31 @@ export function PropostaDocument({
           </View>
         </Sec>
 
-        <Sec k="itens">
-          {materiais.length > 0 && <ItensTable titulo="Materiais" itens={materiais} detailed={detailed} showMarca />}
-          {servicos.length > 0 && <ItensTable titulo="Serviços" itens={servicos} detailed={detailed} showMarca={false} accent={C.green} />}
-          {materiais.length === 0 && servicos.length === 0 && (
-            <Text style={{ fontSize: 9, color: C.s400, fontStyle: 'italic' }}>Itens conforme especificação técnica acordada.</Text>
-          )}
-          {detailed && (
-            <View style={styles.totalWrap} wrap={false}>
-              {(p.maoDeObra || 0) > 0 && (
-                <View style={styles.totalRowLight}>
-                  <Text style={{ fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, color: C.ink, textTransform: 'uppercase' }}>Mão de obra / Serviços adicionais</Text>
-                  <Text style={{ fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>{brl(p.maoDeObra || 0)}</Text>
+        {/* Item 05 - Materiais e Serviços Ofertados com garantia de vinculação do título às tabelas */}
+        <View style={styles.section} minPresenceAhead={160}>
+          <SecHead n={num('itens')} titulo={secoes.find((s) => s.key === 'itens')!.titulo} />
+          <View minPresenceAhead={140}>
+            {materiais.length > 0 && <ItensTable titulo="Materiais" itens={materiais} detailed={detailed} showMarca />}
+            {servicos.length > 0 && <ItensTable titulo="Serviços" itens={servicos} detailed={detailed} showMarca={false} accent={C.green} />}
+            {materiais.length === 0 && servicos.length === 0 && (
+              <Text style={{ fontSize: 9, color: C.s400, fontStyle: 'italic' }}>Itens conforme especificação técnica acordada.</Text>
+            )}
+            {detailed && (
+              <View style={styles.totalWrap} wrap={false}>
+                {(p.maoDeObra || 0) > 0 && (
+                  <View style={styles.totalRowLight}>
+                    <Text style={{ fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, color: C.ink, textTransform: 'uppercase', lineHeight: 1 }}>Mão de obra / Serviços adicionais</Text>
+                    <Text style={{ fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, color: C.ink, lineHeight: 1 }}>{brl(p.maoDeObra || 0)}</Text>
+                  </View>
+                )}
+                <View style={styles.totalRowNavy}>
+                  <Text style={styles.totalLabelGold}>VALOR TOTAL</Text>
+                  <Text style={styles.totalValue}>{brl(p.valorTotal)}</Text>
                 </View>
-              )}
-              <View style={styles.totalRowNavy}>
-                <Text style={styles.totalLabelGold}>VALOR TOTAL</Text>
-                <Text style={styles.totalValue}>{brl(p.valorTotal)}</Text>
               </View>
-            </View>
-          )}
-        </Sec>
+            )}
+          </View>
+        </View>
 
         <Sec k="premissas">
           {lnv(p.premissas) ? <Bullets itens={p.premissas} /> : <Text style={{ fontSize: 9, color: C.s500, fontStyle: 'italic' }}>Premissas conforme rotinas padrão de execução.</Text>}
@@ -1116,19 +1126,19 @@ export function PropostaDocument({
 
         <Sec k="servicos">
           {SERVICOS_OFERTADOS.map((s, i) => (
-            <View key={i} minPresenceAhead={40}>
+            <View key={i} minPresenceAhead={50}>
               <Text style={styles.subTitle}>{`${num('servicos')}.${i + 1}. ${s.titulo}`}</Text>
               <Bullets itens={s.itens} />
             </View>
           ))}
           {lnv(p.entregaveis) && (
-            <View minPresenceAhead={40}>
+            <View minPresenceAhead={50}>
               <Text style={styles.subTitle}>Entregáveis do projeto</Text>
               <Checks itens={p.entregaveis} />
             </View>
           )}
           {lnv(p.responsabilidadesContratada) && (
-            <View minPresenceAhead={40}>
+            <View minPresenceAhead={50}>
               <Text style={styles.subTitle}>Responsabilidades da Contratada</Text>
               <Bullets itens={p.responsabilidadesContratada} />
             </View>
@@ -1150,7 +1160,7 @@ export function PropostaDocument({
           )}
         </Sec>
 
-        {/* Item 09 - Preços com Bloco de Investimento Total bem alinhado em 2 linhas */}
+        {/* Item 09 - Preços com alinhamento vertical perfeito entre rótulo e valor */}
         <Sec k="precos">
           <View style={styles.precoCardBlock} wrap={false}>
             <Text style={styles.precoCardLabel}>INVESTIMENTO TOTAL</Text>
@@ -1246,54 +1256,52 @@ export function PropostaDocument({
         </View>
       </Page>
 
-      {/* ===================== FECHAMENTO (marinho) ===================== */}
+      {/* ===================== FECHAMENTO (marinho, sem estouro de altura) ===================== */}
       {showFechamento && (
         <Page size="A4" style={styles.darkPage}>
           <BlueprintBg />
           <Footer cliente={clienteNome} numero={numero} data={dataEmissao} />
-          <View style={styles.darkPageInner}>
-            <View style={{ flex: 1, justifyContent: 'center' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 }}>
-                {showLogo && (
-                  <View style={styles.coverLogoBox}>
-                    <Logo size={36} />
-                  </View>
-                )}
-                <Text style={styles.coverBrand}>FIREOWL CONTROLS</Text>
+          <View style={{ flex: 1, justifyContent: 'center' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 }}>
+              {showLogo && (
+                <View style={styles.coverLogoBox}>
+                  <Logo size={36} />
+                </View>
+              )}
+              <Text style={styles.coverBrand}>FIREOWL CONTROLS</Text>
+            </View>
+            <Text style={styles.coverKicker}>Obrigado pela oportunidade</Text>
+            <Text style={[styles.closeTitle, { marginTop: 6 }]}>Vamos proteger o seu patrimônio com engenharia de verdade.</Text>
+            <View style={styles.closeBar} />
+            <Text style={{ color: C.s300, fontSize: 9, lineHeight: 1.5, maxWidth: 440, marginBottom: 24 }}>
+              Nossa equipe está à disposição para esclarecer qualquer ponto desta proposta, ajustar escopos e agendar
+              a visita técnica. Fale com a gente pelos canais abaixo.
+            </Text>
+            <View style={styles.closeRow}>
+              <View style={styles.closeItem}>
+                <Text style={styles.closeLabel}>Empresa</Text>
+                <Text style={styles.closeValue}>{razao}</Text>
+                <Text style={{ color: C.s400, fontSize: 8, marginTop: 2 }}>{`CNPJ ${companyProfile.cnpj}`}</Text>
               </View>
-              <Text style={styles.coverKicker}>Obrigado pela oportunidade</Text>
-              <Text style={[styles.closeTitle, { marginTop: 6 }]}>Vamos proteger o seu patrimônio com engenharia de verdade.</Text>
-              <View style={styles.closeBar} />
-              <Text style={{ color: C.s300, fontSize: 9, lineHeight: 1.5, maxWidth: 440, marginBottom: 24 }}>
-                Nossa equipe está à disposição para esclarecer qualquer ponto desta proposta, ajustar escopos e agendar
-                a visita técnica. Fale com a gente pelos canais abaixo.
-              </Text>
-              <View style={styles.closeRow}>
+              <View style={styles.closeItem}>
+                <Text style={styles.closeLabel}>Endereço</Text>
+                <Text style={styles.closeValue}>{companyProfile.endereco}</Text>
+              </View>
+              {nv(companyProfile.telefone) && (
                 <View style={styles.closeItem}>
-                  <Text style={styles.closeLabel}>Empresa</Text>
-                  <Text style={styles.closeValue}>{razao}</Text>
-                  <Text style={{ color: C.s400, fontSize: 8, marginTop: 2 }}>{`CNPJ ${companyProfile.cnpj}`}</Text>
+                  <Text style={styles.closeLabel}>Telefone</Text>
+                  <Text style={styles.closeValue}>{companyProfile.telefone}</Text>
                 </View>
+              )}
+              {nv(companyProfile.email) && (
                 <View style={styles.closeItem}>
-                  <Text style={styles.closeLabel}>Endereço</Text>
-                  <Text style={styles.closeValue}>{companyProfile.endereco}</Text>
+                  <Text style={styles.closeLabel}>E-mail</Text>
+                  <Text style={styles.closeValue}>{companyProfile.email}</Text>
                 </View>
-                {nv(companyProfile.telefone) && (
-                  <View style={styles.closeItem}>
-                    <Text style={styles.closeLabel}>Telefone</Text>
-                    <Text style={styles.closeValue}>{companyProfile.telefone}</Text>
-                  </View>
-                )}
-                {nv(companyProfile.email) && (
-                  <View style={styles.closeItem}>
-                    <Text style={styles.closeLabel}>E-mail</Text>
-                    <Text style={styles.closeValue}>{companyProfile.email}</Text>
-                  </View>
-                )}
-                <View style={styles.closeItem}>
-                  <Text style={styles.closeLabel}>Referência desta Proposta</Text>
-                  <Text style={styles.closeValue}>{numero}</Text>
-                </View>
+              )}
+              <View style={styles.closeItem}>
+                <Text style={styles.closeLabel}>Referência desta Proposta</Text>
+                <Text style={styles.closeValue}>{numero}</Text>
               </View>
             </View>
           </View>
