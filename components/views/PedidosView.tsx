@@ -8,6 +8,7 @@ import { CommercialProposalPDFView } from '@/components/proposta/CommercialPropo
 import { DocumentTypeModal } from '@/components/proposta/DocumentTypeModal';
 import { OrcamentoPDFView } from '@/components/documentos/OrcamentoPDFView';
 import { OrdemServicoPDFView } from '@/components/documentos/OrdemServicoPDFView';
+import { ListaProdutosPDFView } from '@/components/documentos/ListaProdutosPDFView';
 import { resolveDocumentoPadrao, DOCUMENT_TYPE_LABELS } from '@/lib/documentos';
 import { DataListRow, RowMeta, Badge } from '@/components/DataListRow';
 import { Toggle } from '@/components/SidePanel';
@@ -144,6 +145,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   const [docModalPedido, setDocModalPedido] = useState<Pedido | null>(null);
   const [orcamentoPedido, setOrcamentoPedido] = useState<Pedido | null>(null);
   const [osPedido, setOsPedido] = useState<Pedido | null>(null);
+  const [listaProdutosPedido, setListaProdutosPedido] = useState<Pedido | null>(null);
   const [capaBusy, setCapaBusy] = useState(false);
   const capaInputRef = useRef<HTMLInputElement>(null);
 
@@ -192,6 +194,10 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     }
     if (doc === 'ordem_servico') {
       setOsPedido(ped);
+      return;
+    }
+    if (doc === 'lista_produtos') {
+      setListaProdutosPedido(ped);
       return;
     }
     if (doc === 'personalizado') {
@@ -963,6 +969,16 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           companyProfile={companyProfile}
           options={{ showLogo: pdfPrefs.showLogo }}
           onClose={() => setOsPedido(null)}
+        />
+      )}
+
+      {/* Visualizador da Lista de Produtos */}
+      {listaProdutosPedido && (
+        <ListaProdutosPDFView
+          pedido={listaProdutosPedido}
+          companyProfile={companyProfile}
+          options={{ showLogo: pdfPrefs.showLogo }}
+          onClose={() => setListaProdutosPedido(null)}
         />
       )}
 
