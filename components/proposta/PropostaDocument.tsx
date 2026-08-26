@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
   },
   coverImage: {
     width: '100%',
-    height: 120,
+    height: 200,
     borderRadius: 6,
     marginTop: 12,
     objectFit: 'cover',
