@@ -2,11 +2,9 @@ import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import { C, brl, nv, lnv, PdfHeader, PdfFooter } from './pdfKit';
+import { DocOptions } from '@/lib/documentos';
 
-export interface OrcamentoPdfOptions {
-  showLogo?: boolean;
-  detailedSubtotal?: boolean;
-}
+export type OrcamentoPdfOptions = Partial<DocOptions>;
 
 const styles = StyleSheet.create({
   // IMPORTANTE: sem lineHeight na Page (zera o <Text fixed render> do rodapé).
@@ -59,7 +57,7 @@ const InfoCell = ({ label, value, full }: { label: string; value: string; full?:
   </View>
 );
 
-const ItensTable = ({ titulo, itens, detailed, showMarca, accent }: { titulo: string; itens: PedidoEquipmentItem[]; detailed: boolean; showMarca?: boolean; accent: string }) => {
+const ItensTable = ({ titulo, itens, showUnit, showTotal, showMarca, accent }: { titulo: string; itens: PedidoEquipmentItem[]; showUnit: boolean; showTotal: boolean; showMarca: boolean; accent: string }) => {
   const subtotal = itens.reduce((a, e) => a + (e.precoUnitario || 0) * e.quantidade, 0);
   return (
     <View style={{ marginBottom: 10 }} minPresenceAhead={60}>
@@ -71,8 +69,8 @@ const ItensTable = ({ titulo, itens, detailed, showMarca, accent }: { titulo: st
           {showMarca && <Text style={[styles.thCell, { width: 88 }]}>Marca / Modelo</Text>}
           <Text style={[styles.thCell, { width: 30, textAlign: 'center' }]}>Un.</Text>
           <Text style={[styles.thCell, { width: 30, textAlign: 'center' }]}>Qtd</Text>
-          {detailed && <Text style={[styles.thCell, { width: 62, textAlign: 'right' }]}>Unit.</Text>}
-          {detailed && <Text style={[styles.thCell, { width: 68, textAlign: 'right' }]}>Total</Text>}
+          {showUnit && <Text style={[styles.thCell, { width: 62, textAlign: 'right' }]}>Unit.</Text>}
+          {showTotal && <Text style={[styles.thCell, { width: 68, textAlign: 'right' }]}>Total</Text>}
         </View>
         {itens.map((eq, i) => {
           const unit = eq.precoUnitario || 0;
@@ -80,16 +78,16 @@ const ItensTable = ({ titulo, itens, detailed, showMarca, accent }: { titulo: st
           return (
             <View key={i} style={[styles.tr, i % 2 === 1 ? styles.trAlt : {}]} wrap={false}>
               <Text style={[styles.td, { width: 24, textAlign: 'center', color: C.red, fontFamily: 'Roboto', fontWeight: 700 }]}>{i + 1}</Text>
-              <View style={[styles.td, { flex: 1 }]}><Text style={{ color: C.ink, fontFamily: 'Roboto', fontWeight: 700, fontSize: 8 }}>{eq.descricao}</Text>{eq.descricaoDetalhada ? <Text style={{ color: C.s500, fontSize: 7, marginTop: 1, lineHeight: 1.3 }}>{eq.descricaoDetalhada}</Text> : null}</View>
+              <View style={[styles.td, { flex: 1 }]}><Text style={{ color: C.ink, fontFamily: 'Roboto', fontWeight: 700, fontSize: 8 }}>{eq.descricao}</Text>{showMarca && eq.descricaoDetalhada ? <Text style={{ color: C.s500, fontSize: 7, marginTop: 1, lineHeight: 1.3 }}>{eq.descricaoDetalhada}</Text> : null}</View>
               {showMarca && <Text style={[styles.td, { width: 88 }]}>{eq.marcaModelo}</Text>}
               <Text style={[styles.td, { width: 30, textAlign: 'center', textTransform: 'uppercase' }]}>{eq.unidade}</Text>
               <Text style={[styles.td, { width: 30, textAlign: 'center', fontFamily: 'Roboto', fontWeight: 700 }]}>{eq.quantidade}</Text>
-              {detailed && <Text style={[styles.td, { width: 62, textAlign: 'right' }]}>{unit > 0 ? unit.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}</Text>}
-              {detailed && <Text style={[styles.td, { width: 68, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.ink }]}>{tot > 0 ? tot.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}</Text>}
+              {showUnit && <Text style={[styles.td, { width: 62, textAlign: 'right' }]}>{unit > 0 ? unit.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}</Text>}
+              {showTotal && <Text style={[styles.td, { width: 68, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.ink }]}>{tot > 0 ? tot.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}</Text>}
             </View>
           );
         })}
-        {detailed && (
+        {showTotal && (
           <View style={styles.tfoot} wrap={false}>
             <Text style={[styles.tfootCell, { flex: 1, textAlign: 'right', textTransform: 'uppercase' }]}>{`Subtotal ${titulo}`}</Text>
             <Text style={[styles.tfootCell, { width: 68, textAlign: 'right' }]}>{brl(subtotal)}</Text>
@@ -110,7 +108,11 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
   const referencia = pedido.referencia || 'Fornecimento e Serviços';
 
   const showLogo = options?.showLogo !== false;
-  const detailed = options?.detailedSubtotal !== false;
+  const showUnit = options?.showValorUnitario !== false;
+  const showTotal = options?.showSubtotal !== false;
+  const showMarca = options?.showDescricaoDetalhada !== false;
+  const showAssinatura = options?.showAssinaturaCliente !== false;
+  const dataDoc = options?.dataHoje ? new Date().toISOString().split('T')[0] : dataEmissao;
 
   const itens = p.equipmentItems || [];
   const materiais = itens.filter((e) => e.tipo !== 'servico');
@@ -126,7 +128,7 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
     <Document title={`Orçamento ${numero}`} author={razao}>
       <Page size="A4" style={styles.page}>
         <PdfHeader razao={razao} label="Orçamento" showLogo={showLogo} />
-        <PdfFooter numero={numero} data={dataEmissao} cliente={cliente} />
+        <PdfFooter numero={numero} data={dataDoc} cliente={cliente} />
 
         <View style={styles.titleWrap}>
           <Text style={styles.eyebrow}>Documento Comercial</Text>
@@ -138,19 +140,19 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
           <InfoCell label="Cliente / Contratante" value={cliente} full />
           <InfoCell label="Referência / Projeto" value={referencia} />
           <InfoCell label="Número" value={numero} />
-          <InfoCell label="Data de Emissão" value={dataEmissao} />
+          <InfoCell label="Data de Emissão" value={dataDoc} />
           <InfoCell label="Validade" value={validade} />
           <InfoCell label="Responsável" value={assinante} full />
         </View>
 
-        {materiais.length > 0 && <ItensTable titulo="Materiais" itens={materiais} detailed={detailed} showMarca accent={C.navy} />}
-        {servicos.length > 0 && <ItensTable titulo="Serviços" itens={servicos} detailed={detailed} accent={C.green} />}
+        {materiais.length > 0 && <ItensTable titulo="Materiais" itens={materiais} showUnit={showUnit} showTotal={showTotal} showMarca={showMarca} accent={C.navy} />}
+        {servicos.length > 0 && <ItensTable titulo="Serviços" itens={servicos} showUnit={showUnit} showTotal={showTotal} showMarca={showMarca} accent={C.green} />}
         {materiais.length === 0 && servicos.length === 0 && (
           <Text style={{ fontSize: 9, color: C.s400, fontStyle: 'italic', marginBottom: 8 }}>Itens conforme especificação técnica acordada.</Text>
         )}
 
         <View style={styles.totalWrap} wrap={false}>
-          {detailed && (p.maoDeObra || 0) > 0 && (
+          {showTotal && (p.maoDeObra || 0) > 0 && (
             <View style={styles.totalRowLight}>
               <Text style={{ fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, color: C.ink, textTransform: 'uppercase' }}>Mão de obra / Serviços adicionais</Text>
               <Text style={{ fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>{brl(p.maoDeObra || 0)}</Text>
@@ -193,18 +195,20 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
           </View>
         )}
 
-        <View style={styles.signRow} wrap={false}>
-          <View style={styles.signCol}>
-            <View style={styles.signLine} />
-            <Text style={styles.signName}>{razao}</Text>
-            <Text style={styles.signRole}>{assinante}</Text>
+        {showAssinatura && (
+          <View style={styles.signRow} wrap={false}>
+            <View style={styles.signCol}>
+              <View style={styles.signLine} />
+              <Text style={styles.signName}>{razao}</Text>
+              <Text style={styles.signRole}>{assinante}</Text>
+            </View>
+            <View style={styles.signCol}>
+              <View style={styles.signLine} />
+              <Text style={styles.signName}>{cliente}</Text>
+              <Text style={styles.signRole}>De acordo &amp; Aceite</Text>
+            </View>
           </View>
-          <View style={styles.signCol}>
-            <View style={styles.signLine} />
-            <Text style={styles.signName}>{cliente}</Text>
-            <Text style={styles.signRole}>De acordo &amp; Aceite</Text>
-          </View>
-        </View>
+        )}
       </Page>
     </Document>
   );

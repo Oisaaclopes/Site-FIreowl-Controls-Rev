@@ -12,7 +12,8 @@ import { OrdemServicoPDFView } from '@/components/documentos/OrdemServicoPDFView
 import { ListaProdutosPDFView } from '@/components/documentos/ListaProdutosPDFView';
 import { NotaPDFView } from '@/components/documentos/NotaPDFView';
 import { NotaVariante } from '@/components/documentos/NotaDocument';
-import { resolveDocumentoPadrao, DOCUMENT_TYPE_LABELS } from '@/lib/documentos';
+import { DocConfigModal } from '@/components/documentos/DocConfigModal';
+import { resolveDocumentoPadrao, DOCUMENT_TYPE_LABELS, DocOptions, DEFAULT_DOC_OPTIONS } from '@/lib/documentos';
 import { DataListRow, RowMeta, Badge } from '@/components/DataListRow';
 import { Toggle } from '@/components/SidePanel';
 import { usePrivacy } from '@/lib/privacy';
@@ -151,10 +152,11 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   });
   const [pdfConfigPedido, setPdfConfigPedido] = useState<Pedido | null>(null);
   const [docModalPedido, setDocModalPedido] = useState<Pedido | null>(null);
-  const [orcamentoPedido, setOrcamentoPedido] = useState<Pedido | null>(null);
-  const [osPedido, setOsPedido] = useState<Pedido | null>(null);
-  const [listaProdutosPedido, setListaProdutosPedido] = useState<Pedido | null>(null);
-  const [notaPedido, setNotaPedido] = useState<{ pedido: Pedido; variante: NotaVariante } | null>(null);
+  const [orcamentoPedido, setOrcamentoPedido] = useState<{ pedido: Pedido; options: DocOptions } | null>(null);
+  const [osPedido, setOsPedido] = useState<{ pedido: Pedido; options: DocOptions } | null>(null);
+  const [listaProdutosPedido, setListaProdutosPedido] = useState<{ pedido: Pedido; options: DocOptions } | null>(null);
+  const [notaPedido, setNotaPedido] = useState<{ pedido: Pedido; variante: NotaVariante; options: DocOptions } | null>(null);
+  const [docConfig, setDocConfig] = useState<{ pedido: Pedido; doc: DocumentType } | null>(null);
   const [concluindoPedido, setConcluindoPedido] = useState<Pedido | null>(null);
   const [capaBusy, setCapaBusy] = useState(false);
   const capaInputRef = useRef<HTMLInputElement>(null);
@@ -191,35 +193,39 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     else setPdfPreviewPedido(ped);
   };
 
-  // Roteia a geração para o documento escolhido. Fase 1: só a Proposta comercial
-  // tem gerador real; os demais avisam que entram em fases seguintes.
+  const DOCS_GENERICOS: DocumentType[] = ['orcamento', 'ordem_servico', 'lista_produtos', 'nota_servico', 'nota_produtos'];
+
+  // Opções iniciais da tela de configuração (herdam as preferências gerais).
+  const initialDocOptions = (): DocOptions => ({
+    ...DEFAULT_DOC_OPTIONS,
+    showLogo: pdfPrefs.showLogo,
+    showValorUnitario: pdfPrefs.detailedSubtotal,
+    showSubtotal: pdfPrefs.detailedSubtotal,
+  });
+
+  // Abre o visualizador do documento (não proposta) com as opções escolhidas.
+  const openDocViewer = (ped: Pedido, doc: DocumentType, options: DocOptions) => {
+    if (doc === 'orcamento') setOrcamentoPedido({ pedido: ped, options });
+    else if (doc === 'ordem_servico') setOsPedido({ pedido: ped, options });
+    else if (doc === 'lista_produtos') setListaProdutosPedido({ pedido: ped, options });
+    else if (doc === 'nota_servico') setNotaPedido({ pedido: ped, variante: 'servico', options });
+    else if (doc === 'nota_produtos') setNotaPedido({ pedido: ped, variante: 'produtos', options });
+  };
+
+  // Roteia a geração: proposta usa seu próprio modal de opções; os demais
+  // documentos abrem a tela de configuração (as 6 opções) e depois geram.
   const dispatchDocument = (ped: Pedido, doc: DocumentType) => {
     if (doc === 'proposta_comercial') {
       openPdf(ped);
       return;
     }
-    if (doc === 'orcamento') {
-      setOrcamentoPedido(ped);
-      return;
-    }
-    if (doc === 'ordem_servico') {
-      setOsPedido(ped);
-      return;
-    }
-    if (doc === 'lista_produtos') {
-      setListaProdutosPedido(ped);
-      return;
-    }
-    if (doc === 'nota_servico') {
-      setNotaPedido({ pedido: ped, variante: 'servico' });
-      return;
-    }
-    if (doc === 'nota_produtos') {
-      setNotaPedido({ pedido: ped, variante: 'produtos' });
-      return;
-    }
     if (doc === 'personalizado') {
       alert('A personalização de documento (título e campos livres) entra em uma fase seguinte. Por ora, gere a Proposta comercial.');
+      return;
+    }
+    if (DOCS_GENERICOS.includes(doc)) {
+      if (pdfPrefs.configBeforeGenerate) setDocConfig({ pedido: ped, doc });
+      else openDocViewer(ped, doc, initialDocOptions());
       return;
     }
     alert(`O gerador de "${DOCUMENT_TYPE_LABELS[doc]}" entra em uma próxima fase. Por ora, apenas a Proposta comercial é gerada.`);
@@ -1038,12 +1044,27 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
         }}
       />
 
+      {/* Tela de configuração do documento (após escolher o tipo) */}
+      {docConfig && (
+        <DocConfigModal
+          pedido={docConfig.pedido}
+          doc={docConfig.doc}
+          initial={initialDocOptions()}
+          onClose={() => setDocConfig(null)}
+          onConfirm={(opts) => {
+            const { pedido, doc } = docConfig;
+            setDocConfig(null);
+            openDocViewer(pedido, doc, opts);
+          }}
+        />
+      )}
+
       {/* Visualizador do Orçamento */}
       {orcamentoPedido && (
         <OrcamentoPDFView
-          pedido={orcamentoPedido}
+          pedido={orcamentoPedido.pedido}
           companyProfile={companyProfile}
-          options={{ showLogo: pdfPrefs.showLogo, detailedSubtotal: pdfPrefs.detailedSubtotal }}
+          options={orcamentoPedido.options}
           onClose={() => setOrcamentoPedido(null)}
         />
       )}
@@ -1051,9 +1072,9 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
       {/* Visualizador da Ordem de Serviço */}
       {osPedido && (
         <OrdemServicoPDFView
-          pedido={osPedido}
+          pedido={osPedido.pedido}
           companyProfile={companyProfile}
-          options={{ showLogo: pdfPrefs.showLogo }}
+          options={osPedido.options}
           onClose={() => setOsPedido(null)}
         />
       )}
@@ -1061,9 +1082,9 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
       {/* Visualizador da Lista de Produtos */}
       {listaProdutosPedido && (
         <ListaProdutosPDFView
-          pedido={listaProdutosPedido}
+          pedido={listaProdutosPedido.pedido}
           companyProfile={companyProfile}
-          options={{ showLogo: pdfPrefs.showLogo }}
+          options={listaProdutosPedido.options}
           onClose={() => setListaProdutosPedido(null)}
         />
       )}
@@ -1083,7 +1104,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           pedido={notaPedido.pedido}
           variante={notaPedido.variante}
           companyProfile={companyProfile}
-          options={{ showLogo: pdfPrefs.showLogo }}
+          options={notaPedido.options}
           onClose={() => setNotaPedido(null)}
         />
       )}

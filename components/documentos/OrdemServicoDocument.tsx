@@ -3,10 +3,9 @@ import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import { SEGURANCA_TRABALHO } from '@/lib/propostaTextos';
 import { C, nv, lnv, PdfHeader, PdfFooter } from './pdfKit';
+import { DocOptions } from '@/lib/documentos';
 
-export interface OrdemServicoPdfOptions {
-  showLogo?: boolean;
-}
+export type OrdemServicoPdfOptions = Partial<DocOptions>;
 
 const styles = StyleSheet.create({
   page: { paddingTop: 58, paddingBottom: 42, paddingHorizontal: 40, fontSize: 9, fontFamily: 'Roboto', color: C.s700 },
@@ -88,6 +87,9 @@ export function OrdemServicoDocument({ pedido, companyProfile, options }: { pedi
   const referencia = pedido.referencia || 'Serviço de engenharia';
 
   const showLogo = options?.showLogo !== false;
+  const showMarca = options?.showDescricaoDetalhada !== false;
+  const showAssinatura = options?.showAssinaturaCliente !== false;
+  const dataDoc = options?.dataHoje ? new Date().toISOString().split('T')[0] : dataEmissao;
 
   const itens = p.equipmentItems || [];
   const materiais = itens.filter((e) => e.tipo !== 'servico');
@@ -102,7 +104,7 @@ export function OrdemServicoDocument({ pedido, companyProfile, options }: { pedi
     <Document title={`Ordem de Serviço ${os}`} author={razao}>
       <Page size="A4" style={styles.page}>
         <PdfHeader razao={razao} label="Ordem de Serviço" showLogo={showLogo} />
-        <PdfFooter numero={os} data={dataEmissao} cliente={cliente} />
+        <PdfFooter numero={os} data={dataDoc} cliente={cliente} />
 
         <View style={styles.titleWrap}>
           <Text style={styles.eyebrow}>Documento Operacional</Text>
@@ -114,7 +116,7 @@ export function OrdemServicoDocument({ pedido, companyProfile, options }: { pedi
           <InfoCell label="Cliente / Contratante" value={cliente} />
           <InfoCell label="Número da OS" value={os} />
           <InfoCell label="Local / Referência" value={referencia} full />
-          <InfoCell label="Data de Emissão" value={dataEmissao} />
+          <InfoCell label="Data de Emissão" value={dataDoc} />
           <InfoCell label="Prazo Previsto" value={prazo} />
           <InfoCell label="Responsável Técnico" value={responsavel} full />
         </View>
@@ -139,7 +141,7 @@ export function OrdemServicoDocument({ pedido, companyProfile, options }: { pedi
                 <Text style={[styles.thCell, { width: 26, textAlign: 'center' }]}>OK</Text>
                 <Text style={[styles.thCell, { width: 22, textAlign: 'center' }]}>#</Text>
                 <Text style={[styles.thCell, { flex: 1 }]}>Descrição</Text>
-                <Text style={[styles.thCell, { width: 92 }]}>Marca / Modelo</Text>
+                {showMarca && <Text style={[styles.thCell, { width: 92 }]}>Marca / Modelo</Text>}
                 <Text style={[styles.thCell, { width: 30, textAlign: 'center' }]}>Un.</Text>
                 <Text style={[styles.thCell, { width: 30, textAlign: 'center' }]}>Qtd</Text>
               </View>
@@ -147,8 +149,8 @@ export function OrdemServicoDocument({ pedido, companyProfile, options }: { pedi
                 <View key={i} style={[styles.tr, i % 2 === 1 ? styles.trAlt : {}]} wrap={false}>
                   <View style={{ width: 26, alignItems: 'center' }}><View style={styles.tdBox} /></View>
                   <Text style={[styles.td, { width: 22, textAlign: 'center', color: C.red, fontFamily: 'Roboto', fontWeight: 700 }]}>{i + 1}</Text>
-                  <View style={[styles.td, { flex: 1 }]}><Text style={{ color: C.ink, fontFamily: 'Roboto', fontWeight: 700, fontSize: 8 }}>{eq.descricao}</Text>{eq.descricaoDetalhada ? <Text style={{ color: C.s500, fontSize: 7, marginTop: 1, lineHeight: 1.3 }}>{eq.descricaoDetalhada}</Text> : null}</View>
-                  <Text style={[styles.td, { width: 92 }]}>{eq.marcaModelo}</Text>
+                  <View style={[styles.td, { flex: 1 }]}><Text style={{ color: C.ink, fontFamily: 'Roboto', fontWeight: 700, fontSize: 8 }}>{eq.descricao}</Text>{showMarca && eq.descricaoDetalhada ? <Text style={{ color: C.s500, fontSize: 7, marginTop: 1, lineHeight: 1.3 }}>{eq.descricaoDetalhada}</Text> : null}</View>
+                  {showMarca && <Text style={[styles.td, { width: 92 }]}>{eq.marcaModelo}</Text>}
                   <Text style={[styles.td, { width: 30, textAlign: 'center', textTransform: 'uppercase' }]}>{eq.unidade}</Text>
                   <Text style={[styles.td, { width: 30, textAlign: 'center', fontFamily: 'Roboto', fontWeight: 700 }]}>{eq.quantidade}</Text>
                 </View>
@@ -192,11 +194,13 @@ export function OrdemServicoDocument({ pedido, companyProfile, options }: { pedi
               <Text style={styles.signName}>{responsavel}</Text>
               <Text style={styles.signRole}>Técnico Responsável — {razao}</Text>
             </View>
-            <View style={styles.signCol}>
-              <View style={styles.signLine} />
-              <Text style={styles.signName}>{cliente}</Text>
-              <Text style={styles.signRole}>Responsável no Local — Conclusão &amp; Aceite</Text>
-            </View>
+            {showAssinatura && (
+              <View style={styles.signCol}>
+                <View style={styles.signLine} />
+                <Text style={styles.signName}>{cliente}</Text>
+                <Text style={styles.signRole}>Responsável no Local — Conclusão &amp; Aceite</Text>
+              </View>
+            )}
           </View>
         </View>
       </Page>

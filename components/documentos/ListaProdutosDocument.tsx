@@ -2,10 +2,9 @@ import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import { C, nv, PdfHeader, PdfFooter } from './pdfKit';
+import { DocOptions } from '@/lib/documentos';
 
-export interface ListaProdutosPdfOptions {
-  showLogo?: boolean;
-}
+export type ListaProdutosPdfOptions = Partial<DocOptions>;
 
 const styles = StyleSheet.create({
   page: { paddingTop: 58, paddingBottom: 42, paddingHorizontal: 40, fontSize: 9, fontFamily: 'Roboto', color: C.s700 },
@@ -60,6 +59,9 @@ export function ListaProdutosDocument({ pedido, companyProfile, options }: { ped
   const referencia = pedido.referencia || 'Fornecimento de materiais';
 
   const showLogo = options?.showLogo !== false;
+  const showMarca = options?.showDescricaoDetalhada !== false;
+  const showAssinatura = options?.showAssinaturaCliente !== false;
+  const dataDoc = options?.dataHoje ? new Date().toISOString().split('T')[0] : dataEmissao;
 
   const produtos = (p.equipmentItems || []).filter((e: PedidoEquipmentItem) => e.tipo !== 'servico');
   const totalItens = produtos.length;
@@ -69,7 +71,7 @@ export function ListaProdutosDocument({ pedido, companyProfile, options }: { ped
     <Document title={`Lista de Produtos ${numero}`} author={razao}>
       <Page size="A4" style={styles.page}>
         <PdfHeader razao={razao} label="Lista de Produtos" showLogo={showLogo} />
-        <PdfFooter numero={numero} data={dataEmissao} cliente={cliente} />
+        <PdfFooter numero={numero} data={dataDoc} cliente={cliente} />
 
         <View style={styles.titleWrap}>
           <Text style={styles.eyebrow}>Separação & Conferência</Text>
@@ -81,7 +83,7 @@ export function ListaProdutosDocument({ pedido, companyProfile, options }: { ped
           <InfoCell label="Cliente / Contratante" value={cliente} />
           <InfoCell label="Número" value={numero} />
           <InfoCell label="Referência / Projeto" value={referencia} full />
-          <InfoCell label="Data de Emissão" value={dataEmissao} />
+          <InfoCell label="Data de Emissão" value={dataDoc} />
           <InfoCell label="Responsável" value={responsavel} />
         </View>
 
@@ -102,7 +104,7 @@ export function ListaProdutosDocument({ pedido, companyProfile, options }: { ped
               <Text style={[styles.thCell, { width: 28, textAlign: 'center' }]}>OK</Text>
               <Text style={[styles.thCell, { width: 24, textAlign: 'center' }]}>#</Text>
               <Text style={[styles.thCell, { flex: 1 }]}>Descrição do Produto</Text>
-              <Text style={[styles.thCell, { width: 110 }]}>Marca / Modelo</Text>
+              {showMarca && <Text style={[styles.thCell, { width: 110 }]}>Marca / Modelo</Text>}
               <Text style={[styles.thCell, { width: 34, textAlign: 'center' }]}>Un.</Text>
               <Text style={[styles.thCell, { width: 40, textAlign: 'center' }]}>Qtd</Text>
             </View>
@@ -110,8 +112,8 @@ export function ListaProdutosDocument({ pedido, companyProfile, options }: { ped
               <View key={i} style={[styles.tr, i % 2 === 1 ? styles.trAlt : {}]} wrap={false}>
                 <View style={{ width: 28, alignItems: 'center' }}><View style={styles.tdBox} /></View>
                 <Text style={[styles.td, { width: 24, textAlign: 'center', color: C.red, fontFamily: 'Roboto', fontWeight: 700 }]}>{i + 1}</Text>
-                <View style={[styles.td, { flex: 1 }]}><Text style={{ color: C.ink, fontFamily: 'Roboto', fontWeight: 700, fontSize: 8.5 }}>{eq.descricao}</Text>{eq.descricaoDetalhada ? <Text style={{ color: C.s500, fontSize: 7, marginTop: 1, lineHeight: 1.3 }}>{eq.descricaoDetalhada}</Text> : null}</View>
-                <Text style={[styles.td, { width: 110 }]}>{eq.marcaModelo}</Text>
+                <View style={[styles.td, { flex: 1 }]}><Text style={{ color: C.ink, fontFamily: 'Roboto', fontWeight: 700, fontSize: 8.5 }}>{eq.descricao}</Text>{showMarca && eq.descricaoDetalhada ? <Text style={{ color: C.s500, fontSize: 7, marginTop: 1, lineHeight: 1.3 }}>{eq.descricaoDetalhada}</Text> : null}</View>
+                {showMarca && <Text style={[styles.td, { width: 110 }]}>{eq.marcaModelo}</Text>}
                 <Text style={[styles.td, { width: 34, textAlign: 'center', textTransform: 'uppercase' }]}>{eq.unidade}</Text>
                 <Text style={[styles.td, { width: 40, textAlign: 'center', fontFamily: 'Roboto', fontWeight: 700 }]}>{eq.quantidade}</Text>
               </View>
@@ -136,11 +138,13 @@ export function ListaProdutosDocument({ pedido, companyProfile, options }: { ped
             <Text style={styles.signName}>Conferido por</Text>
             <Text style={styles.signRole}>{razao}</Text>
           </View>
-          <View style={styles.signCol}>
-            <View style={styles.signLine} />
-            <Text style={styles.signName}>Recebido por</Text>
-            <Text style={styles.signRole}>{cliente}</Text>
-          </View>
+          {showAssinatura && (
+            <View style={styles.signCol}>
+              <View style={styles.signLine} />
+              <Text style={styles.signName}>Recebido por</Text>
+              <Text style={styles.signRole}>{cliente}</Text>
+            </View>
+          )}
         </View>
       </Page>
     </Document>
