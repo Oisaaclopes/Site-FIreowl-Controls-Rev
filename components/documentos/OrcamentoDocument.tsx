@@ -119,6 +119,7 @@ const ItensTable = ({ titulo, itens, showUnit, showTotal, showMarca, accent }: {
 export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido: Pedido; companyProfile: CompanyProfile; options?: OrcamentoPdfOptions }) {
   const p = pedido.proposal;
   const razao = companyProfile.razaoSocial || 'Fireowl Controls';
+  const fantasia = companyProfile.nomeFantasia || razao;
   const numero = pedido.numeroPedido;
   const dataEmissao = pedido.dataEmissao || '';
   const cliente = pedido.clienteNome || '';
@@ -170,11 +171,11 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
       )}
 
       {/* Áreas de Atuação */}
-      {showAreas && <AreasAtuacaoPage razao={razao} numero={numero} data={dataDoc} cliente={cliente} />}
+      {showAreas && <AreasAtuacaoPage razao={fantasia} numero={numero} data={dataDoc} cliente={cliente} />}
 
       {/* Conteúdo */}
       <Page size="A4" style={styles.page}>
-        <PdfHeader razao={razao} label="Orçamento" showLogo={showLogo} />
+        <PdfHeader razao={fantasia} label="Orçamento" showLogo={showLogo} />
         <PdfFooter numero={numero} data={dataDoc} cliente={cliente} />
 
         <View style={styles.titleWrap}>

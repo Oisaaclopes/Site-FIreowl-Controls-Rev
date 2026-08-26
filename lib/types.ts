@@ -168,6 +168,8 @@ export type DocumentosPadrao = Partial<Record<PedidoTipo, DocumentType | 'nenhum
 
 export interface CompanyProfile {
   razaoSocial: string;
+  /** Nome fantasia / marca (exibido no cabeçalho dos documentos). */
+  nomeFantasia?: string;
   cnpj: string;
   endereco: string;
   telefone: string;

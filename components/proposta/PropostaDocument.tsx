@@ -966,6 +966,7 @@ export function PropostaDocument({
 }) {
   const p = pedido.proposal;
   const razao = companyProfile.razaoSocial || 'Fireowl Controls';
+  const fantasia = companyProfile.nomeFantasia || razao;
   const numero = pedido.numeroPedido;
   const dataEmissao = pedido.dataEmissao || '';
   const clienteNome = pedido.clienteNome || '';
@@ -1147,7 +1148,7 @@ export function PropostaDocument({
       {/* ===================== 03. CARTA DE APRESENTAÇÃO (Página Exclusiva) ===================== */}
       {on('carta') && (
         <Page size="A4" style={styles.page}>
-          <Header razao={razao} />
+          <Header razao={fantasia} />
           <Footer cliente={clienteNome} numero={numero} data={dataEmissao} />
 
           <Sec k="carta">
@@ -1166,7 +1167,7 @@ export function PropostaDocument({
       {/* ===================== 04. ÍNDICE (Página Exclusiva) ===================== */}
       {showIndice && (
         <Page size="A4" style={styles.page}>
-          <Header razao={razao} />
+          <Header razao={fantasia} />
           <Footer cliente={clienteNome} numero={numero} data={dataEmissao} />
 
           <View style={styles.section}>
@@ -1185,7 +1186,7 @@ export function PropostaDocument({
 
       {/* ===================== 05. CORPO DA PROPOSTA ===================== */}
       <Page size="A4" style={styles.page}>
-        <Header razao={razao} />
+        <Header razao={fantasia} />
         <Footer cliente={clienteNome} numero={numero} data={dataEmissao} />
 
         {on('historico') && (

@@ -411,8 +411,14 @@ export function CrmApp({
 
   // Handlers
   const handleAddClient = async (newClient: Client) => {
-    setClients((prev) => [newClient, ...prev]);
-    logAction('Cadastro de Cliente', 'Clientes', `Novo cliente cadastrado: ${newClient.name}`);
+    // Upsert local: se o id já existe é edição (substitui), senão é novo (prepend).
+    const isEdit = clients.some((c) => c.id === newClient.id);
+    setClients((prev) => (isEdit ? prev.map((c) => (c.id === newClient.id ? newClient : c)) : [newClient, ...prev]));
+    logAction(
+      isEdit ? 'Atualização de Cliente' : 'Cadastro de Cliente',
+      'Clientes',
+      isEdit ? `Cliente atualizado: ${newClient.name}` : `Novo cliente cadastrado: ${newClient.name}`
+    );
     if (isSupabaseConfigured()) {
       try {
         const saved = await upsertClient(newClient);

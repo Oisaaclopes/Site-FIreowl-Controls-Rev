@@ -50,6 +50,7 @@ const InfoCell = ({ label, value, full }: { label: string; value: string; full?:
 
 export function PersonalizadoDocument({ pedido, companyProfile, data, showLogo = true, dataHoje = false }: Props) {
   const razao = companyProfile.razaoSocial || 'Fireowl Controls';
+  const fantasia = companyProfile.nomeFantasia || razao;
   const numero = pedido.numeroPedido;
   const cliente = pedido.clienteNome || '';
   const responsavel = pedido.responsavelComercialNome || 'Responsável';
@@ -61,7 +62,7 @@ export function PersonalizadoDocument({ pedido, companyProfile, data, showLogo =
   return (
     <Document title={`${titulo} ${numero}`} author={razao}>
       <Page size="A4" style={styles.page}>
-        <PdfHeader razao={razao} label={titulo} showLogo={showLogo} />
+        <PdfHeader razao={fantasia} label={titulo} showLogo={showLogo} />
         <PdfFooter numero={numero} data={dataDoc} cliente={cliente} />
 
         <View>

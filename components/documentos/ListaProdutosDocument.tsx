@@ -52,6 +52,7 @@ const InfoCell = ({ label, value, full }: { label: string; value: string; full?:
 export function ListaProdutosDocument({ pedido, companyProfile, options }: { pedido: Pedido; companyProfile: CompanyProfile; options?: ListaProdutosPdfOptions }) {
   const p = pedido.proposal;
   const razao = companyProfile.razaoSocial || 'Fireowl Controls';
+  const fantasia = companyProfile.nomeFantasia || razao;
   const numero = pedido.numeroPedido;
   const dataEmissao = pedido.dataEmissao || '';
   const cliente = pedido.clienteNome || '';
@@ -71,7 +72,7 @@ export function ListaProdutosDocument({ pedido, companyProfile, options }: { ped
   return (
     <Document title={`Lista de Produtos ${numero}`} author={razao}>
       <Page size="A4" style={styles.page}>
-        <PdfHeader razao={razao} label="Lista de Produtos" showLogo={showLogo} />
+        <PdfHeader razao={fantasia} label="Lista de Produtos" showLogo={showLogo} />
         <PdfFooter numero={numero} data={dataDoc} cliente={cliente} />
 
         <View style={styles.titleWrap}>

@@ -69,6 +69,7 @@ const SecHead = ({ n, titulo }: { n: string; titulo: string }) => (
 export function LaudoTecnicoDocument({ pedido, companyProfile, options }: { pedido: Pedido; companyProfile: CompanyProfile; options?: LaudoTecnicoPdfOptions }) {
   const p = pedido.proposal;
   const razao = companyProfile.razaoSocial || 'Fireowl Controls';
+  const fantasia = companyProfile.nomeFantasia || razao;
   const numero = pedido.numeroPedido.replace(/^PED-/, 'LT-');
   const dataEmissao = pedido.dataEmissao || '';
   const cliente = pedido.clienteNome || '';
@@ -89,7 +90,7 @@ export function LaudoTecnicoDocument({ pedido, companyProfile, options }: { pedi
   return (
     <Document title={`Laudo Técnico ${numero}`} author={razao}>
       <Page size="A4" style={styles.page}>
-        <PdfHeader razao={razao} label="Laudo Técnico" showLogo={showLogo} />
+        <PdfHeader razao={fantasia} label="Laudo Técnico" showLogo={showLogo} />
         <PdfFooter numero={numero} data={dataDoc} cliente={cliente} />
 
         <View style={styles.titleWrap}>

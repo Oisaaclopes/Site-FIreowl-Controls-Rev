@@ -545,15 +545,28 @@ export const ContaView: React.FC<ContaViewProps> = ({
             </div>
 
             <form onSubmit={handleSaveCompanyProfile} className="space-y-3 text-xs font-medium">
-              <div>
-                <label className={labelCls}>Razão social</label>
-                <input
-                  type="text"
-                  required
-                  value={profile.razaoSocial}
-                  onChange={(e) => setProfile({ ...profile, razaoSocial: e.target.value })}
-                  className={`${inputCls} font-bold`}
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Razão social</label>
+                  <input
+                    type="text"
+                    required
+                    value={profile.razaoSocial}
+                    onChange={(e) => setProfile({ ...profile, razaoSocial: e.target.value })}
+                    className={`${inputCls} font-bold`}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Nome fantasia</label>
+                  <input
+                    type="text"
+                    value={profile.nomeFantasia || ''}
+                    onChange={(e) => setProfile({ ...profile, nomeFantasia: e.target.value })}
+                    placeholder="Ex.: Fireowl Controls"
+                    className={`${inputCls} font-bold`}
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">Aparece no cabeçalho dos documentos.</p>
+                </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>

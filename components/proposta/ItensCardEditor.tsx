@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { PedidoEquipmentItem } from '@/lib/types';
 import { Plus, Minus, Trash2, ChevronUp, ChevronDown, Pencil, Check, X } from 'lucide-react';
 
@@ -48,6 +48,14 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
   const [draft, setDraft] = useState<Draft>(emptyDraft(tipo));
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [openMenu, setOpenMenu] = useState<number | null>(null);
+  const [catalogoFilter, setCatalogoFilter] = useState('');
+
+  const filteredCatalogo = useMemo(() => {
+    if (!catalogo) return [];
+    if (!catalogoFilter.trim()) return catalogo;
+    const term = catalogoFilter.toLowerCase().trim();
+    return catalogo.filter((c) => c.label.toLowerCase().includes(term));
+  }, [catalogo, catalogoFilter]);
 
   const isServico = tipo === 'servico';
   const accentText = accent === 'emerald' ? 'text-emerald-700' : 'text-[#E63946]';
@@ -190,11 +198,33 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
         </div>
 
         {catalogo && catalogo.length > 0 && (
-          <div className="mb-3">
-            <label className={miniLabel}>Vincular do {isServico ? 'catálogo de serviços' : 'estoque'} (opcional)</label>
-            <select value={draft.vinculoId} onChange={(e) => pickCatalogo(e.target.value)} className={`${inputCls} bg-white`}>
-              <option value="">Digitar manualmente…</option>
-              {catalogo.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+          <div className="mb-3 space-y-1">
+            <div className="flex items-center justify-between">
+              <label className={miniLabel}>Vincular do {isServico ? 'catálogo de serviços' : 'estoque'} (opcional)</label>
+              {catalogoFilter && (
+                <button
+                  type="button"
+                  onClick={() => setCatalogoFilter('')}
+                  className="text-[10px] text-slate-400 hover:text-slate-600 underline font-medium"
+                >
+                  Limpar busca ({filteredCatalogo.length} itens)
+                </button>
+              )}
+            </div>
+            <input
+              type="text"
+              value={catalogoFilter}
+              onChange={(e) => setCatalogoFilter(e.target.value)}
+              placeholder={`🔍 Filtrar ${isServico ? 'serviços' : 'materiais do estoque'} por código, nome ou marca...`}
+              className={`${inputCls} bg-white text-xs mb-1.5`}
+            />
+            <select value={draft.vinculoId} onChange={(e) => pickCatalogo(e.target.value)} className={`${inputCls} bg-white text-xs`}>
+              <option value="">Digitar manualmente… ({filteredCatalogo.length} disponíveis)</option>
+              {filteredCatalogo.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
             </select>
           </div>
         )}

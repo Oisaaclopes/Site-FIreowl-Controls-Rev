@@ -79,6 +79,7 @@ const Checklist = ({ itens }: { itens: string[] }) => (
 export function OrdemServicoDocument({ pedido, companyProfile, options }: { pedido: Pedido; companyProfile: CompanyProfile; options?: OrdemServicoPdfOptions }) {
   const p = pedido.proposal;
   const razao = companyProfile.razaoSocial || 'Fireowl Controls';
+  const fantasia = companyProfile.nomeFantasia || razao;
   const numero = pedido.numeroPedido;
   const os = numero.replace(/^PED-/, 'OS-');
   const dataEmissao = pedido.dataEmissao || '';
@@ -104,7 +105,7 @@ export function OrdemServicoDocument({ pedido, companyProfile, options }: { pedi
   return (
     <Document title={`Ordem de Serviço ${os}`} author={razao}>
       <Page size="A4" style={styles.page}>
-        <PdfHeader razao={razao} label="Ordem de Serviço" showLogo={showLogo} />
+        <PdfHeader razao={fantasia} label="Ordem de Serviço" showLogo={showLogo} />
         <PdfFooter numero={os} data={dataDoc} cliente={cliente} />
 
         <View style={styles.titleWrap}>

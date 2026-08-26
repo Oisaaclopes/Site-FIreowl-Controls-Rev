@@ -17,6 +17,7 @@ import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow
 import { usePrivacy } from '@/lib/privacy';
 import { DevicesManager } from '@/components/reports/DevicesManager';
 import { EmptyState } from '@/components/EmptyState';
+import { fetchCnpjData } from '@/lib/cnpj';
 
 interface CrmViewProps {
   clients: Client[];
@@ -103,6 +104,91 @@ export const CrmView: React.FC<CrmViewProps> = ({
   const [nAnnual, setNAnnual] = useState(0);
   const [nContacts, setNContacts] = useState<ContactForm[]>([emptyContact()]);
 
+  // Busca automática de CNPJ
+  const [isSearchingCnpj, setIsSearchingCnpj] = useState(false);
+  const [cnpjSearchError, setCnpjSearchError] = useState('');
+
+  const handleSearchCnpj = async (cnpjToSearch?: string) => {
+    const targetCnpj = cnpjToSearch || nCNPJ;
+    const digits = targetCnpj.replace(/\D/g, '');
+    if (digits.length !== 14) {
+      setCnpjSearchError('CNPJ deve conter 14 dígitos.');
+      return;
+    }
+
+    setIsSearchingCnpj(true);
+    setCnpjSearchError('');
+    try {
+      const data = await fetchCnpjData(digits);
+      if (data.razaoSocial) setNName(data.razaoSocial);
+      if (data.nomeFantasia) setNFantasia(data.nomeFantasia);
+      if (data.logradouro) setNAddress(data.logradouro);
+      if (data.cidadeUf) setNCity(data.cidadeUf);
+
+      // Formata o CNPJ visualmente (XX.XXX.XXX/XXXX-XX)
+      const formattedCnpj = digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+      setNCNPJ(formattedCnpj);
+
+      // Preenche contato principal se houver e-mail ou telefone retornado
+      if (data.email || data.telefone) {
+        setNContacts((prev) => {
+          const first = prev[0] || emptyContact();
+          const updatedFirst: ContactForm = {
+            name: first.name || 'Contato Principal',
+            role: first.role || 'Responsável',
+            phone: first.phone || data.telefone,
+            email: first.email || data.email,
+          };
+          return [updatedFirst, ...prev.slice(1)];
+        });
+      }
+    } catch (err: any) {
+      setCnpjSearchError(err.message || 'Erro ao consultar CNPJ.');
+    } finally {
+      setIsSearchingCnpj(false);
+    }
+  };
+
+  // Estado para edição de cliente existente
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
+
+  const startEditClient = (client: Client) => {
+    setEditingClient(client);
+
+    // Separa Nome de Nome Fantasia se estiver formato "Razão (Fantasia)"
+    const matchFantasia = client.name.match(/\(([^)]+)\)$/);
+    if (matchFantasia) {
+      setNFantasia(matchFantasia[1]);
+      setNName(client.name.replace(/\s*\([^)]*\)$/, '').trim());
+    } else {
+      setNName(client.name);
+      setNFantasia('');
+    }
+
+    setNCNPJ(client.cnpj || '');
+    setNIE('');
+    setNSegment(client.segment || 'Shopping Center');
+    setNStatus(client.contractStatus || 'EM DIA');
+
+    if (client.address && client.address.includes(' — ')) {
+      const parts = client.address.split(' — ');
+      setNAddress(parts[0]);
+      setNCity(parts.slice(1).join(' — '));
+    } else {
+      setNAddress(client.address || '');
+      setNCity('Londrina/PR');
+    }
+
+    setNAnnual(client.totalContractsValue || 0);
+    setNContacts(client.contacts && client.contacts.length > 0 ? client.contacts : [emptyContact()]);
+
+    const digits = (client.cnpj || '').replace(/\D/g, '');
+    setNTipoPessoa(digits.length <= 11 ? 'PF' : 'PJ');
+    setCnpjSearchError('');
+    setIsSearchingCnpj(false);
+    setShowAddClientModal(true);
+  };
+
   const filteredClients = clients.filter(
     (c) =>
       c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -111,6 +197,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
   );
 
   const resetClientForm = () => {
+    setEditingClient(null);
     setNTipoPessoa('PJ');
     setNName('');
     setNFantasia('');
@@ -122,6 +209,8 @@ export const CrmView: React.FC<CrmViewProps> = ({
     setNCity('Londrina/PR');
     setNAnnual(0);
     setNContacts([emptyContact()]);
+    setCnpjSearchError('');
+    setIsSearchingCnpj(false);
   };
 
   const updateContact = (idx: number, field: keyof ContactForm, value: string) => {
@@ -145,21 +234,25 @@ export const CrmView: React.FC<CrmViewProps> = ({
 
     const fullAddress = [nAddress, nCity].filter(Boolean).join(' — ');
 
-    const created: Client = {
-      id: `c_${Date.now()}`,
-      code: `#F0-${Date.now().toString().slice(-4)}`,
+    const payload: Client = {
+      id: editingClient ? editingClient.id : `c_${Date.now()}`,
+      code: editingClient ? editingClient.code : `#F0-${Date.now().toString().slice(-4)}`,
       name: nFantasia ? `${nName} (${nFantasia})` : nName,
       cnpj: nCNPJ || '00.000.000/0001-00',
       segment: nSegment,
       contractStatus: nStatus,
-      lastOSDate: new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase(),
-      lastOSType: 'CADASTRO RECENTE',
+      lastOSDate: editingClient
+        ? editingClient.lastOSDate
+        : new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase(),
+      lastOSType: editingClient ? editingClient.lastOSType : 'CADASTRO RECENTE',
       address: fullAddress || 'Londrina / PR',
       contacts: cleanContacts.length ? cleanContacts : [{ name: 'Responsável', role: 'Gerente', phone: '', email: '' }],
       totalContractsValue: Number(nAnnual) || 0,
+      pendenteValidacao: editingClient ? editingClient.pendenteValidacao : undefined,
+      createdByRole: editingClient ? editingClient.createdByRole : undefined,
     };
 
-    onAddClient(created);
+    onAddClient(payload);
     setShowAddClientModal(false);
     resetClientForm();
   };
@@ -303,6 +396,11 @@ export const CrmView: React.FC<CrmViewProps> = ({
                       <>
                         <Badge color={statusColor}>{client.contractStatus}</Badge>
                         <div className="flex items-center gap-1">
+                          <RowAction
+                            icon="edit"
+                            label="Editar dados do cliente"
+                            onClick={() => startEditClient(client)}
+                          />
                           <RowAction
                             icon="visibility"
                             label="Ver ficha completa do cliente"
@@ -461,7 +559,9 @@ export const CrmView: React.FC<CrmViewProps> = ({
             <style>{`@keyframes slideIn{from{transform:translateX(24px);opacity:.6}to{transform:translateX(0);opacity:1}}`}</style>
             <div className="flex items-start justify-between p-5 border-b border-slate-200 bg-white">
               <div>
-                <h3 className="text-base font-bold text-slate-900 uppercase">Novo cliente</h3>
+                <h3 className="text-base font-bold text-slate-900 uppercase">
+                  {editingClient ? 'Editar cliente' : 'Novo cliente'}
+                </h3>
                 <p className="text-[11px] text-slate-500 mt-0.5">Vinculado a contratos, pedidos e OS.</p>
               </div>
               <button onClick={() => setShowAddClientModal(false)} className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none">✕</button>
@@ -495,8 +595,49 @@ export const CrmView: React.FC<CrmViewProps> = ({
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className={labelCls}>{nTipoPessoa === 'PJ' ? 'CNPJ' : 'CPF'}</label>
-                    <input type="text" inputMode="numeric" value={nCNPJ} onChange={(e) => setNCNPJ(e.target.value)} className={`${inputCls} font-data-mono`} placeholder={nTipoPessoa === 'PJ' ? '00.000.000/0001-00' : '000.000.000-00'} />
+                    <div className="flex items-center justify-between mb-1">
+                      <label className={labelCls}>{nTipoPessoa === 'PJ' ? 'CNPJ' : 'CPF'}</label>
+                      {nTipoPessoa === 'PJ' && (
+                        <button
+                          type="button"
+                          onClick={() => handleSearchCnpj()}
+                          disabled={isSearchingCnpj || !nCNPJ.trim()}
+                          className="text-[10px] font-bold text-[#1A1A72] hover:text-[#E63946] disabled:opacity-40 flex items-center gap-1 uppercase transition-colors"
+                          title="Consultar dados na Receita Federal"
+                        >
+                          {isSearchingCnpj ? (
+                            <>
+                              <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span> Buscando...
+                            </>
+                          ) : (
+                            <>
+                              <span className="material-symbols-outlined text-xs">search</span> Buscar Receita
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={nCNPJ}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setNCNPJ(val);
+                        setCnpjSearchError('');
+                        const digits = val.replace(/\D/g, '');
+                        if (nTipoPessoa === 'PJ' && digits.length === 14 && !isSearchingCnpj) {
+                          handleSearchCnpj(val);
+                        }
+                      }}
+                      className={`${inputCls} font-data-mono`}
+                      placeholder={nTipoPessoa === 'PJ' ? '00.000.000/0001-00' : '000.000.000-00'}
+                    />
+                    {cnpjSearchError && (
+                      <p className="text-[10px] text-red-600 font-semibold mt-1 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-xs">error</span> {cnpjSearchError}
+                      </p>
+                    )}
                   </div>
                   {nTipoPessoa === 'PJ' ? (
                     <div>
@@ -605,7 +746,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
                 form="novoClienteForm"
                 className="w-full bg-[#E63946] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
               >
-                Cadastrar {nTipoPessoa === 'PJ' ? 'empresa' : 'pessoa'}
+                {editingClient ? 'Salvar alterações' : `Cadastrar ${nTipoPessoa === 'PJ' ? 'empresa' : 'pessoa'}`}
               </button>
             </div>
           </div>
@@ -626,6 +767,10 @@ export const CrmView: React.FC<CrmViewProps> = ({
           inventory={inventory}
           onAddFabricante={(name) => onAddPartnerBrand({ id: `pb_${Date.now()}`, name, category: 'SDAI' })}
           onClose={() => setSelectedClientDetail(null)}
+          onEditClient={(c) => {
+            setSelectedClientDetail(null);
+            startEditClient(c);
+          }}
           onOpenReport={(name) => {
             setSelectedClientDetail(null);
             onSelectClientForReport?.(name);
@@ -654,6 +799,7 @@ interface ClientDetailProps {
   inventory: InventoryItem[];
   onAddFabricante: (name: string) => void;
   onClose: () => void;
+  onEditClient?: (c: Client) => void;
   onOpenReport: (name: string) => void;
   onNavigateToTab: (tab: TabPath) => void;
 }
@@ -670,6 +816,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
   inventory,
   onAddFabricante,
   onClose,
+  onEditClient,
   onOpenReport,
   onNavigateToTab,
 }) => {
@@ -739,9 +886,20 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
               </span>
             </p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none shrink-0">
-            ✕
-          </button>
+          <div className="flex items-center gap-2">
+            {onEditClient && (
+              <button
+                onClick={() => onEditClient(client)}
+                className="text-xs font-bold text-[#1A1A72] bg-[#1A1A72]/10 hover:bg-[#1A1A72] hover:text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                title="Editar dados cadastrais deste cliente"
+              >
+                <span className="material-symbols-outlined text-sm">edit</span> Editar dados
+              </button>
+            )}
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none shrink-0 p-1">
+              ✕
+            </button>
+          </div>
         </div>
 
         <div className="p-6 space-y-5 overflow-y-auto text-xs">

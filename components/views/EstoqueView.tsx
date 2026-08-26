@@ -741,6 +741,7 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
   const [criticalOnly, setCriticalOnly] = useState(false);
   const [filterCategory, setFilterCategory] = useState('');
   const [filterSubcategory, setFilterSubcategory] = useState('');
+  const [filterBrand, setFilterBrand] = useState('');
   const [showPanel, setShowPanel] = useState(false);
   const [showUnitModal, setShowUnitModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1024,9 +1025,10 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     .filter((item) => (tab === 'compras' ? item.quantity <= item.minQuantity : true))
     // Filtro "somente nível crítico" (menu de mais opções)
     .filter((item) => (criticalOnly ? item.quantity <= item.minQuantity : true))
-    // Filtro por categoria macro e subcategoria
+    // Filtro por categoria macro, subcategoria e marca
     .filter((item) => (filterCategory ? item.category === filterCategory : true))
     .filter((item) => (filterSubcategory ? item.subcategory === filterSubcategory : true))
+    .filter((item) => (filterBrand ? (item.brand || '').toLowerCase() === filterBrand.toLowerCase() : true))
     .filter(
       (item) =>
         item.name.toLowerCase().includes(term) ||
@@ -1351,17 +1353,30 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
               </option>
             ))}
           </select>
-          {(filterCategory || filterSubcategory || searchTerm) && (
+          <select
+            value={filterBrand}
+            onChange={(e) => setFilterBrand(e.target.value)}
+            className="w-full sm:w-48 px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+          >
+            <option value="">Todas as marcas</option>
+            {brandOptions.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </select>
+          {(filterCategory || filterSubcategory || filterBrand || searchTerm) && (
             <button
               type="button"
               onClick={() => {
                 setSearchTerm('');
                 setFilterCategory('');
                 setFilterSubcategory('');
+                setFilterBrand('');
               }}
-              className="shrink-0 px-3 py-2 text-xs font-semibold text-slate-500 hover:text-[#E63946] border border-slate-200 rounded-lg"
+              className="text-xs font-semibold text-[#1A1A72] hover:underline shrink-0"
             >
-              Limpar
+              Limpar filtros
             </button>
           )}
         </div>

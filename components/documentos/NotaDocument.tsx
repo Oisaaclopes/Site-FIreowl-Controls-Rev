@@ -61,6 +61,7 @@ const InfoCell = ({ label, value, full }: { label: string; value: string; full?:
 export function NotaDocument({ pedido, companyProfile, variante, options }: { pedido: Pedido; companyProfile: CompanyProfile; variante: NotaVariante; options?: NotaPdfOptions }) {
   const p = pedido.proposal;
   const razao = companyProfile.razaoSocial || 'Fireowl Controls';
+  const fantasia = companyProfile.nomeFantasia || razao;
   const isServico = variante === 'servico';
 
   const titulo = isServico ? 'Nota de Serviço' : 'Nota de Produtos';
@@ -87,7 +88,7 @@ export function NotaDocument({ pedido, companyProfile, variante, options }: { pe
   return (
     <Document title={`${titulo} ${numero}`} author={razao}>
       <Page size="A4" style={styles.page}>
-        <PdfHeader razao={razao} label={titulo} showLogo={showLogo} />
+        <PdfHeader razao={fantasia} label={titulo} showLogo={showLogo} />
         <PdfFooter numero={numero} data={dataDoc} cliente={cliente} />
 
         <View style={styles.topRow}>

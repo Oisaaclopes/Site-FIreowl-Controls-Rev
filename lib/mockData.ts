@@ -252,38 +252,7 @@ export const INITIAL_EQUIPMENT: ClientEquipment[] = [
   }
 ];
 
-export const INITIAL_PUNCH_LOGS: TimePunch[] = [
-  {
-    id: 'p1',
-    employeeName: 'Isaac Lopes',
-    timestamp: '24 MAI 2024 | 07:58:12',
-    type: 'ENTRADA',
-    locationStr: 'Catuaí Shopping Londrina (-23.5505, -46.6333)',
-    lat: -23.5505,
-    lng: -46.6333,
-    status: 'APROVADO'
-  },
-  {
-    id: 'p2',
-    employeeName: 'Carlos Silva',
-    timestamp: '24 MAI 2024 | 08:02:45',
-    type: 'ENTRADA',
-    locationStr: 'Londrina Norte Shopping (-23.5301, -46.6120)',
-    lat: -23.5301,
-    lng: -46.6120,
-    status: 'APROVADO'
-  },
-  {
-    id: 'p3',
-    employeeName: 'Amanda Souza',
-    timestamp: '24 MAI 2024 | 12:01:00',
-    type: 'PAUSA',
-    locationStr: 'Sede Fireowl Controls (-23.5510, -46.6320)',
-    lat: -23.5510,
-    lng: -46.6320,
-    status: 'APROVADO'
-  }
-];
+export const INITIAL_PUNCH_LOGS: TimePunch[] = [];
 
 export const INITIAL_TECHNICAL_REPORT: TechnicalReportSDAI = {
   id: 'SDAI-2024-0892',
@@ -580,7 +549,8 @@ export const INITIAL_SERVICES: ServiceCatalogItem[] = [
 ];
 
 export const INITIAL_COMPANY_PROFILE: CompanyProfile = {
-  razaoSocial: 'Fireowl Controls Ltda.',
+  razaoSocial: 'Fireowl Controls Technology Ltda.',
+  nomeFantasia: 'Fireowl Controls',
   cnpj: '57.372.721/0001-40',
   endereco: 'Av. Higienópolis, 70 - Centro, Londrina / PR',
   telefone: '(43) 98445-5979',
