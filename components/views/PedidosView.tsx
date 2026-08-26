@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useMemo, useRef, useState } from 'react';
-import { PedidoOS, Client, Pedido, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem } from '@/lib/types';
+import { PedidoOS, Client, Pedido, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem, DocumentosPadrao, DocumentType } from '@/lib/types';
 import { uploadPropostaCapa, removePropostaCapa, propostaCapaDataUrl, blobToDataUrl, readImageSize } from '@/lib/propostaCapa';
 import { CommercialProposalModal } from '@/components/proposta/CommercialProposalModal';
 import { CommercialProposalPDFView } from '@/components/proposta/CommercialProposalPDFView';
+import { DocumentTypeModal } from '@/components/proposta/DocumentTypeModal';
+import { resolveDocumentoPadrao, DOCUMENT_TYPE_LABELS } from '@/lib/documentos';
 import { DataListRow, RowMeta, Badge } from '@/components/DataListRow';
 import { Toggle } from '@/components/SidePanel';
 import { usePrivacy } from '@/lib/privacy';
@@ -21,6 +23,7 @@ import {
   Pencil,
   Trash2,
   History,
+  Files,
 } from 'lucide-react';
 
 interface PedidosViewProps {
@@ -40,6 +43,7 @@ interface PedidosViewProps {
   onSelectClientForReport?: (clientName: string) => void;
   onAddClient?: (client: Client) => void;
   pdfPrefs: PdfPrefs;
+  documentosPadrao?: DocumentosPadrao;
   userRole: UserRole;
   currentUserName?: string;
   /** Aba inicial ao abrir (ex.: atalho "Nova OS" do painel). */
@@ -84,6 +88,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   onSelectClientForReport,
   onAddClient,
   pdfPrefs,
+  documentosPadrao = {},
   userRole,
   currentUserName = '',
   initialView,
@@ -134,6 +139,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     capaImagemUrl: undefined as string | undefined,
   });
   const [pdfConfigPedido, setPdfConfigPedido] = useState<Pedido | null>(null);
+  const [docModalPedido, setDocModalPedido] = useState<Pedido | null>(null);
   const [capaBusy, setCapaBusy] = useState(false);
   const capaInputRef = useRef<HTMLInputElement>(null);
 
@@ -167,6 +173,28 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     loadCapaIntoOptions(ped);
     if (pdfPrefs.configBeforeGenerate) setPdfConfigPedido(ped);
     else setPdfPreviewPedido(ped);
+  };
+
+  // Roteia a geração para o documento escolhido. Fase 1: só a Proposta comercial
+  // tem gerador real; os demais avisam que entram em fases seguintes.
+  const dispatchDocument = (ped: Pedido, doc: DocumentType) => {
+    if (doc === 'proposta_comercial') {
+      openPdf(ped);
+      return;
+    }
+    if (doc === 'personalizado') {
+      alert('A personalização de documento (título e campos livres) entra em uma fase seguinte. Por ora, gere a Proposta comercial.');
+      return;
+    }
+    alert(`O gerador de "${DOCUMENT_TYPE_LABELS[doc]}" entra em uma próxima fase. Por ora, apenas a Proposta comercial é gerada.`);
+  };
+
+  // Ponto de entrada ao gerar documento: usa o padrão do tipo do pedido; se não
+  // houver padrão, abre o modal de escolha.
+  const handleGenerateDocument = (ped: Pedido) => {
+    const padrao = resolveDocumentoPadrao(ped, documentosPadrao);
+    if (padrao) dispatchDocument(ped, padrao);
+    else setDocModalPedido(ped);
   };
 
   // Upload da imagem de capa (JPG/PNG) no modal de opções do PDF.
@@ -461,13 +489,20 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
             </button>
           )}
 
-          {/* Ações: PDF, editar, excluir */}
+          {/* Ações: gerar documento, editar, excluir */}
           <button
-            onClick={() => openPdf(ped)}
-            title="Pré-visualizar PDF"
+            onClick={() => handleGenerateDocument(ped)}
+            title="Gerar documento"
             className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
           >
             <Eye className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setDocModalPedido(ped)}
+            title="Gerar outro documento"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-[#1A1A72] hover:bg-slate-100 transition-colors"
+          >
+            <Files className="w-4 h-4" />
           </button>
           <button
             onClick={() => handleEditProposal(ped)}
@@ -885,6 +920,18 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
         services={services}
         onAddClient={onAddClient}
         onPreviewPDF={(ped) => setPdfPreviewPedido(ped)}
+      />
+
+      {/* Modal "Qual documento gerar?" (quando não há padrão, ou via "Gerar outro documento") */}
+      <DocumentTypeModal
+        isOpen={!!docModalPedido}
+        onClose={() => setDocModalPedido(null)}
+        atual={docModalPedido ? resolveDocumentoPadrao(docModalPedido, documentosPadrao) ?? undefined : undefined}
+        onSelect={(doc) => {
+          const ped = docModalPedido;
+          setDocModalPedido(null);
+          if (ped) dispatchDocument(ped, doc);
+        }}
       />
 
       {/* Config antes de gerar o PDF */}

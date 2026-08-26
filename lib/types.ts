@@ -54,6 +54,11 @@ export interface CommercialProposalData {
   revisoes?: { numero: string; data: string; elaborador: string; motivo?: string; status?: string }[];
   /** Caminho no Storage (bucket report-media) da imagem opcional da capa do PDF. */
   capaImagemPath?: string;
+  /**
+   * Tipo do pedido (Fase 1: guardado no JSONB da proposta para não exigir
+   * migração de coluna). Usado para escolher o documento padrão ao gerar PDF.
+   */
+  pedidoTipo?: PedidoTipo;
   diretrizesNormativas: string[];
   escopoServico: string;
   entregaveis: string[];
@@ -116,6 +121,30 @@ export interface PdfPrefs {
   showLogo: boolean;
   showBankData: boolean;
 }
+
+/**
+ * Tipos de documento que o sistema pode gerar (as 8 opções do modal
+ * "Qual documento gerar?"). Hoje só 'proposta_comercial' tem gerador real;
+ * os demais são construídos em fases seguintes.
+ */
+export type DocumentType =
+  | 'orcamento'
+  | 'proposta_comercial'
+  | 'ordem_servico'
+  | 'lista_produtos'
+  | 'nota_servico'
+  | 'nota_produtos'
+  | 'laudo_tecnico'
+  | 'personalizado';
+
+/** Classificação do pedido, usada para decidir o documento padrão. */
+export type PedidoTipo = 'orcamento' | 'proposta' | 'servico' | 'fornecimento' | 'laudo';
+
+/**
+ * Config nível-empresa: documento padrão para cada tipo de pedido.
+ * Ausência da chave (ou 'nenhum') = comportamento atual (perguntar no modal).
+ */
+export type DocumentosPadrao = Partial<Record<PedidoTipo, DocumentType | 'nenhum'>>;
 
 export interface CompanyProfile {
   razaoSocial: string;

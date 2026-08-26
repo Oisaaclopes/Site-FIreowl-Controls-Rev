@@ -33,7 +33,8 @@ import {
   CompanyProfile,
   PedidoTemplate,
   PedidoStatus,
-  PdfPrefs
+  PdfPrefs,
+  DocumentosPadrao
 } from '@/lib/types';
 
 import {
@@ -195,10 +196,15 @@ export function CrmApp({
   };
   const [pdfPrefs, setPdfPrefs] = useState<PdfPrefs>(DEFAULT_PDF_PREFS);
 
+  // Documento padrão por tipo de pedido (config nível-empresa, no navegador).
+  const [documentosPadrao, setDocumentosPadrao] = useState<DocumentosPadrao>({});
+
   useEffect(() => {
     try {
       const saved = localStorage.getItem('fireowl_pdf_prefs');
       if (saved) setPdfPrefs({ ...DEFAULT_PDF_PREFS, ...JSON.parse(saved) });
+      const savedDocs = localStorage.getItem('fireowl_documentos_padrao');
+      if (savedDocs) setDocumentosPadrao(JSON.parse(savedDocs));
     } catch {
       /* localStorage indisponível */
     }
@@ -246,6 +252,15 @@ export function CrmApp({
     setPdfPrefs(p);
     try {
       localStorage.setItem('fireowl_pdf_prefs', JSON.stringify(p));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleUpdateDocumentosPadrao = (d: DocumentosPadrao) => {
+    setDocumentosPadrao(d);
+    try {
+      localStorage.setItem('fireowl_documentos_padrao', JSON.stringify(d));
     } catch {
       /* ignore */
     }
@@ -776,6 +791,7 @@ export function CrmApp({
               onSelectClientForReport={handleSelectClientForReport}
               onAddClient={handleAddClient}
               pdfPrefs={pdfPrefs}
+              documentosPadrao={documentosPadrao}
               userRole={userRole}
               currentUserName={userName}
               initialView={pedidosInitialView}
@@ -912,6 +928,8 @@ export function CrmApp({
               onDeletePartnerBrand={handleDeletePartnerBrand}
               pdfPrefs={pdfPrefs}
               onUpdatePdfPrefs={handleUpdatePdfPrefs}
+              documentosPadrao={documentosPadrao}
+              onUpdateDocumentosPadrao={handleUpdateDocumentosPadrao}
               canSwitchRole={canSwitchRole}
               currentEmail={userEmail}
             />

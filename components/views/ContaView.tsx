@@ -1,7 +1,14 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { SystemAuditLog, UserRole, CompanyProfile, PartnerBrand, PdfPrefs, Client, CatalogoProvisorio } from '@/lib/types';
+import { SystemAuditLog, UserRole, CompanyProfile, PartnerBrand, PdfPrefs, Client, CatalogoProvisorio, DocumentosPadrao, PedidoTipo, DocumentType } from '@/lib/types';
+import {
+  PEDIDO_TIPO_LABELS,
+  PEDIDO_TIPO_ORDER,
+  DOCUMENT_TYPE_LABELS,
+  DOCUMENT_TYPE_ORDER,
+  isDocumentoImplementado,
+} from '@/lib/documentos';
 import { fetchClients } from '@/lib/clients';
 import {
   aprovarClienteProvisorio,
@@ -35,6 +42,8 @@ interface ContaViewProps {
   onDeletePartnerBrand: (id: string) => void;
   pdfPrefs: PdfPrefs;
   onUpdatePdfPrefs: (p: PdfPrefs) => void;
+  documentosPadrao: DocumentosPadrao;
+  onUpdateDocumentosPadrao: (d: DocumentosPadrao) => void;
   canSwitchRole?: boolean;
   currentEmail?: string;
 }
@@ -111,6 +120,8 @@ export const ContaView: React.FC<ContaViewProps> = ({
   onDeletePartnerBrand,
   pdfPrefs,
   onUpdatePdfPrefs,
+  documentosPadrao,
+  onUpdateDocumentosPadrao,
   canSwitchRole = false,
   currentEmail = '',
 }) => {
@@ -1030,6 +1041,53 @@ export const ContaView: React.FC<ContaViewProps> = ({
             <span className="material-symbols-outlined text-sm">info</span>
             Preferências de geração de PDF (aplicadas às propostas comerciais).
           </p>
+
+          {/* ===== Documentos padrão por tipo de pedido ===== */}
+          <div className="mt-4 pt-4 border-t border-slate-200">
+            <div className="flex items-center gap-2 mb-1 px-1">
+              <span className="material-symbols-outlined text-[#1A1A72] text-lg">rule</span>
+              <h3 className="font-display text-sm font-bold uppercase tracking-wide text-[#1A1A72]">
+                Documentos padrão por tipo de pedido
+              </h3>
+            </div>
+            <p className="text-[11px] text-slate-400 px-1 mb-3">
+              Defina o documento gerado automaticamente para cada tipo de pedido. Com um padrão definido, o PDF é
+              gerado direto — sem o modal de escolha. Deixe em &ldquo;Sempre perguntar&rdquo; para escolher toda vez.
+            </p>
+            <div className="flex flex-col gap-2">
+              {PEDIDO_TIPO_ORDER.map((tipo: PedidoTipo) => (
+                <div
+                  key={tipo}
+                  className="flex items-center justify-between gap-3 bg-white border border-slate-200 rounded-lg px-3 py-2.5"
+                >
+                  <span className="text-sm font-semibold text-slate-700">{PEDIDO_TIPO_LABELS[tipo]}</span>
+                  <select
+                    value={documentosPadrao[tipo] ?? 'nenhum'}
+                    onChange={(e) => {
+                      const v = e.target.value as DocumentType | 'nenhum';
+                      const next: DocumentosPadrao = { ...documentosPadrao };
+                      if (v === 'nenhum') delete next[tipo];
+                      else next[tipo] = v;
+                      onUpdateDocumentosPadrao(next);
+                    }}
+                    className="text-xs font-semibold text-slate-700 border border-slate-200 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20 min-w-[190px]"
+                  >
+                    <option value="nenhum">Sempre perguntar (nenhum padrão)</option>
+                    {DOCUMENT_TYPE_ORDER.map((doc: DocumentType) => (
+                      <option key={doc} value={doc}>
+                        {DOCUMENT_TYPE_LABELS[doc]}
+                        {isDocumentoImplementado(doc) ? '' : ' (em breve)'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-slate-400 px-1 pt-2 flex items-center gap-1">
+              <span className="material-symbols-outlined text-sm">info</span>
+              Fase 1: só a Proposta comercial já gera de verdade; os demais documentos entram em breve.
+            </p>
+          </div>
         </div>
       )}
 

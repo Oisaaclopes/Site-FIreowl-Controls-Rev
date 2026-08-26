@@ -11,7 +11,9 @@ import {
   PedidoBrand,
   PedidoStatus,
   ServiceCatalogItem,
+  PedidoTipo,
 } from '@/lib/types';
+import { PEDIDO_TIPO_LABELS, PEDIDO_TIPO_ORDER } from '@/lib/documentos';
 import {
   X,
   Plus,
@@ -253,6 +255,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     initialPedido?.numeroPedido || `PED-2026-${Math.floor(100 + Math.random() * 900)}`
   );
   const [referencia, setReferencia] = useState<string>(initialPedido?.referencia || 'Manutenção Preventiva SDAI');
+  const [pedidoTipo, setPedidoTipo] = useState<PedidoTipo | ''>(initialPedido?.proposal?.pedidoTipo || '');
   const [clienteId, setClienteId] = useState<string>(initialPedido?.clienteId || clients[0]?.id || '');
   const [fornecedor, setFornecedor] = useState<string>(initialPedido?.fornecedor || 'Fireowl Controls Ltda.');
   const [dataEmissao, setDataEmissao] = useState<string>(
@@ -478,6 +481,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         cartaApresentacao,
         revisoes: initialPedido?.proposal?.revisoes,
         capaImagemPath: initialPedido?.proposal?.capaImagemPath,
+        pedidoTipo: pedidoTipo || undefined,
         diretrizesNormativas: diretrizes,
         escopoServico,
         entregaveis,
@@ -642,6 +646,24 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               <div>
                 <label className={labelCls}>Referência / Nome do Projeto</label>
                 <input type="text" value={referencia} onChange={(e) => setReferencia(e.target.value)} placeholder="Ex.: Retrofit SDAI Bloco A" className={inputCls} />
+              </div>
+              <div className="sm:col-span-2">
+                <label className={labelCls}>Tipo de Pedido</label>
+                <select
+                  value={pedidoTipo}
+                  onChange={(e) => setPedidoTipo(e.target.value as PedidoTipo | '')}
+                  className={inputCls}
+                >
+                  <option value="">Não definido</option>
+                  {PEDIDO_TIPO_ORDER.map((t) => (
+                    <option key={t} value={t}>
+                      {PEDIDO_TIPO_LABELS[t]}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Define o documento gerado por padrão (configurável em Conta → PDF).
+                </p>
               </div>
               <div className="sm:col-span-2">
                 <label className={labelCls}>
