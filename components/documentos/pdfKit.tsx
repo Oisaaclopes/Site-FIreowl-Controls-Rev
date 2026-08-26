@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Svg, Path, Line, Font } from '@react-pdf/renderer';
+import { Page, View, Text, Svg, Path, Line, Rect, Circle, Image, Font } from '@react-pdf/renderer';
 
 /**
  * Primitivos compartilhados de PDF (fontes, paleta, logo, rodapé) para os
@@ -142,4 +142,136 @@ export const PdfFooter = ({ numero, data, cliente }: { numero: string; data: str
       `${numero}   •   ${data}   •   ${cliente}   •   Página ${pageNumber} de ${totalPages}`
     }
   />
+);
+
+// ===================== Capa e Áreas de Atuação (compartilhadas) =====================
+
+const g = { gold: C.gold, red: C.red, navy2: C.navy2, deep: '#0E2647', line2: '#22406B', ring: '#2A4A78', muteNum: '#31507F' };
+
+const CoverBlock = ({ label, value }: { label: string; value: string }) => (
+  <View style={{ backgroundColor: g.navy2, borderLeftWidth: 3, borderLeftColor: g.red, borderRadius: 4, paddingVertical: 9, paddingHorizontal: 12, marginBottom: 8 }}>
+    <Text style={{ color: g.gold, fontSize: 7.5, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 3 }}>{label}</Text>
+    <Text style={{ color: C.white, fontSize: 13, fontFamily: 'Roboto', fontWeight: 700, lineHeight: 1.2 }}>{value || '—'}</Text>
+  </View>
+);
+
+/** Capa institucional marinho (reaproveita o visual da proposta). Renderiza uma <Page>. */
+export const DocCover = ({
+  razao, cnpj, endereco, telefone, email, titulo, subtitulo, cliente, numero, escopo, data, capaImagemUrl, showLogo = true,
+}: {
+  razao: string; cnpj?: string; endereco?: string; telefone?: string; email?: string;
+  titulo: string; subtitulo?: string; cliente: string; numero: string; escopo: string; data: string;
+  capaImagemUrl?: string; showLogo?: boolean;
+}) => (
+  <Page size="A4" style={{ padding: 0, fontSize: 9, fontFamily: 'Roboto', color: C.white, backgroundColor: C.navy }}>
+    <BlueprintBg />
+    <View style={{ flex: 1, padding: 40, justifyContent: 'space-between' }}>
+      <View>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            {showLogo && (
+              <View style={{ backgroundColor: C.white, borderRadius: 8, padding: 4, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+                <Logo size={36} />
+              </View>
+            )}
+            <View>
+              <Text style={{ color: C.white, fontFamily: 'Poppins', fontWeight: 700, fontSize: 16, letterSpacing: 1.2 }}>FIREOWL CONTROLS</Text>
+              <Text style={{ color: C.s400, fontSize: 7, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 2, marginTop: 3 }}>Sistemas Integrados de Proteção</Text>
+            </View>
+          </View>
+          <Text style={{ color: g.gold, fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.3, textAlign: 'right' }}>Engenharia de Segurança{'\n'}& Detecção de Incêndio</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 14 }}>
+          <View style={{ width: 40, height: 2, backgroundColor: g.gold, borderRadius: 1 }} />
+          <View style={{ flex: 1, height: 1, backgroundColor: g.line2, marginLeft: 8 }} />
+        </View>
+      </View>
+
+      {nv(capaImagemUrl) ? <Image src={capaImagemUrl!} style={{ width: '100%', height: 150, borderRadius: 6, marginTop: 12, objectFit: 'cover' }} /> : null}
+
+      <View style={{ marginTop: nv(capaImagemUrl) ? 12 : 28 }}>
+        <Text style={{ color: g.gold, fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.3 }}>{subtitulo || 'Documento Comercial'}</Text>
+        <View style={{ width: 56, height: 4, backgroundColor: g.red, borderRadius: 2, marginTop: 6, marginBottom: 4 }} />
+        <Text style={{ color: C.white, fontSize: 30, fontFamily: 'Poppins', fontWeight: 700, letterSpacing: 0.5, lineHeight: 1.1 }}>{titulo}</Text>
+      </View>
+
+      <View>
+        <CoverBlock label="Cliente" value={cliente} />
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={{ flex: 1 }}><CoverBlock label="Número da Proposta" value={numero} /></View>
+          <View style={{ flex: 1 }}><CoverBlock label="Data de Emissão" value={data} /></View>
+        </View>
+        <CoverBlock label="Escopo de Fornecimento" value={escopo} />
+      </View>
+
+      <View style={{ borderTopWidth: 1, borderTopColor: g.navy2, paddingTop: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ width: 6, height: 6, backgroundColor: g.gold, borderRadius: 1, marginRight: 6 }} />
+          <Text style={{ color: C.white, fontSize: 8.5, fontFamily: 'Roboto', fontWeight: 700 }}>{`${razao}${cnpj ? ` — CNPJ ${cnpj}` : ''}`}</Text>
+        </View>
+        {nv(endereco) ? <Text style={{ color: C.s400, fontSize: 7.5, marginTop: 2 }}>{endereco}</Text> : null}
+        {(nv(telefone) || nv(email)) ? <Text style={{ color: C.s400, fontSize: 7.5, marginTop: 2 }}>{[telefone, email].filter(nv).join('  •  ')}</Text> : null}
+      </View>
+    </View>
+  </Page>
+);
+
+const AreaIcon = ({ kind }: { kind: string }) => {
+  const S = 22, sw = 1.6;
+  const p = (d: string) => <Path d={d} stroke={g.red} strokeWidth={sw} fill="none" />;
+  return (
+    <Svg viewBox="0 0 24 24" style={{ width: S, height: S }}>
+      {kind === 'sdai' && p('M12 2 C12 7 16 8 14 13 C13 16 10 16 9 13 C8 15 9 16.5 9 18 C6 16 6.5 10.5 10 8 C10 10.5 12 10.5 12 8 C12 5.5 12 3.5 12 2 Z')}
+      {kind === 'cftv' && (<><Rect x={3} y={7} width={13} height={10} rx={1.5} stroke={g.red} strokeWidth={sw} fill="none" /><Circle cx={9.5} cy={12} r={3} stroke={g.red} strokeWidth={sw} fill="none" />{p('M16 10 L21 7 L21 17 L16 14 Z')}</>)}
+      {kind === 'acesso' && (<><Rect x={4} y={4} width={16} height={11} rx={1.5} stroke={g.red} strokeWidth={sw} fill="none" /><Circle cx={12} cy={9} r={2.2} stroke={g.red} strokeWidth={sw} fill="none" />{p('M8.5 15 C8.5 12.5 15.5 12.5 15.5 15')}{p('M9 19 L15 19')}</>)}
+      {kind === 'alarme' && (<>{p('M12 3 C8.5 3 7 6 7 10 L6 15 L18 15 L17 10 C17 6 15.5 3 12 3 Z')}{p('M10 18 C10 20 14 20 14 18')}<Circle cx={12} cy={3} r={0.8} stroke={g.red} strokeWidth={sw} fill="none" /></>)}
+      {kind === 'bms' && (<><Rect x={3} y={4} width={18} height={12} rx={1.5} stroke={g.red} strokeWidth={sw} fill="none" /><Circle cx={12} cy={10} r={3} stroke={g.red} strokeWidth={sw} fill="none" />{p('M12 6 L12 4.5')}{p('M12 14 L12 15.5')}{p('M8 10 L6.5 10')}{p('M16 10 L17.5 10')}{p('M9 20 L15 20')}</>)}
+      {kind === 'integracao' && (<><Circle cx={5} cy={6} r={2} stroke={g.red} strokeWidth={sw} fill="none" /><Circle cx={19} cy={6} r={2} stroke={g.red} strokeWidth={sw} fill="none" /><Circle cx={12} cy={19} r={2} stroke={g.red} strokeWidth={sw} fill="none" />{p('M6.5 7.5 L11 17.5')}{p('M17.5 7.5 L13 17.5')}{p('M7 6 L17 6')}</>)}
+    </Svg>
+  );
+};
+
+const AREAS = [
+  { kind: 'sdai', titulo: 'Detecção e Alarme (SDAI)', desc: 'Projeto, instalação e manutenção de sistemas de detecção e alarme de incêndio conforme NBR 17240 e NPT 019.' },
+  { kind: 'cftv', titulo: 'CFTV / Videomonitoramento', desc: 'Câmeras IP e analíticos de vídeo para monitoramento, gravação e supervisão remota de perímetros e ambientes.' },
+  { kind: 'acesso', titulo: 'Controle de Acesso', desc: 'Controle de portas, catracas e biometria com gestão de credenciais, níveis de acesso e trilha de auditoria.' },
+  { kind: 'alarme', titulo: 'Alarme de Intrusão', desc: 'Sensores, centrais e comunicação para proteção perimetral e detecção de intrusão com notificação em tempo real.' },
+  { kind: 'bms', titulo: 'Automação Predial (BMS)', desc: 'Supervisão e automação de utilidades prediais, integrando climatização, energia e iluminação em uma central.' },
+  { kind: 'integracao', titulo: 'Integração de Sistemas', desc: 'Convergência de SDAI, CFTV, acesso e alarme em plataforma unificada, com dashboards e resposta coordenada.' },
+];
+
+/** Página institucional "Áreas de Atuação" (reaproveita o visual da proposta). Renderiza uma <Page>. */
+export const AreasAtuacaoPage = ({ razao, numero, data, cliente }: { razao?: string; numero: string; data: string; cliente: string }) => (
+  <Page size="A4" style={{ padding: 0, fontSize: 9, fontFamily: 'Roboto', color: C.white, backgroundColor: C.navy }}>
+    <BlueprintBg />
+    <PdfFooter numero={numero} data={data} cliente={cliente} />
+    <View style={{ flex: 1, paddingTop: 40, paddingHorizontal: 40, paddingBottom: 40 }}>
+      <Text style={{ color: g.gold, fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.6 }}>Quem é a {razao || 'Fireowl Controls'}</Text>
+      <Text style={{ color: C.white, fontSize: 24, fontFamily: 'Poppins', fontWeight: 700, letterSpacing: 0.3, marginTop: 5 }}>Áreas de Atuação</Text>
+      <View style={{ width: 52, height: 4, backgroundColor: g.red, borderRadius: 2, marginTop: 8, marginBottom: 10 }} />
+      <Text style={{ color: C.s300, fontSize: 9, lineHeight: 1.5, marginBottom: 18, maxWidth: 470 }}>
+        Engenharia especializada em segurança eletrônica e proteção contra incêndio. Projetamos, instalamos,
+        comissionamos e mantemos soluções integradas — do sensor de campo à central de supervisão.
+      </Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+        {AREAS.map((a, i) => (
+          <View key={a.kind} style={{ width: '48%', backgroundColor: g.navy2, borderRadius: 10, borderWidth: 1, borderColor: g.line2, padding: 14, marginBottom: 12, minHeight: 116 }} wrap={false}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 }}>
+              <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: g.deep, borderWidth: 1, borderColor: g.ring, alignItems: 'center', justifyContent: 'center' }}>
+                <AreaIcon kind={a.kind} />
+              </View>
+              <Text style={{ fontSize: 18, fontFamily: 'Poppins', fontWeight: 700, color: g.muteNum }}>{String(i + 1).padStart(2, '0')}</Text>
+            </View>
+            <Text style={{ color: C.white, fontSize: 10, fontFamily: 'Poppins', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>{a.titulo}</Text>
+            <View style={{ width: 22, height: 2, backgroundColor: g.red, borderRadius: 1, marginTop: 5, marginBottom: 6 }} />
+            <Text style={{ color: C.s300, fontSize: 7.8, lineHeight: 1.45 }}>{a.desc}</Text>
+          </View>
+        ))}
+      </View>
+      <View style={{ marginTop: 4, backgroundColor: g.deep, borderLeftWidth: 3, borderLeftColor: g.gold, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 14 }}>
+        <Text style={{ color: C.s400, fontSize: 7, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 3 }}>Ciclo completo de engenharia</Text>
+        <Text style={{ color: C.white, fontSize: 8.5, fontFamily: 'Poppins', fontWeight: 600, letterSpacing: 0.6 }}>Projeto   ·   Instalação   ·   Comissionamento   ·   Manutenção   ·   Suporte</Text>
+      </View>
+    </View>
+  </Page>
 );

@@ -1,10 +1,15 @@
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
-import { C, brl, nv, lnv, PdfHeader, PdfFooter, CamposExtras, itemTotal } from './pdfKit';
+import { C, brl, nv, lnv, PdfHeader, PdfFooter, CamposExtras, itemTotal, DocCover, AreasAtuacaoPage } from './pdfKit';
 import { DocOptions } from '@/lib/documentos';
 
-export type OrcamentoPdfOptions = Partial<DocOptions>;
+export type OrcamentoPdfOptions = Partial<DocOptions> & {
+  capaImagemUrl?: string;
+  /** Exibir a capa e a página de Áreas de Atuação (padrão: sim). */
+  showCapa?: boolean;
+  showAreasAtuacao?: boolean;
+};
 
 const styles = StyleSheet.create({
   // IMPORTANTE: sem lineHeight na Page (zera o <Text fixed render> do rodapé).
@@ -21,6 +26,12 @@ const styles = StyleSheet.create({
   infoValue: { color: C.ink, fontSize: 9.5, fontFamily: 'Roboto', fontWeight: 700 },
 
   subTitle: { color: C.navy, fontSize: 9.5, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4, marginTop: 6 },
+
+  secHead: { flexDirection: 'row', alignItems: 'center', borderLeftWidth: 3, borderLeftColor: C.red, paddingLeft: 8, marginTop: 10, marginBottom: 6 },
+  secNum: { backgroundColor: C.navy, color: C.white, fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, paddingVertical: 1.5, paddingHorizontal: 5, borderRadius: 2, marginRight: 7 },
+  secTitle: { color: C.navy, fontSize: 11, fontFamily: 'Poppins', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4 },
+  para: { fontSize: 9, color: C.s700, textAlign: 'justify', lineHeight: 1.4 },
+  contatoCard: { backgroundColor: C.s50, borderWidth: 1, borderColor: C.s200, borderLeftWidth: 4, borderLeftColor: C.navy, borderRadius: 5, padding: 10, marginTop: 4 },
 
   th: { flexDirection: 'row', backgroundColor: C.navy },
   thCell: { color: C.white, fontSize: 7.5, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', paddingVertical: 6, paddingHorizontal: 6 },
@@ -54,6 +65,13 @@ const InfoCell = ({ label, value, full }: { label: string; value: string; full?:
   <View style={[styles.infoCell, full ? { width: '100%' } : {}]}>
     <Text style={styles.infoLabel}>{label}</Text>
     <Text style={styles.infoValue}>{value || '—'}</Text>
+  </View>
+);
+
+const SecHead = ({ n, titulo }: { n?: string; titulo: string }) => (
+  <View style={styles.secHead} minPresenceAhead={50}>
+    {n ? <Text style={styles.secNum}>{n}</Text> : null}
+    <Text style={styles.secTitle}>{titulo}</Text>
   </View>
 );
 
@@ -113,6 +131,9 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
   const showMarca = options?.showDescricaoDetalhada !== false;
   const showAssinatura = options?.showAssinaturaCliente !== false;
   const showCampos = options?.showCamposPersonalizados === true;
+  const showCapa = options?.showCapa !== false;
+  const showAreas = options?.showAreasAtuacao !== false;
+  const capaImagemUrl = options?.capaImagemUrl;
   const dataDoc = options?.dataHoje ? new Date().toISOString().split('T')[0] : dataEmissao;
 
   const itens = p.equipmentItems || [];
@@ -125,8 +146,33 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
       ? [p.formasPagamento?.length ? `Formas: ${p.formasPagamento.join(', ')}` : '', p.condicoesPagamento?.length ? p.condicoesPagamento.join(' · ') : ''].filter(Boolean).join(' — ')
       : (nv(p.formaPagamento) ? p.formaPagamento! : 'A combinar entre as partes.');
 
+  const contato = [companyProfile.telefone, companyProfile.email].filter(nv).join('  •  ');
+
   return (
     <Document title={`Orçamento ${numero}`} author={razao}>
+      {/* Capa (com a foto opcional, igual à proposta) */}
+      {showCapa && (
+        <DocCover
+          razao={razao}
+          cnpj={companyProfile.cnpj}
+          endereco={companyProfile.endereco}
+          telefone={companyProfile.telefone}
+          email={companyProfile.email}
+          titulo="Orçamento"
+          subtitulo="Documento Comercial"
+          cliente={cliente}
+          numero={numero}
+          escopo={referencia}
+          data={dataDoc}
+          capaImagemUrl={capaImagemUrl}
+          showLogo={showLogo}
+        />
+      )}
+
+      {/* Áreas de Atuação */}
+      {showAreas && <AreasAtuacaoPage razao={razao} numero={numero} data={dataDoc} cliente={cliente} />}
+
+      {/* Conteúdo */}
       <Page size="A4" style={styles.page}>
         <PdfHeader razao={razao} label="Orçamento" showLogo={showLogo} />
         <PdfFooter numero={numero} data={dataDoc} cliente={cliente} />
@@ -137,6 +183,7 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
           <View style={styles.titleBar} />
         </View>
 
+        {/* Cabeçalho básico */}
         <View style={styles.infoCard}>
           <InfoCell label="Cliente / Contratante" value={cliente} full />
           <InfoCell label="Referência / Projeto" value={referencia} />
@@ -147,9 +194,9 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
         </View>
 
         {(nv(p.escopoServico) || nv(p.objetivo)) && (
-          <View style={{ marginBottom: 12 }}>
-            <Text style={styles.subTitle}>Objetivo</Text>
-            <Text style={{ fontSize: 9, color: C.s700, textAlign: 'justify', lineHeight: 1.4 }}>{nv(p.escopoServico) ? p.escopoServico : p.objetivo}</Text>
+          <View minPresenceAhead={50}>
+            <SecHead n="01" titulo="Objetivo" />
+            <Text style={styles.para}>{nv(p.escopoServico) ? p.escopoServico : p.objetivo}</Text>
             {lnv(p.diretrizesNormativas) && (
               <Text style={{ fontSize: 8, color: C.s500, marginTop: 4 }}>
                 <Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Normas de referência: </Text>
@@ -159,12 +206,16 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
           </View>
         )}
 
+        {/* Seção 05 — Materiais e Serviços (o coração do orçamento) */}
+        <SecHead n="02" titulo="Materiais e Serviços" />
         {materiais.length > 0 && <ItensTable titulo="Materiais" itens={materiais} showUnit={showUnit} showTotal={showTotal} showMarca={showMarca} accent={C.navy} />}
         {servicos.length > 0 && <ItensTable titulo="Serviços" itens={servicos} showUnit={showUnit} showTotal={showTotal} showMarca={showMarca} accent={C.green} />}
         {materiais.length === 0 && servicos.length === 0 && (
           <Text style={{ fontSize: 9, color: C.s400, fontStyle: 'italic', marginBottom: 8 }}>Itens conforme especificação técnica acordada.</Text>
         )}
 
+        {/* Seção 11 — Preços */}
+        <SecHead n="03" titulo="Preços" />
         <View style={styles.totalWrap} wrap={false}>
           {showTotal && (p.maoDeObra || 0) > 0 && (
             <View style={styles.totalRowLight}>
@@ -173,29 +224,40 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
             </View>
           )}
           <View style={styles.totalRowNavy}>
-            <Text style={styles.totalLabelGold}>Valor Total</Text>
+            <Text style={styles.totalLabelGold}>Investimento Total</Text>
             <Text style={styles.totalValue}>{brl(p.valorTotal)}</Text>
           </View>
         </View>
 
-        <View style={styles.condCard} wrap={false}>
-          <View style={styles.condRow}>
-            <Text style={styles.condText}><Text style={styles.condLabel}>Condições de pagamento: </Text>{pagamento}{nv(p.faturamento) ? ` — Faturamento: ${p.faturamento}` : ''}</Text>
-          </View>
-          <View style={styles.condRow}>
-            <Text style={styles.condText}><Text style={styles.condLabel}>Prazo de execução: </Text>{nv(p.prazoExecucao) ? p.prazoExecucao : 'A combinar após confirmação do pedido.'}</Text>
-          </View>
-          <View style={styles.condRow}>
-            <Text style={styles.condText}><Text style={styles.condLabel}>Garantia: </Text>{nv(p.garantia) ? p.garantia : '90 dias para serviços e 12 meses para equipamentos fornecidos.'}</Text>
-          </View>
-          <View>
-            <Text style={styles.condText}><Text style={styles.condLabel}>Validade da proposta: </Text>{validade}.</Text>
-          </View>
+        {/* Seção 13 — Impostos e Taxas */}
+        <View minPresenceAhead={50} wrap={false}>
+          <SecHead n="04" titulo="Impostos e Taxas" />
+          <Text style={styles.para}>{nv(p.impostos) ? p.impostos : 'Impostos inclusos conforme o regime tributário vigente.'} Não inclui taxas de condomínio, aluguéis ou custos de estadia não previstos.</Text>
         </View>
 
-        <Text style={styles.obs}>
-          Este orçamento não inclui taxas de condomínio, alugueis ou custos de estadia não previstos. Impostos: {nv(p.impostos) ? p.impostos : 'inclusos conforme regime tributário vigente'}. Os preços permanecem fixos dentro do período de validade.
-        </Text>
+        {/* Seção 14 — Condições de Pagamento */}
+        <View minPresenceAhead={50} wrap={false}>
+          <SecHead n="05" titulo="Condições de Pagamento" />
+          <Text style={styles.para}>{pagamento}{nv(p.faturamento) ? ` Faturamento: ${p.faturamento}.` : ''}</Text>
+        </View>
+
+        {/* Seção 17 — Prazo de Fornecimento */}
+        <View minPresenceAhead={50} wrap={false}>
+          <SecHead n="06" titulo="Prazo de Fornecimento" />
+          <Text style={styles.para}>{nv(p.prazoExecucao) ? p.prazoExecucao : 'A combinar após a confirmação do pedido.'}</Text>
+        </View>
+
+        {/* Seção 18 — Garantia */}
+        <View minPresenceAhead={50} wrap={false}>
+          <SecHead n="07" titulo="Garantia" />
+          <Text style={styles.para}>{nv(p.garantia) ? p.garantia : 'Garantia de 90 (noventa) dias sobre os serviços de instalação e de 12 (doze) meses para os equipamentos fornecidos, contra defeitos de fabricação, a contar da entrega.'}</Text>
+        </View>
+
+        {/* Seção 22 — Validade da Proposta */}
+        <View minPresenceAhead={50} wrap={false}>
+          <SecHead n="08" titulo="Validade da Proposta" />
+          <Text style={styles.para}>Os preços permanecem fixos dentro do período de validade: {validade}. Após esse período, eventuais variações na base de preços dos fabricantes poderão ser repactuadas.</Text>
+        </View>
 
         {lnv(p.premissas) && (
           <View wrap={false} minPresenceAhead={50}>
@@ -210,6 +272,17 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
         )}
 
         {showCampos && <CamposExtras campos={p.camposPersonalizados} />}
+
+        {/* Dados de contato */}
+        <View minPresenceAhead={70} wrap={false}>
+          <SecHead titulo="Contato" />
+          <View style={styles.contatoCard}>
+            <Text style={{ fontSize: 9, color: C.ink, fontFamily: 'Roboto', fontWeight: 700 }}>{razao}</Text>
+            {nv(companyProfile.endereco) ? <Text style={{ fontSize: 8.5, color: C.s600, marginTop: 2 }}>{companyProfile.endereco}</Text> : null}
+            {nv(companyProfile.cnpj) ? <Text style={{ fontSize: 8.5, color: C.s600, marginTop: 1 }}>CNPJ {companyProfile.cnpj}</Text> : null}
+            {nv(contato) ? <Text style={{ fontSize: 9, color: C.navy, fontFamily: 'Roboto', fontWeight: 700, marginTop: 3 }}>{contato}</Text> : null}
+          </View>
+        </View>
 
         {showAssinatura && (
           <View style={styles.signRow} wrap={false}>

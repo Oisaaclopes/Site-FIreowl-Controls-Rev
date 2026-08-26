@@ -155,7 +155,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   });
   const [pdfConfigPedido, setPdfConfigPedido] = useState<Pedido | null>(null);
   const [docModalPedido, setDocModalPedido] = useState<Pedido | null>(null);
-  const [orcamentoPedido, setOrcamentoPedido] = useState<{ pedido: Pedido; options: DocOptions } | null>(null);
+  const [orcamentoPedido, setOrcamentoPedido] = useState<{ pedido: Pedido; options: DocOptions & { capaImagemUrl?: string } } | null>(null);
   const [osPedido, setOsPedido] = useState<{ pedido: Pedido; options: DocOptions } | null>(null);
   const [listaProdutosPedido, setListaProdutosPedido] = useState<{ pedido: Pedido; options: DocOptions } | null>(null);
   const [notaPedido, setNotaPedido] = useState<{ pedido: Pedido; variante: NotaVariante; options: DocOptions } | null>(null);
@@ -211,7 +211,16 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
 
   // Abre o visualizador do documento (não proposta) com as opções escolhidas.
   const openDocViewer = (ped: Pedido, doc: DocumentType, options: DocOptions) => {
-    if (doc === 'orcamento') setOrcamentoPedido({ pedido: ped, options });
+    if (doc === 'orcamento') {
+      setOrcamentoPedido({ pedido: ped, options });
+      // Reaproveita a foto de capa da proposta (resolve o data URI e injeta).
+      const path = ped.proposal?.capaImagemPath;
+      if (path) {
+        propostaCapaDataUrl(path)
+          .then((url) => setOrcamentoPedido((prev) => (prev && prev.pedido.id === ped.id ? { ...prev, options: { ...prev.options, capaImagemUrl: url } } : prev)))
+          .catch(() => { /* sem imagem → grafismo blueprint */ });
+      }
+    }
     else if (doc === 'ordem_servico') setOsPedido({ pedido: ped, options });
     else if (doc === 'lista_produtos') setListaProdutosPedido({ pedido: ped, options });
     else if (doc === 'nota_servico') setNotaPedido({ pedido: ped, variante: 'servico', options });
