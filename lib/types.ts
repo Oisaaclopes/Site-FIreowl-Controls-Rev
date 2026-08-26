@@ -39,6 +39,8 @@ export interface RecebimentoProposta {
 export interface PedidoEquipmentItem {
   itemNumero: number;
   descricao: string;
+  /** Descrição detalhada opcional (aparece abaixo do item no documento). */
+  descricaoDetalhada?: string;
   marcaModelo: string;
   unidade: string;
   quantidade: number;

@@ -110,7 +110,7 @@ export function ListaProdutosDocument({ pedido, companyProfile, options }: { ped
               <View key={i} style={[styles.tr, i % 2 === 1 ? styles.trAlt : {}]} wrap={false}>
                 <View style={{ width: 28, alignItems: 'center' }}><View style={styles.tdBox} /></View>
                 <Text style={[styles.td, { width: 24, textAlign: 'center', color: C.red, fontFamily: 'Roboto', fontWeight: 700 }]}>{i + 1}</Text>
-                <Text style={[styles.td, { flex: 1, color: C.ink, fontFamily: 'Roboto', fontWeight: 700 }]}>{eq.descricao}</Text>
+                <View style={[styles.td, { flex: 1 }]}><Text style={{ color: C.ink, fontFamily: 'Roboto', fontWeight: 700, fontSize: 8.5 }}>{eq.descricao}</Text>{eq.descricaoDetalhada ? <Text style={{ color: C.s500, fontSize: 7, marginTop: 1, lineHeight: 1.3 }}>{eq.descricaoDetalhada}</Text> : null}</View>
                 <Text style={[styles.td, { width: 110 }]}>{eq.marcaModelo}</Text>
                 <Text style={[styles.td, { width: 34, textAlign: 'center', textTransform: 'uppercase' }]}>{eq.unidade}</Text>
                 <Text style={[styles.td, { width: 40, textAlign: 'center', fontFamily: 'Roboto', fontWeight: 700 }]}>{eq.quantidade}</Text>

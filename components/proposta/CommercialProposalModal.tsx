@@ -741,7 +741,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                     <th className="p-2">Descrição</th>
                     <th className="p-2 w-28">Marca/Modelo</th>
                     <th className="p-2 text-center w-12">Unid.</th>
-                    <th className="p-2 text-center w-14">Qtd.</th>
+                    <th className="p-2 text-center w-20">Qtd.</th>
                     <th className="p-2 text-right w-24">Unit. (R$)</th>
                     <th className="p-2 text-right w-24">Subtotal</th>
                     <th className="p-2 text-center w-8" />
@@ -749,7 +749,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                 </thead>
                 <tbody className="divide-y divide-slate-200 font-medium text-slate-700">
                   {materiaisRows.map(({ it, idx }, pos) => (
-                    <tr key={idx} className="hover:bg-slate-50">
+                    <tr key={idx} className="hover:bg-slate-50 [&>td]:align-top">
                       <td className="p-2 text-center font-bold font-data-mono text-[#E63946]">{pos + 1}</td>
                       <td className="p-2">
                         <select value={it.vinculoEstoqueId || ''} onChange={(e) => handleSelectInventoryItem(idx, e.target.value)} className="w-full border border-slate-300 rounded p-1.5 text-[11px] bg-slate-50">
@@ -759,7 +759,10 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                           ))}
                         </select>
                       </td>
-                      <td className="p-2"><input type="text" value={it.descricao} onChange={(e) => handleUpdateEquipment(idx, 'descricao', e.target.value)} placeholder="Material..." className="w-full border border-slate-300 rounded p-1.5 text-slate-900 font-semibold" /></td>
+                      <td className="p-2">
+                        <input type="text" value={it.descricao} onChange={(e) => handleUpdateEquipment(idx, 'descricao', e.target.value)} placeholder="Material..." className="w-full border border-slate-300 rounded p-1.5 text-slate-900 font-semibold" />
+                        <textarea rows={2} value={it.descricaoDetalhada || ''} onChange={(e) => handleUpdateEquipment(idx, 'descricaoDetalhada', e.target.value)} placeholder="Descrição detalhada (opcional) — aparece abaixo do item no documento" className="w-full mt-1 border border-slate-200 rounded p-1.5 text-[11px] text-slate-600 resize-y" />
+                      </td>
                       <td className="p-2"><input type="text" value={it.marcaModelo} onChange={(e) => handleUpdateEquipment(idx, 'marcaModelo', e.target.value)} placeholder="(opcional)" className="w-full border border-slate-300 rounded p-1.5" /></td>
                       <td className="p-2 text-center"><input type="text" value={it.unidade} onChange={(e) => handleUpdateEquipment(idx, 'unidade', e.target.value)} className="w-full border border-slate-300 rounded p-1.5 text-center font-bold uppercase" /></td>
                       <td className="p-2 text-center"><input type="number" min={1} value={it.quantidade} onChange={(e) => handleUpdateEquipment(idx, 'quantidade', Number(e.target.value))} className="w-full border border-slate-300 rounded p-1.5 text-center font-data-mono font-bold" /></td>
@@ -801,7 +804,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                     <th className="p-2 w-40">Vincular do Catálogo</th>
                     <th className="p-2">Descrição do serviço</th>
                     <th className="p-2 text-center w-12">Unid.</th>
-                    <th className="p-2 text-center w-14">Qtd.</th>
+                    <th className="p-2 text-center w-20">Qtd.</th>
                     <th className="p-2 text-right w-24">Unit. (R$)</th>
                     <th className="p-2 text-right w-24">Subtotal</th>
                     <th className="p-2 text-center w-8" />
@@ -809,7 +812,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                 </thead>
                 <tbody className="divide-y divide-slate-200 font-medium text-slate-700">
                   {servicosRows.map(({ it, idx }, pos) => (
-                    <tr key={idx} className="hover:bg-slate-50">
+                    <tr key={idx} className="hover:bg-slate-50 [&>td]:align-top">
                       <td className="p-2 text-center font-bold font-data-mono text-emerald-700">{pos + 1}</td>
                       <td className="p-2">
                         <select value={it.vinculoServicoId || ''} onChange={(e) => handleSelectService(idx, e.target.value)} className="w-full border border-slate-300 rounded p-1.5 text-[11px] bg-slate-50">
@@ -819,7 +822,10 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                           ))}
                         </select>
                       </td>
-                      <td className="p-2"><input type="text" value={it.descricao} onChange={(e) => handleUpdateEquipment(idx, 'descricao', e.target.value)} placeholder="Serviço a ser realizado..." className="w-full border border-slate-300 rounded p-1.5 text-slate-900 font-semibold" /></td>
+                      <td className="p-2">
+                        <input type="text" value={it.descricao} onChange={(e) => handleUpdateEquipment(idx, 'descricao', e.target.value)} placeholder="Serviço a ser realizado..." className="w-full border border-slate-300 rounded p-1.5 text-slate-900 font-semibold" />
+                        <textarea rows={2} value={it.descricaoDetalhada || ''} onChange={(e) => handleUpdateEquipment(idx, 'descricaoDetalhada', e.target.value)} placeholder="Descrição detalhada (opcional) — aparece abaixo do item no documento" className="w-full mt-1 border border-slate-200 rounded p-1.5 text-[11px] text-slate-600 resize-y" />
+                      </td>
                       <td className="p-2 text-center"><input type="text" value={it.unidade} onChange={(e) => handleUpdateEquipment(idx, 'unidade', e.target.value)} className="w-full border border-slate-300 rounded p-1.5 text-center font-bold uppercase" /></td>
                       <td className="p-2 text-center"><input type="number" min={1} value={it.quantidade} onChange={(e) => handleUpdateEquipment(idx, 'quantidade', Number(e.target.value))} className="w-full border border-slate-300 rounded p-1.5 text-center font-data-mono font-bold" /></td>
                       <td className="p-2 text-right"><input type="number" value={it.precoUnitario || 0} onChange={(e) => handleUpdateEquipment(idx, 'precoUnitario', Number(e.target.value))} className="w-full border border-slate-300 rounded p-1.5 text-right font-data-mono" /></td>

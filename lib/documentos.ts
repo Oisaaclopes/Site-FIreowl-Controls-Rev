@@ -57,6 +57,44 @@ export const PEDIDO_TIPO_LABELS: Record<PedidoTipo, string> = {
 
 export const PEDIDO_TIPO_ORDER: PedidoTipo[] = ['orcamento', 'proposta', 'servico', 'fornecimento', 'laudo'];
 
+/**
+ * Opções de configuração do documento, escolhidas na tela que abre depois de
+ * definir o tipo de documento. Valem para todos os documentos (as que não se
+ * aplicam a um documento — ex.: preços numa Lista de Produtos — são ignoradas).
+ */
+export interface DocOptions {
+  dataHoje: boolean;
+  showValorUnitario: boolean;
+  showSubtotal: boolean;
+  showDescricaoDetalhada: boolean;
+  showCamposPersonalizados: boolean;
+  showAssinaturaCliente: boolean;
+  showLogo: boolean;
+}
+
+export const DEFAULT_DOC_OPTIONS: DocOptions = {
+  dataHoje: false,
+  showValorUnitario: true,
+  showSubtotal: true,
+  showDescricaoDetalhada: true,
+  showCamposPersonalizados: false,
+  showAssinaturaCliente: true,
+  showLogo: true,
+};
+
+/** Campos exibidos na tela de configuração (na ordem). */
+export const DOC_OPTION_FIELDS: { key: keyof DocOptions; label: string; hint?: string }[] = [
+  { key: 'dataHoje', label: 'Gerar com a data de hoje', hint: 'Usa a data atual no lugar da data de emissão do pedido.' },
+  { key: 'showValorUnitario', label: 'Mostrar valor unitário' },
+  { key: 'showSubtotal', label: 'Mostrar subtotais / totais por item', hint: 'Desligue este e o valor unitário para enviar com valor fechado (só o total).' },
+  { key: 'showDescricaoDetalhada', label: 'Mostrar descrição detalhada', hint: 'Inclui marca/modelo dos itens.' },
+  { key: 'showCamposPersonalizados', label: 'Mostrar campos personalizados' },
+  { key: 'showAssinaturaCliente', label: 'Mostrar campo de assinatura do cliente' },
+];
+
+/** Documentos que têm valores (preços) — os toggles de valor só fazem sentido neles. */
+export const DOCUMENTOS_COM_VALORES: DocumentType[] = ['orcamento', 'proposta_comercial', 'nota_servico', 'nota_produtos'];
+
 /** Tipo do pedido (guardado no JSONB da proposta na Fase 1). */
 export function getPedidoTipo(pedido: Pedido): PedidoTipo | undefined {
   return pedido.proposal?.pedidoTipo;
