@@ -6,6 +6,7 @@ import { uploadPropostaCapa, removePropostaCapa, propostaCapaDataUrl, blobToData
 import { CommercialProposalModal } from '@/components/proposta/CommercialProposalModal';
 import { CommercialProposalPDFView } from '@/components/proposta/CommercialProposalPDFView';
 import { DocumentTypeModal } from '@/components/proposta/DocumentTypeModal';
+import { OrcamentoPDFView } from '@/components/documentos/OrcamentoPDFView';
 import { resolveDocumentoPadrao, DOCUMENT_TYPE_LABELS } from '@/lib/documentos';
 import { DataListRow, RowMeta, Badge } from '@/components/DataListRow';
 import { Toggle } from '@/components/SidePanel';
@@ -140,6 +141,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   });
   const [pdfConfigPedido, setPdfConfigPedido] = useState<Pedido | null>(null);
   const [docModalPedido, setDocModalPedido] = useState<Pedido | null>(null);
+  const [orcamentoPedido, setOrcamentoPedido] = useState<Pedido | null>(null);
   const [capaBusy, setCapaBusy] = useState(false);
   const capaInputRef = useRef<HTMLInputElement>(null);
 
@@ -180,6 +182,10 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   const dispatchDocument = (ped: Pedido, doc: DocumentType) => {
     if (doc === 'proposta_comercial') {
       openPdf(ped);
+      return;
+    }
+    if (doc === 'orcamento') {
+      setOrcamentoPedido(ped);
       return;
     }
     if (doc === 'personalizado') {
@@ -933,6 +939,16 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           if (ped) dispatchDocument(ped, doc);
         }}
       />
+
+      {/* Visualizador do Orçamento */}
+      {orcamentoPedido && (
+        <OrcamentoPDFView
+          pedido={orcamentoPedido}
+          companyProfile={companyProfile}
+          options={{ showLogo: pdfPrefs.showLogo, detailedSubtotal: pdfPrefs.detailedSubtotal }}
+          onClose={() => setOrcamentoPedido(null)}
+        />
+      )}
 
       {/* Config antes de gerar o PDF */}
       {pdfConfigPedido && (
