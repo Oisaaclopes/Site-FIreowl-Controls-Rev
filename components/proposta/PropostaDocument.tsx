@@ -1,6 +1,7 @@
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet, Svg, Path, Line, Rect, Circle, Image, Font } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
+import { InclusoExcluso } from '@/components/documentos/pdfKit';
 import {
   CARTA_APRESENTACAO,
   SERVICOS_OFERTADOS,
@@ -1278,6 +1279,7 @@ export function PropostaDocument({
 
         <Sec k="premissas">
           {lnv(p.premissas) ? <Bullets itens={p.premissas} /> : <Text style={{ fontSize: 9, color: C.s500, fontStyle: 'italic' }}>Premissas conforme rotinas padrão de execução.</Text>}
+          <InclusoExcluso incluso={p.incluso} naoIncluso={p.naoIncluso} />
         </Sec>
 
         <Sec k="servicos">

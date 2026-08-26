@@ -1,7 +1,7 @@
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
-import { C, brl, nv, lnv, PdfHeader, PdfFooter, CamposExtras, itemTotal, DocCover, AreasAtuacaoPage } from './pdfKit';
+import { C, brl, nv, lnv, PdfHeader, PdfFooter, CamposExtras, itemTotal, DocCover, AreasAtuacaoPage, InclusoExcluso } from './pdfKit';
 import { DocOptions } from '@/lib/documentos';
 
 export type OrcamentoPdfOptions = Partial<DocOptions> & {
@@ -236,6 +236,8 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
         {materiais.length === 0 && servicos.length === 0 && (
           <Text style={{ fontSize: 9, color: C.s400, fontStyle: 'italic', marginBottom: 8 }}>Itens conforme especificação técnica acordada.</Text>
         )}
+
+        <InclusoExcluso incluso={p.incluso} naoIncluso={p.naoIncluso} />
 
         {/* Seção 11 — Preços */}
         <SecHead n="03" titulo="Preços" />

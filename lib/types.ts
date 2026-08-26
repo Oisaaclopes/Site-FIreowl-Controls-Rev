@@ -83,6 +83,10 @@ export interface CommercialProposalData {
   escopoServico: string;
   entregaveis: string[];
   premissas: string[];
+  /** §16 — itens incluídos no escopo (bloco visual "Incluso / Não incluso"). */
+  incluso?: string[];
+  /** §16 — itens explicitamente fora do escopo. */
+  naoIncluso?: string[];
   prazoExecucao: string;
   garantia: string;
   validadePropostaDias: number;

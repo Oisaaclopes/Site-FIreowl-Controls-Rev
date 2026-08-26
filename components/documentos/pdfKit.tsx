@@ -128,6 +128,35 @@ export const CamposExtras = ({ campos, titulo = 'Informações Adicionais' }: { 
   );
 };
 
+/**
+ * §16 — Bloco visual "Incluso / Não incluso". Só renderiza as colunas que têm
+ * itens; com as duas, fica em 2 colunas; com uma só, ocupa a largura toda.
+ */
+export const InclusoExcluso = ({ incluso, naoIncluso }: { incluso?: string[]; naoIncluso?: string[] }) => {
+  const inc = (incluso || []).filter(nv);
+  const nao = (naoIncluso || []).filter(nv);
+  if (!inc.length && !nao.length) return null;
+  const both = inc.length > 0 && nao.length > 0;
+  const colW = both ? '48.5%' : '100%';
+  const Col = ({ titulo, itens, cor, bg, borda }: { titulo: string; itens: string[]; cor: string; bg: string; borda: string }) => (
+    <View style={{ width: colW, backgroundColor: bg, borderWidth: 1, borderColor: borda, borderRadius: 5, padding: 8 }}>
+      <Text style={{ fontSize: 8, fontFamily: 'Poppins', fontWeight: 700, color: cor, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>{titulo}</Text>
+      {itens.map((t, i) => (
+        <View key={i} style={{ flexDirection: 'row', marginBottom: 2 }}>
+          <Text style={{ color: cor, fontSize: 8, marginRight: 5 }}>•</Text>
+          <Text style={{ flex: 1, fontSize: 8, color: C.s700, lineHeight: 1.35 }}>{t}</Text>
+        </View>
+      ))}
+    </View>
+  );
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', marginBottom: 12 }} wrap={false}>
+      {inc.length > 0 && <Col titulo="Incluso no escopo" itens={inc} cor={C.green} bg="#F0FAF4" borda="#BFE6D0" />}
+      {nao.length > 0 && <Col titulo="Não incluso" itens={nao} cor={C.red} bg="#FCF1F1" borda="#F0C9C9" />}
+    </View>
+  );
+};
+
 /** Rodapé fixo (barra marinho, texto centralizado, "Página X de Y"). */
 export const PdfFooter = ({ numero, data, cliente }: { numero: string; data: string; cliente: string }) => (
   <Text

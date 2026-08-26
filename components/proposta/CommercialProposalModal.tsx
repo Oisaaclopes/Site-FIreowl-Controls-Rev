@@ -304,6 +304,9 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
       'Acompanhamento do responsável de segurança do cliente durante os testes sonoros',
     ]
   );
+  // §16 — Incluso / Não incluso (blocos opcionais; só aparecem no PDF se houver itens).
+  const [incluso, setIncluso] = useState<string[]>(initialPedido?.proposal?.incluso || []);
+  const [naoIncluso, setNaoIncluso] = useState<string[]>(initialPedido?.proposal?.naoIncluso || []);
   const [respContratada, setRespContratada] = useState<string[]>(
     initialPedido?.proposal?.responsabilidadesContratada || [
       'Fornecer equipe qualificada, EPIs, ferramentas calibradas e emitir laudo ART',
@@ -482,6 +485,8 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         escopoServico,
         entregaveis,
         premissas,
+        incluso,
+        naoIncluso,
         prazoExecucao,
         garantia,
         validadePropostaDias: validadeDias,
@@ -830,6 +835,19 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
 
           <Accordion title="Premissas Adotadas" icon={<ShieldCheck className="w-4 h-4 text-[#0B1E38]" />} open={!!open.premissas} onToggle={() => toggle('premissas')}>
             <ListEditor items={premissas} onAdd={() => addStr(setPremissas, 'Acesso livre e facilitado')} onUpdate={(i, v) => updStr(setPremissas, i, v)} onRemove={(i) => rmStr(setPremissas, i)} addLabel="Adicionar premissa" />
+          </Accordion>
+
+          <Accordion title="Incluso / Não incluso" icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />} open={!!open.incluso} onToggle={() => toggle('incluso')}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>Incluso no escopo</label>
+                <ListEditor items={incluso} onAdd={() => addStr(setIncluso, 'Item incluso no escopo')} onUpdate={(i, v) => updStr(setIncluso, i, v)} onRemove={(i) => rmStr(setIncluso, i)} addLabel="Adicionar incluso" />
+              </div>
+              <div>
+                <label className={labelCls}>Não incluso</label>
+                <ListEditor items={naoIncluso} onAdd={() => addStr(setNaoIncluso, 'Item fora do escopo')} onUpdate={(i, v) => updStr(setNaoIncluso, i, v)} onRemove={(i) => rmStr(setNaoIncluso, i)} addLabel="Adicionar exclusão" />
+              </div>
+            </div>
           </Accordion>
 
           <Accordion title="Responsabilidades da Contratada" icon={<CheckCircle className="w-4 h-4 text-emerald-600" />} open={!!open.respContratada} onToggle={() => toggle('respContratada')}>
