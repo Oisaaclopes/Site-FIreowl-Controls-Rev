@@ -1,7 +1,7 @@
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
-import { C, nv, PdfHeader, PdfFooter } from './pdfKit';
+import { C, nv, PdfHeader, PdfFooter, CamposExtras } from './pdfKit';
 import { DocOptions } from '@/lib/documentos';
 
 export type ListaProdutosPdfOptions = Partial<DocOptions>;
@@ -61,6 +61,7 @@ export function ListaProdutosDocument({ pedido, companyProfile, options }: { ped
   const showLogo = options?.showLogo !== false;
   const showMarca = options?.showDescricaoDetalhada !== false;
   const showAssinatura = options?.showAssinaturaCliente !== false;
+  const showCampos = options?.showCamposPersonalizados === true;
   const dataDoc = options?.dataHoje ? new Date().toISOString().split('T')[0] : dataEmissao;
 
   const produtos = (p.equipmentItems || []).filter((e: PedidoEquipmentItem) => e.tipo !== 'servico');
@@ -131,6 +132,8 @@ export function ListaProdutosDocument({ pedido, companyProfile, options }: { ped
           Documento de separação e conferência de produtos. Marque a coluna &ldquo;OK&rdquo; à medida que cada item for
           separado/conferido. Não representa nota fiscal.
         </Text>
+
+        {showCampos && <CamposExtras campos={p.camposPersonalizados} />}
 
         <View style={styles.signRow} wrap={false}>
           <View style={styles.signCol}>

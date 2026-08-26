@@ -1,7 +1,7 @@
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
-import { C, nv, lnv, PdfHeader, PdfFooter } from './pdfKit';
+import { C, nv, lnv, PdfHeader, PdfFooter, CamposExtras } from './pdfKit';
 import { DocOptions } from '@/lib/documentos';
 
 export type LaudoTecnicoPdfOptions = Partial<DocOptions>;
@@ -78,6 +78,7 @@ export function LaudoTecnicoDocument({ pedido, companyProfile, options }: { pedi
   const showLogo = options?.showLogo !== false;
   const showMarca = options?.showDescricaoDetalhada !== false;
   const showAssinatura = options?.showAssinaturaCliente !== false;
+  const showCampos = options?.showCamposPersonalizados === true;
   const dataDoc = options?.dataHoje ? new Date().toISOString().split('T')[0] : dataEmissao;
 
   const itens = p.equipmentItems || [];
@@ -155,6 +156,8 @@ export function LaudoTecnicoDocument({ pedido, companyProfile, options }: { pedi
           <Text style={styles.artLabel}>Observações e não conformidades</Text>
           <View style={styles.parecerBox} />
         </View>
+
+        {showCampos && <CamposExtras campos={p.camposPersonalizados} />}
 
         <View minPresenceAhead={130} wrap={false}>
           <SecHead n={itens.length > 0 ? '05' : '04'} titulo="Responsável Técnico" />

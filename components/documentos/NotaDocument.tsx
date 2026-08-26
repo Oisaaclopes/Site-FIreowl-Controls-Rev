@@ -1,7 +1,7 @@
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
-import { C, brl, nv, PdfHeader, PdfFooter } from './pdfKit';
+import { C, brl, nv, PdfHeader, PdfFooter, CamposExtras } from './pdfKit';
 import { DocOptions } from '@/lib/documentos';
 
 export type NotaVariante = 'servico' | 'produtos';
@@ -75,6 +75,7 @@ export function NotaDocument({ pedido, companyProfile, variante, options }: { pe
   const showTotal = options?.showSubtotal !== false;
   const showDetalhe = options?.showDescricaoDetalhada !== false;
   const showAssinatura = options?.showAssinaturaCliente !== false;
+  const showCampos = options?.showCamposPersonalizados === true;
   const dataDoc = options?.dataHoje ? new Date().toISOString().split('T')[0] : dataEmissao;
 
   const itens = (p.equipmentItems || []).filter((e: PedidoEquipmentItem) => (isServico ? e.tipo === 'servico' : e.tipo !== 'servico'));
@@ -171,6 +172,8 @@ export function NotaDocument({ pedido, companyProfile, variante, options }: { pe
         </View>
 
         {nv(p.faturamento) && <Text style={styles.note}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Faturamento: </Text>{p.faturamento}</Text>}
+
+        {showCampos && <CamposExtras campos={p.camposPersonalizados} />}
 
         {showAssinatura && (
           <View style={styles.signRow} wrap={false}>

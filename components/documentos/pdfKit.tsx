@@ -106,6 +106,25 @@ export const PdfHeader = ({ razao, label, showLogo = true }: { razao: string; la
   </View>
 );
 
+/** Seção "Informações Adicionais" com os campos personalizados do pedido. */
+export const CamposExtras = ({ campos, titulo = 'Informações Adicionais' }: { campos?: { rotulo: string; valor: string }[]; titulo?: string }) => {
+  const list = (campos || []).filter((c) => (c.rotulo || '').trim() || (c.valor || '').trim());
+  if (!list.length) return null;
+  return (
+    <View minPresenceAhead={50}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', borderLeftWidth: 3, borderLeftColor: C.red, paddingLeft: 8, marginTop: 8, marginBottom: 5 }}>
+        <Text style={{ color: C.navy, fontSize: 11, fontFamily: 'Poppins', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4 }}>{titulo}</Text>
+      </View>
+      {list.map((c, i) => (
+        <View key={i} style={{ marginBottom: 4 }} wrap={false}>
+          {(c.rotulo || '').trim() ? <Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink, fontSize: 8.5, textTransform: 'uppercase' }}>{c.rotulo}</Text> : null}
+          <Text style={{ fontSize: 9, color: C.s700, textAlign: 'justify', lineHeight: 1.4 }}>{c.valor}</Text>
+        </View>
+      ))}
+    </View>
+  );
+};
+
 /** Rodapé fixo (barra marinho, texto centralizado, "Página X de Y"). */
 export const PdfFooter = ({ numero, data, cliente }: { numero: string; data: string; cliente: string }) => (
   <Text

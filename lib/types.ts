@@ -74,6 +74,9 @@ export interface CommercialProposalData {
   pedidoTipo?: PedidoTipo;
   /** Dados do recebimento quando a proposta é concluída (à vista/parcelado). */
   recebimento?: RecebimentoProposta;
+  /** Documento Personalizado: título e campos livres (rótulo + valor). */
+  tituloPersonalizado?: string;
+  camposPersonalizados?: { rotulo: string; valor: string }[];
   diretrizesNormativas: string[];
   escopoServico: string;
   entregaveis: string[];

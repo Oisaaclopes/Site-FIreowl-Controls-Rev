@@ -14,6 +14,8 @@ import { NotaPDFView } from '@/components/documentos/NotaPDFView';
 import { NotaVariante } from '@/components/documentos/NotaDocument';
 import { LaudoTecnicoPDFView } from '@/components/documentos/LaudoTecnicoPDFView';
 import { DocConfigModal } from '@/components/documentos/DocConfigModal';
+import { PersonalizadoConfigModal, PersonalizadoData } from '@/components/documentos/PersonalizadoConfigModal';
+import { PersonalizadoPDFView } from '@/components/documentos/PersonalizadoPDFView';
 import { resolveDocumentoPadrao, DOCUMENT_TYPE_LABELS, DocOptions, DEFAULT_DOC_OPTIONS } from '@/lib/documentos';
 import { DataListRow, RowMeta, Badge } from '@/components/DataListRow';
 import { Toggle } from '@/components/SidePanel';
@@ -158,6 +160,8 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   const [listaProdutosPedido, setListaProdutosPedido] = useState<{ pedido: Pedido; options: DocOptions } | null>(null);
   const [notaPedido, setNotaPedido] = useState<{ pedido: Pedido; variante: NotaVariante; options: DocOptions } | null>(null);
   const [laudoPedido, setLaudoPedido] = useState<{ pedido: Pedido; options: DocOptions } | null>(null);
+  const [personalizarPedido, setPersonalizarPedido] = useState<Pedido | null>(null);
+  const [personalizadoView, setPersonalizadoView] = useState<{ pedido: Pedido; data: PersonalizadoData } | null>(null);
   const [docConfig, setDocConfig] = useState<{ pedido: Pedido; doc: DocumentType } | null>(null);
   const [concluindoPedido, setConcluindoPedido] = useState<Pedido | null>(null);
   const [capaBusy, setCapaBusy] = useState(false);
@@ -223,7 +227,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
       return;
     }
     if (doc === 'personalizado') {
-      alert('A personalização de documento (título e campos livres) entra em uma fase seguinte. Por ora, gere a Proposta comercial.');
+      setPersonalizarPedido(ped);
       return;
     }
     if (DOCS_GENERICOS.includes(doc)) {
@@ -1098,6 +1102,33 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           pedido={concluindoPedido}
           onClose={() => setConcluindoPedido(null)}
           onConfirm={(receb) => handleConcluir(concluindoPedido, receb)}
+        />
+      )}
+
+      {/* Configuração do documento Personalizado (título + campos) */}
+      {personalizarPedido && (
+        <PersonalizadoConfigModal
+          pedido={personalizarPedido}
+          onClose={() => setPersonalizarPedido(null)}
+          onConfirm={(data) => {
+            const ped = personalizarPedido;
+            setPersonalizarPedido(null);
+            // Persiste título/campos na proposta para reuso e para o toggle
+            // "campos personalizados" dos outros documentos.
+            onSavePedido({ ...ped, proposal: { ...ped.proposal, tituloPersonalizado: data.titulo, camposPersonalizados: data.campos } });
+            setPersonalizadoView({ pedido: ped, data });
+          }}
+        />
+      )}
+
+      {/* Visualizador do documento Personalizado */}
+      {personalizadoView && (
+        <PersonalizadoPDFView
+          pedido={personalizadoView.pedido}
+          companyProfile={companyProfile}
+          data={personalizadoView.data}
+          showLogo={pdfPrefs.showLogo}
+          onClose={() => setPersonalizadoView(null)}
         />
       )}
 

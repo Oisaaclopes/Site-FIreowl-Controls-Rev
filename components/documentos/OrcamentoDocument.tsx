@@ -1,7 +1,7 @@
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
-import { C, brl, nv, lnv, PdfHeader, PdfFooter } from './pdfKit';
+import { C, brl, nv, lnv, PdfHeader, PdfFooter, CamposExtras } from './pdfKit';
 import { DocOptions } from '@/lib/documentos';
 
 export type OrcamentoPdfOptions = Partial<DocOptions>;
@@ -112,6 +112,7 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
   const showTotal = options?.showSubtotal !== false;
   const showMarca = options?.showDescricaoDetalhada !== false;
   const showAssinatura = options?.showAssinaturaCliente !== false;
+  const showCampos = options?.showCamposPersonalizados === true;
   const dataDoc = options?.dataHoje ? new Date().toISOString().split('T')[0] : dataEmissao;
 
   const itens = p.equipmentItems || [];
@@ -194,6 +195,8 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
             ))}
           </View>
         )}
+
+        {showCampos && <CamposExtras campos={p.camposPersonalizados} />}
 
         {showAssinatura && (
           <View style={styles.signRow} wrap={false}>

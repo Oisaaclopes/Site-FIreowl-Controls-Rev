@@ -2,7 +2,7 @@ import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import { SEGURANCA_TRABALHO } from '@/lib/propostaTextos';
-import { C, nv, lnv, PdfHeader, PdfFooter } from './pdfKit';
+import { C, nv, lnv, PdfHeader, PdfFooter, CamposExtras } from './pdfKit';
 import { DocOptions } from '@/lib/documentos';
 
 export type OrdemServicoPdfOptions = Partial<DocOptions>;
@@ -89,6 +89,7 @@ export function OrdemServicoDocument({ pedido, companyProfile, options }: { pedi
   const showLogo = options?.showLogo !== false;
   const showMarca = options?.showDescricaoDetalhada !== false;
   const showAssinatura = options?.showAssinaturaCliente !== false;
+  const showCampos = options?.showCamposPersonalizados === true;
   const dataDoc = options?.dataHoje ? new Date().toISOString().split('T')[0] : dataEmissao;
 
   const itens = p.equipmentItems || [];
@@ -168,6 +169,8 @@ export function OrdemServicoDocument({ pedido, companyProfile, options }: { pedi
           <SecHead n={materiais.length > 0 ? '04' : '03'} titulo="Diretrizes de Segurança" />
           <Checklist itens={SEGURANCA_TRABALHO} />
         </View>
+
+        {showCampos && <CamposExtras campos={p.camposPersonalizados} />}
 
         <View minPresenceAhead={150} wrap={false}>
           <SecHead n={materiais.length > 0 ? '05' : '04'} titulo="Registro de Execução" />
