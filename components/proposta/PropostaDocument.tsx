@@ -853,7 +853,7 @@ const Footer = ({ cliente, numero, data }: { cliente: string; numero: string; da
 );
 
 const SecHead = ({ n, titulo }: { n: string; titulo: string }) => (
-  <View style={styles.secHeadWrap} minPresenceAhead={140}>
+  <View style={styles.secHeadWrap} minPresenceAhead={48}>
     <View style={styles.secHeadRow}>
       {n ? <Text style={styles.secNum}>{n}</Text> : null}
       <Text style={styles.secTitle}>{titulo}</Text>
@@ -917,7 +917,7 @@ const ItensTable = ({
 }) => {
   const subtotal = itens.reduce((a, e) => a + (e.precoUnitario || 0) * e.quantidade, 0);
   return (
-    <View style={{ marginBottom: 10 }} minPresenceAhead={140}>
+    <View style={{ marginBottom: 10 }} minPresenceAhead={56}>
       <Text style={styles.subTitle}>{titulo}</Text>
       <View style={{ borderWidth: 1, borderColor: C.s200, borderRadius: 4, overflow: 'hidden' }}>
         <View style={[styles.th, { backgroundColor: accent }]} fixed>
@@ -1027,7 +1027,7 @@ export function PropostaDocument({
   const on = (key: string) => vis.some((s) => s.key === key);
 
   const Sec = ({ k, children }: { k: string; children: React.ReactNode }) => (
-    <View style={styles.section} minPresenceAhead={140}>
+    <View style={styles.section}>
       <SecHead n={num(k)} titulo={secoes.find((s) => s.key === k)!.titulo} />
       {children}
     </View>
@@ -1233,10 +1233,12 @@ export function PropostaDocument({
           </View>
         </Sec>
 
-        {/* Item 05 - Materiais e Serviços Ofertados VINCULADO com minPresenceAhead={200} para nunca ficar um título sozinho na página 8 */}
-        <View style={styles.section} minPresenceAhead={200}>
+        {/* Item 05 - Materiais e Serviços Ofertados. O orfão do título é evitado
+            pelo minPresenceAhead do próprio SecHead (48pt) + o da 1ª tabela (56pt);
+            valores altos aqui criavam um vão grande antes da seção. */}
+        <View style={styles.section}>
           <SecHead n={num('itens')} titulo={secoes.find((s) => s.key === 'itens')!.titulo} />
-          <View minPresenceAhead={160}>
+          <View>
             {materiais.length > 0 && <ItensTable titulo="Materiais" itens={materiais} detailed={detailed} showMarca />}
             {servicos.length > 0 && <ItensTable titulo="Serviços" itens={servicos} detailed={detailed} showMarca={false} accent={C.green} />}
             {materiais.length === 0 && servicos.length === 0 && (
