@@ -12,6 +12,7 @@ import { OrdemServicoPDFView } from '@/components/documentos/OrdemServicoPDFView
 import { ListaProdutosPDFView } from '@/components/documentos/ListaProdutosPDFView';
 import { NotaPDFView } from '@/components/documentos/NotaPDFView';
 import { NotaVariante } from '@/components/documentos/NotaDocument';
+import { LaudoTecnicoPDFView } from '@/components/documentos/LaudoTecnicoPDFView';
 import { DocConfigModal } from '@/components/documentos/DocConfigModal';
 import { resolveDocumentoPadrao, DOCUMENT_TYPE_LABELS, DocOptions, DEFAULT_DOC_OPTIONS } from '@/lib/documentos';
 import { DataListRow, RowMeta, Badge } from '@/components/DataListRow';
@@ -156,6 +157,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   const [osPedido, setOsPedido] = useState<{ pedido: Pedido; options: DocOptions } | null>(null);
   const [listaProdutosPedido, setListaProdutosPedido] = useState<{ pedido: Pedido; options: DocOptions } | null>(null);
   const [notaPedido, setNotaPedido] = useState<{ pedido: Pedido; variante: NotaVariante; options: DocOptions } | null>(null);
+  const [laudoPedido, setLaudoPedido] = useState<{ pedido: Pedido; options: DocOptions } | null>(null);
   const [docConfig, setDocConfig] = useState<{ pedido: Pedido; doc: DocumentType } | null>(null);
   const [concluindoPedido, setConcluindoPedido] = useState<Pedido | null>(null);
   const [capaBusy, setCapaBusy] = useState(false);
@@ -193,7 +195,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     else setPdfPreviewPedido(ped);
   };
 
-  const DOCS_GENERICOS: DocumentType[] = ['orcamento', 'ordem_servico', 'lista_produtos', 'nota_servico', 'nota_produtos'];
+  const DOCS_GENERICOS: DocumentType[] = ['orcamento', 'ordem_servico', 'lista_produtos', 'nota_servico', 'nota_produtos', 'laudo_tecnico'];
 
   // Opções iniciais da tela de configuração (herdam as preferências gerais).
   const initialDocOptions = (): DocOptions => ({
@@ -210,6 +212,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     else if (doc === 'lista_produtos') setListaProdutosPedido({ pedido: ped, options });
     else if (doc === 'nota_servico') setNotaPedido({ pedido: ped, variante: 'servico', options });
     else if (doc === 'nota_produtos') setNotaPedido({ pedido: ped, variante: 'produtos', options });
+    else if (doc === 'laudo_tecnico') setLaudoPedido({ pedido: ped, options });
   };
 
   // Roteia a geração: proposta usa seu próprio modal de opções; os demais
@@ -1095,6 +1098,16 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           pedido={concluindoPedido}
           onClose={() => setConcluindoPedido(null)}
           onConfirm={(receb) => handleConcluir(concluindoPedido, receb)}
+        />
+      )}
+
+      {/* Visualizador do Laudo Técnico */}
+      {laudoPedido && (
+        <LaudoTecnicoPDFView
+          pedido={laudoPedido.pedido}
+          companyProfile={companyProfile}
+          options={laudoPedido.options}
+          onClose={() => setLaudoPedido(null)}
         />
       )}
 

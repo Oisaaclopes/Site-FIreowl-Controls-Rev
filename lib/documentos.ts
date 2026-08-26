@@ -40,7 +40,7 @@ export const DOCUMENT_TYPE_ORDER: DocumentType[] = [
  * Documentos que já possuem gerador real. Fase 1: apenas a Proposta Comercial.
  * As demais opções aparecem, mas avisam "em desenvolvimento".
  */
-export const DOCUMENTOS_IMPLEMENTADOS: DocumentType[] = ['proposta_comercial', 'orcamento', 'ordem_servico', 'lista_produtos', 'nota_servico', 'nota_produtos'];
+export const DOCUMENTOS_IMPLEMENTADOS: DocumentType[] = ['proposta_comercial', 'orcamento', 'ordem_servico', 'lista_produtos', 'nota_servico', 'nota_produtos', 'laudo_tecnico'];
 
 export function isDocumentoImplementado(doc: DocumentType): boolean {
   return DOCUMENTOS_IMPLEMENTADOS.includes(doc);
