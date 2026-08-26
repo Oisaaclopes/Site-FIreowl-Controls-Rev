@@ -9,6 +9,8 @@ import { DocumentTypeModal } from '@/components/proposta/DocumentTypeModal';
 import { OrcamentoPDFView } from '@/components/documentos/OrcamentoPDFView';
 import { OrdemServicoPDFView } from '@/components/documentos/OrdemServicoPDFView';
 import { ListaProdutosPDFView } from '@/components/documentos/ListaProdutosPDFView';
+import { NotaPDFView } from '@/components/documentos/NotaPDFView';
+import { NotaVariante } from '@/components/documentos/NotaDocument';
 import { resolveDocumentoPadrao, DOCUMENT_TYPE_LABELS } from '@/lib/documentos';
 import { DataListRow, RowMeta, Badge } from '@/components/DataListRow';
 import { Toggle } from '@/components/SidePanel';
@@ -146,6 +148,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   const [orcamentoPedido, setOrcamentoPedido] = useState<Pedido | null>(null);
   const [osPedido, setOsPedido] = useState<Pedido | null>(null);
   const [listaProdutosPedido, setListaProdutosPedido] = useState<Pedido | null>(null);
+  const [notaPedido, setNotaPedido] = useState<{ pedido: Pedido; variante: NotaVariante } | null>(null);
   const [capaBusy, setCapaBusy] = useState(false);
   const capaInputRef = useRef<HTMLInputElement>(null);
 
@@ -198,6 +201,14 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     }
     if (doc === 'lista_produtos') {
       setListaProdutosPedido(ped);
+      return;
+    }
+    if (doc === 'nota_servico') {
+      setNotaPedido({ pedido: ped, variante: 'servico' });
+      return;
+    }
+    if (doc === 'nota_produtos') {
+      setNotaPedido({ pedido: ped, variante: 'produtos' });
       return;
     }
     if (doc === 'personalizado') {
@@ -979,6 +990,17 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           companyProfile={companyProfile}
           options={{ showLogo: pdfPrefs.showLogo }}
           onClose={() => setListaProdutosPedido(null)}
+        />
+      )}
+
+      {/* Visualizador da Nota de Serviço / Nota de Produtos (não fiscal) */}
+      {notaPedido && (
+        <NotaPDFView
+          pedido={notaPedido.pedido}
+          variante={notaPedido.variante}
+          companyProfile={companyProfile}
+          options={{ showLogo: pdfPrefs.showLogo }}
+          onClose={() => setNotaPedido(null)}
         />
       )}
 
