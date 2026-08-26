@@ -1,7 +1,7 @@
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
-import { C, brl, nv, lnv, PdfHeader, PdfFooter, CamposExtras, itemTotal, DocCover, AreasAtuacaoPage, InclusoExcluso } from './pdfKit';
+import { C, brl, nv, lnv, PdfHeader, PdfFooter, CamposExtras, itemTotal, DocCover, AreasAtuacaoPage, InclusoExcluso, ResumoExecutivoPage, SlaBloco } from './pdfKit';
 import { DocOptions } from '@/lib/documentos';
 
 export type OrcamentoPdfOptions = Partial<DocOptions> & {
@@ -159,6 +159,16 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
   const vMensal = p.valorMensal || 0;
   const vMeses = p.vigenciaMeses || 0;
 
+  // §18/§28 — indicadores do resumo executivo (só os preenchidos).
+  const indicadores: { valor: string; label: string }[] = [];
+  if (recorrente) indicadores.push({ valor: `${brl(vMensal)}`, label: 'Valor mensal' });
+  if ((p.unidadesAtendidas || 0) > 0) indicadores.push({ valor: String(p.unidadesAtendidas), label: 'Unidades atendidas' });
+  if (nv(p.frequenciaManutencao)) indicadores.push({ valor: p.frequenciaManutencao!, label: 'Frequência' });
+  if (nv(p.slaCritico)) indicadores.push({ valor: p.slaCritico!, label: 'SLA falhas críticas' });
+  if (recorrente && vMeses > 0) indicadores.push({ valor: `${vMeses} meses`, label: 'Vigência' });
+  const objetoBase = nv(p.objetivo) ? p.objetivo : nv(p.escopoServico) ? p.escopoServico : referencia;
+  const objetoResumo = objetoBase.length > 320 ? `${objetoBase.slice(0, 317)}…` : objetoBase;
+
   const pagamento =
     (p.formasPagamento?.length || p.condicoesPagamento?.length)
       ? [p.formasPagamento?.length ? `Formas: ${p.formasPagamento.join(', ')}` : '', p.condicoesPagamento?.length ? p.condicoesPagamento.join(' · ') : ''].filter(Boolean).join(' — ')
@@ -185,6 +195,11 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
           capaImagemUrl={capaImagemUrl}
           showLogo={showLogo}
         />
+      )}
+
+      {/* Resumo Executivo (§18/§28) — só quando há indicadores */}
+      {indicadores.length > 0 && (
+        <ResumoExecutivoPage fantasia={fantasia} numero={numero} data={dataDoc} cliente={cliente} indicadores={indicadores} objeto={objetoResumo} />
       )}
 
       {/* Áreas de Atuação */}
@@ -279,6 +294,9 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
           <SecHead n="06" titulo="Prazo de Fornecimento" />
           <Text style={styles.para}>{nv(p.prazoExecucao) ? p.prazoExecucao : 'A combinar após a confirmação do pedido.'}</Text>
         </View>
+
+        {/* Seção 17 (SLA) — SLA em destaque, quando cadastrado */}
+        <SlaBloco tabela={p.slaTabela} slaCritico={p.slaCritico} />
 
         {/* Seção 18 — Garantia */}
         <View minPresenceAhead={50} wrap={false}>

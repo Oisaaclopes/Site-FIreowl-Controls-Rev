@@ -87,6 +87,14 @@ export interface CommercialProposalData {
   incluso?: string[];
   /** §16 — itens explicitamente fora do escopo. */
   naoIncluso?: string[];
+  /** §18/§28 — nº de unidades/pontos atendidos (card de indicador). */
+  unidadesAtendidas?: number;
+  /** §18/§28 — frequência de manutenção/atendimento (ex.: "Trimestral"). */
+  frequenciaManutencao?: string;
+  /** §17/§18 — SLA para falhas críticas (ex.: "48 horas"). */
+  slaCritico?: string;
+  /** §17 — tabela de SLA (situação → prazo). Só aparece se preenchida. */
+  slaTabela?: { situacao: string; prazo: string }[];
   prazoExecucao: string;
   garantia: string;
   validadePropostaDias: number;

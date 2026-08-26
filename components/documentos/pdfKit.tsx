@@ -270,6 +270,65 @@ const AREAS = [
 ];
 
 /** Página institucional "Áreas de Atuação" (reaproveita o visual da proposta). Renderiza uma <Page>. */
+/**
+ * §18/§28 — Página de Resumo Executivo: cards de indicadores + objeto.
+ * Só deve ser renderizada pelo chamador quando houver indicadores.
+ */
+export const ResumoExecutivoPage = ({
+  fantasia, numero, data, cliente, titulo = 'Resumo Executivo', indicadores, objeto,
+}: {
+  fantasia?: string; numero: string; data: string; cliente: string; titulo?: string;
+  indicadores: { valor: string; label: string }[]; objeto?: string;
+}) => (
+  <Page size="A4" style={{ padding: 0, fontSize: 9, fontFamily: 'Roboto', color: C.white, backgroundColor: C.navy }}>
+    <BlueprintBg />
+    <PdfFooter numero={numero} data={data} cliente={cliente} />
+    <View style={{ flex: 1, paddingTop: 40, paddingHorizontal: 40, paddingBottom: 40 }}>
+      <Text style={{ color: g.gold, fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.6 }}>{fantasia || 'Fireowl Controls'}</Text>
+      <Text style={{ color: C.white, fontSize: 24, fontFamily: 'Poppins', fontWeight: 700, letterSpacing: 0.3, marginTop: 5 }}>{titulo}</Text>
+      <View style={{ width: 52, height: 4, backgroundColor: g.red, borderRadius: 2, marginTop: 8, marginBottom: 18 }} />
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+        {indicadores.map((ind, i) => (
+          <View key={i} style={{ width: '48%', backgroundColor: g.navy2, borderRadius: 10, borderWidth: 1, borderColor: g.line2, borderTopWidth: 3, borderTopColor: g.gold, padding: 16, marginBottom: 12, minHeight: 86, justifyContent: 'center' }} wrap={false}>
+            <Text style={{ color: C.white, fontSize: 22, fontFamily: 'Poppins', fontWeight: 700, letterSpacing: 0.3 }}>{ind.valor}</Text>
+            <Text style={{ color: C.s400, fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginTop: 5 }}>{ind.label}</Text>
+          </View>
+        ))}
+      </View>
+      {nv(objeto) ? (
+        <View style={{ marginTop: 6, backgroundColor: g.deep, borderLeftWidth: 3, borderLeftColor: g.gold, borderRadius: 8, paddingVertical: 12, paddingHorizontal: 16 }}>
+          <Text style={{ color: g.gold, fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 5 }}>Objeto</Text>
+          <Text style={{ color: C.s300, fontSize: 9.5, lineHeight: 1.5 }}>{objeto}</Text>
+        </View>
+      ) : null}
+    </View>
+  </Page>
+);
+
+/**
+ * §17 — SLA em destaque (tabela situação → prazo). Aparece só quando há tabela
+ * cadastrada; com apenas o SLA crítico, mostra uma linha de destaque.
+ */
+export const SlaBloco = ({ tabela, slaCritico }: { tabela?: { situacao: string; prazo: string }[]; slaCritico?: string }) => {
+  const linhas = (tabela || []).filter((r) => nv(r?.situacao) || nv(r?.prazo));
+  if (!linhas.length && !nv(slaCritico)) return null;
+  const rows = linhas.length ? linhas : [{ situacao: 'Falha crítica', prazo: slaCritico! }];
+  return (
+    <View style={{ borderWidth: 1, borderColor: C.s200, borderRadius: 5, overflow: 'hidden', marginBottom: 12 }} wrap={false}>
+      <View style={{ flexDirection: 'row', backgroundColor: C.navy, paddingVertical: 6, paddingHorizontal: 10 }}>
+        <Text style={{ flex: 1, color: C.gold, fontSize: 8, fontFamily: 'Poppins', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8 }}>SLA de Atendimento</Text>
+        <Text style={{ width: 130, color: C.gold, fontSize: 8, fontFamily: 'Poppins', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, textAlign: 'right' }}>Prazo</Text>
+      </View>
+      {rows.map((r, i) => (
+        <View key={i} style={{ flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 10, backgroundColor: i % 2 ? C.s50 : C.white }}>
+          <Text style={{ flex: 1, fontSize: 8.5, color: C.s700 }}>{r.situacao}</Text>
+          <Text style={{ width: 130, fontSize: 8.5, color: C.ink, fontFamily: 'Roboto', fontWeight: 700, textAlign: 'right' }}>{r.prazo}</Text>
+        </View>
+      ))}
+    </View>
+  );
+};
+
 export const AreasAtuacaoPage = ({ razao, numero, data, cliente }: { razao?: string; numero: string; data: string; cliente: string }) => (
   <Page size="A4" style={{ padding: 0, fontSize: 9, fontFamily: 'Roboto', color: C.white, backgroundColor: C.navy }}>
     <BlueprintBg />

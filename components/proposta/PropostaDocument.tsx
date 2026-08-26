@@ -1,7 +1,7 @@
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet, Svg, Path, Line, Rect, Circle, Image, Font } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
-import { InclusoExcluso } from '@/components/documentos/pdfKit';
+import { InclusoExcluso, ResumoExecutivoPage, SlaBloco } from '@/components/documentos/pdfKit';
 import {
   CARTA_APRESENTACAO,
   SERVICOS_OFERTADOS,
@@ -982,6 +982,16 @@ export function PropostaDocument({
   const recorrente = !!p.recorrente && (p.valorMensal || 0) > 0;
   const vMensal = p.valorMensal || 0;
   const vMeses = p.vigenciaMeses || 0;
+
+  // §18/§28 — indicadores do resumo executivo (só os preenchidos).
+  const indicadores: { valor: string; label: string }[] = [];
+  if (recorrente) indicadores.push({ valor: brl(vMensal), label: 'Valor mensal' });
+  if ((p.unidadesAtendidas || 0) > 0) indicadores.push({ valor: String(p.unidadesAtendidas), label: 'Unidades atendidas' });
+  if (nv(p.frequenciaManutencao)) indicadores.push({ valor: p.frequenciaManutencao!, label: 'Frequência' });
+  if (nv(p.slaCritico)) indicadores.push({ valor: p.slaCritico!, label: 'SLA falhas críticas' });
+  if (recorrente && vMeses > 0) indicadores.push({ valor: `${vMeses} meses`, label: 'Vigência' });
+  const objetoBase = nv(p.objetivo) ? p.objetivo : nv(p.escopoServico) ? p.escopoServico : (pedido.referencia || '');
+  const objetoResumo = objetoBase.length > 320 ? `${objetoBase.slice(0, 317)}…` : objetoBase;
   const numero = pedido.numeroPedido;
   const dataEmissao = pedido.dataEmissao || '';
   const clienteNome = pedido.clienteNome || '';
@@ -1124,6 +1134,11 @@ export function PropostaDocument({
         </View>
       </Page>
 
+      {/* ===================== RESUMO EXECUTIVO (§18/§28) — só quando há indicadores ===================== */}
+      {indicadores.length > 0 && (
+        <ResumoExecutivoPage fantasia={fantasia} numero={numero} data={dataEmissao} cliente={clienteNome} indicadores={indicadores} objeto={objetoResumo} />
+      )}
+
       {/* ===================== 02. ÁREAS DE ATUAÇÃO (Grade 2x3 sem estouro de altura) ===================== */}
       {showAreas && (
         <Page size="A4" style={styles.darkPage}>
@@ -1247,6 +1262,8 @@ export function PropostaDocument({
           <View style={styles.scenarioCard}>
             <Text style={{ fontSize: 9, color: C.s700, textAlign: 'justify', lineHeight: 1.4 }}>{nv(p.escopoServico) ? p.escopoServico : 'Escopo conforme especificação técnica acordada com o cliente.'}</Text>
           </View>
+          {/* §17 — SLA em destaque (quando cadastrado) */}
+          <SlaBloco tabela={p.slaTabela} slaCritico={p.slaCritico} />
         </Sec>
 
         {/* Item 05 - Materiais e Serviços Ofertados. O orfão do título é evitado

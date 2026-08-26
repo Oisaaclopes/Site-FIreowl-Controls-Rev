@@ -307,6 +307,15 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   // §16 — Incluso / Não incluso (blocos opcionais; só aparecem no PDF se houver itens).
   const [incluso, setIncluso] = useState<string[]>(initialPedido?.proposal?.incluso || []);
   const [naoIncluso, setNaoIncluso] = useState<string[]>(initialPedido?.proposal?.naoIncluso || []);
+
+  // §17/§18/§28 — indicadores do resumo executivo + SLA (todos opcionais).
+  const [unidadesAtendidas, setUnidadesAtendidas] = useState<number>(initialPedido?.proposal?.unidadesAtendidas ?? 0);
+  const [frequenciaManutencao, setFrequenciaManutencao] = useState<string>(initialPedido?.proposal?.frequenciaManutencao ?? '');
+  const [slaCritico, setSlaCritico] = useState<string>(initialPedido?.proposal?.slaCritico ?? '');
+  const [slaTabela, setSlaTabela] = useState<{ situacao: string; prazo: string }[]>(initialPedido?.proposal?.slaTabela ?? []);
+  const addSla = () => setSlaTabela((prev) => [...prev, { situacao: '', prazo: '' }]);
+  const updSla = (i: number, k: 'situacao' | 'prazo', v: string) => setSlaTabela((prev) => prev.map((r, idx) => (idx === i ? { ...r, [k]: v } : r)));
+  const rmSla = (i: number) => setSlaTabela((prev) => prev.filter((_, idx) => idx !== i));
   const [respContratada, setRespContratada] = useState<string[]>(
     initialPedido?.proposal?.responsabilidadesContratada || [
       'Fornecer equipe qualificada, EPIs, ferramentas calibradas e emitir laudo ART',
@@ -487,6 +496,10 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         premissas,
         incluso,
         naoIncluso,
+        unidadesAtendidas: unidadesAtendidas > 0 ? unidadesAtendidas : undefined,
+        frequenciaManutencao: frequenciaManutencao.trim() || undefined,
+        slaCritico: slaCritico.trim() || undefined,
+        slaTabela: slaTabela.filter((r) => r.situacao.trim() || r.prazo.trim()),
         prazoExecucao,
         garantia,
         validadePropostaDias: validadeDias,
@@ -847,6 +860,35 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                 <label className={labelCls}>Não incluso</label>
                 <ListEditor items={naoIncluso} onAdd={() => addStr(setNaoIncluso, 'Item fora do escopo')} onUpdate={(i, v) => updStr(setNaoIncluso, i, v)} onRemove={(i) => rmStr(setNaoIncluso, i)} addLabel="Adicionar exclusão" />
               </div>
+            </div>
+          </Accordion>
+
+          <Accordion title="Indicadores & SLA (resumo executivo)" icon={<ShieldCheck className="w-4 h-4 text-[#0B1E38]" />} open={!!open.indicadores} onToggle={() => toggle('indicadores')}>
+            <p className="text-[11px] text-slate-500 mb-3">Opcional. Preenchido, gera a página de <b>Resumo Executivo</b> (cards) e o bloco de <b>SLA</b>. Em branco, nada aparece.</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+              <div>
+                <label className={labelCls}>Unidades atendidas</label>
+                <input type="number" min={0} value={unidadesAtendidas} onChange={(e) => setUnidadesAtendidas(e.target.value === '' ? 0 : Number(e.target.value))} className={inputCls} placeholder="Ex: 19" />
+              </div>
+              <div>
+                <label className={labelCls}>Frequência de manutenção</label>
+                <input type="text" value={frequenciaManutencao} onChange={(e) => setFrequenciaManutencao(e.target.value)} className={inputCls} placeholder="Ex: Trimestral" />
+              </div>
+              <div>
+                <label className={labelCls}>SLA falhas críticas</label>
+                <input type="text" value={slaCritico} onChange={(e) => setSlaCritico(e.target.value)} className={inputCls} placeholder="Ex: 48 horas" />
+              </div>
+            </div>
+            <label className={labelCls}>Tabela de SLA (situação → prazo)</label>
+            <div className="space-y-2">
+              {slaTabela.map((r, i) => (
+                <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+                  <input type="text" value={r.situacao} onChange={(e) => updSla(i, 'situacao', e.target.value)} className={inputCls} placeholder="Situação (ex: Falha crítica)" />
+                  <input type="text" value={r.prazo} onChange={(e) => updSla(i, 'prazo', e.target.value)} className={inputCls} placeholder="Prazo (ex: Até 48 horas)" />
+                  <button type="button" onClick={() => rmSla(i)} className="text-slate-400 hover:text-[#E63946] p-1" title="Remover linha">✕</button>
+                </div>
+              ))}
+              <button type="button" onClick={addSla} className="text-[11px] font-semibold text-[#1A1A72] hover:text-[#E63946] uppercase">+ Adicionar linha de SLA</button>
             </div>
           </Accordion>
 
