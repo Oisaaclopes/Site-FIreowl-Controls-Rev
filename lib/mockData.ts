@@ -584,7 +584,7 @@ export const INITIAL_COMPANY_PROFILE: CompanyProfile = {
   cnpj: '57.372.721/0001-40',
   endereco: 'Av. Higienópolis, 70 - Centro, Londrina / PR',
   telefone: '(43) 98445-5979',
-  email: 'comercial@fireowlcontrols.com.br',
+  email: 'contato@fireowlcontrols.com.br',
   regimeTributario: 'Simples Nacional (Incluso Anexo III)',
   logoUrl: '',
 };

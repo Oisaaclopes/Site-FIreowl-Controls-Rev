@@ -193,10 +193,15 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
           <InfoCell label="Responsável" value={assinante} full />
         </View>
 
-        {(nv(p.escopoServico) || nv(p.objetivo)) && (
+        {(nv(p.objetivo) || nv(p.escopoServico)) && (
           <View minPresenceAhead={50}>
             <SecHead n="01" titulo="Objetivo" />
-            <Text style={styles.para}>{nv(p.escopoServico) ? p.escopoServico : p.objetivo}</Text>
+            <Text style={styles.para}>{nv(p.objetivo) ? p.objetivo : p.escopoServico}</Text>
+            {nv(p.objetivo) && nv(p.escopoServico) && p.escopoServico.trim() !== p.objetivo.trim() && (
+              <Text style={[styles.para, { marginTop: 4 }]}>
+                <Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Escopo: </Text>{p.escopoServico}
+              </Text>
+            )}
             {lnv(p.diretrizesNormativas) && (
               <Text style={{ fontSize: 8, color: C.s500, marginTop: 4 }}>
                 <Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Normas de referência: </Text>
