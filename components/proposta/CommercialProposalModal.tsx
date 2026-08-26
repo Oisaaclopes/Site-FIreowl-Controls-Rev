@@ -48,6 +48,8 @@ interface CommercialProposalModalProps {
   onSaveTemplate?: (template: PedidoTemplate) => void;
   onAddClient?: (client: Client) => void;
   onPreviewPDF: (pedido: Pedido) => void;
+  /** Próximo número sequencial para novas propostas (default do campo). */
+  nextProposalNumber?: number;
 }
 
 const inputCls =
@@ -241,6 +243,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   services = [],
   onAddClient,
   onPreviewPDF,
+  nextProposalNumber = 249,
 }) => {
   // Sanfonas abertas (por padrão as principais abertas).
   const [open, setOpen] = useState<Record<string, boolean>>({
@@ -251,8 +254,8 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }));
 
   // ----------------- estado do formulário -----------------
-  const [numeroPedido] = useState<string>(
-    initialPedido?.numeroPedido || `PED-2026-${Math.floor(100 + Math.random() * 900)}`
+  const [numeroPedido, setNumeroPedido] = useState<string>(
+    initialPedido?.numeroPedido || `PED-${new Date().getFullYear()}-${nextProposalNumber}`
   );
   const [referencia, setReferencia] = useState<string>(initialPedido?.referencia || 'Manutenção Preventiva SDAI');
   const [pedidoTipo, setPedidoTipo] = useState<PedidoTipo | ''>(initialPedido?.proposal?.pedidoTipo || '');
@@ -641,7 +644,14 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
                 <label className={labelCls}>Número do Pedido</label>
-                <input type="text" readOnly value={numeroPedido} className={`${inputCls} bg-slate-100 font-data-mono font-bold`} />
+                <input
+                  type="text"
+                  value={numeroPedido}
+                  onChange={(e) => setNumeroPedido(e.target.value)}
+                  placeholder="Ex.: PED-2026-249"
+                  className={`${inputCls} font-data-mono font-bold`}
+                />
+                <p className="text-[11px] text-slate-400 mt-1">Sequencial automático — edite se quiser um número específico.</p>
               </div>
               <div>
                 <label className={labelCls}>Referência / Nome do Projeto</label>
@@ -707,6 +717,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                   <option value="em_revisao">Em Revisão</option>
                   <option value="enviado_ao_cliente">Enviado ao Cliente</option>
                   <option value="aceito">Aceito</option>
+                  <option value="concluido">Concluída / Recebida</option>
                 </select>
               </div>
             </div>

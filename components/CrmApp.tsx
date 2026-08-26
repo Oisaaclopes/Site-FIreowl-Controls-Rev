@@ -199,12 +199,17 @@ export function CrmApp({
   // Documento padrão por tipo de pedido (config nível-empresa, no navegador).
   const [documentosPadrao, setDocumentosPadrao] = useState<DocumentosPadrao>({});
 
+  // Próximo número sequencial de proposta (continua a numeração do site antigo).
+  const [nextProposalNumber, setNextProposalNumber] = useState<number>(249);
+
   useEffect(() => {
     try {
       const saved = localStorage.getItem('fireowl_pdf_prefs');
       if (saved) setPdfPrefs({ ...DEFAULT_PDF_PREFS, ...JSON.parse(saved) });
       const savedDocs = localStorage.getItem('fireowl_documentos_padrao');
       if (savedDocs) setDocumentosPadrao(JSON.parse(savedDocs));
+      const savedNum = localStorage.getItem('fireowl_next_proposal_number');
+      if (savedNum && !Number.isNaN(parseInt(savedNum, 10))) setNextProposalNumber(parseInt(savedNum, 10));
     } catch {
       /* localStorage indisponível */
     }
@@ -300,7 +305,25 @@ export function CrmApp({
     });
   };
 
+  // Mantém o contador sequencial à frente do maior número já usado.
+  const bumpProposalNumber = (numeroPedido: string) => {
+    const m = String(numeroPedido || '').match(/(\d+)\s*$/);
+    if (!m) return;
+    const seq = parseInt(m[1], 10);
+    if (Number.isNaN(seq)) return;
+    setNextProposalNumber((prev) => {
+      const next = Math.max(prev, seq + 1);
+      try {
+        localStorage.setItem('fireowl_next_proposal_number', String(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
   const handleSavePedido = async (savedPedido: Pedido) => {
+    bumpProposalNumber(savedPedido.numeroPedido);
     if (isSupabaseConfigured()) {
       try {
         const persisted = await upsertPedido(savedPedido);
@@ -790,8 +813,10 @@ export function CrmApp({
               onGenerateOSFromPedido={handleGenerateOSFromPedido}
               onSelectClientForReport={handleSelectClientForReport}
               onAddClient={handleAddClient}
+              onAddTransaction={handleAddTransaction}
               pdfPrefs={pdfPrefs}
               documentosPadrao={documentosPadrao}
+              nextProposalNumber={nextProposalNumber}
               userRole={userRole}
               currentUserName={userName}
               initialView={pedidosInitialView}

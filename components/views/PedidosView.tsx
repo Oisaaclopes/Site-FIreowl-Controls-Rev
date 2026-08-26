@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useMemo, useRef, useState } from 'react';
-import { PedidoOS, Client, Pedido, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem, DocumentosPadrao, DocumentType } from '@/lib/types';
+import { PedidoOS, Client, Pedido, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem, DocumentosPadrao, DocumentType, FinancialTransaction, RecebimentoProposta } from '@/lib/types';
 import { uploadPropostaCapa, removePropostaCapa, propostaCapaDataUrl, blobToDataUrl, readImageSize } from '@/lib/propostaCapa';
 import { CommercialProposalModal } from '@/components/proposta/CommercialProposalModal';
 import { CommercialProposalPDFView } from '@/components/proposta/CommercialProposalPDFView';
+import { ConclusaoModal } from '@/components/proposta/ConclusaoModal';
 import { DocumentTypeModal } from '@/components/proposta/DocumentTypeModal';
 import { OrcamentoPDFView } from '@/components/documentos/OrcamentoPDFView';
 import { OrdemServicoPDFView } from '@/components/documentos/OrdemServicoPDFView';
@@ -49,6 +50,8 @@ interface PedidosViewProps {
   onAddClient?: (client: Client) => void;
   pdfPrefs: PdfPrefs;
   documentosPadrao?: DocumentosPadrao;
+  nextProposalNumber?: number;
+  onAddTransaction?: (tx: FinancialTransaction) => void;
   userRole: UserRole;
   currentUserName?: string;
   /** Aba inicial ao abrir (ex.: atalho "Nova OS" do painel). */
@@ -62,13 +65,14 @@ const STATUS_META: Record<PedidoStatus, { label: string; color: string }> = {
   aprovado_interno: { label: 'Aprovado Interno', color: '#1d4ed8' },
   enviado_ao_cliente: { label: 'Enviado ao Cliente', color: '#7e22ce' },
   aceito: { label: 'Aceito', color: '#047857' },
+  concluido: { label: 'Concluída / Recebida', color: '#059669' },
   recusado: { label: 'Recusado', color: '#dc2626' },
   expirado: { label: 'Expirado', color: '#64748b' },
 };
 const STATUS_ORDER = Object.keys(STATUS_META) as PedidoStatus[];
 
 // Mini-cards do funil (ordem enxuta e representativa)
-const PIPELINE: PedidoStatus[] = ['rascunho', 'em_revisao', 'enviado_ao_cliente', 'aceito', 'recusado'];
+const PIPELINE: PedidoStatus[] = ['rascunho', 'em_revisao', 'enviado_ao_cliente', 'aceito', 'concluido'];
 
 const DEFAULT_STATUS_KEY = 'fireowl_pedidos_default_status';
 
@@ -92,8 +96,10 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   onGenerateOSFromPedido,
   onSelectClientForReport,
   onAddClient,
+  onAddTransaction,
   pdfPrefs,
   documentosPadrao = {},
+  nextProposalNumber = 249,
   userRole,
   currentUserName = '',
   initialView,
@@ -149,6 +155,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   const [osPedido, setOsPedido] = useState<Pedido | null>(null);
   const [listaProdutosPedido, setListaProdutosPedido] = useState<Pedido | null>(null);
   const [notaPedido, setNotaPedido] = useState<{ pedido: Pedido; variante: NotaVariante } | null>(null);
+  const [concluindoPedido, setConcluindoPedido] = useState<Pedido | null>(null);
   const [capaBusy, setCapaBusy] = useState(false);
   const capaInputRef = useRef<HTMLInputElement>(null);
 
@@ -224,6 +231,73 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     const padrao = resolveDocumentoPadrao(ped, documentosPadrao);
     if (padrao) dispatchDocument(ped, padrao);
     else setDocModalPedido(ped);
+  };
+
+  // Mudança de status na lista: "Concluída" abre o modal de recebimento; os
+  // demais status seguem direto.
+  const handleStatusChange = (ped: Pedido, ns: PedidoStatus) => {
+    if (ns === 'concluido' && ped.status !== 'concluido') {
+      setConcluindoPedido(ped);
+      return;
+    }
+    onUpdatePedidoStatus(ped.id, ns);
+  };
+
+  // Conclui a proposta (recebida): grava o recebimento e lança as receitas
+  // (parcelas viram lançamentos com vencimento) no Financeiro.
+  const handleConcluir = (ped: Pedido, receb: RecebimentoProposta) => {
+    const atualizado: Pedido = {
+      ...ped,
+      status: 'concluido',
+      proposal: { ...ped.proposal, recebimento: receb },
+    };
+    onSavePedido(atualizado);
+
+    if (onAddTransaction) {
+      const baseId = `#FOWL-${Date.now().toString(36).toUpperCase()}`;
+      const mkTx = (idx: number, over: Partial<FinancialTransaction>): FinancialTransaction => ({
+        id: `${baseId}-${idx}`,
+        type: 'RECEITA',
+        clientOrVendor: ped.clienteNome,
+        description: '',
+        date: receb.dataRecebimento || new Date().toISOString().split('T')[0],
+        status: 'CONFIRMADO',
+        amount: 0,
+        category: 'Proposta comercial',
+        paymentMethod: receb.paymentMethod,
+        documentRef: ped.numeroPedido,
+        clientId: ped.clienteId,
+        ...over,
+      });
+
+      if (receb.forma === 'avista') {
+        onAddTransaction(mkTx(1, {
+          description: `Recebimento — proposta ${ped.numeroPedido}`,
+          amount: receb.valor,
+          dueDate: receb.dataRecebimento,
+        }));
+      } else {
+        let idx = 1;
+        if ((receb.entrada || 0) > 0) {
+          onAddTransaction(mkTx(idx++, {
+            description: `Entrada — proposta ${ped.numeroPedido}`,
+            amount: receb.entrada || 0,
+            dueDate: receb.dataRecebimento,
+          }));
+        }
+        (receb.parcelas || []).forEach((p) => {
+          onAddTransaction(mkTx(idx++, {
+            description: `Parcela ${p.numero}/${p.total} — proposta ${ped.numeroPedido}`,
+            amount: p.valor,
+            status: 'PENDENTE',
+            date: p.vencimento,
+            dueDate: p.vencimento,
+          }));
+        });
+      }
+    }
+
+    setConcluindoPedido(null);
   };
 
   // Upload da imagem de capa (JPG/PNG) no modal de opções do PDF.
@@ -496,7 +570,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           {/* Status interativo (dropdown com aparência de botão na cor do status) */}
           <select
             value={ped.status}
-            onChange={(e) => onUpdatePedidoStatus(ped.id, e.target.value as PedidoStatus)}
+            onChange={(e) => handleStatusChange(ped, e.target.value as PedidoStatus)}
             style={{ color: meta.color, borderColor: meta.color }}
             className="text-[11px] font-bold uppercase rounded-lg border-2 bg-white px-2 py-1.5 cursor-pointer focus:outline-none"
             title="Alterar status"
@@ -949,6 +1023,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
         services={services}
         onAddClient={onAddClient}
         onPreviewPDF={(ped) => setPdfPreviewPedido(ped)}
+        nextProposalNumber={nextProposalNumber}
       />
 
       {/* Modal "Qual documento gerar?" (quando não há padrão, ou via "Gerar outro documento") */}
@@ -990,6 +1065,15 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           companyProfile={companyProfile}
           options={{ showLogo: pdfPrefs.showLogo }}
           onClose={() => setListaProdutosPedido(null)}
+        />
+      )}
+
+      {/* Conclusão & recebimento (lança receitas no Financeiro) */}
+      {concluindoPedido && (
+        <ConclusaoModal
+          pedido={concluindoPedido}
+          onClose={() => setConcluindoPedido(null)}
+          onConfirm={(receb) => handleConcluir(concluindoPedido, receb)}
         />
       )}
 

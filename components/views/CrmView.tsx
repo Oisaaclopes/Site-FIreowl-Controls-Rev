@@ -62,6 +62,7 @@ const proposalStatusLabel: Record<Pedido['status'], string> = {
   aprovado_interno: 'Aprovado interno',
   enviado_ao_cliente: 'Enviado ao cliente',
   aceito: 'Aceito',
+  concluido: 'Concluída / Recebida',
   recusado: 'Recusado',
   expirado: 'Expirado',
 };

@@ -22,8 +22,19 @@ export type PedidoStatus =
   | 'aprovado_interno'
   | 'enviado_ao_cliente'
   | 'aceito'
+  | 'concluido'
   | 'recusado'
   | 'expirado';
+
+/** Recebimento de uma proposta concluída (à vista ou parcelado). */
+export interface RecebimentoProposta {
+  forma: 'avista' | 'parcelado';
+  valor: number;
+  paymentMethod?: string; // PIX, Boleto, TED, Cartão, Dinheiro...
+  dataRecebimento?: string; // data em que foi marcada como recebida (à vista) ou da entrada
+  entrada?: number; // valor pago à vista antes do parcelamento
+  parcelas?: { numero: number; total: number; valor: number; vencimento: string }[];
+}
 
 export interface PedidoEquipmentItem {
   itemNumero: number;
@@ -59,6 +70,8 @@ export interface CommercialProposalData {
    * migração de coluna). Usado para escolher o documento padrão ao gerar PDF.
    */
   pedidoTipo?: PedidoTipo;
+  /** Dados do recebimento quando a proposta é concluída (à vista/parcelado). */
+  recebimento?: RecebimentoProposta;
   diretrizesNormativas: string[];
   escopoServico: string;
   entregaveis: string[];
