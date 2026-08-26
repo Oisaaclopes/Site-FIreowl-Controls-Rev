@@ -14,6 +14,7 @@ import {
   PedidoTipo,
 } from '@/lib/types';
 import { PEDIDO_TIPO_LABELS, PEDIDO_TIPO_ORDER } from '@/lib/documentos';
+import { ItensCardEditor } from '@/components/proposta/ItensCardEditor';
 import {
   X,
   Plus,
@@ -368,7 +369,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   // Subtotal = soma dos itens (materiais e/ou serviços). Mão de obra é opcional
   // (0 por padrão); o botão "Sugerir 70/30" preenche pela regra material 30% /
   // mão de obra 70% quando a proposta for de fornecimento com instalação.
-  const subtotalItens = round2(equipmentItems.reduce((acc, item) => acc + (item.precoUnitario || 0) * item.quantidade, 0));
+  const subtotalItens = round2(equipmentItems.reduce((acc, item) => acc + Math.max(0, (item.precoUnitario || 0) * item.quantidade - (item.desconto || 0)), 0));
   const valorBase = round2(subtotalItens + (Number(maoDeObra) || 0));
   const effectiveValorTotal = manualValorTotal !== null ? manualValorTotal : valorBase;
   const sugerir7030 = () => setMaoDeObra(round2(subtotalItens > 0 ? subtotalItens * (0.7 / 0.3) : 0));
@@ -377,8 +378,6 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   // original de cada um no array para os handlers de edição/remoção.
   const materiaisRows = equipmentItems.map((it, idx) => ({ it, idx })).filter((x) => x.it.tipo !== 'servico');
   const servicosRows = equipmentItems.map((it, idx) => ({ it, idx })).filter((x) => x.it.tipo === 'servico');
-  const subtotalMateriais = round2(materiaisRows.reduce((a, x) => a + (x.it.precoUnitario || 0) * x.it.quantidade, 0));
-  const subtotalServicos = round2(servicosRows.reduce((a, x) => a + (x.it.precoUnitario || 0) * x.it.quantidade, 0));
 
   // ----------------- helpers de lista -----------------
   const addStr = (setter: React.Dispatch<React.SetStateAction<string[]>>, def = '') => setter((p) => [...p, def]);
@@ -388,35 +387,24 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     setter((p) => p.filter((_, idx) => idx !== i));
 
   // ----------------- equipamentos -----------------
-  const handleAddEquipment = (tipo: 'material' | 'servico' = 'material') =>
-    setEquipmentItems((prev) => [
-      ...prev,
-      { itemNumero: prev.length + 1, descricao: '', marcaModelo: '', unidade: tipo === 'servico' ? 'vb' : 'un', quantidade: 1, precoUnitario: 0, tipo },
-    ]);
-  const handleSelectInventoryItem = (index: number, inventoryId: string) => {
-    const inv = inventory.find((i) => i.id === inventoryId);
-    if (!inv) return;
-    setEquipmentItems((prev) =>
-      prev.map((it, i) =>
-        i === index
-          ? { ...it, vinculoEstoqueId: inv.id, descricao: inv.name, marcaModelo: inv.brand || inv.supplier || inv.category, precoUnitario: inv.salePrice ?? inv.unitPrice }
-          : it
-      )
-    );
-  };
-  const handleSelectService = (index: number, serviceId: string) => {
-    const svc = services.find((s) => s.id === serviceId);
-    if (!svc) return;
-    setEquipmentItems((prev) =>
-      prev.map((it, i) =>
-        i === index ? { ...it, vinculoServicoId: svc.id, descricao: svc.title, precoUnitario: svc.standardValue } : it
-      )
-    );
-  };
-  const handleUpdateEquipment = (index: number, field: keyof PedidoEquipmentItem, val: unknown) =>
-    setEquipmentItems((prev) => prev.map((it, i) => (i === index ? { ...it, [field]: val } : it)));
+  const handleUpdateEquipmentPatch = (index: number, patch: Partial<PedidoEquipmentItem>) =>
+    setEquipmentItems((prev) => prev.map((it, i) => (i === index ? { ...it, ...patch } : it)));
   const handleRemoveEquipment = (index: number) =>
     setEquipmentItems((prev) => prev.filter((_, i) => i !== index).map((it, i) => ({ ...it, itemNumero: i + 1 })));
+  const handleAddEquipmentItem = (item: Partial<PedidoEquipmentItem>) =>
+    setEquipmentItems((prev) => [
+      ...prev,
+      { itemNumero: prev.length + 1, descricao: '', marcaModelo: '', unidade: 'un', quantidade: 1, precoUnitario: 0, ...item } as PedidoEquipmentItem,
+    ]);
+  // Move um item trocando de posição com o vizinho (mantém a ordem geral).
+  const handleMoveEquipment = (index: number, dir: -1 | 1) =>
+    setEquipmentItems((prev) => {
+      const j = index + dir;
+      if (j < 0 || j >= prev.length) return prev;
+      const copy = [...prev];
+      [copy[index], copy[j]] = [copy[j], copy[index]];
+      return copy.map((it, i) => ({ ...it, itemNumero: i + 1 }));
+    });
 
   // ----------------- templates -----------------
   const handleLoadTemplate = (template: PedidoTemplate) => {
@@ -731,58 +719,22 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             onToggle={() => toggle('materiais')}
             badge={<span className="text-[10px] font-bold bg-slate-100 text-slate-600 rounded-full px-2 py-0.5">{materiaisRows.length}</span>}
           >
-            <p className="text-[11px] text-slate-500 mb-2">Vincule do Estoque (código, nome e preço vêm do produto) ou digite manualmente.</p>
-            <div className="overflow-x-auto border border-slate-200 rounded-lg">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-[#0B1E38] text-white font-bold uppercase text-[10px]">
-                  <tr>
-                    <th className="p-2 text-center w-8">#</th>
-                    <th className="p-2 w-40">Vincular do Estoque</th>
-                    <th className="p-2">Descrição</th>
-                    <th className="p-2 w-28">Marca/Modelo</th>
-                    <th className="p-2 text-center w-12">Unid.</th>
-                    <th className="p-2 text-center w-20">Qtd.</th>
-                    <th className="p-2 text-right w-24">Unit. (R$)</th>
-                    <th className="p-2 text-right w-24">Subtotal</th>
-                    <th className="p-2 text-center w-8" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 font-medium text-slate-700">
-                  {materiaisRows.map(({ it, idx }, pos) => (
-                    <tr key={idx} className="hover:bg-slate-50 [&>td]:align-top">
-                      <td className="p-2 text-center font-bold font-data-mono text-[#E63946]">{pos + 1}</td>
-                      <td className="p-2">
-                        <select value={it.vinculoEstoqueId || ''} onChange={(e) => handleSelectInventoryItem(idx, e.target.value)} className="w-full border border-slate-300 rounded p-1.5 text-[11px] bg-slate-50">
-                          <option value="">Selecione...</option>
-                          {inventory.map((inv) => (
-                            <option key={inv.id} value={inv.id}>{inv.code} - {inv.name}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="p-2">
-                        <input type="text" value={it.descricao} onChange={(e) => handleUpdateEquipment(idx, 'descricao', e.target.value)} placeholder="Material..." className="w-full border border-slate-300 rounded p-1.5 text-slate-900 font-semibold" />
-                        <textarea rows={2} value={it.descricaoDetalhada || ''} onChange={(e) => handleUpdateEquipment(idx, 'descricaoDetalhada', e.target.value)} placeholder="Descrição detalhada (opcional) — aparece abaixo do item no documento" className="w-full mt-1 border border-slate-200 rounded p-1.5 text-[11px] text-slate-600 resize-y" />
-                      </td>
-                      <td className="p-2"><input type="text" value={it.marcaModelo} onChange={(e) => handleUpdateEquipment(idx, 'marcaModelo', e.target.value)} placeholder="(opcional)" className="w-full border border-slate-300 rounded p-1.5" /></td>
-                      <td className="p-2 text-center"><input type="text" value={it.unidade} onChange={(e) => handleUpdateEquipment(idx, 'unidade', e.target.value)} className="w-full border border-slate-300 rounded p-1.5 text-center font-bold uppercase" /></td>
-                      <td className="p-2 text-center"><input type="number" min={1} value={it.quantidade} onChange={(e) => handleUpdateEquipment(idx, 'quantidade', Number(e.target.value))} className="w-full border border-slate-300 rounded p-1.5 text-center font-data-mono font-bold" /></td>
-                      <td className="p-2 text-right"><input type="number" value={it.precoUnitario || 0} onChange={(e) => handleUpdateEquipment(idx, 'precoUnitario', Number(e.target.value))} className="w-full border border-slate-300 rounded p-1.5 text-right font-data-mono" /></td>
-                      <td className="p-2 text-right font-data-mono font-bold text-slate-900">{((it.precoUnitario || 0) * it.quantidade).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                      <td className="p-2 text-center"><button type="button" onClick={() => handleRemoveEquipment(idx)} className="p-1 text-slate-400 hover:text-[#E63946] hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button></td>
-                    </tr>
-                  ))}
-                  {materiaisRows.length === 0 && (
-                    <tr><td colSpan={9} className="p-4 text-center text-slate-400 italic">Nenhum material. Adicione abaixo.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <div className="mt-2 flex items-center justify-between">
-              <button type="button" onClick={() => handleAddEquipment('material')} className="py-2 px-3 rounded-lg border border-dashed border-[#E63946]/50 text-[11px] font-semibold text-[#E63946] hover:bg-red-50 transition-colors flex items-center gap-1 uppercase">
-                <Plus className="w-3.5 h-3.5" /> Adicionar material
-              </button>
-              <span className="text-[11px] font-bold text-slate-600 font-data-mono">Subtotal materiais: R$ {subtotalMateriais.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-            </div>
+            <p className="text-[11px] text-slate-500 mb-3">Vincule do Estoque (código, nome e preço vêm do produto) ou digite manualmente no card abaixo.</p>
+            <ItensCardEditor
+              tipo="material"
+              accent="red"
+              itens={materiaisRows}
+              catalogo={inventory.map((inv) => ({ id: inv.id, label: `${inv.code} - ${inv.name}` }))}
+              resolveCatalogo={(id) => {
+                const inv = inventory.find((i) => i.id === id);
+                if (!inv) return undefined;
+                return { descricao: inv.name, marcaModelo: inv.brand || inv.supplier || inv.category, precoUnitario: inv.salePrice ?? inv.unitPrice, unidade: 'un' };
+              }}
+              onAdd={handleAddEquipmentItem}
+              onUpdate={handleUpdateEquipmentPatch}
+              onRemove={handleRemoveEquipment}
+              onMove={handleMoveEquipment}
+            />
           </Accordion>
 
           {/* ---- Lista de Serviços (digitado ou do catálogo de Serviços) ---- */}
@@ -793,58 +745,24 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             onToggle={() => toggle('servicos')}
             badge={<span className="text-[10px] font-bold bg-slate-100 text-slate-600 rounded-full px-2 py-0.5">{servicosRows.length}</span>}
           >
-            <p className="text-[11px] text-slate-500 mb-2">
-              Digite o serviço (ex.: &ldquo;Integração SDAI do lojista com o sistema do shopping&rdquo;) ou vincule ao catálogo da aba Serviços.
+            <p className="text-[11px] text-slate-500 mb-3">
+              Digite o serviço (ex.: &ldquo;Integração SDAI do lojista&rdquo;) ou vincule ao catálogo da aba Serviços, no card abaixo.
             </p>
-            <div className="overflow-x-auto border border-slate-200 rounded-lg">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-emerald-700 text-white font-bold uppercase text-[10px]">
-                  <tr>
-                    <th className="p-2 text-center w-8">#</th>
-                    <th className="p-2 w-40">Vincular do Catálogo</th>
-                    <th className="p-2">Descrição do serviço</th>
-                    <th className="p-2 text-center w-12">Unid.</th>
-                    <th className="p-2 text-center w-20">Qtd.</th>
-                    <th className="p-2 text-right w-24">Unit. (R$)</th>
-                    <th className="p-2 text-right w-24">Subtotal</th>
-                    <th className="p-2 text-center w-8" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 font-medium text-slate-700">
-                  {servicosRows.map(({ it, idx }, pos) => (
-                    <tr key={idx} className="hover:bg-slate-50 [&>td]:align-top">
-                      <td className="p-2 text-center font-bold font-data-mono text-emerald-700">{pos + 1}</td>
-                      <td className="p-2">
-                        <select value={it.vinculoServicoId || ''} onChange={(e) => handleSelectService(idx, e.target.value)} className="w-full border border-slate-300 rounded p-1.5 text-[11px] bg-slate-50">
-                          <option value="">{services.length ? 'Selecione...' : 'Sem catálogo'}</option>
-                          {services.map((svc) => (
-                            <option key={svc.id} value={svc.id}>{svc.code} - {svc.title}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="p-2">
-                        <input type="text" value={it.descricao} onChange={(e) => handleUpdateEquipment(idx, 'descricao', e.target.value)} placeholder="Serviço a ser realizado..." className="w-full border border-slate-300 rounded p-1.5 text-slate-900 font-semibold" />
-                        <textarea rows={2} value={it.descricaoDetalhada || ''} onChange={(e) => handleUpdateEquipment(idx, 'descricaoDetalhada', e.target.value)} placeholder="Descrição detalhada (opcional) — aparece abaixo do item no documento" className="w-full mt-1 border border-slate-200 rounded p-1.5 text-[11px] text-slate-600 resize-y" />
-                      </td>
-                      <td className="p-2 text-center"><input type="text" value={it.unidade} onChange={(e) => handleUpdateEquipment(idx, 'unidade', e.target.value)} className="w-full border border-slate-300 rounded p-1.5 text-center font-bold uppercase" /></td>
-                      <td className="p-2 text-center"><input type="number" min={1} value={it.quantidade} onChange={(e) => handleUpdateEquipment(idx, 'quantidade', Number(e.target.value))} className="w-full border border-slate-300 rounded p-1.5 text-center font-data-mono font-bold" /></td>
-                      <td className="p-2 text-right"><input type="number" value={it.precoUnitario || 0} onChange={(e) => handleUpdateEquipment(idx, 'precoUnitario', Number(e.target.value))} className="w-full border border-slate-300 rounded p-1.5 text-right font-data-mono" /></td>
-                      <td className="p-2 text-right font-data-mono font-bold text-slate-900">{((it.precoUnitario || 0) * it.quantidade).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                      <td className="p-2 text-center"><button type="button" onClick={() => handleRemoveEquipment(idx)} className="p-1 text-slate-400 hover:text-[#E63946] hover:bg-red-50 rounded"><Trash2 className="w-4 h-4" /></button></td>
-                    </tr>
-                  ))}
-                  {servicosRows.length === 0 && (
-                    <tr><td colSpan={8} className="p-4 text-center text-slate-400 italic">Nenhum serviço. Adicione abaixo.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <div className="mt-2 flex items-center justify-between">
-              <button type="button" onClick={() => handleAddEquipment('servico')} className="py-2 px-3 rounded-lg border border-dashed border-emerald-500/60 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors flex items-center gap-1 uppercase">
-                <Plus className="w-3.5 h-3.5" /> Adicionar serviço
-              </button>
-              <span className="text-[11px] font-bold text-slate-600 font-data-mono">Subtotal serviços: R$ {subtotalServicos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-            </div>
+            <ItensCardEditor
+              tipo="servico"
+              accent="emerald"
+              itens={servicosRows}
+              catalogo={services.map((svc) => ({ id: svc.id, label: `${svc.code} - ${svc.title}` }))}
+              resolveCatalogo={(id) => {
+                const svc = services.find((s) => s.id === id);
+                if (!svc) return undefined;
+                return { descricao: svc.title, precoUnitario: svc.standardValue, unidade: 'vb' };
+              }}
+              onAdd={handleAddEquipmentItem}
+              onUpdate={handleUpdateEquipmentPatch}
+              onRemove={handleRemoveEquipment}
+              onMove={handleMoveEquipment}
+            />
           </Accordion>
 
           {valorCard}

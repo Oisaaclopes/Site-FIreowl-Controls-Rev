@@ -44,6 +44,8 @@ export interface PedidoEquipmentItem {
   marcaModelo: string;
   unidade: string;
   quantidade: number;
+  /** Desconto em R$ aplicado sobre o total da linha (preço × qtd − desconto). */
+  desconto?: number;
   vinculoEstoqueId?: string;
   /** Serviço vinculado ao catálogo de Serviços (quando tipo = 'servico'). */
   vinculoServicoId?: string;

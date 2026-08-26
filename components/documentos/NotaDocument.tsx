@@ -1,7 +1,7 @@
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
-import { C, brl, nv, PdfHeader, PdfFooter, CamposExtras } from './pdfKit';
+import { C, brl, nv, PdfHeader, PdfFooter, CamposExtras, itemTotal } from './pdfKit';
 import { DocOptions } from '@/lib/documentos';
 
 export type NotaVariante = 'servico' | 'produtos';
@@ -81,7 +81,7 @@ export function NotaDocument({ pedido, companyProfile, variante, options }: { pe
   const itens = (p.equipmentItems || []).filter((e: PedidoEquipmentItem) => (isServico ? e.tipo === 'servico' : e.tipo !== 'servico'));
   const showMarca = !isServico && showDetalhe;
   const maoDeObra = isServico ? (p.maoDeObra || 0) : 0;
-  const subtotal = itens.reduce((a, e) => a + (e.precoUnitario || 0) * e.quantidade, 0);
+  const subtotal = itens.reduce((a, e) => a + itemTotal(e), 0);
   const total = subtotal + maoDeObra;
 
   return (
@@ -125,7 +125,7 @@ export function NotaDocument({ pedido, companyProfile, variante, options }: { pe
             </View>
             {itens.map((eq, i) => {
               const unit = eq.precoUnitario || 0;
-              const tot = unit * eq.quantidade;
+              const tot = itemTotal(eq);
               return (
                 <View key={i} style={[styles.tr, i % 2 === 1 ? styles.trAlt : {}]} wrap={false}>
                   <Text style={[styles.td, { width: 24, textAlign: 'center', color: C.red, fontFamily: 'Roboto', fontWeight: 700 }]}>{i + 1}</Text>

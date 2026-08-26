@@ -52,6 +52,9 @@ export const C = {
 export const A4 = { w: 595.28, h: 841.89 };
 
 export const brl = (n: number) => `R$ ${(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+/** Total da linha do item: preço × qtd − desconto (nunca negativo). */
+export const itemTotal = (eq: { precoUnitario?: number; quantidade: number; desconto?: number }) =>
+  Math.max(0, (eq.precoUnitario || 0) * eq.quantidade - (eq.desconto || 0));
 export const nv = (s?: string) => !!s && s.trim().length > 0;
 export const lnv = (a?: string[]) => Array.isArray(a) && a.filter((x) => nv(x)).length > 0;
 

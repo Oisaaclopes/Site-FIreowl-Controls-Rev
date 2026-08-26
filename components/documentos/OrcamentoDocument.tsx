@@ -1,7 +1,7 @@
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
-import { C, brl, nv, lnv, PdfHeader, PdfFooter, CamposExtras } from './pdfKit';
+import { C, brl, nv, lnv, PdfHeader, PdfFooter, CamposExtras, itemTotal } from './pdfKit';
 import { DocOptions } from '@/lib/documentos';
 
 export type OrcamentoPdfOptions = Partial<DocOptions>;
@@ -58,7 +58,7 @@ const InfoCell = ({ label, value, full }: { label: string; value: string; full?:
 );
 
 const ItensTable = ({ titulo, itens, showUnit, showTotal, showMarca, accent }: { titulo: string; itens: PedidoEquipmentItem[]; showUnit: boolean; showTotal: boolean; showMarca: boolean; accent: string }) => {
-  const subtotal = itens.reduce((a, e) => a + (e.precoUnitario || 0) * e.quantidade, 0);
+  const subtotal = itens.reduce((a, e) => a + itemTotal(e), 0);
   return (
     <View style={{ marginBottom: 10 }} minPresenceAhead={60}>
       <Text style={styles.subTitle}>{titulo}</Text>
@@ -74,11 +74,11 @@ const ItensTable = ({ titulo, itens, showUnit, showTotal, showMarca, accent }: {
         </View>
         {itens.map((eq, i) => {
           const unit = eq.precoUnitario || 0;
-          const tot = unit * eq.quantidade;
+          const tot = itemTotal(eq);
           return (
             <View key={i} style={[styles.tr, i % 2 === 1 ? styles.trAlt : {}]} wrap={false}>
               <Text style={[styles.td, { width: 24, textAlign: 'center', color: C.red, fontFamily: 'Roboto', fontWeight: 700 }]}>{i + 1}</Text>
-              <View style={[styles.td, { flex: 1 }]}><Text style={{ color: C.ink, fontFamily: 'Roboto', fontWeight: 700, fontSize: 8 }}>{eq.descricao}</Text>{showMarca && eq.descricaoDetalhada ? <Text style={{ color: C.s500, fontSize: 7, marginTop: 1, lineHeight: 1.3 }}>{eq.descricaoDetalhada}</Text> : null}</View>
+              <View style={[styles.td, { flex: 1 }]}><Text style={{ color: C.ink, fontFamily: 'Roboto', fontWeight: 700, fontSize: 8 }}>{eq.descricao}</Text>{showMarca && eq.descricaoDetalhada ? <Text style={{ color: C.s500, fontSize: 7, marginTop: 1, lineHeight: 1.3 }}>{eq.descricaoDetalhada}</Text> : null}{eq.desconto ? <Text style={{ color: C.red, fontSize: 6.5, marginTop: 1 }}>{`desconto: ${brl(eq.desconto)}`}</Text> : null}</View>
               {showMarca && <Text style={[styles.td, { width: 88 }]}>{eq.marcaModelo}</Text>}
               <Text style={[styles.td, { width: 30, textAlign: 'center', textTransform: 'uppercase' }]}>{eq.unidade}</Text>
               <Text style={[styles.td, { width: 30, textAlign: 'center', fontFamily: 'Roboto', fontWeight: 700 }]}>{eq.quantidade}</Text>
@@ -145,6 +145,19 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
           <InfoCell label="Validade" value={validade} />
           <InfoCell label="Responsável" value={assinante} full />
         </View>
+
+        {(nv(p.escopoServico) || nv(p.objetivo)) && (
+          <View style={{ marginBottom: 12 }}>
+            <Text style={styles.subTitle}>Objetivo</Text>
+            <Text style={{ fontSize: 9, color: C.s700, textAlign: 'justify', lineHeight: 1.4 }}>{nv(p.escopoServico) ? p.escopoServico : p.objetivo}</Text>
+            {lnv(p.diretrizesNormativas) && (
+              <Text style={{ fontSize: 8, color: C.s500, marginTop: 4 }}>
+                <Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Normas de referência: </Text>
+                {p.diretrizesNormativas.filter(nv).join(' · ')}
+              </Text>
+            )}
+          </View>
+        )}
 
         {materiais.length > 0 && <ItensTable titulo="Materiais" itens={materiais} showUnit={showUnit} showTotal={showTotal} showMarca={showMarca} accent={C.navy} />}
         {servicos.length > 0 && <ItensTable titulo="Serviços" itens={servicos} showUnit={showUnit} showTotal={showTotal} showMarca={showMarca} accent={C.green} />}

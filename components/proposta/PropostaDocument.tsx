@@ -915,7 +915,7 @@ const ItensTable = ({
   showMarca?: boolean;
   accent?: string;
 }) => {
-  const subtotal = itens.reduce((a, e) => a + (e.precoUnitario || 0) * e.quantidade, 0);
+  const subtotal = itens.reduce((a, e) => a + Math.max(0, (e.precoUnitario || 0) * e.quantidade - (e.desconto || 0)), 0);
   return (
     <View style={{ marginBottom: 10 }} minPresenceAhead={56}>
       <Text style={styles.subTitle}>{titulo}</Text>
@@ -931,7 +931,7 @@ const ItensTable = ({
         </View>
         {itens.map((eq, i) => {
           const unit = eq.precoUnitario || 0;
-          const tot = unit * eq.quantidade;
+          const tot = Math.max(0, unit * eq.quantidade - (eq.desconto || 0));
           return (
             <View key={i} style={[styles.tr, i % 2 === 1 ? styles.trAlt : {}]} wrap={false}>
               <Text style={[styles.td, { width: 26, textAlign: 'center', color: C.red, fontFamily: 'Roboto', fontWeight: 700 }]}>{i + 1}</Text>
