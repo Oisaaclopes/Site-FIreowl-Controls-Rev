@@ -659,6 +659,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     lineHeight: 1,
   },
+  mensalCell: { width: '48.5%', marginBottom: 6, backgroundColor: C.s50, borderWidth: 1, borderColor: C.s200, borderRadius: 5, paddingVertical: 6, paddingHorizontal: 10 },
+  mensalLabel: { fontSize: 7.5, color: C.s500, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 },
+  mensalValue: { fontSize: 12, color: C.navy, fontFamily: 'Poppins', fontWeight: 700, marginTop: 2 },
 
   // ===== Blocos =====
   infoBox: {
@@ -865,6 +868,13 @@ const SecHead = ({ n, titulo }: { n: string; titulo: string }) => (
   </View>
 );
 
+const MensalCell = ({ label, value }: { label: string; value: string }) => (
+  <View style={styles.mensalCell}>
+    <Text style={styles.mensalLabel}>{label}</Text>
+    <Text style={styles.mensalValue}>{value}</Text>
+  </View>
+);
+
 const Paras = ({ paras }: { paras: string[] }) => (
   <>
     {paras.filter(nv).map((p, i) => (
@@ -967,6 +977,10 @@ export function PropostaDocument({
   const p = pedido.proposal;
   const razao = companyProfile.razaoSocial || 'Fireowl Controls';
   const fantasia = companyProfile.nomeFantasia || razao;
+  // §15 — contrato recorrente (valor mensal / anual / vigência).
+  const recorrente = !!p.recorrente && (p.valorMensal || 0) > 0;
+  const vMensal = p.valorMensal || 0;
+  const vMeses = p.vigenciaMeses || 0;
   const numero = pedido.numeroPedido;
   const dataEmissao = pedido.dataEmissao || '';
   const clienteNome = pedido.clienteNome || '';
@@ -1305,9 +1319,17 @@ export function PropostaDocument({
         {/* Item 09 - Preços em 2 Linhas limpas (Rótulo no topo, valor em baixo) */}
         <Sec k="precos">
           <View style={styles.precoCardBlock} wrap={false}>
-            <Text style={styles.precoCardLabel}>INVESTIMENTO TOTAL</Text>
-            <Text style={styles.precoCardValue}>{brl(p.valorTotal)}</Text>
+            <Text style={styles.precoCardLabel}>{recorrente ? 'INVESTIMENTO MENSAL' : 'INVESTIMENTO TOTAL'}</Text>
+            <Text style={styles.precoCardValue}>{recorrente ? `${brl(vMensal)} / mês` : brl(p.valorTotal)}</Text>
           </View>
+          {recorrente && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginTop: 8 }} wrap={false}>
+              <MensalCell label="Valor mensal" value={brl(vMensal)} />
+              <MensalCell label="Valor anual" value={brl(vMensal * 12)} />
+              {vMeses > 0 && <MensalCell label="Vigência" value={`${vMeses} meses`} />}
+              {vMeses > 0 && <MensalCell label="Valor estimado do contrato" value={brl(vMensal * vMeses)} />}
+            </View>
+          )}
           <Paras paras={PRECOS_OBS} />
         </Sec>
 

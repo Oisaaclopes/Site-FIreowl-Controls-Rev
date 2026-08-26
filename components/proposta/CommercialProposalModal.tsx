@@ -355,6 +355,11 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const [maoDeObra, setMaoDeObra] = useState<number>(initialPedido?.proposal?.maoDeObra ?? 0);
   const [manualValorTotal, setManualValorTotal] = useState<number | null>(null);
 
+  // §15 — Contrato recorrente (valor mensal / anual / vigência).
+  const [recorrente, setRecorrente] = useState<boolean>(initialPedido?.proposal?.recorrente ?? false);
+  const [valorMensal, setValorMensal] = useState<number>(initialPedido?.proposal?.valorMensal ?? 0);
+  const [vigenciaMeses, setVigenciaMeses] = useState<number>(initialPedido?.proposal?.vigenciaMeses ?? 12);
+
   // Cadastro rápido de cliente (dialog sobreposto).
   const [newClientOpen, setNewClientOpen] = useState(false);
   const [ncName, setNcName] = useState('');
@@ -487,6 +492,9 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         responsabilidadesContratada: respContratada,
         responsabilidadesContratante: respContratante,
         valorTotal: effectiveValorTotal,
+        recorrente,
+        valorMensal: recorrente ? valorMensal : undefined,
+        vigenciaMeses: recorrente ? vigenciaMeses : undefined,
         maoDeObra,
         composicaoValor: '',
         // Texto legado composto das tags (compatibilidade).
@@ -584,6 +592,31 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           onChange={(e) => setManualValorTotal(e.target.value === '' ? null : Number(e.target.value))}
           className="w-44 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xl font-black text-amber-400 font-data-mono text-right"
         />
+      </div>
+      {/* §15 — Contrato recorrente (valor mensal) */}
+      <div className="border-t border-slate-700 pt-3 space-y-2">
+        <label className="flex items-center gap-2 text-[10px] font-bold text-slate-300 uppercase tracking-widest cursor-pointer">
+          <input type="checkbox" checked={recorrente} onChange={(e) => setRecorrente(e.target.checked)} className="accent-[#F2A900] w-3.5 h-3.5" />
+          Contrato recorrente (mensal)
+        </label>
+        {recorrente && (
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <span className="block text-[9px] text-slate-400 uppercase mb-1">Valor mensal (R$)</span>
+              <input type="number" min={0} value={valorMensal} onChange={(e) => setValorMensal(e.target.value === '' ? 0 : Number(e.target.value))} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-right font-data-mono font-bold text-amber-300" />
+            </div>
+            <div>
+              <span className="block text-[9px] text-slate-400 uppercase mb-1">Vigência (meses)</span>
+              <input type="number" min={1} value={vigenciaMeses} onChange={(e) => setVigenciaMeses(e.target.value === '' ? 0 : Number(e.target.value))} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-right font-data-mono font-bold text-slate-200" />
+            </div>
+            {valorMensal > 0 && (
+              <p className="col-span-2 text-[10px] text-slate-400 font-data-mono leading-relaxed">
+                Anual: R$ {(valorMensal * 12).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                {vigenciaMeses > 0 && <> · Total ({vigenciaMeses} meses): R$ {(valorMensal * vigenciaMeses).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</>}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

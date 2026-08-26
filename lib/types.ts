@@ -93,6 +93,12 @@ export interface CommercialProposalData {
   responsabilidadesContratada: string[];
   responsabilidadesContratante: string[];
   valorTotal: number;
+  /** Contrato recorrente (mensal): quando true, o PDF destaca "R$ X / mês". */
+  recorrente?: boolean;
+  /** Valor mensal do contrato recorrente. */
+  valorMensal?: number;
+  /** Vigência do contrato em meses (para valor anual/estimado total). */
+  vigenciaMeses?: number;
   /** Valor de mão de obra / serviços (aparece como linha "Serviços" no PDF). */
   maoDeObra?: number;
   composicaoValor: string;

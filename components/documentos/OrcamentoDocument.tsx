@@ -46,6 +46,10 @@ const styles = StyleSheet.create({
   totalRowNavy: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: C.navy, paddingVertical: 9, paddingHorizontal: 12, borderTopWidth: 3, borderTopColor: C.red },
   totalLabelGold: { color: C.gold, fontSize: 9, fontFamily: 'Poppins', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 },
   totalValue: { color: C.white, fontSize: 16, fontFamily: 'Poppins', fontWeight: 700 },
+  mensalGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginTop: -8, marginBottom: 14 },
+  mensalCell: { width: '48.5%', marginBottom: 6, backgroundColor: C.s50, borderWidth: 1, borderColor: C.s200, borderRadius: 5, paddingVertical: 6, paddingHorizontal: 10 },
+  mensalLabel: { fontSize: 7.5, color: C.s500, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 },
+  mensalValue: { fontSize: 11, color: C.navy, fontFamily: 'Poppins', fontWeight: 700, marginTop: 2 },
 
   condCard: { backgroundColor: C.s50, borderWidth: 1, borderColor: C.s200, borderLeftWidth: 4, borderLeftColor: C.red, borderRadius: 5, padding: 10, marginBottom: 10 },
   condRow: { marginBottom: 4 },
@@ -72,6 +76,14 @@ const SecHead = ({ n, titulo }: { n?: string; titulo: string }) => (
   <View style={styles.secHead} minPresenceAhead={50}>
     {n ? <Text style={styles.secNum}>{n}</Text> : null}
     <Text style={styles.secTitle}>{titulo}</Text>
+  </View>
+);
+
+// §15 — célula do resumo de valores do contrato recorrente.
+const MensalCell = ({ label, value }: { label: string; value: string }) => (
+  <View style={styles.mensalCell}>
+    <Text style={styles.mensalLabel}>{label}</Text>
+    <Text style={styles.mensalValue}>{value}</Text>
   </View>
 );
 
@@ -141,6 +153,11 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
   const materiais = itens.filter((e) => e.tipo !== 'servico');
   const servicos = itens.filter((e) => e.tipo === 'servico');
   const validade = `${p.validadePropostaDias || 15} ${p.validadePropostaComplemento || 'dias corridos a partir da emissão'}`;
+
+  // §15 — Contrato recorrente (valor mensal / anual / vigência).
+  const recorrente = !!p.recorrente && (p.valorMensal || 0) > 0;
+  const vMensal = p.valorMensal || 0;
+  const vMeses = p.vigenciaMeses || 0;
 
   const pagamento =
     (p.formasPagamento?.length || p.condicoesPagamento?.length)
@@ -230,10 +247,18 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
             </View>
           )}
           <View style={styles.totalRowNavy}>
-            <Text style={styles.totalLabelGold}>Investimento Total</Text>
-            <Text style={styles.totalValue}>{brl(p.valorTotal)}</Text>
+            <Text style={styles.totalLabelGold}>{recorrente ? 'Investimento Mensal' : 'Investimento Total'}</Text>
+            <Text style={styles.totalValue}>{recorrente ? `${brl(vMensal)} / mês` : brl(p.valorTotal)}</Text>
           </View>
         </View>
+        {recorrente && (
+          <View style={styles.mensalGrid} wrap={false}>
+            <MensalCell label="Valor mensal" value={brl(vMensal)} />
+            <MensalCell label="Valor anual" value={brl(vMensal * 12)} />
+            {vMeses > 0 && <MensalCell label="Vigência" value={`${vMeses} meses`} />}
+            {vMeses > 0 && <MensalCell label="Valor estimado do contrato" value={brl(vMensal * vMeses)} />}
+          </View>
+        )}
 
         {/* Seção 13 — Impostos e Taxas */}
         <View minPresenceAhead={50} wrap={false}>
