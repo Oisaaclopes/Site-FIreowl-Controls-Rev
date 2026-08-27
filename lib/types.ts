@@ -206,6 +206,8 @@ export interface CompanyProfile {
   apresentacaoGeral?: string;
   /** §8 — apresentação por área (ids: sdai, cftv, acesso, alarme, bms, integracao). */
   apresentacaoAreas?: Record<string, string>;
+  /** §20 — capa (storage_path) por área; usada quando a proposta não tem capa própria. */
+  capaAreas?: Record<string, string>;
 }
 
 export interface PedidoTemplate {

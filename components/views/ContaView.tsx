@@ -30,6 +30,7 @@ import {
 import { WorkSchedule, DEFAULT_SCHEDULE, WEEKDAY_SHORT } from '@/lib/schedule';
 import { maskCpf } from '@/lib/utils';
 import { listEmployeeDocs, uploadEmployeeDoc, signedDocUrl, deleteEmployeeDoc, EmployeeDoc } from '@/lib/storage';
+import { uploadPropostaCapa, removePropostaCapa } from '@/lib/propostaCapa';
 
 interface ContaViewProps {
   logs: SystemAuditLog[];
@@ -460,6 +461,28 @@ export const ContaView: React.FC<ContaViewProps> = ({
   };
 
   const [profile, setProfile] = useState<CompanyProfile>(companyProfile);
+  // §20 — upload de capa por área (id da área em envio).
+  const [capaBusy, setCapaBusy] = useState<string | null>(null);
+  const handleCapaAreaUpload = async (id: string, file: File) => {
+    setCapaBusy(id);
+    try {
+      const path = await uploadPropostaCapa(file, `_areas_${id}`);
+      setProfile((prev) => ({ ...prev, capaAreas: { ...(prev.capaAreas || {}), [id]: path } }));
+    } catch {
+      alert('Não foi possível enviar a imagem. Verifique a conexão com o Supabase.');
+    } finally {
+      setCapaBusy(null);
+    }
+  };
+  const handleCapaAreaRemove = async (id: string) => {
+    const path = profile.capaAreas?.[id];
+    if (path) { try { await removePropostaCapa(path); } catch { /* best-effort */ } }
+    setProfile((prev) => {
+      const next = { ...(prev.capaAreas || {}) };
+      delete next[id];
+      return { ...prev, capaAreas: next };
+    });
+  };
 
   const [newBrandName, setNewBrandName] = useState('');
   const [newBrandCategory, setNewBrandCategory] = useState('');
@@ -661,9 +684,25 @@ export const ContaView: React.FC<ContaViewProps> = ({
                         onChange={(e) => setProfile({ ...profile, apresentacaoAreas: { ...(profile.apresentacaoAreas || {}), [id]: e.target.value } })}
                         className={inputCls}
                       />
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] uppercase tracking-wider text-slate-400">Capa:</span>
+                        {profile.capaAreas?.[id] ? (
+                          <>
+                            <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5"><span className="material-symbols-outlined text-[13px]">check_circle</span>definida</span>
+                            <button type="button" onClick={() => handleCapaAreaRemove(id)} className="text-[10px] font-bold uppercase text-slate-400 hover:text-[#E63946]">remover</button>
+                          </>
+                        ) : (
+                          <label className="text-[10px] font-bold uppercase text-[#1A1A72] hover:text-[#E63946] cursor-pointer">
+                            {capaBusy === id ? 'enviando…' : 'enviar imagem'}
+                            <input type="file" accept="image/*" className="hidden" disabled={capaBusy === id}
+                              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleCapaAreaUpload(id, f); e.target.value = ''; }} />
+                          </label>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
+                <p className="text-[10px] text-slate-400 mt-2">Capa por área: usada na proposta/orçamento quando o pedido não tem capa própria. Enviada ao salvar os dados da empresa.</p>
               </div>
 
               <button

@@ -18,6 +18,7 @@ import { PersonalizadoConfigModal, PersonalizadoData } from '@/components/docume
 import { PersonalizadoPDFView } from '@/components/documentos/PersonalizadoPDFView';
 import { resolveDocumentoPadrao, DOCUMENT_TYPE_LABELS, DocOptions, DEFAULT_DOC_OPTIONS } from '@/lib/documentos';
 import { validateProposal, ValidationIssue } from '@/lib/proposalValidation';
+import { capaAreaPath } from '@/lib/companyProfile';
 import { ProposalValidationModal } from '@/components/proposta/ProposalValidationModal';
 import { DataListRow, RowMeta, Badge } from '@/components/DataListRow';
 import { Toggle } from '@/components/SidePanel';
@@ -173,7 +174,8 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
 
   // Carrega (assíncrono) a imagem de capa persistida na proposta como data URI.
   const loadCapaIntoOptions = async (ped: Pedido) => {
-    const path = ped.proposal?.capaImagemPath;
+    // §20 — sem capa própria, cai na capa da área de atuação.
+    const path = ped.proposal?.capaImagemPath || capaAreaPath(companyProfile, ped.proposal?.areaPrincipal || []);
     if (!path) return;
     try {
       const dataUrl = await propostaCapaDataUrl(path);
@@ -217,8 +219,8 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   const openDocViewer = (ped: Pedido, doc: DocumentType, options: DocOptions) => {
     if (doc === 'orcamento') {
       setOrcamentoPedido({ pedido: ped, options });
-      // Reaproveita a foto de capa da proposta (resolve o data URI e injeta).
-      const path = ped.proposal?.capaImagemPath;
+      // Reaproveita a capa da proposta; sem ela, usa a capa da área de atuação (§20).
+      const path = ped.proposal?.capaImagemPath || capaAreaPath(companyProfile, ped.proposal?.areaPrincipal || []);
       if (path) {
         propostaCapaDataUrl(path)
           .then((url) => setOrcamentoPedido((prev) => (prev && prev.pedido.id === ped.id ? { ...prev, options: { ...prev.options, capaImagemUrl: url } } : prev)))

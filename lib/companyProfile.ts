@@ -15,7 +15,19 @@ function rowToProfile(r: any): CompanyProfile {
     logoUrl: r.logo_url || undefined,
     apresentacaoGeral: r.apresentacao_geral || undefined,
     apresentacaoAreas: (r.apresentacao_areas && typeof r.apresentacao_areas === 'object') ? r.apresentacao_areas : undefined,
+    capaAreas: (r.capa_areas && typeof r.capa_areas === 'object') ? r.capa_areas : undefined,
   };
+}
+
+/** §20 — storage_path da capa da 1ª área da proposta que tiver capa cadastrada. */
+export function capaAreaPath(profile: { capaAreas?: Record<string, string> } | undefined, areaIds: string[]): string | undefined {
+  const mapa = profile?.capaAreas;
+  if (!mapa) return undefined;
+  for (const id of areaIds) {
+    const p = mapa[id];
+    if (p && p.trim()) return p;
+  }
+  return undefined;
 }
 
 function profileToRow(p: CompanyProfile): Record<string, unknown> {
@@ -31,6 +43,7 @@ function profileToRow(p: CompanyProfile): Record<string, unknown> {
     logo_url: p.logoUrl || null,
     apresentacao_geral: p.apresentacaoGeral || null,
     apresentacao_areas: p.apresentacaoAreas || {},
+    capa_areas: p.capaAreas || {},
     updated_at: new Date().toISOString(),
   };
 }
