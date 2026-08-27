@@ -12,6 +12,8 @@ import {
   PedidoStatus,
   ServiceCatalogItem,
   PedidoTipo,
+  EmpresaAtendida,
+  MarcaTecnologia,
 } from '@/lib/types';
 import { PEDIDO_TIPO_LABELS, PEDIDO_TIPO_ORDER } from '@/lib/documentos';
 import { AREAS_PROPOSTA, TIPOS_SERVICO, gerarTituloProposta, conclusaoPorTipo, presetPorTipo } from '@/lib/propostaTitulo';
@@ -48,6 +50,8 @@ interface CommercialProposalModalProps {
   partnerBrands: PartnerBrand[];
   templates: PedidoTemplate[];
   services?: ServiceCatalogItem[];
+  empresasAtendidas?: EmpresaAtendida[];
+  marcasTecnologias?: MarcaTecnologia[];
   onSaveTemplate?: (template: PedidoTemplate) => void;
   onAddClient?: (client: Client) => void;
   onPreviewPDF: (pedido: Pedido) => void;
@@ -244,6 +248,8 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   partnerBrands,
   templates,
   services = [],
+  empresasAtendidas = [],
+  marcasTecnologias = [],
   onAddClient,
   onPreviewPDF,
   nextProposalNumber = 249,
@@ -268,6 +274,11 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const [ordemSecoes, setOrdemSecoes] = useState<string[]>(initialPedido?.proposal?.ordemSecoes || []);
   // Página "Experiência e Capacidade Técnica": undefined = automático (por nível).
   const [incluirExperiencia, setIncluirExperiencia] = useState<boolean | undefined>(initialPedido?.proposal?.incluirExperiencia);
+  // §14 — seleção automática (default) x manual das empresas/marcas.
+  const [experienciaAuto, setExperienciaAuto] = useState<boolean>(initialPedido?.proposal?.experienciaAuto !== false);
+  const [experienciaEmpresasIds, setExperienciaEmpresasIds] = useState<string[]>(initialPedido?.proposal?.experienciaEmpresasIds || []);
+  const [experienciaMarcasIds, setExperienciaMarcasIds] = useState<string[]>(initialPedido?.proposal?.experienciaMarcasIds || []);
+  const toggleSelId = (arr: string[], set: (v: string[]) => void, id: string) => set(arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]);
   const toggleArea = (id: string) => setAreaPrincipal((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   const tituloDinamico = gerarTituloProposta(areaPrincipal, tipoServico);
   const [pedidoTipo, setPedidoTipo] = useState<PedidoTipo | ''>(initialPedido?.proposal?.pedidoTipo || '');
@@ -501,6 +512,9 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         nivelProposta,
         ordemSecoes: ordemSecoes.length ? ordemSecoes : undefined,
         incluirExperiencia,
+        experienciaAuto,
+        experienciaEmpresasIds: experienciaAuto ? undefined : experienciaEmpresasIds,
+        experienciaMarcasIds: experienciaAuto ? undefined : experienciaMarcasIds,
         objetivo,
         cartaApresentacao,
         revisoes: initialPedido?.proposal?.revisoes,
@@ -829,6 +843,48 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                   })}
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1">Mostra empresas atendidas e marcas relevantes ao serviço (cadastradas em Conta). Sem dados, a página não é gerada.</p>
+                {incluirExperiencia !== false && (empresasAtendidas.length > 0 || marcasTecnologias.length > 0) && (
+                  <div className="mt-3 rounded-lg border border-slate-200 p-3 bg-slate-50/60">
+                    <div className="flex items-center gap-4 mb-2">
+                      <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 cursor-pointer">
+                        <input type="radio" checked={experienciaAuto} onChange={() => setExperienciaAuto(true)} className="accent-[#0B1E38]" /> Seleção automática
+                      </label>
+                      <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 cursor-pointer">
+                        <input type="radio" checked={!experienciaAuto} onChange={() => setExperienciaAuto(false)} className="accent-[#0B1E38]" /> Selecionar manualmente
+                      </label>
+                    </div>
+                    {experienciaAuto ? (
+                      <p className="text-[11px] text-slate-400">O sistema escolhe as empresas e marcas mais relevantes à área/tipo/segmento desta proposta.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1">Empresas ({experienciaEmpresasIds.length})</p>
+                          <div className="max-h-40 overflow-y-auto space-y-0.5 pr-1">
+                            {empresasAtendidas.length === 0 && <p className="text-[11px] text-slate-400 italic">Nenhuma cadastrada.</p>}
+                            {empresasAtendidas.map((e) => (
+                              <label key={e.id} className="flex items-center gap-2 text-[11px] text-slate-700 py-0.5 cursor-pointer">
+                                <input type="checkbox" checked={experienciaEmpresasIds.includes(e.id)} onChange={() => toggleSelId(experienciaEmpresasIds, setExperienciaEmpresasIds, e.id)} className="accent-[#0B1E38]" />
+                                <span className="truncate">{e.nomeFantasia || e.nome}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1">Marcas ({experienciaMarcasIds.length})</p>
+                          <div className="max-h-40 overflow-y-auto space-y-0.5 pr-1">
+                            {marcasTecnologias.length === 0 && <p className="text-[11px] text-slate-400 italic">Nenhuma cadastrada.</p>}
+                            {marcasTecnologias.map((m) => (
+                              <label key={m.id} className="flex items-center gap-2 text-[11px] text-slate-700 py-0.5 cursor-pointer">
+                                <input type="checkbox" checked={experienciaMarcasIds.includes(m.id)} onChange={() => toggleSelId(experienciaMarcasIds, setExperienciaMarcasIds, m.id)} className="accent-[#0B1E38]" />
+                                <span className="truncate">{m.nome}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="sm:col-span-2">

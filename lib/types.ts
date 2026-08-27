@@ -72,6 +72,12 @@ export interface CommercialProposalData {
   ordemSecoes?: string[];
   /** Página "Experiência e Capacidade Técnica": true/false força; undefined = automático (por nível). */
   incluirExperiencia?: boolean;
+  /** §14 — false = seleção manual das empresas/marcas; undefined/true = automática. */
+  experienciaAuto?: boolean;
+  /** §14 — ids das empresas escolhidas manualmente (na ordem). */
+  experienciaEmpresasIds?: string[];
+  /** §14 — ids das marcas escolhidas manualmente (na ordem). */
+  experienciaMarcasIds?: string[];
   objetivo: string;
   /** Carta de apresentação (opcional). Vazio → usa o texto institucional padrão. */
   cartaApresentacao?: string;

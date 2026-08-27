@@ -211,8 +211,18 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     const ctx = { areas, tipoServico: p.tipoServico, segmentoCliente };
     const maxE = companyProfile?.expMaxEmpresas ?? 8;
     const maxM = companyProfile?.expMaxMarcas ?? 8;
-    const emp = selecionarEmpresas(empresasAtendidas, ctx, maxE);
-    const mar = selecionarMarcas(marcasTecnologias, ctx, maxM);
+    let emp: EmpresaAtendida[];
+    let mar: MarcaTecnologia[];
+    if (p.experienciaAuto === false) {
+      // §14 — seleção manual: usa os ids escolhidos, na ordem, respeitando o limite.
+      const byE = new Map(empresasAtendidas.map((e) => [e.id, e]));
+      const byM = new Map(marcasTecnologias.map((m) => [m.id, m]));
+      emp = (p.experienciaEmpresasIds || []).map((id) => byE.get(id)).filter((e): e is EmpresaAtendida => !!e && e.autorizacao !== 'nao_autorizado').slice(0, maxE);
+      mar = (p.experienciaMarcasIds || []).map((id) => byM.get(id)).filter((m): m is MarcaTecnologia => !!m).slice(0, maxM);
+    } else {
+      emp = selecionarEmpresas(empresasAtendidas, ctx, maxE);
+      mar = selecionarMarcas(marcasTecnologias, ctx, maxM);
+    }
     if (emp.length === 0 && mar.length === 0) return;
     const segmentos = Array.from(new Set(emp.flatMap((e) => e.segmentos))).slice(0, 6);
     try {
@@ -1132,6 +1142,8 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
         partnerBrands={partnerBrands}
         templates={templates}
         services={services}
+        empresasAtendidas={empresasAtendidas}
+        marcasTecnologias={marcasTecnologias}
         onAddClient={onAddClient}
         onPreviewPDF={(ped) => setPdfPreviewPedido(ped)}
         nextProposalNumber={nextProposalNumber}
