@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { PDFViewer, pdf } from '@react-pdf/renderer';
 import { NotaDocument, NotaVariante, NotaPdfOptions } from './NotaDocument';
 import { Pedido, CompanyProfile } from '@/lib/types';
+import { nomeArquivoPdf } from '@/lib/utils';
 import { ArrowLeft, Download } from 'lucide-react';
 
 interface Props {
@@ -29,7 +30,7 @@ export default function NotaPdfInner({ pedido, companyProfile, variante, options
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${isServico ? 'NotaServico' : 'NotaProdutos'}-${numero}.pdf`;
+      a.download = nomeArquivoPdf(isServico ? 'NotaServico' : 'NotaProdutos', numero, pedido.clienteNome);
       document.body.appendChild(a);
       a.click();
       a.remove();

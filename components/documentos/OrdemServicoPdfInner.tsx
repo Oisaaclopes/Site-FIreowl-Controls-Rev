@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { PDFViewer, pdf } from '@react-pdf/renderer';
 import { OrdemServicoDocument, OrdemServicoPdfOptions } from './OrdemServicoDocument';
 import { Pedido, CompanyProfile } from '@/lib/types';
+import { nomeArquivoPdf } from '@/lib/utils';
 import { ArrowLeft, Download } from 'lucide-react';
 
 interface Props {
@@ -25,7 +26,7 @@ export default function OrdemServicoPdfInner({ pedido, companyProfile, options, 
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `OrdemServico-${pedido.numeroPedido.replace(/^PED-/, 'OS-')}.pdf`;
+      a.download = nomeArquivoPdf('OrdemServico', pedido.numeroPedido.replace(/^PED-/, 'OS-'), pedido.clienteNome);
       document.body.appendChild(a);
       a.click();
       a.remove();

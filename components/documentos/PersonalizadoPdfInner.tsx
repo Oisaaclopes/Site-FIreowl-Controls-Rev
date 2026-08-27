@@ -5,6 +5,7 @@ import { PDFViewer, pdf } from '@react-pdf/renderer';
 import { PersonalizadoDocument } from './PersonalizadoDocument';
 import { PersonalizadoData } from './PersonalizadoConfigModal';
 import { Pedido, CompanyProfile } from '@/lib/types';
+import { nomeArquivoPdf } from '@/lib/utils';
 import { ArrowLeft, Download } from 'lucide-react';
 
 interface Props {
@@ -29,7 +30,7 @@ export default function PersonalizadoPdfInner({ pedido, companyProfile, data, sh
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${slug(data.titulo)}-${pedido.numeroPedido}.pdf`;
+      a.download = nomeArquivoPdf(slug(data.titulo), pedido.numeroPedido, pedido.clienteNome);
       document.body.appendChild(a);
       a.click();
       a.remove();

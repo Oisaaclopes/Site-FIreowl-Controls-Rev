@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { PDFViewer, pdf } from '@react-pdf/renderer';
 import { PropostaDocument, PropostaPdfOptions } from './PropostaDocument';
 import { Pedido, CompanyProfile } from '@/lib/types';
+import { nomeArquivoPdf } from '@/lib/utils';
 import { ArrowLeft, Download, Send } from 'lucide-react';
 
 interface Props {
@@ -26,7 +27,7 @@ export default function PropostaPdfInner({ pedido, companyProfile, options, onCl
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Proposta-${pedido.numeroPedido}.pdf`;
+      a.download = nomeArquivoPdf('Proposta', pedido.numeroPedido, pedido.clienteNome);
       document.body.appendChild(a);
       a.click();
       a.remove();

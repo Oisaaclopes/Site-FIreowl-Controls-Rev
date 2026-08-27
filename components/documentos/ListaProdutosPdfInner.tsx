@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { PDFViewer, pdf } from '@react-pdf/renderer';
 import { ListaProdutosDocument, ListaProdutosPdfOptions } from './ListaProdutosDocument';
 import { Pedido, CompanyProfile } from '@/lib/types';
+import { nomeArquivoPdf } from '@/lib/utils';
 import { ArrowLeft, Download } from 'lucide-react';
 
 interface Props {
@@ -25,7 +26,7 @@ export default function ListaProdutosPdfInner({ pedido, companyProfile, options,
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `ListaProdutos-${pedido.numeroPedido}.pdf`;
+      a.download = nomeArquivoPdf('ListaProdutos', pedido.numeroPedido, pedido.clienteNome);
       document.body.appendChild(a);
       a.click();
       a.remove();

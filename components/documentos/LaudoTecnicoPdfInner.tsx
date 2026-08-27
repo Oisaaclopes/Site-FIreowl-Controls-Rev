@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { PDFViewer, pdf } from '@react-pdf/renderer';
 import { LaudoTecnicoDocument, LaudoTecnicoPdfOptions } from './LaudoTecnicoDocument';
 import { Pedido, CompanyProfile } from '@/lib/types';
+import { nomeArquivoPdf } from '@/lib/utils';
 import { ArrowLeft, Download } from 'lucide-react';
 
 interface Props {
@@ -26,7 +27,7 @@ export default function LaudoTecnicoPdfInner({ pedido, companyProfile, options, 
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `LaudoTecnico-${numero}.pdf`;
+      a.download = nomeArquivoPdf('LaudoTecnico', numero, pedido.clienteNome);
       document.body.appendChild(a);
       a.click();
       a.remove();
