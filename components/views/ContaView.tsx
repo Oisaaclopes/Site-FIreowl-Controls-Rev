@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { SystemAuditLog, UserRole, CompanyProfile, PartnerBrand, PdfPrefs, Client, CatalogoProvisorio, DocumentosPadrao, PedidoTipo, DocumentType } from '@/lib/types';
+import { SystemAuditLog, UserRole, CompanyProfile, PartnerBrand, PdfPrefs, Client, CatalogoProvisorio, DocumentosPadrao, PedidoTipo, DocumentType, EmpresaAtendida, MarcaTecnologia } from '@/lib/types';
+import { ExperienciaAdmin } from '@/components/views/ExperienciaAdmin';
 import {
   PEDIDO_TIPO_LABELS,
   PEDIDO_TIPO_ORDER,
@@ -31,6 +32,7 @@ import { WorkSchedule, DEFAULT_SCHEDULE, WEEKDAY_SHORT } from '@/lib/schedule';
 import { maskCpf } from '@/lib/utils';
 import { listEmployeeDocs, uploadEmployeeDoc, signedDocUrl, deleteEmployeeDoc, EmployeeDoc } from '@/lib/storage';
 import { uploadPropostaCapa, removePropostaCapa } from '@/lib/propostaCapa';
+import { uploadInstitucionalLogo, removeInstitucionalLogo } from '@/lib/institucional';
 
 interface ContaViewProps {
   logs: SystemAuditLog[];
@@ -41,6 +43,12 @@ interface ContaViewProps {
   partnerBrands: PartnerBrand[];
   onAddPartnerBrand: (brand: PartnerBrand) => void;
   onDeletePartnerBrand: (id: string) => void;
+  empresasAtendidas?: EmpresaAtendida[];
+  marcasTecnologias?: MarcaTecnologia[];
+  onSaveEmpresaAtendida?: (e: EmpresaAtendida) => void;
+  onDeleteEmpresaAtendida?: (id: string) => void;
+  onSaveMarcaTecnologia?: (m: MarcaTecnologia) => void;
+  onDeleteMarcaTecnologia?: (id: string) => void;
   pdfPrefs: PdfPrefs;
   onUpdatePdfPrefs: (p: PdfPrefs) => void;
   documentosPadrao: DocumentosPadrao;
@@ -119,6 +127,12 @@ export const ContaView: React.FC<ContaViewProps> = ({
   partnerBrands,
   onAddPartnerBrand,
   onDeletePartnerBrand,
+  empresasAtendidas = [],
+  marcasTecnologias = [],
+  onSaveEmpresaAtendida,
+  onDeleteEmpresaAtendida,
+  onSaveMarcaTecnologia,
+  onDeleteMarcaTecnologia,
   pdfPrefs,
   onUpdatePdfPrefs,
   documentosPadrao,
@@ -484,6 +498,28 @@ export const ContaView: React.FC<ContaViewProps> = ({
     });
   };
 
+  // §1 — logos oficiais da Fireowl (rasterizados p/ PNG no upload).
+  const [logoBusy, setLogoBusy] = useState<string | null>(null);
+  const [logoPreview, setLogoPreview] = useState<Record<string, string>>({});
+  const handleProfileLogoUpload = async (field: keyof CompanyProfile, slug: string, file: File) => {
+    setLogoBusy(field as string);
+    try {
+      const path = await uploadInstitucionalLogo(file, slug);
+      setProfile((prev) => ({ ...prev, [field]: path }));
+      setLogoPreview((prev) => ({ ...prev, [field as string]: URL.createObjectURL(file) }));
+    } catch {
+      alert('Não foi possível enviar o logo. Verifique a conexão com o Supabase.');
+    } finally {
+      setLogoBusy(null);
+    }
+  };
+  const handleProfileLogoRemove = async (field: keyof CompanyProfile) => {
+    const path = profile[field] as string | undefined;
+    if (path) { try { await removeInstitucionalLogo(path); } catch { /* best-effort */ } }
+    setProfile((prev) => ({ ...prev, [field]: undefined }));
+    setLogoPreview((prev) => { const n = { ...prev }; delete n[field as string]; return n; });
+  };
+
   const [newBrandName, setNewBrandName] = useState('');
   const [newBrandCategory, setNewBrandCategory] = useState('');
   const [newBrandLogo, setNewBrandLogo] = useState('');
@@ -705,6 +741,67 @@ export const ContaView: React.FC<ContaViewProps> = ({
                 <p className="text-[10px] text-slate-400 mt-2">Capa por área: usada na proposta/orçamento quando o pedido não tem capa própria. Enviada ao salvar os dados da empresa.</p>
               </div>
 
+              {/* §1 — Identidade visual (logos oficiais) */}
+              <div className="pt-3 border-t border-slate-200">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Identidade visual (logos)</p>
+                <p className="text-[11px] text-slate-400 mb-3">Prefira arquivos <b>SVG</b> para preservar a qualidade da marca em documentos impressos e PDFs (o sistema converte para PNG de alta resolução automaticamente).</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {([
+                    ['logoPrincipalPath', 'Logo principal', 'principal'],
+                    ['logoClaroPath', 'Logo p/ fundo claro', 'claro'],
+                    ['logoEscuroPath', 'Logo p/ fundo escuro', 'escuro'],
+                    ['logoIconePath', 'Ícone / símbolo', 'icone'],
+                  ] as const).map(([field, nome, slug]) => (
+                    <div key={field} className="rounded-lg border border-slate-200 p-2 flex flex-col items-center gap-1.5">
+                      <span className="text-[10px] font-semibold text-slate-500 text-center">{nome}</span>
+                      <div className={`w-full h-14 rounded flex items-center justify-center overflow-hidden ${slug === 'escuro' ? 'bg-[#0B1E38]' : 'bg-slate-50 border border-slate-100'}`}>
+                        {logoPreview[field] ? (
+                          <img src={logoPreview[field]} alt={nome} className="max-h-12 max-w-full object-contain" />
+                        ) : profile[field] ? (
+                          <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5"><span className="material-symbols-outlined text-[14px]">check_circle</span>definido</span>
+                        ) : (
+                          <span className="material-symbols-outlined text-slate-300 text-xl">image</span>
+                        )}
+                      </div>
+                      {profile[field] ? (
+                        <button type="button" onClick={() => handleProfileLogoRemove(field)} className="text-[10px] font-bold uppercase text-slate-400 hover:text-[#E63946]">remover</button>
+                      ) : (
+                        <label className={`text-[10px] font-bold uppercase cursor-pointer ${logoBusy === field ? 'text-slate-400' : 'text-[#1A1A72] hover:text-[#E63946]'}`}>
+                          {logoBusy === field ? 'enviando…' : 'enviar'}
+                          <input type="file" accept="image/svg+xml,image/png,image/*" className="hidden" disabled={logoBusy === field}
+                            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleProfileLogoUpload(field, slug, f); e.target.value = ''; }} />
+                        </label>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* §8 — Textos da página "Experiência e Capacidade Técnica" + limites */}
+              <div className="pt-3 border-t border-slate-200">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">Experiência e Capacidade Técnica</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className={labelCls}>Texto — Empresas Atendidas</label>
+                    <textarea rows={2} placeholder="A Fireowl Controls atua em diferentes ambientes comerciais, industriais e corporativos…" value={profile.expIntro || ''} onChange={(e) => setProfile({ ...profile, expIntro: e.target.value })} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Texto — Marcas e Tecnologias</label>
+                    <textarea rows={2} placeholder="Atuamos com tecnologias e equipamentos de fabricantes reconhecidos…" value={profile.techIntro || ''} onChange={(e) => setProfile({ ...profile, techIntro: e.target.value })} className={inputCls} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>Máx. de empresas na página</label>
+                      <input type="number" min={0} max={20} value={profile.expMaxEmpresas ?? 8} onChange={(e) => setProfile({ ...profile, expMaxEmpresas: e.target.value === '' ? 8 : Number(e.target.value) })} className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Máx. de marcas na página</label>
+                      <input type="number" min={0} max={20} value={profile.expMaxMarcas ?? 8} onChange={(e) => setProfile({ ...profile, expMaxMarcas: e.target.value === '' ? 8 : Number(e.target.value) })} className={inputCls} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <button
                 type="submit"
                 className="bg-[#1A1A72] hover:bg-[#12124f] text-white font-semibold py-2.5 px-5 rounded-lg uppercase tracking-wider text-xs transition-colors shadow-sm flex items-center gap-1.5"
@@ -713,6 +810,16 @@ export const ContaView: React.FC<ContaViewProps> = ({
               </button>
             </form>
           </div>
+
+          {/* Card: Experiência, Clientes e Marcas (apresentação institucional) */}
+          <ExperienciaAdmin
+            empresas={empresasAtendidas}
+            marcas={marcasTecnologias}
+            onSaveEmpresa={(e) => onSaveEmpresaAtendida?.(e)}
+            onDeleteEmpresa={(id) => onDeleteEmpresaAtendida?.(id)}
+            onSaveMarca={(m) => onSaveMarcaTecnologia?.(m)}
+            onDeleteMarca={(id) => onDeleteMarcaTecnologia?.(id)}
+          />
 
           {/* Card: Permissões (RBAC) */}
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">

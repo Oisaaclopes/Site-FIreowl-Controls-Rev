@@ -1007,6 +1007,12 @@ export function CrmApp({
               partnerBrands={partnerBrands}
               onAddPartnerBrand={handleAddPartnerBrand}
               onDeletePartnerBrand={handleDeletePartnerBrand}
+              empresasAtendidas={empresasAtendidas}
+              marcasTecnologias={marcasTecnologias}
+              onSaveEmpresaAtendida={handleSaveEmpresaAtendida}
+              onDeleteEmpresaAtendida={handleDeleteEmpresaAtendida}
+              onSaveMarcaTecnologia={handleSaveMarcaTecnologia}
+              onDeleteMarcaTecnologia={handleDeleteMarcaTecnologia}
               pdfPrefs={pdfPrefs}
               onUpdatePdfPrefs={handleUpdatePdfPrefs}
               documentosPadrao={documentosPadrao}
