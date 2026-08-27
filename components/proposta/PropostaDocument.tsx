@@ -3,6 +3,7 @@ import { Document, Page, View, Text, StyleSheet, Svg, Path, Line, Rect, Circle, 
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import { InclusoExcluso, ResumoExecutivoPage, SlaBloco } from '@/components/documentos/pdfKit';
 import { gerarTituloProposta, faixaSiglas, tituloEscopo, conclusaoPorTipo, apresentacaoAreas } from '@/lib/propostaTitulo';
+import { montarEstruturaProposta } from '@/lib/propostaEstrutura';
 import {
   CARTA_APRESENTACAO,
   SERVICOS_OFERTADOS,
@@ -1029,32 +1030,7 @@ export function PropostaDocument({
   const incTermoAceite = p.incluirTermoAceite !== false;
   const temMateriais = materiais.length > 0;
 
-  const secoes = [
-    { key: 'carta', titulo: 'Carta de Apresentação', visible: showCarta },
-    { key: 'historico', titulo: 'Histórico de Propostas', visible: showHistorico },
-    { key: 'visao', titulo: 'Visão Geral da Proposta', visible: true },
-    { key: 'escopo', titulo: tituloEscopo(p.tipoServico), visible: true },
-    { key: 'itens', titulo: 'Materiais e Serviços Ofertados', visible: true },
-    { key: 'premissas', titulo: 'Premissas Adotadas', visible: true },
-    { key: 'servicos', titulo: 'Descrição dos Serviços Ofertados', visible: true },
-    { key: 'embalagem', titulo: 'Embalagem, Transporte e Armazenamento', visible: temMateriais },
-    { key: 'seguranca', titulo: 'Segurança do Trabalho', visible: incSeguranca },
-    { key: 'obrigacoes', titulo: 'Obrigações da Contratante', visible: true },
-    { key: 'precos', titulo: 'Preços', visible: true },
-    { key: 'infoCompra', titulo: 'Informações para o Pedido de Compra', visible: true },
-    { key: 'impostos', titulo: 'Impostos e Taxas', visible: true },
-    { key: 'pagamento', titulo: 'Condições de Pagamento', visible: true },
-    { key: 'multas', titulo: 'Multas por Atraso de Pagamento', visible: incMultas },
-    { key: 'limitacao', titulo: 'Limitação de Responsabilidade', visible: incLimitacao },
-    { key: 'prazo', titulo: 'Prazo de Fornecimento', visible: true },
-    { key: 'garantia', titulo: 'Garantia', visible: true },
-    { key: 'confidencialidade', titulo: 'Confidencialidade', visible: incConfid },
-    { key: 'termoAceite', titulo: 'Termo de Aceite da Proposta', visible: incTermoAceite },
-    { key: 'condicoesGerais', titulo: 'Condições Gerais', visible: incCondGerais },
-    { key: 'validade', titulo: 'Validade da Proposta', visible: true },
-    { key: 'conclusao', titulo: 'Conclusão', visible: true },
-    { key: 'aceite', titulo: 'Aceite da Proposta', visible: true },
-  ];
+  const secoes = montarEstruturaProposta(p, { cartaVisivel: showCarta, historicoVisivel: showHistorico, temMateriais });
   const vis = secoes.filter((s) => s.visible);
   const num = (key: string) => {
     const i = vis.findIndex((s) => s.key === key);

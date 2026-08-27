@@ -15,6 +15,7 @@ import {
 } from '@/lib/types';
 import { PEDIDO_TIPO_LABELS, PEDIDO_TIPO_ORDER } from '@/lib/documentos';
 import { AREAS_PROPOSTA, TIPOS_SERVICO, gerarTituloProposta, conclusaoPorTipo } from '@/lib/propostaTitulo';
+import { montarEstruturaProposta } from '@/lib/propostaEstrutura';
 import { ItensCardEditor } from '@/components/proposta/ItensCardEditor';
 import {
   X,
@@ -1014,6 +1015,49 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               <ClauseRow label="Segurança do Trabalho" checked={incluirSeguranca} onChange={setIncluirSeguranca} />
               <ClauseRow label="Termo de Aceite da Proposta" checked={incluirTermoAceite} onChange={setIncluirTermoAceite} />
             </div>
+          </Accordion>
+
+          {/* ---- Estrutura da proposta (§10/§11/§12: prévia do índice + ativar/desativar) ---- */}
+          <Accordion title="Estrutura da proposta" icon={<FileText className="w-4 h-4 text-[#0B1E38]" />} open={!!open.estrutura} onToggle={() => toggle('estrutura')}>
+            <p className="text-[11px] text-slate-500 mb-2">Prévia do índice que será gerado. Ative/desative as seções opcionais — a numeração é recalculada automaticamente.</p>
+            {(() => {
+              const secToggle: Record<string, { v: boolean; set: (b: boolean) => void }> = {
+                seguranca: { v: incluirSeguranca, set: setIncluirSeguranca },
+                multas: { v: incluirMultas, set: setIncluirMultas },
+                limitacao: { v: incluirLimitacao, set: setIncluirLimitacao },
+                confidencialidade: { v: incluirConfidencialidade, set: setIncluirConfidencialidade },
+                termoAceite: { v: incluirTermoAceite, set: setIncluirTermoAceite },
+                condicoesGerais: { v: incluirCondicoesGerais, set: setIncluirCondicoesGerais },
+              };
+              const temMateriais = equipmentItems.some((it) => it.tipo !== 'servico');
+              const estrutura = montarEstruturaProposta(
+                { tipoServico, incluirSeguranca, incluirMultas, incluirLimitacao, incluirConfidencialidade, incluirTermoAceite, incluirCondicoesGerais },
+                { cartaVisivel: nivelProposta !== 'simples', historicoVisivel: nivelProposta !== 'simples', temMateriais }
+              );
+              let n = 0;
+              return (
+                <div className="space-y-1">
+                  {estrutura.map((s) => {
+                    const tg = secToggle[s.key];
+                    if (s.visible) n += 1;
+                    return (
+                      <div key={s.key} className={`flex items-center justify-between rounded-lg border px-3 py-1.5 ${s.visible ? 'bg-white border-slate-200' : 'bg-slate-50 border-dashed border-slate-200'}`}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`font-data-mono text-[11px] font-bold ${s.visible ? 'text-[#0B1E38]' : 'text-slate-300'}`}>{s.visible ? String(n).padStart(2, '0') : '--'}</span>
+                          <span className={`text-xs truncate ${s.visible ? 'text-slate-700' : 'text-slate-400 line-through'}`}>{s.titulo}</span>
+                          {s.opcional && <span className="text-[9px] uppercase text-slate-400 border border-slate-200 rounded px-1 shrink-0">opcional</span>}
+                        </div>
+                        {tg ? (
+                          <button type="button" onClick={() => tg.set(!tg.v)} className={`shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded ${tg.v ? 'text-emerald-700 bg-emerald-50' : 'text-slate-400 bg-slate-100'}`}>{tg.v ? 'Ativa' : 'Inativa'}</button>
+                        ) : s.opcional ? (
+                          <span className="text-[9px] text-slate-400 shrink-0">automática</span>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </Accordion>
 
           {/* ---- Informações Básicas (colapsável com +/lixeira) ---- */}
