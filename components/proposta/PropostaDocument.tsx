@@ -2,7 +2,7 @@ import React from 'react';
 import { Document, Page, View, Text, StyleSheet, Svg, Path, Line, Rect, Circle, Image, Font } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import { InclusoExcluso, ResumoExecutivoPage, SlaBloco } from '@/components/documentos/pdfKit';
-import { gerarTituloProposta, faixaSiglas } from '@/lib/propostaTitulo';
+import { gerarTituloProposta, faixaSiglas, tituloEscopo } from '@/lib/propostaTitulo';
 import {
   CARTA_APRESENTACAO,
   SERVICOS_OFERTADOS,
@@ -1027,7 +1027,7 @@ export function PropostaDocument({
     { key: 'carta', titulo: 'Carta de Apresentação', visible: showCarta },
     { key: 'historico', titulo: 'Histórico de Propostas', visible: showHistorico },
     { key: 'visao', titulo: 'Visão Geral da Proposta', visible: true },
-    { key: 'escopo', titulo: 'Escopo da Proposta', visible: true },
+    { key: 'escopo', titulo: tituloEscopo(p.tipoServico), visible: true },
     { key: 'itens', titulo: 'Materiais e Serviços Ofertados', visible: true },
     { key: 'premissas', titulo: 'Premissas Adotadas', visible: true },
     { key: 'servicos', titulo: 'Descrição dos Serviços Ofertados', visible: true },

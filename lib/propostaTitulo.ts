@@ -52,6 +52,26 @@ export const TIPOS_SERVICO: TipoServicoOpcao[] = [
 export const areaById = (id?: string) => AREAS_PROPOSTA.find((a) => a.id === id);
 export const tipoById = (id?: string) => TIPOS_SERVICO.find((t) => t.id === id);
 
+/** §9 — título dinâmico da seção "Escopo" conforme o tipo de serviço. */
+const ESCOPO_POR_TIPO: Record<string, string> = {
+  manut_corretiva: 'Escopo dos Serviços de Manutenção Corretiva',
+  manut_preventiva: 'Escopo dos Serviços de Manutenção Preventiva',
+  contrato_manut: 'Escopo dos Serviços de Manutenção',
+  contrato_inspecao: 'Escopo da Inspeção',
+  inspecao: 'Escopo da Inspeção Técnica',
+  instalacao: 'Escopo de Instalação e Comissionamento',
+  implantacao: 'Escopo da Implantação',
+  retrofit: 'Escopo do Retrofit',
+  adequacao: 'Escopo da Adequação Normativa',
+  projeto: 'Escopo do Projeto',
+  comissionamento: 'Escopo do Comissionamento',
+  integracao_serv: 'Escopo da Integração',
+  fornecimento: 'Escopo de Fornecimento',
+};
+export function tituloEscopo(tipoId?: string): string {
+  return (tipoId && ESCOPO_POR_TIPO[tipoId]) || 'Escopo da Proposta';
+}
+
 /**
  * Compõe o nome da(s) área(s) para o título. Com várias áreas, junta os nomes;
  * com muitas, usa uma expressão integrada.
