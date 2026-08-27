@@ -72,6 +72,39 @@ export function tituloEscopo(tipoId?: string): string {
   return (tipoId && ESCOPO_POR_TIPO[tipoId]) || 'Escopo da Proposta';
 }
 
+/** §30 — conclusão dinâmica (texto do sistema) conforme o tipo de serviço. */
+const CONCLUSAO_GENERICA =
+  'Reiteramos nosso compromisso com a qualidade e a segurança, permanecendo à disposição para eventuais esclarecimentos e negociações. Aguardamos sua análise e retorno.';
+const CONCLUSAO_POR_TIPO: Record<string, string> = {
+  contrato_manut:
+    'Este contrato assegura a continuidade operacional e a previsibilidade de custos, com manutenção preventiva planejada, atendimento conforme SLA e suporte técnico especializado — reduzindo riscos e prolongando a vida útil do sistema. Permanecemos à disposição para os ajustes necessários.',
+  manut_preventiva:
+    'A manutenção preventiva proposta preserva a confiabilidade do sistema, antecipando falhas e mantendo a conformidade normativa. Colocamo-nos à disposição para alinhar o plano à rotina da sua operação.',
+  manut_corretiva:
+    'A correção proposta restabelece a plena operação do sistema com agilidade e segurança. Permanecemos à disposição para esclarecimentos e para a execução no menor prazo possível.',
+  retrofit:
+    'O retrofit proposto moderniza a infraestrutura existente, elevando a confiabilidade, atualizando tecnologicamente os equipamentos e preparando o sistema para expansões futuras, em conformidade com as normas vigentes. Ficamos à disposição para detalhar o plano de transição.',
+  inspecao:
+    'A inspeção técnica proposta oferece um diagnóstico preciso, identifica não conformidades com rastreabilidade e embasa a tomada de decisão sobre a segurança do sistema. Permanecemos à disposição para apresentar o relatório e os próximos passos.',
+  contrato_inspecao:
+    'O programa de inspeção proposto garante avaliações periódicas com rastreabilidade, sustentando a segurança e a conformidade do sistema ao longo do tempo. Ficamos à disposição para alinhar a periodicidade às suas necessidades.',
+  instalacao:
+    'A instalação proposta entrega um sistema comissionado, testado e pronto para operação, com garantia e suporte. Permanecemos à disposição para alinhar cronograma e liberar as frentes de trabalho.',
+  implantacao:
+    'A implantação proposta entrega a solução completa, integrada e comissionada, pronta para operação. Ficamos à disposição para detalhar as etapas e o cronograma.',
+  projeto:
+    'O projeto proposto fornece a base técnica e normativa para uma execução segura e eficiente, com responsabilidade técnica e rastreabilidade. Permanecemos à disposição para esclarecimentos.',
+  comissionamento:
+    'O comissionamento proposto valida o desempenho do sistema por meio de testes funcionais documentados, assegurando a entrega em plena conformidade. Ficamos à disposição para agendar as atividades.',
+  integracao_serv:
+    'A integração proposta unifica os sistemas em uma plataforma coordenada, ampliando a supervisão, a rastreabilidade e a resposta a eventos. Permanecemos à disposição para detalhar a arquitetura da solução.',
+  fornecimento:
+    'O fornecimento proposto contempla equipamentos homologados, com garantia de fábrica e suporte. Ficamos à disposição para confirmar prazos e condições de entrega.',
+};
+export function conclusaoPorTipo(tipoId?: string): string {
+  return (tipoId && CONCLUSAO_POR_TIPO[tipoId]) || CONCLUSAO_GENERICA;
+}
+
 /**
  * Compõe o nome da(s) área(s) para o título. Com várias áreas, junta os nomes;
  * com muitas, usa uma expressão integrada.

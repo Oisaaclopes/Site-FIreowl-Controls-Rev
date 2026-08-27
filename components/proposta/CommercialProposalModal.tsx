@@ -14,7 +14,7 @@ import {
   PedidoTipo,
 } from '@/lib/types';
 import { PEDIDO_TIPO_LABELS, PEDIDO_TIPO_ORDER } from '@/lib/documentos';
-import { AREAS_PROPOSTA, TIPOS_SERVICO, gerarTituloProposta } from '@/lib/propostaTitulo';
+import { AREAS_PROPOSTA, TIPOS_SERVICO, gerarTituloProposta, conclusaoPorTipo } from '@/lib/propostaTitulo';
 import { ItensCardEditor } from '@/components/proposta/ItensCardEditor';
 import {
   X,
@@ -972,6 +972,19 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           </Accordion>
 
           <Accordion title="Conclusão" icon={<FileText className="w-4 h-4 text-[#0B1E38]" />} open={!!open.conclusao} onToggle={() => toggle('conclusao')}>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[11px] text-slate-400">Texto de fechamento da proposta.</span>
+              {tipoServico && (
+                <button
+                  type="button"
+                  onClick={() => setConclusao(conclusaoPorTipo(tipoServico))}
+                  title="Preenche com uma conclusão adequada ao tipo de serviço (você pode editar)"
+                  className="text-[10px] font-bold uppercase text-[#1A1A72] hover:text-[#E63946]"
+                >
+                  Sugerir pelo tipo
+                </button>
+              )}
+            </div>
             <textarea rows={3} value={conclusao} onChange={(e) => setConclusao(e.target.value)} className={inputCls} />
           </Accordion>
 

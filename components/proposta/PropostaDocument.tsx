@@ -2,7 +2,7 @@ import React from 'react';
 import { Document, Page, View, Text, StyleSheet, Svg, Path, Line, Rect, Circle, Image, Font } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import { InclusoExcluso, ResumoExecutivoPage, SlaBloco } from '@/components/documentos/pdfKit';
-import { gerarTituloProposta, faixaSiglas, tituloEscopo } from '@/lib/propostaTitulo';
+import { gerarTituloProposta, faixaSiglas, tituloEscopo, conclusaoPorTipo } from '@/lib/propostaTitulo';
 import {
   CARTA_APRESENTACAO,
   SERVICOS_OFERTADOS,
@@ -1431,7 +1431,7 @@ export function PropostaDocument({
         </Sec>
 
         <Sec k="conclusao">
-          <Text style={[styles.para, { fontStyle: 'italic' }]}>{nv(p.conclusao) ? p.conclusao : 'Reiteramos nosso compromisso com a qualidade e a segurança, permanecendo à disposição para eventuais esclarecimentos e negociações. Aguardamos sua análise e retorno.'}</Text>
+          <Text style={[styles.para, { fontStyle: 'italic' }]}>{nv(p.conclusao) ? p.conclusao : conclusaoPorTipo(p.tipoServico)}</Text>
         </Sec>
 
         {/* Aceite: mantém junto para não quebrar no meio */}
