@@ -1,7 +1,7 @@
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
-import { C, brl, nv, lnv, PdfHeader, PdfFooter, CamposExtras, itemTotal, DocCover, AreasAtuacaoPage, InclusoExcluso, ResumoExecutivoPage, SlaBloco } from './pdfKit';
+import { C, brl, nv, lnv, PdfHeader, PdfFooter, CamposExtras, itemTotal, DocCover, AreasAtuacaoPage, InclusoExcluso, ResumoExecutivoPage, SlaBloco, QrCode, contatoQrUrl } from './pdfKit';
 import { gerarTituloProposta, apresentacaoAreas } from '@/lib/propostaTitulo';
 import { DocOptions } from '@/lib/documentos';
 
@@ -178,6 +178,7 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
       : (nv(p.formaPagamento) ? p.formaPagamento! : 'A combinar entre as partes.');
 
   const contato = [companyProfile.telefone, companyProfile.email].filter(nv).join('  •  ');
+  const qrUrl = contatoQrUrl(companyProfile.telefone, companyProfile.email); // §32
   // P1 — título dinâmico (área × tipo) usado como subtítulo da capa.
   const tituloDin = gerarTituloProposta(p.areaPrincipal || [], p.tipoServico);
 
@@ -332,11 +333,19 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
         {/* Dados de contato */}
         <View minPresenceAhead={70} wrap={false}>
           <SecHead titulo="Contato" />
-          <View style={styles.contatoCard}>
-            <Text style={{ fontSize: 9, color: C.ink, fontFamily: 'Roboto', fontWeight: 700 }}>{razao}</Text>
-            {nv(companyProfile.endereco) ? <Text style={{ fontSize: 8.5, color: C.s600, marginTop: 2 }}>{companyProfile.endereco}</Text> : null}
-            {nv(companyProfile.cnpj) ? <Text style={{ fontSize: 8.5, color: C.s600, marginTop: 1 }}>CNPJ {companyProfile.cnpj}</Text> : null}
-            {nv(contato) ? <Text style={{ fontSize: 9, color: C.navy, fontFamily: 'Roboto', fontWeight: 700, marginTop: 3 }}>{contato}</Text> : null}
+          <View style={[styles.contatoCard, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 9, color: C.ink, fontFamily: 'Roboto', fontWeight: 700 }}>{razao}</Text>
+              {nv(companyProfile.endereco) ? <Text style={{ fontSize: 8.5, color: C.s600, marginTop: 2 }}>{companyProfile.endereco}</Text> : null}
+              {nv(companyProfile.cnpj) ? <Text style={{ fontSize: 8.5, color: C.s600, marginTop: 1 }}>CNPJ {companyProfile.cnpj}</Text> : null}
+              {nv(contato) ? <Text style={{ fontSize: 9, color: C.navy, fontFamily: 'Roboto', fontWeight: 700, marginTop: 3 }}>{contato}</Text> : null}
+            </View>
+            {nv(qrUrl) ? (
+              <View style={{ alignItems: 'center', marginLeft: 10 }}>
+                <QrCode text={qrUrl} size={62} />
+                <Text style={{ fontSize: 6.5, color: C.s500, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 2 }}>Fale conosco</Text>
+              </View>
+            ) : null}
           </View>
         </View>
 

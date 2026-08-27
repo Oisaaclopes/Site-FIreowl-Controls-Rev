@@ -1,5 +1,6 @@
 import React from 'react';
 import { Page, View, Text, Svg, Path, Line, Rect, Circle, Image, Font } from '@react-pdf/renderer';
+import QRCode from 'qrcode';
 
 /**
  * Primitivos compartilhados de PDF (fontes, paleta, logo, rodapé) para os
@@ -154,6 +155,39 @@ export const InclusoExcluso = ({ incluso, naoIncluso }: { incluso?: string[]; na
       {inc.length > 0 && <Col titulo="Incluso no escopo" itens={inc} cor={C.green} bg="#F0FAF4" borda="#BFE6D0" />}
       {nao.length > 0 && <Col titulo="Não incluso" itens={nao} cor={C.red} bg="#FCF1F1" borda="#F0C9C9" />}
     </View>
+  );
+};
+
+/**
+ * §32 — QR code renderizado de forma síncrona (matriz → retângulos SVG), sem
+ * imagem/async. Retorna null se o texto for vazio ou a geração falhar.
+ */
+export const contatoQrUrl = (telefone?: string, email?: string): string => {
+  const dig = (telefone || '').replace(/\D/g, '');
+  if (dig.length >= 10) return `https://wa.me/55${dig}`;
+  if (nv(email)) return `mailto:${email!.trim()}`;
+  return '';
+};
+export const QrCode = ({ text, size = 68, fg = C.navy }: { text: string; size?: number; fg?: string }) => {
+  if (!nv(text)) return null;
+  let modules: { size: number; data: Uint8Array } | null = null;
+  try { modules = (QRCode.create(text, { errorCorrectionLevel: 'M' }).modules as unknown) as { size: number; data: Uint8Array }; } catch { return null; }
+  if (!modules) return null;
+  const n = modules.size;
+  const cell = size / n;
+  const rects: React.ReactElement[] = [];
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      if (modules.data[r * n + c]) {
+        rects.push(<Rect key={`${r}-${c}`} x={c * cell} y={r * cell} width={cell} height={cell} fill={fg} />);
+      }
+    }
+  }
+  return (
+    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <Rect x={0} y={0} width={size} height={size} fill="#ffffff" />
+      {rects}
+    </Svg>
   );
 };
 

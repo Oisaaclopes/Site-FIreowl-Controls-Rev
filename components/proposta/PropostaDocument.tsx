@@ -1,7 +1,7 @@
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet, Svg, Path, Line, Rect, Circle, Image, Font } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
-import { InclusoExcluso, ResumoExecutivoPage, SlaBloco } from '@/components/documentos/pdfKit';
+import { InclusoExcluso, ResumoExecutivoPage, SlaBloco, QrCode, contatoQrUrl } from '@/components/documentos/pdfKit';
 import { gerarTituloProposta, faixaSiglas, tituloEscopo, conclusaoPorTipo, apresentacaoAreas } from '@/lib/propostaTitulo';
 import { montarEstruturaProposta, ordenarEstrutura } from '@/lib/propostaEstrutura';
 import {
@@ -1498,6 +1498,19 @@ export function PropostaDocument({
                 <Text style={styles.closeValue}>{numero}</Text>
               </View>
             </View>
+            {/* §32 — QR de contato (WhatsApp/e-mail) */}
+            {nv(contatoQrUrl(companyProfile.telefone, companyProfile.email)) ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 24 }}>
+                <View style={{ backgroundColor: '#ffffff', borderRadius: 6, padding: 5 }}>
+                  <QrCode text={contatoQrUrl(companyProfile.telefone, companyProfile.email)} size={70} />
+                </View>
+                <View style={{ marginLeft: 12 }}>
+                  <Text style={{ color: '#F2A900', fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>Fale conosco</Text>
+                  <Text style={{ color: C.white, fontSize: 10, fontFamily: 'Poppins', fontWeight: 600, marginTop: 2 }}>Aponte a câmera para falar com a Fireowl Controls</Text>
+                  <Text style={{ color: C.s400, fontSize: 8, marginTop: 2 }}>{numero}</Text>
+                </View>
+              </View>
+            ) : null}
           </View>
         </Page>
       )}
