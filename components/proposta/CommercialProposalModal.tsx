@@ -263,6 +263,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   // P1 — Área principal (multi) + Tipo de serviço → título dinâmico.
   const [areaPrincipal, setAreaPrincipal] = useState<string[]>(initialPedido?.proposal?.areaPrincipal || []);
   const [tipoServico, setTipoServico] = useState<string>(initialPedido?.proposal?.tipoServico || '');
+  const [nivelProposta, setNivelProposta] = useState<'simples' | 'tecnica' | 'corporativa'>(initialPedido?.proposal?.nivelProposta || 'tecnica');
   const toggleArea = (id: string) => setAreaPrincipal((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   const tituloDinamico = gerarTituloProposta(areaPrincipal, tipoServico);
   const [pedidoTipo, setPedidoTipo] = useState<PedidoTipo | ''>(initialPedido?.proposal?.pedidoTipo || '');
@@ -493,6 +494,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
       proposal: {
         areaPrincipal,
         tipoServico: tipoServico || undefined,
+        nivelProposta,
         objetivo,
         cartaApresentacao,
         revisoes: initialPedido?.proposal?.revisoes,
@@ -757,6 +759,30 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                     <p className="text-xs font-bold text-[#0B1E38]">{tituloDinamico}</p>
                   </div>
                 )}
+              </div>
+              <div className="sm:col-span-2">
+                <label className={labelCls}>Nível da proposta</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { id: 'simples', nome: 'Simples', desc: 'Enxuta, sem capa institucional' },
+                    { id: 'tecnica', nome: 'Técnica', desc: 'Padrão, com áreas e resumo' },
+                    { id: 'corporativa', nome: 'Corporativa', desc: 'Completa, máx. apresentação' },
+                  ] as const).map((n) => {
+                    const on = nivelProposta === n.id;
+                    return (
+                      <button
+                        key={n.id}
+                        type="button"
+                        onClick={() => setNivelProposta(n.id)}
+                        className={`text-left rounded-lg border px-3 py-2 transition-colors ${on ? 'bg-[#0B1E38] text-white border-[#0B1E38]' : 'bg-white text-slate-600 border-slate-300 hover:border-[#0B1E38]'}`}
+                      >
+                        <p className="text-xs font-bold">{n.nome}</p>
+                        <p className={`text-[10px] ${on ? 'text-slate-300' : 'text-slate-400'}`}>{n.desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">Na Simples, capa institucional (Áreas de Atuação) e Resumo Executivo não entram.</p>
               </div>
 
               <div className="sm:col-span-2">

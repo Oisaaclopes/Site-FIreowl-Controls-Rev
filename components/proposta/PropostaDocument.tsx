@@ -1010,8 +1010,10 @@ export function PropostaDocument({
   const detailed = options?.detailedSubtotal !== false;
   const showIndice = options?.showIndice !== false;
   const showHistorico = options?.showHistorico !== false;
-  const showCarta = options?.showCarta !== false;
-  const showAreas = options?.showAreasAtuacao !== false;
+  // §37/§38 — nível da proposta dimensiona o documento.
+  const nivel = p.nivelProposta || 'tecnica';
+  const showCarta = options?.showCarta !== false && nivel !== 'simples';
+  const showAreas = options?.showAreasAtuacao !== false && nivel !== 'simples';
   const showFechamento = options?.showFechamento !== false;
   const capaImagemUrl = options?.capaImagemUrl;
 
@@ -1144,8 +1146,8 @@ export function PropostaDocument({
         </View>
       </Page>
 
-      {/* ===================== RESUMO EXECUTIVO (§18/§28) — só quando há indicadores ===================== */}
-      {indicadores.length > 0 && (
+      {/* ===================== RESUMO EXECUTIVO (§18/§28) — indicadores + nível ≠ simples ===================== */}
+      {indicadores.length > 0 && nivel !== 'simples' && (
         <ResumoExecutivoPage fantasia={fantasia} numero={numero} data={dataEmissao} cliente={clienteNome} indicadores={indicadores} objeto={objetoResumo} />
       )}
 

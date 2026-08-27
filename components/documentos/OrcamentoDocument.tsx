@@ -145,8 +145,10 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
   const showMarca = options?.showDescricaoDetalhada !== false;
   const showAssinatura = options?.showAssinaturaCliente !== false;
   const showCampos = options?.showCamposPersonalizados === true;
+  // §37/§38 — nível dimensiona o documento (simples = mais enxuto).
+  const nivel = p.nivelProposta || 'tecnica';
   const showCapa = options?.showCapa !== false;
-  const showAreas = options?.showAreasAtuacao !== false;
+  const showAreas = options?.showAreasAtuacao !== false && nivel !== 'simples';
   const capaImagemUrl = options?.capaImagemUrl;
   const dataDoc = options?.dataHoje ? new Date().toISOString().split('T')[0] : dataEmissao;
 
@@ -201,7 +203,7 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
       )}
 
       {/* Resumo Executivo (§18/§28) — só quando há indicadores */}
-      {indicadores.length > 0 && (
+      {indicadores.length > 0 && nivel !== 'simples' && (
         <ResumoExecutivoPage fantasia={fantasia} numero={numero} data={dataDoc} cliente={cliente} indicadores={indicadores} objeto={objetoResumo} />
       )}
 

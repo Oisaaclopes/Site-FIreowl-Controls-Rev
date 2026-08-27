@@ -66,6 +66,8 @@ export interface CommercialProposalData {
   areaPrincipal?: string[];
   /** P1 — tipo de serviço (id de TIPOS_SERVICO). Compõe o título dinâmico. */
   tipoServico?: string;
+  /** §37 — nível de apresentação: simples (enxuto), técnica (padrão), corporativa. */
+  nivelProposta?: 'simples' | 'tecnica' | 'corporativa';
   objetivo: string;
   /** Carta de apresentação (opcional). Vazio → usa o texto institucional padrão. */
   cartaApresentacao?: string;
