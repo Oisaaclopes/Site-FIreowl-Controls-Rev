@@ -17,6 +17,8 @@ import { DocConfigModal } from '@/components/documentos/DocConfigModal';
 import { PersonalizadoConfigModal, PersonalizadoData } from '@/components/documentos/PersonalizadoConfigModal';
 import { PersonalizadoPDFView } from '@/components/documentos/PersonalizadoPDFView';
 import { resolveDocumentoPadrao, DOCUMENT_TYPE_LABELS, DocOptions, DEFAULT_DOC_OPTIONS } from '@/lib/documentos';
+import { validateProposal, ValidationIssue } from '@/lib/proposalValidation';
+import { ProposalValidationModal } from '@/components/proposta/ProposalValidationModal';
 import { DataListRow, RowMeta, Badge } from '@/components/DataListRow';
 import { Toggle } from '@/components/SidePanel';
 import { usePrivacy } from '@/lib/privacy';
@@ -139,6 +141,8 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   // Modais & Overlays
   const [isProposalModalOpen, setIsProposalModalOpen] = useState(false);
   const [editingPedido, setEditingPedido] = useState<Pedido | null>(null);
+  // P4 — validação antes de gerar (proposta/orçamento).
+  const [validacao, setValidacao] = useState<{ pedido: Pedido; doc: DocumentType; issues: ValidationIssue[] } | null>(null);
   const [pdfPreviewPedido, setPdfPreviewPedido] = useState<Pedido | null>(null);
   const [pdfOptions, setPdfOptions] = useState({
     showLogo: pdfPrefs.showLogo,
@@ -230,7 +234,15 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
 
   // Roteia a geração: proposta usa seu próprio modal de opções; os demais
   // documentos abrem a tela de configuração (as 6 opções) e depois geram.
-  const dispatchDocument = (ped: Pedido, doc: DocumentType) => {
+  const dispatchDocument = (ped: Pedido, doc: DocumentType, skipValidation = false) => {
+    // P4 — valida proposta/orçamento antes de gerar; alerta (não corrige nada).
+    if (!skipValidation && (doc === 'proposta_comercial' || doc === 'orcamento')) {
+      const issues = validateProposal(ped, companyProfile);
+      if (issues.length > 0) {
+        setValidacao({ pedido: ped, doc, issues });
+        return;
+      }
+    }
     if (doc === 'proposta_comercial') {
       openPdf(ped);
       return;
@@ -1023,6 +1035,26 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
             </div>
           )}
         </>
+      )}
+
+      {/* P4 — Modal de validação antes de gerar */}
+      {validacao && (
+        <ProposalValidationModal
+          numero={validacao.pedido.numeroPedido}
+          docLabel={DOCUMENT_TYPE_LABELS[validacao.doc]}
+          issues={validacao.issues}
+          onClose={() => setValidacao(null)}
+          onGenerate={() => {
+            const { pedido, doc } = validacao;
+            setValidacao(null);
+            dispatchDocument(pedido, doc, true);
+          }}
+          onRevisar={() => {
+            const ped = validacao.pedido;
+            setValidacao(null);
+            handleEditProposal(ped);
+          }}
+        />
       )}
 
       {/* Commercial Proposal Form Modal */}
