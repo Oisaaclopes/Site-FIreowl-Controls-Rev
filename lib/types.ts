@@ -62,6 +62,10 @@ export interface PedidoBrand {
 }
 
 export interface CommercialProposalData {
+  /** P1 — áreas de atuação da proposta (ids de AREAS_PROPOSTA). Compõe o título. */
+  areaPrincipal?: string[];
+  /** P1 — tipo de serviço (id de TIPOS_SERVICO). Compõe o título dinâmico. */
+  tipoServico?: string;
   objetivo: string;
   /** Carta de apresentação (opcional). Vazio → usa o texto institucional padrão. */
   cartaApresentacao?: string;

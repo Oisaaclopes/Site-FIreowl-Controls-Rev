@@ -14,6 +14,7 @@ import {
   PedidoTipo,
 } from '@/lib/types';
 import { PEDIDO_TIPO_LABELS, PEDIDO_TIPO_ORDER } from '@/lib/documentos';
+import { AREAS_PROPOSTA, TIPOS_SERVICO, gerarTituloProposta } from '@/lib/propostaTitulo';
 import { ItensCardEditor } from '@/components/proposta/ItensCardEditor';
 import {
   X,
@@ -259,6 +260,11 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     initialPedido?.numeroPedido || `PED-${new Date().getFullYear()}-${nextProposalNumber}`
   );
   const [referencia, setReferencia] = useState<string>(initialPedido?.referencia || 'Manutenção Preventiva SDAI');
+  // P1 — Área principal (multi) + Tipo de serviço → título dinâmico.
+  const [areaPrincipal, setAreaPrincipal] = useState<string[]>(initialPedido?.proposal?.areaPrincipal || []);
+  const [tipoServico, setTipoServico] = useState<string>(initialPedido?.proposal?.tipoServico || '');
+  const toggleArea = (id: string) => setAreaPrincipal((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const tituloDinamico = gerarTituloProposta(areaPrincipal, tipoServico);
   const [pedidoTipo, setPedidoTipo] = useState<PedidoTipo | ''>(initialPedido?.proposal?.pedidoTipo || '');
   const [clienteId, setClienteId] = useState<string>(initialPedido?.clienteId || clients[0]?.id || '');
   const [fornecedor, setFornecedor] = useState<string>(initialPedido?.fornecedor || 'Fireowl Controls Ltda.');
@@ -485,6 +491,8 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
       createdAt: initialPedido?.createdAt || now,
       updatedAt: now,
       proposal: {
+        areaPrincipal,
+        tipoServico: tipoServico || undefined,
         objetivo,
         cartaApresentacao,
         revisoes: initialPedido?.proposal?.revisoes,
@@ -714,6 +722,43 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                   Define o documento gerado por padrão (configurável em Conta → PDF).
                 </p>
               </div>
+
+              {/* P1 — Área de atuação (multi) + Tipo de serviço → título dinâmico */}
+              <div className="sm:col-span-2">
+                <label className={labelCls}>Área(s) de atuação</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {AREAS_PROPOSTA.map((a) => {
+                    const on = areaPrincipal.includes(a.id);
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => toggleArea(a.id)}
+                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${on ? 'bg-[#0B1E38] text-white border-[#0B1E38]' : 'bg-white text-slate-600 border-slate-300 hover:border-[#0B1E38]'}`}
+                      >
+                        {a.sigla}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">Selecione uma ou mais áreas. Compõe o título e a apresentação.</p>
+              </div>
+              <div className="sm:col-span-2">
+                <label className={labelCls}>Tipo de serviço</label>
+                <select value={tipoServico} onChange={(e) => setTipoServico(e.target.value)} className={inputCls}>
+                  <option value="">Não definido</option>
+                  {TIPOS_SERVICO.map((t) => (
+                    <option key={t.id} value={t.id}>{t.label}</option>
+                  ))}
+                </select>
+                {tituloDinamico && (
+                  <div className="mt-2 rounded-lg bg-[#0B1E38]/5 border border-[#0B1E38]/15 px-3 py-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[#0B1E38]/60">Título gerado</p>
+                    <p className="text-xs font-bold text-[#0B1E38]">{tituloDinamico}</p>
+                  </div>
+                )}
+              </div>
+
               <div className="sm:col-span-2">
                 <label className={labelCls}>
                   Cliente / Contratante <span className="text-[#E63946]">*</span>

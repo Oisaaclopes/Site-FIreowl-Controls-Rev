@@ -2,6 +2,7 @@ import React from 'react';
 import { Document, Page, View, Text, StyleSheet, Svg, Path, Line, Rect, Circle, Image, Font } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import { InclusoExcluso, ResumoExecutivoPage, SlaBloco } from '@/components/documentos/pdfKit';
+import { gerarTituloProposta, faixaSiglas } from '@/lib/propostaTitulo';
 import {
   CARTA_APRESENTACAO,
   SERVICOS_OFERTADOS,
@@ -997,6 +998,9 @@ export function PropostaDocument({
   const clienteNome = pedido.clienteNome || '';
   const assinante = pedido.responsavelComercialNome || 'Responsável Comercial';
   const escopoTitulo = pedido.referencia || 'Fornecimento e Serviços de Engenharia';
+  // P1 — título dinâmico (área × tipo) e faixa de siglas (§3/§7).
+  const tituloDin = gerarTituloProposta(p.areaPrincipal || [], p.tipoServico);
+  const siglas = faixaSiglas(p.areaPrincipal || []);
 
   const showLogo = options?.showLogo !== false;
   const detailed = options?.detailedSubtotal !== false;
@@ -1092,6 +1096,8 @@ export function PropostaDocument({
             <Text style={styles.coverKicker}>Documento Técnico-Comercial</Text>
             <View style={styles.coverTitleBar} />
             <Text style={styles.coverTitle}>Proposta{'\n'}Técnico-Comercial</Text>
+            {tituloDin ? <Text style={{ color: '#F2A900', fontSize: 11, fontFamily: 'Poppins', fontWeight: 600, marginTop: 8, letterSpacing: 0.2 }}>{tituloDin}</Text> : null}
+            {nv(siglas) ? <Text style={{ color: C.s300, fontSize: 8.5, fontFamily: 'Roboto', fontWeight: 700, letterSpacing: 1.5, marginTop: 4 }}>{siglas}</Text> : null}
           </View>
 
           <View style={styles.coverBlockContainer}>

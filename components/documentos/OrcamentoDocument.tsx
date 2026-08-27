@@ -2,6 +2,7 @@ import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import { C, brl, nv, lnv, PdfHeader, PdfFooter, CamposExtras, itemTotal, DocCover, AreasAtuacaoPage, InclusoExcluso, ResumoExecutivoPage, SlaBloco } from './pdfKit';
+import { gerarTituloProposta } from '@/lib/propostaTitulo';
 import { DocOptions } from '@/lib/documentos';
 
 export type OrcamentoPdfOptions = Partial<DocOptions> & {
@@ -175,6 +176,8 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
       : (nv(p.formaPagamento) ? p.formaPagamento! : 'A combinar entre as partes.');
 
   const contato = [companyProfile.telefone, companyProfile.email].filter(nv).join('  •  ');
+  // P1 — título dinâmico (área × tipo) usado como subtítulo da capa.
+  const tituloDin = gerarTituloProposta(p.areaPrincipal || [], p.tipoServico);
 
   return (
     <Document title={`Orçamento ${numero}`} author={razao}>
@@ -187,7 +190,7 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
           telefone={companyProfile.telefone}
           email={companyProfile.email}
           titulo="Orçamento"
-          subtitulo="Documento Comercial"
+          subtitulo={tituloDin || 'Documento Comercial'}
           cliente={cliente}
           numero={numero}
           escopo={referencia}

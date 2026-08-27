@@ -219,9 +219,12 @@ export const DocCover = ({
       {nv(capaImagemUrl) ? <Image src={capaImagemUrl!} style={{ width: '100%', height: 210, borderRadius: 6, marginTop: 12, objectFit: 'cover' }} /> : null}
 
       <View style={{ marginTop: nv(capaImagemUrl) ? 12 : 28 }}>
-        <Text style={{ color: g.gold, fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.3 }}>{subtitulo || 'Documento Comercial'}</Text>
+        <Text style={{ color: g.gold, fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.3 }}>Documento Comercial</Text>
         <View style={{ width: 56, height: 4, backgroundColor: g.red, borderRadius: 2, marginTop: 6, marginBottom: 4 }} />
         <Text style={{ color: C.white, fontSize: 30, fontFamily: 'Poppins', fontWeight: 700, letterSpacing: 0.5, lineHeight: 1.1 }}>{titulo}</Text>
+        {nv(subtitulo) && subtitulo !== 'Documento Comercial' ? (
+          <Text style={{ color: g.gold, fontSize: 12, fontFamily: 'Poppins', fontWeight: 600, letterSpacing: 0.2, marginTop: 8, maxWidth: 460 }}>{subtitulo}</Text>
+        ) : null}
       </View>
 
       <View>
