@@ -105,6 +105,34 @@ export function conclusaoPorTipo(tipoId?: string): string {
   return (tipoId && CONCLUSAO_POR_TIPO[tipoId]) || CONCLUSAO_GENERICA;
 }
 
+/**
+ * §5 — preset de estrutura por tipo de serviço: sugere o nível de apresentação
+ * e se a seção "Segurança do Trabalho" (trabalho em campo) deve entrar. Aplicado
+ * só quando o usuário clica em "Aplicar sugestão" — nunca automaticamente.
+ */
+export interface PresetTipo {
+  nivel: 'simples' | 'tecnica' | 'corporativa';
+  seguranca: boolean;
+}
+const PRESET_POR_TIPO: Record<string, PresetTipo> = {
+  manut_corretiva: { nivel: 'simples', seguranca: true },
+  manut_preventiva: { nivel: 'tecnica', seguranca: true },
+  contrato_manut: { nivel: 'corporativa', seguranca: true },
+  contrato_inspecao: { nivel: 'corporativa', seguranca: false },
+  inspecao: { nivel: 'tecnica', seguranca: false },
+  instalacao: { nivel: 'tecnica', seguranca: true },
+  implantacao: { nivel: 'corporativa', seguranca: true },
+  retrofit: { nivel: 'corporativa', seguranca: true },
+  adequacao: { nivel: 'tecnica', seguranca: true },
+  projeto: { nivel: 'tecnica', seguranca: false },
+  comissionamento: { nivel: 'tecnica', seguranca: true },
+  integracao_serv: { nivel: 'tecnica', seguranca: true },
+  fornecimento: { nivel: 'simples', seguranca: false },
+};
+export function presetPorTipo(tipoId?: string): PresetTipo | undefined {
+  return tipoId ? PRESET_POR_TIPO[tipoId] : undefined;
+}
+
 /** §6 — texto institucional (do sistema) da página de Áreas, por área. */
 const APRESENTACAO_GENERICA =
   'Engenharia especializada em segurança eletrônica e proteção contra incêndio. Projetamos, instalamos, comissionamos e mantemos soluções integradas — do sensor de campo à central de supervisão.';

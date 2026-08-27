@@ -14,7 +14,7 @@ import {
   PedidoTipo,
 } from '@/lib/types';
 import { PEDIDO_TIPO_LABELS, PEDIDO_TIPO_ORDER } from '@/lib/documentos';
-import { AREAS_PROPOSTA, TIPOS_SERVICO, gerarTituloProposta, conclusaoPorTipo } from '@/lib/propostaTitulo';
+import { AREAS_PROPOSTA, TIPOS_SERVICO, gerarTituloProposta, conclusaoPorTipo, presetPorTipo } from '@/lib/propostaTitulo';
 import { montarEstruturaProposta, ordenarEstrutura, SECOES_FIXAS_INICIO, SECOES_FIXAS_FIM } from '@/lib/propostaEstrutura';
 import { ItensCardEditor } from '@/components/proposta/ItensCardEditor';
 import {
@@ -749,7 +749,23 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                 <p className="text-[11px] text-slate-400 mt-1">Selecione uma ou mais áreas. Compõe o título e a apresentação.</p>
               </div>
               <div className="sm:col-span-2">
-                <label className={labelCls}>Tipo de serviço</label>
+                <div className="flex items-center justify-between">
+                  <label className={labelCls}>Tipo de serviço</label>
+                  {presetPorTipo(tipoServico) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const preset = presetPorTipo(tipoServico)!;
+                        setNivelProposta(preset.nivel);
+                        setIncluirSeguranca(preset.seguranca);
+                      }}
+                      title="Ajusta o nível da proposta e a seção Segurança do Trabalho conforme o tipo (você pode alterar depois)"
+                      className="text-[10px] font-bold uppercase text-[#1A1A72] hover:text-[#E63946]"
+                    >
+                      Aplicar sugestão do tipo
+                    </button>
+                  )}
+                </div>
                 <select value={tipoServico} onChange={(e) => setTipoServico(e.target.value)} className={inputCls}>
                   <option value="">Não definido</option>
                   {TIPOS_SERVICO.map((t) => (
