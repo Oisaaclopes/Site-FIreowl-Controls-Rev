@@ -339,7 +339,7 @@ const AREA_SIGLA: Record<string, string> = { sdai: 'SDAI', cftv: 'CFTV', acesso:
  * selecionadas (areaIds), destaca-as (ordena na frente, borda dourada) e mostra
  * a faixa de siglas (§7). Sem seleção, mantém as 6 áreas com peso igual.
  */
-export const AreasAtuacaoPage = ({ razao, numero, data, cliente, areaIds = [] }: { razao?: string; numero: string; data: string; cliente: string; areaIds?: string[] }) => {
+export const AreasAtuacaoPage = ({ razao, numero, data, cliente, areaIds = [], intro }: { razao?: string; numero: string; data: string; cliente: string; areaIds?: string[]; intro?: string }) => {
   const sel = new Set(areaIds);
   const temSel = AREAS.some((a) => sel.has(a.kind));
   const ordered = temSel ? [...AREAS].sort((a, b) => (sel.has(b.kind) ? 1 : 0) - (sel.has(a.kind) ? 1 : 0)) : AREAS;
@@ -358,8 +358,7 @@ export const AreasAtuacaoPage = ({ razao, numero, data, cliente, areaIds = [] }:
           </View>
         ) : null}
         <Text style={{ color: C.s300, fontSize: 9, lineHeight: 1.5, marginBottom: 16, maxWidth: 470 }}>
-          Engenharia especializada em segurança eletrônica e proteção contra incêndio. Projetamos, instalamos,
-          comissionamos e mantemos soluções integradas — do sensor de campo à central de supervisão.
+          {nv(intro) ? intro : 'Engenharia especializada em segurança eletrônica e proteção contra incêndio. Projetamos, instalamos, comissionamos e mantemos soluções integradas — do sensor de campo à central de supervisão.'}
         </Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
           {ordered.map((a, i) => {

@@ -2,7 +2,7 @@ import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import { C, brl, nv, lnv, PdfHeader, PdfFooter, CamposExtras, itemTotal, DocCover, AreasAtuacaoPage, InclusoExcluso, ResumoExecutivoPage, SlaBloco } from './pdfKit';
-import { gerarTituloProposta } from '@/lib/propostaTitulo';
+import { gerarTituloProposta, apresentacaoAreas } from '@/lib/propostaTitulo';
 import { DocOptions } from '@/lib/documentos';
 
 export type OrcamentoPdfOptions = Partial<DocOptions> & {
@@ -208,7 +208,7 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
       )}
 
       {/* Áreas de Atuação */}
-      {showAreas && <AreasAtuacaoPage razao={fantasia} numero={numero} data={dataDoc} cliente={cliente} areaIds={p.areaPrincipal} />}
+      {showAreas && <AreasAtuacaoPage razao={fantasia} numero={numero} data={dataDoc} cliente={cliente} areaIds={p.areaPrincipal} intro={apresentacaoAreas(p.areaPrincipal || [])} />}
 
       {/* Conteúdo */}
       <Page size="A4" style={styles.page}>

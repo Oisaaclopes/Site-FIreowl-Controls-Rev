@@ -105,6 +105,28 @@ export function conclusaoPorTipo(tipoId?: string): string {
   return (tipoId && CONCLUSAO_POR_TIPO[tipoId]) || CONCLUSAO_GENERICA;
 }
 
+/** §6 — texto institucional (do sistema) da página de Áreas, por área. */
+const APRESENTACAO_GENERICA =
+  'Engenharia especializada em segurança eletrônica e proteção contra incêndio. Projetamos, instalamos, comissionamos e mantemos soluções integradas — do sensor de campo à central de supervisão.';
+const APRESENTACAO_POR_AREA: Record<string, string> = {
+  sdai: 'Especialistas em proteção contra incêndio: projeto, instalação, comissionamento, manutenção e retrofit de sistemas de detecção e alarme, com responsabilidade técnica e em conformidade com a NBR 17240 e a NPT 019.',
+  cftv: 'Videomonitoramento de ponta a ponta: câmeras IP, gravação, analíticos de vídeo e supervisão integrada para a segurança patrimonial, com projeto, instalação e manutenção.',
+  acesso: 'Controle de acesso completo: portas, catracas, biometria e credenciais com níveis de acesso e trilha de auditoria — projeto, instalação e manutenção.',
+  alarme: 'Alarme de intrusão e proteção perimetral: sensores, centrais e comunicação com notificação em tempo real, projetados, instalados e mantidos pela nossa equipe.',
+  bms: 'Automação predial (BMS): supervisão e integração de climatização, energia e iluminação em uma central, com engenharia própria e suporte contínuo.',
+  integracao: 'Integração de sistemas de segurança e proteção contra incêndio em uma plataforma unificada, com supervisão centralizada, dashboards e resposta coordenada a eventos.',
+};
+
+export function apresentacaoAreas(areaIds: string[]): string {
+  const ids = areaIds.filter((id) => id in APRESENTACAO_POR_AREA);
+  if (ids.length === 0) return APRESENTACAO_GENERICA;
+  // Múltiplas áreas (ou integração explícita) → texto integrado.
+  if (ids.length > 1 || ids.includes('integracao')) {
+    return 'Integramos proteção contra incêndio e segurança eletrônica em uma única solução de engenharia — do projeto e instalação ao comissionamento, à manutenção e à supervisão centralizada, com responsabilidade técnica e rastreabilidade.';
+  }
+  return APRESENTACAO_POR_AREA[ids[0]];
+}
+
 /**
  * Compõe o nome da(s) área(s) para o título. Com várias áreas, junta os nomes;
  * com muitas, usa uma expressão integrada.

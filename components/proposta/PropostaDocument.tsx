@@ -2,7 +2,7 @@ import React from 'react';
 import { Document, Page, View, Text, StyleSheet, Svg, Path, Line, Rect, Circle, Image, Font } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import { InclusoExcluso, ResumoExecutivoPage, SlaBloco } from '@/components/documentos/pdfKit';
-import { gerarTituloProposta, faixaSiglas, tituloEscopo, conclusaoPorTipo } from '@/lib/propostaTitulo';
+import { gerarTituloProposta, faixaSiglas, tituloEscopo, conclusaoPorTipo, apresentacaoAreas } from '@/lib/propostaTitulo';
 import {
   CARTA_APRESENTACAO,
   SERVICOS_OFERTADOS,
@@ -1165,10 +1165,7 @@ export function PropostaDocument({
                 <Text style={{ color: '#F2A900', fontSize: 10, fontFamily: 'Poppins', fontWeight: 700, letterSpacing: 1.5 }}>{siglas}</Text>
               </View>
             ) : null}
-            <Text style={styles.areasIntro}>
-              Engenharia especializada em segurança eletrônica e proteção contra incêndio. Projetamos, instalamos,
-              comissionamos e mantemos soluções integradas — do sensor de campo à central de supervisão.
-            </Text>
+            <Text style={styles.areasIntro}>{apresentacaoAreas(p.areaPrincipal || [])}</Text>
             <View style={styles.areasGrid}>
               {areasOrd.map((a, i) => {
                 const on = areaSel.has(a.kind);
