@@ -208,7 +208,7 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
       )}
 
       {/* Áreas de Atuação */}
-      {showAreas && <AreasAtuacaoPage razao={fantasia} numero={numero} data={dataDoc} cliente={cliente} areaIds={p.areaPrincipal} intro={apresentacaoAreas(p.areaPrincipal || [])} />}
+      {showAreas && <AreasAtuacaoPage razao={fantasia} numero={numero} data={dataDoc} cliente={cliente} areaIds={p.areaPrincipal} intro={apresentacaoAreas(p.areaPrincipal || [], { geral: companyProfile.apresentacaoGeral, porArea: companyProfile.apresentacaoAreas })} />}
 
       {/* Conteúdo */}
       <Page size="A4" style={styles.page}>

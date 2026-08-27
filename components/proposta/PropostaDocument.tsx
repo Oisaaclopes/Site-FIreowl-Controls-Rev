@@ -1348,7 +1348,7 @@ export function PropostaDocument({
                 <Text style={{ color: '#F2A900', fontSize: 10, fontFamily: 'Poppins', fontWeight: 700, letterSpacing: 1.5 }}>{siglas}</Text>
               </View>
             ) : null}
-            <Text style={styles.areasIntro}>{apresentacaoAreas(p.areaPrincipal || [])}</Text>
+            <Text style={styles.areasIntro}>{apresentacaoAreas(p.areaPrincipal || [], { geral: companyProfile.apresentacaoGeral, porArea: companyProfile.apresentacaoAreas })}</Text>
             <View style={styles.areasGrid}>
               {areasOrd.map((a, i) => {
                 const on = areaSel.has(a.kind);

@@ -628,6 +628,44 @@ export const ContaView: React.FC<ContaViewProps> = ({
                   className={inputCls}
                 />
               </div>
+
+              {/* §8 — Biblioteca de textos institucionais (usados na página "Áreas de Atuação") */}
+              <div className="pt-3 border-t border-slate-200">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Textos institucionais das propostas</p>
+                <p className="text-[11px] text-slate-400 mb-3">Aparecem na página &ldquo;Áreas de Atuação&rdquo;. Em branco, o texto padrão do sistema é usado.</p>
+                <div className="mb-3">
+                  <label className={labelCls}>Apresentação geral / multi-área</label>
+                  <textarea
+                    rows={2}
+                    placeholder="Texto usado quando a proposta cobre várias áreas ou integração."
+                    value={profile.apresentacaoGeral || ''}
+                    onChange={(e) => setProfile({ ...profile, apresentacaoGeral: e.target.value })}
+                    className={inputCls}
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {([
+                    ['sdai', 'SDAI — Detecção e Alarme'],
+                    ['cftv', 'CFTV / Videomonitoramento'],
+                    ['acesso', 'Controle de Acesso'],
+                    ['alarme', 'Alarme de Intrusão'],
+                    ['bms', 'Automação / BMS'],
+                    ['integracao', 'Integração'],
+                  ] as const).map(([id, nome]) => (
+                    <div key={id}>
+                      <label className={labelCls}>{nome}</label>
+                      <textarea
+                        rows={2}
+                        placeholder="Texto padrão do sistema"
+                        value={profile.apresentacaoAreas?.[id] || ''}
+                        onChange={(e) => setProfile({ ...profile, apresentacaoAreas: { ...(profile.apresentacaoAreas || {}), [id]: e.target.value } })}
+                        className={inputCls}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <button
                 type="submit"
                 className="bg-[#1A1A72] hover:bg-[#12124f] text-white font-semibold py-2.5 px-5 rounded-lg uppercase tracking-wider text-xs transition-colors shadow-sm flex items-center gap-1.5"

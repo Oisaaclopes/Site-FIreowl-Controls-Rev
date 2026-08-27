@@ -117,14 +117,26 @@ const APRESENTACAO_POR_AREA: Record<string, string> = {
   integracao: 'Integração de sistemas de segurança e proteção contra incêndio em uma plataforma unificada, com supervisão centralizada, dashboards e resposta coordenada a eventos.',
 };
 
-export function apresentacaoAreas(areaIds: string[]): string {
+const APRESENTACAO_INTEGRADA =
+  'Integramos proteção contra incêndio e segurança eletrônica em uma única solução de engenharia — do projeto e instalação ao comissionamento, à manutenção e à supervisão centralizada, com responsabilidade técnica e rastreabilidade.';
+
+/** §8 — textos institucionais cadastrados no admin, sobrepõem os padrões. */
+export interface ApresentacaoOverrides {
+  /** Texto usado quando há múltiplas áreas / integração (ou como geral). */
+  geral?: string;
+  /** Texto por área (ids: sdai, cftv, acesso, alarme, bms, integracao). */
+  porArea?: Record<string, string | undefined>;
+}
+const ov = (s?: string) => (s && s.trim().length > 0 ? s.trim() : undefined);
+
+export function apresentacaoAreas(areaIds: string[], overrides?: ApresentacaoOverrides): string {
   const ids = areaIds.filter((id) => id in APRESENTACAO_POR_AREA);
-  if (ids.length === 0) return APRESENTACAO_GENERICA;
-  // Múltiplas áreas (ou integração explícita) → texto integrado.
+  if (ids.length === 0) return ov(overrides?.geral) || APRESENTACAO_GENERICA;
+  // Múltiplas áreas (ou integração explícita) → texto integrado (ou o geral do admin).
   if (ids.length > 1 || ids.includes('integracao')) {
-    return 'Integramos proteção contra incêndio e segurança eletrônica em uma única solução de engenharia — do projeto e instalação ao comissionamento, à manutenção e à supervisão centralizada, com responsabilidade técnica e rastreabilidade.';
+    return ov(overrides?.geral) || APRESENTACAO_INTEGRADA;
   }
-  return APRESENTACAO_POR_AREA[ids[0]];
+  return ov(overrides?.porArea?.[ids[0]]) || APRESENTACAO_POR_AREA[ids[0]];
 }
 
 /**

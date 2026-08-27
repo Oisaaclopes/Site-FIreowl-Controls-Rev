@@ -202,6 +202,10 @@ export interface CompanyProfile {
   email: string;
   regimeTributario: string;
   logoUrl?: string;
+  /** §8 — biblioteca de textos institucionais (editável em Conta). */
+  apresentacaoGeral?: string;
+  /** §8 — apresentação por área (ids: sdai, cftv, acesso, alarme, bms, integracao). */
+  apresentacaoAreas?: Record<string, string>;
 }
 
 export interface PedidoTemplate {
