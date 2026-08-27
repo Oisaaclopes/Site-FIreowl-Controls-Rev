@@ -6,6 +6,17 @@ import { EmpresaAtendida, MarcaTecnologia } from './types';
  * (área da proposta, tipo, segmento, destaque) e limita a quantidade.
  */
 
+/**
+ * §16 — a página "Experiência e Capacidade Técnica" está ativa? true/false na
+ * proposta força; undefined = automático: entra em Técnica/Corporativa, não em
+ * Simples.
+ */
+export function experienciaAtiva(p: { incluirExperiencia?: boolean; nivelProposta?: string }): boolean {
+  if (p.incluirExperiencia === true) return true;
+  if (p.incluirExperiencia === false) return false;
+  return (p.nivelProposta || 'tecnica') !== 'simples';
+}
+
 export interface SelecaoCtx {
   /** Áreas da proposta (proposal.areaPrincipal): sdai, cftv, ... */
   areas: string[];

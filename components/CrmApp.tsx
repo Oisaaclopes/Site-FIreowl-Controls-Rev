@@ -30,6 +30,8 @@ import {
   InventoryItem,
   Pedido,
   PartnerBrand,
+  EmpresaAtendida,
+  MarcaTecnologia,
   CompanyProfile,
   PedidoTemplate,
   PedidoStatus,
@@ -80,6 +82,8 @@ import { fetchSuppliers, upsertSupplier, deleteSupplier } from '@/lib/suppliers'
 import { fetchBrands, ensureBrand, deleteBrand, seedBrands } from '@/lib/brands';
 import { fetchClients, upsertClient } from '@/lib/clients';
 import { fetchCompanyProfile, upsertCompanyProfile } from '@/lib/companyProfile';
+import { fetchEmpresasAtendidas, upsertEmpresaAtendida, deleteEmpresaAtendida } from '@/lib/empresasAtendidas';
+import { fetchMarcasTecnologias, upsertMarcaTecnologia, deleteMarcaTecnologia } from '@/lib/marcasTecnologias';
 import { fetchTransactions, upsertTransaction, deleteTransaction } from '@/lib/transactions';
 import { fetchContracts, upsertContract } from '@/lib/contracts';
 import { WorkSchedule } from '@/lib/schedule';
@@ -165,6 +169,8 @@ export function CrmApp({
   const [pedidosOS, setPedidosOS] = useState<PedidoOS[]>(INITIAL_PEDIDOS_OS);
   const [pedidos, setPedidos] = useState<Pedido[]>(isSupabaseConfigured() ? [] : INITIAL_PEDIDOS);
   const [partnerBrands, setPartnerBrands] = useState<PartnerBrand[]>(INITIAL_PARTNER_BRANDS);
+  const [empresasAtendidas, setEmpresasAtendidas] = useState<EmpresaAtendida[]>([]);
+  const [marcasTecnologias, setMarcasTecnologias] = useState<MarcaTecnologia[]>([]);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(INITIAL_COMPANY_PROFILE);
   const [templates, setTemplates] = useState<PedidoTemplate[]>(INITIAL_TEMPLATES);
   const [contracts, setContracts] = useState<Contract[]>(isSupabaseConfigured() ? [] : INITIAL_CONTRACTS);
@@ -255,6 +261,12 @@ export function CrmApp({
     fetchCompanyProfile()
       .then((cp) => { if (cp) setCompanyProfile(cp); })
       .catch((err) => console.warn('Perfil da empresa: falha ao carregar do Supabase.', err));
+    fetchEmpresasAtendidas()
+      .then((rows) => setEmpresasAtendidas(rows))
+      .catch((err) => console.warn('Empresas atendidas: falha ao carregar do Supabase.', err));
+    fetchMarcasTecnologias()
+      .then((rows) => setMarcasTecnologias(rows))
+      .catch((err) => console.warn('Marcas/tecnologias: falha ao carregar do Supabase.', err));
   }, []);
 
   const handleUpdatePdfPrefs = (p: PdfPrefs) => {
@@ -401,6 +413,32 @@ export function CrmApp({
         alert('Não foi possível salvar o perfil da empresa no banco. Salvo apenas nesta sessão.');
       });
     }
+  };
+
+  // ===== Módulo Experiência: Empresas Atendidas e Marcas/Tecnologias =====
+  const handleSaveEmpresaAtendida = (e: EmpresaAtendida) => {
+    setEmpresasAtendidas((prev) => (prev.some((x) => x.id === e.id) ? prev.map((x) => (x.id === e.id ? e : x)) : [...prev, e]));
+    if (isSupabaseConfigured()) {
+      upsertEmpresaAtendida(e)
+        .then((saved) => setEmpresasAtendidas((prev) => prev.map((x) => (x.id === saved.id ? saved : x))))
+        .catch((err) => { console.error('Empresa atendida: falha ao salvar.', err); alert('Não foi possível salvar a empresa no banco. Salva apenas nesta sessão.'); });
+    }
+  };
+  const handleDeleteEmpresaAtendida = (id: string) => {
+    setEmpresasAtendidas((prev) => prev.filter((x) => x.id !== id));
+    if (isSupabaseConfigured()) deleteEmpresaAtendida(id).catch((err) => console.error('Empresa atendida: falha ao excluir.', err));
+  };
+  const handleSaveMarcaTecnologia = (m: MarcaTecnologia) => {
+    setMarcasTecnologias((prev) => (prev.some((x) => x.id === m.id) ? prev.map((x) => (x.id === m.id ? m : x)) : [...prev, m]));
+    if (isSupabaseConfigured()) {
+      upsertMarcaTecnologia(m)
+        .then((saved) => setMarcasTecnologias((prev) => prev.map((x) => (x.id === saved.id ? saved : x))))
+        .catch((err) => { console.error('Marca/tecnologia: falha ao salvar.', err); alert('Não foi possível salvar a marca no banco. Salva apenas nesta sessão.'); });
+    }
+  };
+  const handleDeleteMarcaTecnologia = (id: string) => {
+    setMarcasTecnologias((prev) => prev.filter((x) => x.id !== id));
+    if (isSupabaseConfigured()) deleteMarcaTecnologia(id).catch((err) => console.error('Marca/tecnologia: falha ao excluir.', err));
   };
 
   const handleAddPartnerBrand = (brand: PartnerBrand) => {
@@ -822,6 +860,8 @@ export function CrmApp({
               templates={templates}
               services={services}
               companyProfile={companyProfile}
+              empresasAtendidas={empresasAtendidas}
+              marcasTecnologias={marcasTecnologias}
               onAddOS={handleAddOS}
               onSavePedido={handleSavePedido}
               onUpdatePedidoStatus={handleUpdatePedidoStatus}

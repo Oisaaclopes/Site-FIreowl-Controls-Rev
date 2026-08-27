@@ -1,7 +1,8 @@
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet, Svg, Path, Line, Rect, Circle, Image, Font } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
-import { InclusoExcluso, ResumoExecutivoPage, SlaBloco, QrCode, contatoQrUrl } from '@/components/documentos/pdfKit';
+import { InclusoExcluso, ResumoExecutivoPage, SlaBloco, QrCode, contatoQrUrl, ExperienciaParceriasPage } from '@/components/documentos/pdfKit';
+import { experienciaAtiva } from '@/lib/experienciaSelecao';
 import { gerarTituloProposta, faixaSiglas, tituloEscopo, conclusaoPorTipo, apresentacaoAreas } from '@/lib/propostaTitulo';
 import { montarEstruturaProposta, ordenarEstrutura } from '@/lib/propostaEstrutura';
 import {
@@ -30,6 +31,14 @@ export interface PropostaPdfOptions {
   showFechamento?: boolean;
   /** Imagem opcional da capa (URL ou data URI). Sem ela, usa o grafismo blueprint. */
   capaImagemUrl?: string;
+  /** Dados já resolvidos da página "Experiência e Capacidade Técnica" (logos em data URI). */
+  experiencia?: {
+    empresas: { nome: string; logoDataUrl?: string; destaque?: boolean }[];
+    marcas: { nome: string; logoDataUrl?: string }[];
+    segmentos: string[];
+    expIntro?: string;
+    techIntro?: string;
+  };
 }
 
 // Tipografia de marca: corpo em Roboto, títulos em Poppins.
@@ -1375,6 +1384,21 @@ export function PropostaDocument({
             </View>
           </View>
         </Page>
+      )}
+
+      {/* ===================== EXPERIÊNCIA E CAPACIDADE TÉCNICA (§8/§16) ===================== */}
+      {experienciaAtiva(p) && options?.experiencia && (options.experiencia.empresas.length > 0 || options.experiencia.marcas.length > 0) && (
+        <ExperienciaParceriasPage
+          fantasia={fantasia}
+          numero={numero}
+          data={dataEmissao}
+          cliente={clienteNome}
+          empresas={options.experiencia.empresas}
+          marcas={options.experiencia.marcas}
+          segmentos={options.experiencia.segmentos}
+          expIntro={options.experiencia.expIntro}
+          techIntro={options.experiencia.techIntro}
+        />
       )}
 
       {/* ===================== 03. CARTA DE APRESENTAÇÃO (Página Exclusiva) ===================== */}

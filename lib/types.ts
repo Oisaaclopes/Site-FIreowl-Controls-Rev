@@ -70,6 +70,8 @@ export interface CommercialProposalData {
   nivelProposta?: 'simples' | 'tecnica' | 'corporativa';
   /** §12 — ordem das seções do corpo (chaves). Vazio/ausente = ordem padrão. */
   ordemSecoes?: string[];
+  /** Página "Experiência e Capacidade Técnica": true/false força; undefined = automático (por nível). */
+  incluirExperiencia?: boolean;
   objetivo: string;
   /** Carta de apresentação (opcional). Vazio → usa o texto institucional padrão. */
   cartaApresentacao?: string;

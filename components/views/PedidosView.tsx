@@ -1,7 +1,17 @@
 'use client';
 
 import React, { useMemo, useRef, useState } from 'react';
-import { PedidoOS, Client, Pedido, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem, DocumentosPadrao, DocumentType, FinancialTransaction, RecebimentoProposta } from '@/lib/types';
+import { PedidoOS, Client, Pedido, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem, DocumentosPadrao, DocumentType, FinancialTransaction, RecebimentoProposta, EmpresaAtendida, MarcaTecnologia } from '@/lib/types';
+import { selecionarEmpresas, selecionarMarcas, experienciaAtiva } from '@/lib/experienciaSelecao';
+import { resolveLogoDataUrls } from '@/lib/institucional';
+
+type ExperienciaOpt = {
+  empresas: { nome: string; logoDataUrl?: string; destaque?: boolean }[];
+  marcas: { nome: string; logoDataUrl?: string }[];
+  segmentos: string[];
+  expIntro?: string;
+  techIntro?: string;
+};
 import { uploadPropostaCapa, removePropostaCapa, propostaCapaDataUrl, blobToDataUrl, readImageSize } from '@/lib/propostaCapa';
 import { CommercialProposalModal } from '@/components/proposta/CommercialProposalModal';
 import { CommercialProposalPDFView } from '@/components/proposta/CommercialProposalPDFView';
@@ -48,6 +58,8 @@ interface PedidosViewProps {
   templates: PedidoTemplate[];
   services?: ServiceCatalogItem[];
   companyProfile: any;
+  empresasAtendidas?: EmpresaAtendida[];
+  marcasTecnologias?: MarcaTecnologia[];
   onAddOS: (os: PedidoOS) => void;
   onSavePedido: (pedido: Pedido) => void;
   onUpdatePedidoStatus: (pedidoId: string, newStatus: PedidoStatus) => void;
@@ -96,6 +108,8 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   templates,
   services = [],
   companyProfile,
+  empresasAtendidas = [],
+  marcasTecnologias = [],
   onAddOS,
   onSavePedido,
   onUpdatePedidoStatus,
@@ -157,6 +171,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     showAreasAtuacao: true,
     showFechamento: true,
     capaImagemUrl: undefined as string | undefined,
+    experiencia: undefined as ExperienciaOpt | undefined,
   });
   const [pdfConfigPedido, setPdfConfigPedido] = useState<Pedido | null>(null);
   const [docModalPedido, setDocModalPedido] = useState<Pedido | null>(null);
@@ -186,6 +201,35 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     }
   };
 
+  // §9/§10 — monta (assíncrono) a página "Experiência e Capacidade Técnica":
+  // seleção inteligente + resolução dos logos como data URI.
+  const buildExperienciaIntoOptions = async (ped: Pedido) => {
+    const p = ped.proposal;
+    if (!p || !experienciaAtiva(p)) return;
+    const areas = p.areaPrincipal || [];
+    const segmentoCliente = clients.find((c) => c.id === ped.clienteId)?.segment;
+    const ctx = { areas, tipoServico: p.tipoServico, segmentoCliente };
+    const maxE = companyProfile?.expMaxEmpresas ?? 8;
+    const maxM = companyProfile?.expMaxMarcas ?? 8;
+    const emp = selecionarEmpresas(empresasAtendidas, ctx, maxE);
+    const mar = selecionarMarcas(marcasTecnologias, ctx, maxM);
+    if (emp.length === 0 && mar.length === 0) return;
+    const segmentos = Array.from(new Set(emp.flatMap((e) => e.segmentos))).slice(0, 6);
+    try {
+      const map = await resolveLogoDataUrls([...emp, ...mar].map((x) => x.logoPath || '').filter(Boolean));
+      const experiencia = {
+        empresas: emp.map((e) => ({ nome: e.nomeFantasia || e.nome, logoDataUrl: e.logoPath ? map[e.logoPath] : undefined, destaque: e.destaque })),
+        marcas: mar.map((m) => ({ nome: m.nome, logoDataUrl: m.logoPath ? map[m.logoPath] : undefined })),
+        segmentos,
+        expIntro: companyProfile?.expIntro,
+        techIntro: companyProfile?.techIntro,
+      };
+      setPdfOptions((prev) => ({ ...prev, experiencia }));
+    } catch {
+      /* falha ao resolver logos → página não é gerada */
+    }
+  };
+
   const openPdf = (ped: Pedido) => {
     const base = {
       showLogo: pdfPrefs.showLogo,
@@ -199,9 +243,11 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
       showAreasAtuacao: true,
       showFechamento: true,
       capaImagemUrl: undefined as string | undefined,
+      experiencia: undefined as ExperienciaOpt | undefined,
     };
     setPdfOptions(base);
     loadCapaIntoOptions(ped);
+    buildExperienciaIntoOptions(ped);
     if (pdfPrefs.configBeforeGenerate) setPdfConfigPedido(ped);
     else setPdfPreviewPedido(ped);
   };

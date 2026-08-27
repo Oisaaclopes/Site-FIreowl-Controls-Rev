@@ -266,6 +266,8 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const [tipoServico, setTipoServico] = useState<string>(initialPedido?.proposal?.tipoServico || '');
   const [nivelProposta, setNivelProposta] = useState<'simples' | 'tecnica' | 'corporativa'>(initialPedido?.proposal?.nivelProposta || 'tecnica');
   const [ordemSecoes, setOrdemSecoes] = useState<string[]>(initialPedido?.proposal?.ordemSecoes || []);
+  // Página "Experiência e Capacidade Técnica": undefined = automático (por nível).
+  const [incluirExperiencia, setIncluirExperiencia] = useState<boolean | undefined>(initialPedido?.proposal?.incluirExperiencia);
   const toggleArea = (id: string) => setAreaPrincipal((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   const tituloDinamico = gerarTituloProposta(areaPrincipal, tipoServico);
   const [pedidoTipo, setPedidoTipo] = useState<PedidoTipo | ''>(initialPedido?.proposal?.pedidoTipo || '');
@@ -498,6 +500,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         tipoServico: tipoServico || undefined,
         nivelProposta,
         ordemSecoes: ordemSecoes.length ? ordemSecoes : undefined,
+        incluirExperiencia,
         objetivo,
         cartaApresentacao,
         revisoes: initialPedido?.proposal?.revisoes,
@@ -802,6 +805,30 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                   })}
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1">Na Simples, capa institucional (Áreas de Atuação) e Resumo Executivo não entram.</p>
+              </div>
+              <div className="sm:col-span-2">
+                <label className={labelCls}>Página &ldquo;Experiência e Capacidade Técnica&rdquo;</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { v: undefined as boolean | undefined, nome: 'Automático', desc: 'Entra em Técnica/Corporativa' },
+                    { v: true, nome: 'Incluir', desc: 'Sempre nesta proposta' },
+                    { v: false, nome: 'Não incluir', desc: 'Nunca nesta proposta' },
+                  ]).map((o) => {
+                    const on = incluirExperiencia === o.v;
+                    return (
+                      <button
+                        key={String(o.v)}
+                        type="button"
+                        onClick={() => setIncluirExperiencia(o.v)}
+                        className={`text-left rounded-lg border px-3 py-2 transition-colors ${on ? 'bg-[#0B1E38] text-white border-[#0B1E38]' : 'bg-white text-slate-600 border-slate-300 hover:border-[#0B1E38]'}`}
+                      >
+                        <p className="text-xs font-bold">{o.nome}</p>
+                        <p className={`text-[10px] ${on ? 'text-slate-300' : 'text-slate-400'}`}>{o.desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">Mostra empresas atendidas e marcas relevantes ao serviço (cadastradas em Conta). Sem dados, a página não é gerada.</p>
               </div>
 
               <div className="sm:col-span-2">

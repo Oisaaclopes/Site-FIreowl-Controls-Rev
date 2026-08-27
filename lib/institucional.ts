@@ -1,4 +1,6 @@
 import { getSupabaseClient } from './supabaseClient';
+import { signedReportUrls } from './reportMedia';
+import { blobToDataUrl } from './propostaCapa';
 
 /**
  * Logos institucionais (identidade da Fireowl, empresas atendidas, marcas).
@@ -67,6 +69,31 @@ export async function uploadInstitucionalLogo(file: Blob, slug: string): Promise
   const { error } = await supabase.storage.from(BUCKET).upload(path, png, { upsert: false, contentType: 'image/png' });
   if (error) throw error;
   return path;
+}
+
+/**
+ * Resolve vários storage_paths de logo para data URI (para o <Image> do PDF),
+ * em lote e sem CORS. Falhas individuais são ignoradas (tile cai no fallback).
+ */
+export async function resolveLogoDataUrls(paths: string[]): Promise<Record<string, string>> {
+  const uniq = Array.from(new Set(paths.filter(Boolean)));
+  if (uniq.length === 0) return {};
+  const out: Record<string, string> = {};
+  try {
+    const signed = await signedReportUrls(uniq);
+    await Promise.all(
+      uniq.map(async (p) => {
+        try {
+          const url = signed[p];
+          if (!url) return;
+          const resp = await fetch(url);
+          const blob = await resp.blob();
+          out[p] = await blobToDataUrl(blob);
+        } catch { /* ignora este logo */ }
+      })
+    );
+  } catch { /* sem storage → sem logos */ }
+  return out;
 }
 
 /** Remove um logo do Storage (best-effort). */
