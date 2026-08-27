@@ -72,6 +72,8 @@ export interface DocOptions {
   showLogo: boolean;
   /** Foto do cliente (data URI) para a capa/topo do documento; resolvida na geração. */
   capaImagemUrl?: string;
+  /** §20 — logo oficial (data URI) para o cabeçalho/capa; resolvido na geração. */
+  logoUrl?: string;
 }
 
 export const DEFAULT_DOC_OPTIONS: DocOptions = {

@@ -105,7 +105,7 @@ export function OrdemServicoDocument({ pedido, companyProfile, options }: { pedi
   return (
     <Document title={`Ordem de Serviço ${os}`} author={razao}>
       <Page size="A4" style={styles.page}>
-        <PdfHeader razao={fantasia} label="Ordem de Serviço" showLogo={showLogo} />
+        <PdfHeader razao={fantasia} label="Ordem de Serviço" showLogo={showLogo} logoUrl={options?.logoUrl} />
         <CapaBanner capaImagemUrl={options?.capaImagemUrl} />
         <PdfFooter numero={os} data={dataDoc} cliente={cliente} />
 

@@ -67,12 +67,17 @@ const LOGO_PATHS = [
   { d: 'M216.992 319.209 218.186 319.409 216.276 322.202 214.844 323.798 208.876 328.786 206.967 330.182 204.341 332.177 201.715 333.973 198.851 335.968 194.793 338.562 190.496 341.355 186.438 344.148 183.335 346.343 179.992 348.937 178.083 350.333 175.457 352.328 173.547 353.725 170.205 356.119 164.954 359.71 161.851 361.905 159.225 363.701 157.554 365.097 155.644 366.494 152.064 369.088 149.676 370.883 147.767 372.28 144.425 374.674 142.038 376.47 140.128 377.866 137.741 379.662 135.115 381.457 132.967 383.253 131.057 384.65 127.954 387.044 122.702 390.635 118.883 393.229 116.257 395.024 112.915 397.418 109.335 400.012 107.664 401.209 107.425 401.209 107.186 395.623 107.186 388.64 107.664 349.934 107.902 334.971 108.141 328.187 108.857 327.988 121.031 328.586 136.547 328.586 146.096 328.187 157.315 327.589 173.309 326.192 186.676 324.596 195.986 323.199 208.399 321.005Z', fill: C.logoRed },
 ];
 
-export const Logo = ({ size = 36 }: { size?: number }) => (
-  <Svg viewBox="0 0 503 503" style={{ width: size, height: size }}>
-    {LOGO_PATHS.map((p, i) => (
-      <Path key={i} d={p.d} fill={p.fill} stroke="#0C0C0C" strokeWidth={4} fillRule="evenodd" />
-    ))}
-  </Svg>
+/** §20 — logo oficial: usa a imagem cadastrada (src) quando houver; senão, o vetor embutido. */
+export const Logo = ({ size = 36, src }: { size?: number; src?: string }) => (
+  nv(src) ? (
+    <Image src={src!} style={{ width: size, height: size, objectFit: 'contain' }} />
+  ) : (
+    <Svg viewBox="0 0 503 503" style={{ width: size, height: size }}>
+      {LOGO_PATHS.map((p, i) => (
+        <Path key={i} d={p.d} fill={p.fill} stroke="#0C0C0C" strokeWidth={4} fillRule="evenodd" />
+      ))}
+    </Svg>
+  )
 );
 
 // Fundo "blueprint" ancorado (fixed) para páginas marinho.
@@ -88,7 +93,7 @@ export const BlueprintBg = () => (
 );
 
 /** Cabeçalho fixo: logo pequena + marca à esquerda, rótulo do documento à direita. */
-export const PdfHeader = ({ razao, label, showLogo = true }: { razao: string; label: string; showLogo?: boolean }) => (
+export const PdfHeader = ({ razao, label, showLogo = true, logoUrl }: { razao: string; label: string; showLogo?: boolean; logoUrl?: string }) => (
   <View
     fixed
     style={{
@@ -98,7 +103,7 @@ export const PdfHeader = ({ razao, label, showLogo = true }: { razao: string; la
     }}
   >
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-      {showLogo && <Logo size={18} />}
+      {showLogo && <Logo size={18} src={logoUrl} />}
       <Text style={{ fontSize: 8.5, fontFamily: 'Poppins', fontWeight: 600, color: C.navy, letterSpacing: 0.8 }}>
         {(razao || 'FIREOWL CONTROLS').toUpperCase()}
       </Text>
@@ -224,11 +229,11 @@ const CoverBlock = ({ label, value }: { label: string; value: string }) => (
 
 /** Capa institucional marinho (reaproveita o visual da proposta). Renderiza uma <Page>. */
 export const DocCover = ({
-  razao, cnpj, endereco, telefone, email, titulo, subtitulo, cliente, numero, escopo, data, capaImagemUrl, showLogo = true,
+  razao, cnpj, endereco, telefone, email, titulo, subtitulo, cliente, numero, escopo, data, capaImagemUrl, showLogo = true, logoUrl,
 }: {
   razao: string; cnpj?: string; endereco?: string; telefone?: string; email?: string;
   titulo: string; subtitulo?: string; cliente: string; numero: string; escopo: string; data: string;
-  capaImagemUrl?: string; showLogo?: boolean;
+  capaImagemUrl?: string; showLogo?: boolean; logoUrl?: string;
 }) => (
   <Page size="A4" style={{ padding: 0, fontSize: 9, fontFamily: 'Roboto', color: C.white, backgroundColor: C.navy }}>
     <BlueprintBg />
@@ -238,7 +243,7 @@ export const DocCover = ({
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             {showLogo && (
               <View style={{ backgroundColor: C.white, borderRadius: 8, padding: 4, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-                <Logo size={36} />
+                <Logo size={36} src={logoUrl} />
               </View>
             )}
             <View>

@@ -31,6 +31,8 @@ export interface PropostaPdfOptions {
   showFechamento?: boolean;
   /** Imagem opcional da capa (URL ou data URI). Sem ela, usa o grafismo blueprint. */
   capaImagemUrl?: string;
+  /** §20 — logo oficial (data URI) para o cabeçalho e a capa. */
+  logoUrl?: string;
   /** Dados já resolvidos da página "Experiência e Capacidade Técnica" (logos em data URI). */
   experiencia?: {
     empresas: { nome: string; logoDataUrl?: string; destaque?: boolean }[];
@@ -756,12 +758,16 @@ const brl = (n: number) => `R$ ${(n || 0).toLocaleString('pt-BR', { minimumFract
 const nv = (s?: string) => !!s && s.trim().length > 0;
 const lnv = (a?: string[]) => Array.isArray(a) && a.filter((x) => nv(x)).length > 0;
 
-const Logo = ({ size = 36 }: { size?: number }) => (
-  <Svg viewBox="0 0 503 503" style={{ width: size, height: size }}>
-    {LOGO_PATHS.map((p, i) => (
-      <Path key={i} d={p.d} fill={p.fill} stroke="#0C0C0C" strokeWidth={4} fillRule="evenodd" />
-    ))}
-  </Svg>
+const Logo = ({ size = 36, src }: { size?: number; src?: string }) => (
+  nv(src) ? (
+    <Image src={src!} style={{ width: size, height: size, objectFit: 'contain' }} />
+  ) : (
+    <Svg viewBox="0 0 503 503" style={{ width: size, height: size }}>
+      {LOGO_PATHS.map((p, i) => (
+        <Path key={i} d={p.d} fill={p.fill} stroke="#0C0C0C" strokeWidth={4} fillRule="evenodd" />
+      ))}
+    </Svg>
+  )
 );
 
 // BlueprintBg: fundo ancorado à página (fixed) — fora do fluxo, para não ser
@@ -844,10 +850,10 @@ const AREAS = [
   { kind: 'integracao', titulo: 'Integração de Sistemas', desc: 'Convergência de SDAI, CFTV, acesso e alarme em plataforma unificada, com dashboards e resposta coordenada.' },
 ];
 
-const Header = ({ razao }: { razao: string }) => (
+const Header = ({ razao, logoUrl }: { razao: string; logoUrl?: string }) => (
   <View fixed style={styles.header}>
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-      <Logo size={18} />
+      <Logo size={18} src={logoUrl} />
       <Text style={styles.headerBrand}>{(razao || 'FIREOWL CONTROLS').toUpperCase()}</Text>
     </View>
     <View style={{ flex: 1 }} />
@@ -1272,7 +1278,7 @@ export function PropostaDocument({
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 {showLogo && (
                   <View style={styles.coverLogoBox}>
-                    <Logo size={36} />
+                    <Logo size={36} src={options?.logoUrl} />
                   </View>
                 )}
                 <View>
@@ -1404,7 +1410,7 @@ export function PropostaDocument({
       {/* ===================== 03. CARTA DE APRESENTAÇÃO (Página Exclusiva) ===================== */}
       {on('carta') && (
         <Page size="A4" style={styles.page}>
-          <Header razao={fantasia} />
+          <Header razao={fantasia} logoUrl={options?.logoUrl} />
           <Footer cliente={clienteNome} numero={numero} data={dataEmissao} />
 
           <Sec k="carta">
@@ -1423,7 +1429,7 @@ export function PropostaDocument({
       {/* ===================== 04. ÍNDICE (Página Exclusiva) ===================== */}
       {showIndice && (
         <Page size="A4" style={styles.page}>
-          <Header razao={fantasia} />
+          <Header razao={fantasia} logoUrl={options?.logoUrl} />
           <Footer cliente={clienteNome} numero={numero} data={dataEmissao} />
 
           <View style={styles.section}>
@@ -1442,7 +1448,7 @@ export function PropostaDocument({
 
       {/* ===================== 05. CORPO DA PROPOSTA ===================== */}
       <Page size="A4" style={styles.page}>
-        <Header razao={fantasia} />
+        <Header razao={fantasia} logoUrl={options?.logoUrl} />
         <Footer cliente={clienteNome} numero={numero} data={dataEmissao} />
 
         {/* §12 — corpo renderizado na ordem de `secoes` (permite reordenar). */}
@@ -1483,7 +1489,7 @@ export function PropostaDocument({
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 }}>
               {showLogo && (
                 <View style={styles.coverLogoBox}>
-                  <Logo size={36} />
+                  <Logo size={36} src={options?.logoUrl} />
                 </View>
               )}
               <Text style={styles.coverBrand}>FIREOWL CONTROLS</Text>

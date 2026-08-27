@@ -88,7 +88,7 @@ export function NotaDocument({ pedido, companyProfile, variante, options }: { pe
   return (
     <Document title={`${titulo} ${numero}`} author={razao}>
       <Page size="A4" style={styles.page}>
-        <PdfHeader razao={fantasia} label={titulo} showLogo={showLogo} />
+        <PdfHeader razao={fantasia} label={titulo} showLogo={showLogo} logoUrl={options?.logoUrl} />
         <CapaBanner capaImagemUrl={options?.capaImagemUrl} />
         <PdfFooter numero={numero} data={dataDoc} cliente={cliente} />
 

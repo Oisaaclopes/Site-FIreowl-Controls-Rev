@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { PedidoOS, Client, Pedido, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem, DocumentosPadrao, DocumentType, FinancialTransaction, RecebimentoProposta, EmpresaAtendida, MarcaTecnologia } from '@/lib/types';
 import { selecionarEmpresas, selecionarMarcas, experienciaAtiva } from '@/lib/experienciaSelecao';
 import { resolveLogoDataUrls } from '@/lib/institucional';
@@ -172,6 +172,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     showFechamento: true,
     capaImagemUrl: undefined as string | undefined,
     experiencia: undefined as ExperienciaOpt | undefined,
+    logoUrl: undefined as string | undefined,
   });
   const [pdfConfigPedido, setPdfConfigPedido] = useState<Pedido | null>(null);
   const [docModalPedido, setDocModalPedido] = useState<Pedido | null>(null);
@@ -186,6 +187,16 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   const [concluindoPedido, setConcluindoPedido] = useState<Pedido | null>(null);
   const [capaBusy, setCapaBusy] = useState(false);
   const capaInputRef = useRef<HTMLInputElement>(null);
+
+  // §20 — logo oficial cadastrado (data URI), resolvido uma vez do perfil.
+  const [logoOficialUrl, setLogoOficialUrl] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    const path = companyProfile?.logoPrincipalPath || companyProfile?.logoEscuroPath || companyProfile?.logoClaroPath;
+    if (!path) { setLogoOficialUrl(undefined); return; }
+    let alive = true;
+    propostaCapaDataUrl(path).then((url) => { if (alive) setLogoOficialUrl(url); }).catch(() => {});
+    return () => { alive = false; };
+  }, [companyProfile?.logoPrincipalPath, companyProfile?.logoEscuroPath, companyProfile?.logoClaroPath]);
 
   // Carrega (assíncrono) a imagem de capa persistida na proposta como data URI.
   const loadCapaIntoOptions = async (ped: Pedido) => {
@@ -254,6 +265,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
       showFechamento: true,
       capaImagemUrl: undefined as string | undefined,
       experiencia: undefined as ExperienciaOpt | undefined,
+      logoUrl: logoOficialUrl,
     };
     setPdfOptions(base);
     loadCapaIntoOptions(ped);
@@ -273,7 +285,8 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   });
 
   // Abre o visualizador do documento (não proposta) com as opções escolhidas.
-  const openDocViewer = (ped: Pedido, doc: DocumentType, options: DocOptions) => {
+  const openDocViewer = (ped: Pedido, doc: DocumentType, optionsIn: DocOptions) => {
+    const options: DocOptions = { ...optionsIn, logoUrl: logoOficialUrl }; // §20 — logo oficial
     if (doc === 'orcamento') setOrcamentoPedido({ pedido: ped, options });
     else if (doc === 'ordem_servico') setOsPedido({ pedido: ped, options });
     else if (doc === 'lista_produtos') setListaProdutosPedido({ pedido: ped, options });

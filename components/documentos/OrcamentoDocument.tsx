@@ -200,6 +200,7 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
           data={dataDoc}
           capaImagemUrl={capaImagemUrl}
           showLogo={showLogo}
+          logoUrl={options?.logoUrl}
         />
       )}
 
@@ -213,7 +214,7 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
 
       {/* Conteúdo */}
       <Page size="A4" style={styles.page}>
-        <PdfHeader razao={fantasia} label="Orçamento" showLogo={showLogo} />
+        <PdfHeader razao={fantasia} label="Orçamento" showLogo={showLogo} logoUrl={options?.logoUrl} />
         <PdfFooter numero={numero} data={dataDoc} cliente={cliente} />
 
         <View style={styles.titleWrap}>

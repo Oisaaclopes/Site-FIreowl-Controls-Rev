@@ -90,7 +90,7 @@ export function LaudoTecnicoDocument({ pedido, companyProfile, options }: { pedi
   return (
     <Document title={`Laudo Técnico ${numero}`} author={razao}>
       <Page size="A4" style={styles.page}>
-        <PdfHeader razao={fantasia} label="Laudo Técnico" showLogo={showLogo} />
+        <PdfHeader razao={fantasia} label="Laudo Técnico" showLogo={showLogo} logoUrl={options?.logoUrl} />
         <CapaBanner capaImagemUrl={options?.capaImagemUrl} />
         <PdfFooter numero={numero} data={dataDoc} cliente={cliente} />
 
