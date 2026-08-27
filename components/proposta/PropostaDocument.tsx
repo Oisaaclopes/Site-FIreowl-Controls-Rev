@@ -1191,6 +1191,7 @@ export function PropostaDocument({
             <View style={styles.chainStrip}>
               <Text style={styles.chainLabel}>Ciclo completo de engenharia</Text>
               <Text style={styles.chainText}>Projeto   ·   Instalação   ·   Comissionamento   ·   Manutenção   ·   Suporte</Text>
+              <Text style={{ color: '#F2A900', fontSize: 7.5, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginTop: 5 }}>Engenharia   ·   Responsabilidade Técnica   ·   Rastreabilidade   ·   Comissionamento</Text>
             </View>
           </View>
         </Page>

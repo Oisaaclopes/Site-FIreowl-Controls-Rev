@@ -383,6 +383,7 @@ export const AreasAtuacaoPage = ({ razao, numero, data, cliente, areaIds = [] }:
         <View style={{ marginTop: 4, backgroundColor: g.deep, borderLeftWidth: 3, borderLeftColor: g.gold, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 14 }}>
           <Text style={{ color: C.s400, fontSize: 7, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 3 }}>Ciclo completo de engenharia</Text>
           <Text style={{ color: C.white, fontSize: 8.5, fontFamily: 'Poppins', fontWeight: 600, letterSpacing: 0.6 }}>Projeto   ·   Instalação   ·   Comissionamento   ·   Manutenção   ·   Suporte</Text>
+          <Text style={{ color: g.gold, fontSize: 7.5, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginTop: 5 }}>Engenharia   ·   Responsabilidade Técnica   ·   Rastreabilidade   ·   Comissionamento</Text>
         </View>
       </View>
     </Page>
