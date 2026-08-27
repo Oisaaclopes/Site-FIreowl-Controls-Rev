@@ -161,6 +161,42 @@ export interface PartnerBrand {
   logoUrl?: string;
 }
 
+// ===== Módulo "Experiência, Clientes e Marcas" (apresentação institucional) =====
+
+export type AutorizacaoMarca = 'nao_informado' | 'autorizado' | 'nao_autorizado';
+
+/** Empresa/cliente de destaque já atendido (para a página institucional). */
+export interface EmpresaAtendida {
+  id: string;
+  nome: string;
+  nomeFantasia?: string;
+  /** storage_path do logo (PNG rasterizado). */
+  logoPath?: string;
+  descricao?: string;
+  segmentos: string[];
+  /** ids de área (sdai, cftv, acesso, alarme, bms, integracao, seguranca, engenharia). */
+  areas: string[];
+  destaque: boolean;
+  ativo: boolean;
+  exibirProposta: boolean;
+  autorizacao: AutorizacaoMarca;
+  ordem: number;
+}
+
+/** Marca/fabricante/tecnologia com que a Fireowl trabalha (institucional). */
+export interface MarcaTecnologia {
+  id: string;
+  nome: string;
+  logoPath?: string;
+  descricao?: string;
+  categoria?: string;
+  areas: string[];
+  tecnologias: string[];
+  ativo: boolean;
+  exibirProposta: boolean;
+  ordem: number;
+}
+
 export interface PdfPrefs {
   configBeforeGenerate: boolean;
   detailedSubtotal: boolean;
@@ -208,6 +244,17 @@ export interface CompanyProfile {
   apresentacaoAreas?: Record<string, string>;
   /** §20 — capa (storage_path) por área; usada quando a proposta não tem capa própria. */
   capaAreas?: Record<string, string>;
+  // ===== Identidade visual (logos oficiais — storage_path PNG) =====
+  logoPrincipalPath?: string;
+  logoClaroPath?: string;
+  logoEscuroPath?: string;
+  logoIconePath?: string;
+  // ===== Textos institucionais da página "Experiência e Capacidade Técnica" =====
+  expIntro?: string;
+  techIntro?: string;
+  // ===== Limites de logos por proposta (config) =====
+  expMaxEmpresas?: number;
+  expMaxMarcas?: number;
 }
 
 export interface PedidoTemplate {

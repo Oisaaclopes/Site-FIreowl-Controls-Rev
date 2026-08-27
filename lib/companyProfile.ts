@@ -16,6 +16,14 @@ function rowToProfile(r: any): CompanyProfile {
     apresentacaoGeral: r.apresentacao_geral || undefined,
     apresentacaoAreas: (r.apresentacao_areas && typeof r.apresentacao_areas === 'object') ? r.apresentacao_areas : undefined,
     capaAreas: (r.capa_areas && typeof r.capa_areas === 'object') ? r.capa_areas : undefined,
+    logoPrincipalPath: r.logo_principal_path || undefined,
+    logoClaroPath: r.logo_claro_path || undefined,
+    logoEscuroPath: r.logo_escuro_path || undefined,
+    logoIconePath: r.logo_icone_path || undefined,
+    expIntro: r.exp_intro || undefined,
+    techIntro: r.tech_intro || undefined,
+    expMaxEmpresas: r.exp_max_empresas ?? undefined,
+    expMaxMarcas: r.exp_max_marcas ?? undefined,
   };
 }
 
@@ -44,6 +52,14 @@ function profileToRow(p: CompanyProfile): Record<string, unknown> {
     apresentacao_geral: p.apresentacaoGeral || null,
     apresentacao_areas: p.apresentacaoAreas || {},
     capa_areas: p.capaAreas || {},
+    logo_principal_path: p.logoPrincipalPath || null,
+    logo_claro_path: p.logoClaroPath || null,
+    logo_escuro_path: p.logoEscuroPath || null,
+    logo_icone_path: p.logoIconePath || null,
+    exp_intro: p.expIntro || null,
+    tech_intro: p.techIntro || null,
+    exp_max_empresas: p.expMaxEmpresas ?? 8,
+    exp_max_marcas: p.expMaxMarcas ?? 8,
     updated_at: new Date().toISOString(),
   };
 }
