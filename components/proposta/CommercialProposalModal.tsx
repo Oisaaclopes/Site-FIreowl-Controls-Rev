@@ -15,7 +15,7 @@ import {
 } from '@/lib/types';
 import { PEDIDO_TIPO_LABELS, PEDIDO_TIPO_ORDER } from '@/lib/documentos';
 import { AREAS_PROPOSTA, TIPOS_SERVICO, gerarTituloProposta, conclusaoPorTipo } from '@/lib/propostaTitulo';
-import { montarEstruturaProposta } from '@/lib/propostaEstrutura';
+import { montarEstruturaProposta, ordenarEstrutura, SECOES_FIXAS_INICIO, SECOES_FIXAS_FIM } from '@/lib/propostaEstrutura';
 import { ItensCardEditor } from '@/components/proposta/ItensCardEditor';
 import {
   X,
@@ -265,6 +265,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const [areaPrincipal, setAreaPrincipal] = useState<string[]>(initialPedido?.proposal?.areaPrincipal || []);
   const [tipoServico, setTipoServico] = useState<string>(initialPedido?.proposal?.tipoServico || '');
   const [nivelProposta, setNivelProposta] = useState<'simples' | 'tecnica' | 'corporativa'>(initialPedido?.proposal?.nivelProposta || 'tecnica');
+  const [ordemSecoes, setOrdemSecoes] = useState<string[]>(initialPedido?.proposal?.ordemSecoes || []);
   const toggleArea = (id: string) => setAreaPrincipal((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   const tituloDinamico = gerarTituloProposta(areaPrincipal, tipoServico);
   const [pedidoTipo, setPedidoTipo] = useState<PedidoTipo | ''>(initialPedido?.proposal?.pedidoTipo || '');
@@ -496,6 +497,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         areaPrincipal,
         tipoServico: tipoServico || undefined,
         nivelProposta,
+        ordemSecoes: ordemSecoes.length ? ordemSecoes : undefined,
         objetivo,
         cartaApresentacao,
         revisoes: initialPedido?.proposal?.revisoes,
@@ -1017,9 +1019,14 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             </div>
           </Accordion>
 
-          {/* ---- Estrutura da proposta (§10/§11/§12: prévia do índice + ativar/desativar) ---- */}
+          {/* ---- Estrutura da proposta (§10/§11/§12: prévia + ativar/desativar + reordenar) ---- */}
           <Accordion title="Estrutura da proposta" icon={<FileText className="w-4 h-4 text-[#0B1E38]" />} open={!!open.estrutura} onToggle={() => toggle('estrutura')}>
-            <p className="text-[11px] text-slate-500 mb-2">Prévia do índice que será gerado. Ative/desative as seções opcionais — a numeração é recalculada automaticamente.</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[11px] text-slate-500">Prévia do índice. Ative/desative as opcionais e use ↑↓ para reordenar — a numeração é recalculada sozinha.</p>
+              {ordemSecoes.length > 0 && (
+                <button type="button" onClick={() => setOrdemSecoes([])} className="shrink-0 text-[10px] font-bold uppercase text-[#1A1A72] hover:text-[#E63946]">Ordem padrão</button>
+              )}
+            </div>
             {(() => {
               const secToggle: Record<string, { v: boolean; set: (b: boolean) => void }> = {
                 seguranca: { v: incluirSeguranca, set: setIncluirSeguranca },
@@ -1030,23 +1037,43 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                 condicoesGerais: { v: incluirCondicoesGerais, set: setIncluirCondicoesGerais },
               };
               const temMateriais = equipmentItems.some((it) => it.tipo !== 'servico');
-              const estrutura = montarEstruturaProposta(
-                { tipoServico, incluirSeguranca, incluirMultas, incluirLimitacao, incluirConfidencialidade, incluirTermoAceite, incluirCondicoesGerais },
-                { cartaVisivel: nivelProposta !== 'simples', historicoVisivel: nivelProposta !== 'simples', temMateriais }
+              const estrutura = ordenarEstrutura(
+                montarEstruturaProposta(
+                  { tipoServico, incluirSeguranca, incluirMultas, incluirLimitacao, incluirConfidencialidade, incluirTermoAceite, incluirCondicoesGerais },
+                  { cartaVisivel: nivelProposta !== 'simples', historicoVisivel: nivelProposta !== 'simples', temMateriais }
+                ),
+                ordemSecoes
               );
+              const fixa = (k: string) => SECOES_FIXAS_INICIO.includes(k) || SECOES_FIXAS_FIM.includes(k);
+              const meioKeys = estrutura.filter((s) => !fixa(s.key)).map((s) => s.key);
+              const mover = (key: string, dir: -1 | 1) => {
+                const i = meioKeys.indexOf(key);
+                const j = i + dir;
+                if (i < 0 || j < 0 || j >= meioKeys.length) return;
+                const next = [...meioKeys];
+                [next[i], next[j]] = [next[j], next[i]];
+                setOrdemSecoes(next);
+              };
               let n = 0;
               return (
                 <div className="space-y-1">
                   {estrutura.map((s) => {
                     const tg = secToggle[s.key];
+                    const podeMover = !fixa(s.key);
+                    const mi = meioKeys.indexOf(s.key);
                     if (s.visible) n += 1;
                     return (
-                      <div key={s.key} className={`flex items-center justify-between rounded-lg border px-3 py-1.5 ${s.visible ? 'bg-white border-slate-200' : 'bg-slate-50 border-dashed border-slate-200'}`}>
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className={`font-data-mono text-[11px] font-bold ${s.visible ? 'text-[#0B1E38]' : 'text-slate-300'}`}>{s.visible ? String(n).padStart(2, '0') : '--'}</span>
-                          <span className={`text-xs truncate ${s.visible ? 'text-slate-700' : 'text-slate-400 line-through'}`}>{s.titulo}</span>
-                          {s.opcional && <span className="text-[9px] uppercase text-slate-400 border border-slate-200 rounded px-1 shrink-0">opcional</span>}
-                        </div>
+                      <div key={s.key} className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 ${s.visible ? 'bg-white border-slate-200' : 'bg-slate-50 border-dashed border-slate-200'}`}>
+                        {podeMover ? (
+                          <div className="flex flex-col shrink-0 -my-1">
+                            <button type="button" onClick={() => mover(s.key, -1)} disabled={mi <= 0} className="text-slate-400 hover:text-[#0B1E38] disabled:opacity-25 leading-none text-[11px]" title="Subir">▲</button>
+                            <button type="button" onClick={() => mover(s.key, 1)} disabled={mi >= meioKeys.length - 1} className="text-slate-400 hover:text-[#0B1E38] disabled:opacity-25 leading-none text-[11px]" title="Descer">▼</button>
+                          </div>
+                        ) : (
+                          <div className="w-3 shrink-0" />
+                        )}
+                        <span className={`font-data-mono text-[11px] font-bold shrink-0 ${s.visible ? 'text-[#0B1E38]' : 'text-slate-300'}`}>{s.visible ? String(n).padStart(2, '0') : '--'}</span>
+                        <span className={`text-xs truncate flex-1 ${s.visible ? 'text-slate-700' : 'text-slate-400 line-through'}`}>{s.titulo}{fixa(s.key) && <span className="text-[9px] text-slate-400 ml-1">(fixa)</span>}</span>
                         {tg ? (
                           <button type="button" onClick={() => tg.set(!tg.v)} className={`shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded ${tg.v ? 'text-emerald-700 bg-emerald-50' : 'text-slate-400 bg-slate-100'}`}>{tg.v ? 'Ativa' : 'Inativa'}</button>
                         ) : s.opcional ? (

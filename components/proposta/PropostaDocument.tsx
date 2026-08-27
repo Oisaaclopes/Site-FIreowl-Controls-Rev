@@ -3,7 +3,7 @@ import { Document, Page, View, Text, StyleSheet, Svg, Path, Line, Rect, Circle, 
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import { InclusoExcluso, ResumoExecutivoPage, SlaBloco } from '@/components/documentos/pdfKit';
 import { gerarTituloProposta, faixaSiglas, tituloEscopo, conclusaoPorTipo, apresentacaoAreas } from '@/lib/propostaTitulo';
-import { montarEstruturaProposta } from '@/lib/propostaEstrutura';
+import { montarEstruturaProposta, ordenarEstrutura } from '@/lib/propostaEstrutura';
 import {
   CARTA_APRESENTACAO,
   SERVICOS_OFERTADOS,
@@ -1030,7 +1030,10 @@ export function PropostaDocument({
   const incTermoAceite = p.incluirTermoAceite !== false;
   const temMateriais = materiais.length > 0;
 
-  const secoes = montarEstruturaProposta(p, { cartaVisivel: showCarta, historicoVisivel: showHistorico, temMateriais });
+  const secoes = ordenarEstrutura(
+    montarEstruturaProposta(p, { cartaVisivel: showCarta, historicoVisivel: showHistorico, temMateriais }),
+    p.ordemSecoes
+  );
   const vis = secoes.filter((s) => s.visible);
   const num = (key: string) => {
     const i = vis.findIndex((s) => s.key === key);
@@ -1044,6 +1047,210 @@ export function PropostaDocument({
       {children}
     </View>
   );
+
+  // §12 — renderizadores das seções do corpo (uma única <Page> que flui). A ordem
+  // e a numeração vêm de `secoes`; o corpo é renderizado a partir dela (bodyOrder),
+  // o que permite reordenar sem quebrar índice/numeração. Carta (página própria) e
+  // Aceite (fixo no fim) ficam fora do loop.
+  const bodyRenderers: Record<string, () => React.ReactNode> = {
+    historico: () => (
+      <Sec k="historico">
+        <View style={{ borderWidth: 1, borderColor: C.s200, borderRadius: 4, overflow: 'hidden' }}>
+          <View style={styles.th}>
+            <Text style={[styles.thCell, { width: 100 }]}>Revisão / Número</Text>
+            <Text style={[styles.thCell, { width: 64 }]}>Data</Text>
+            <Text style={[styles.thCell, { width: 108 }]}>Elaborador</Text>
+            <Text style={[styles.thCell, { flex: 1 }]}>Motivo da Revisão</Text>
+          </View>
+          {(p.revisoes || []).map((rev, i) => (
+            <View key={i} style={[styles.tr, i % 2 === 1 ? styles.trAlt : {}]} wrap={false}>
+              <Text style={[styles.td, { width: 100, fontFamily: 'Roboto', fontWeight: 700, color: C.ink }]}>{rev.numero}</Text>
+              <Text style={[styles.td, { width: 64 }]}>{rev.data}</Text>
+              <Text style={[styles.td, { width: 108 }]}>{rev.elaborador}</Text>
+              <Text style={[styles.td, { flex: 1 }]}>{nv(rev.motivo) ? rev.motivo : '—'}</Text>
+            </View>
+          ))}
+          <View style={[styles.tr, { backgroundColor: '#fffbeb' }]} wrap={false}>
+            <Text style={[styles.td, { width: 100, fontFamily: 'Roboto', fontWeight: 700, color: C.ink }]}>{numero}</Text>
+            <Text style={[styles.td, { width: 64 }]}>{pedido.dataEmissao}</Text>
+            <Text style={[styles.td, { width: 108 }]}>{assinante}</Text>
+            <Text style={[styles.td, { flex: 1, color: C.ink, fontFamily: 'Roboto', fontWeight: 700 }]}>{(p.revisoes && p.revisoes.length > 0) ? 'Versão vigente' : 'Emissão inicial'}</Text>
+          </View>
+        </View>
+      </Sec>
+    ),
+    visao: () => (
+      <Sec k="visao">
+        <Text style={styles.subTitle}>{`${num('visao')}.1. Introdução`}</Text>
+        <Text style={styles.para}>{nv(p.objetivo) ? p.objetivo : `Apresentamos nossa proposta para o fornecimento e execução dos serviços referentes a ${escopoTitulo}, para ${clienteNome}.`}</Text>
+        {lnv(p.diretrizesNormativas) && (
+          <>
+            <Text style={styles.subTitle}>Diretrizes normativas de referência</Text>
+            <Bullets itens={p.diretrizesNormativas} />
+          </>
+        )}
+      </Sec>
+    ),
+    escopo: () => (
+      <Sec k="escopo">
+        <Text style={styles.subTitle}>{`${num('escopo')}.1. Descrição do escopo proposto`}</Text>
+        <View style={styles.scenarioCard}>
+          <Text style={{ fontSize: 9, color: C.s700, textAlign: 'justify', lineHeight: 1.4 }}>{nv(p.escopoServico) ? p.escopoServico : 'Escopo conforme especificação técnica acordada com o cliente.'}</Text>
+        </View>
+        <SlaBloco tabela={p.slaTabela} slaCritico={p.slaCritico} />
+      </Sec>
+    ),
+    itens: () => (
+      <View style={styles.section}>
+        <SecHead n={num('itens')} titulo={secoes.find((s) => s.key === 'itens')!.titulo} />
+        <View>
+          {materiais.length > 0 && <ItensTable titulo="Materiais" itens={materiais} detailed={detailed} showMarca />}
+          {servicos.length > 0 && <ItensTable titulo="Serviços" itens={servicos} detailed={detailed} showMarca={false} accent={C.green} />}
+          {materiais.length === 0 && servicos.length === 0 && (
+            <Text style={{ fontSize: 9, color: C.s400, fontStyle: 'italic' }}>Itens conforme especificação técnica acordada.</Text>
+          )}
+          {detailed && (
+            <View style={styles.totalWrap} wrap={false}>
+              {(p.maoDeObra || 0) > 0 && (
+                <View style={styles.totalRowLight}>
+                  <Text style={{ fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, color: C.ink, textTransform: 'uppercase', lineHeight: 1 }}>Mão de obra / Serviços adicionais</Text>
+                  <Text style={{ fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, color: C.ink, lineHeight: 1 }}>{brl(p.maoDeObra || 0)}</Text>
+                </View>
+              )}
+              <View style={styles.totalRowNavy}>
+                <Text style={styles.totalLabelGold}>VALOR TOTAL</Text>
+                <Text style={styles.totalValue}>{brl(p.valorTotal)}</Text>
+              </View>
+            </View>
+          )}
+        </View>
+      </View>
+    ),
+    premissas: () => (
+      <Sec k="premissas">
+        {lnv(p.premissas) ? <Bullets itens={p.premissas} /> : <Text style={{ fontSize: 9, color: C.s500, fontStyle: 'italic' }}>Premissas conforme rotinas padrão de execução.</Text>}
+        <InclusoExcluso incluso={p.incluso} naoIncluso={p.naoIncluso} />
+      </Sec>
+    ),
+    servicos: () => (
+      <Sec k="servicos">
+        {SERVICOS_OFERTADOS.map((s, i) => (
+          <View key={i} minPresenceAhead={50}>
+            <Text style={styles.subTitle}>{`${num('servicos')}.${i + 1}. ${s.titulo}`}</Text>
+            <Bullets itens={s.itens} />
+          </View>
+        ))}
+        {lnv(p.entregaveis) && (
+          <View minPresenceAhead={50}>
+            <Text style={styles.subTitle}>Entregáveis do projeto</Text>
+            <Checks itens={p.entregaveis} />
+          </View>
+        )}
+        {lnv(p.responsabilidadesContratada) && (
+          <View minPresenceAhead={50}>
+            <Text style={styles.subTitle}>Responsabilidades da Contratada</Text>
+            <Bullets itens={p.responsabilidadesContratada} />
+          </View>
+        )}
+      </Sec>
+    ),
+    embalagem: () => <Sec k="embalagem"><Paras paras={EMBALAGEM_TRANSPORTE} /></Sec>,
+    seguranca: () => <Sec k="seguranca"><Bullets itens={SEGURANCA_TRABALHO} /></Sec>,
+    obrigacoes: () => (
+      <Sec k="obrigacoes">
+        {lnv(p.responsabilidadesContratante) ? (
+          <Bullets itens={p.responsabilidadesContratante} />
+        ) : (
+          <Bullets itens={['Liberação das frentes de trabalho e dos acessos necessários à equipe.', 'Fornecimento de ponto de energia elétrica 120/220 Vac para os serviços.', 'Local seguro e adequado para guarda de materiais e ferramentas.']} />
+        )}
+      </Sec>
+    ),
+    precos: () => (
+      <Sec k="precos">
+        <View style={styles.precoCardBlock} wrap={false}>
+          <Text style={styles.precoCardLabel}>{recorrente ? 'INVESTIMENTO MENSAL' : 'INVESTIMENTO TOTAL'}</Text>
+          <Text style={styles.precoCardValue}>{recorrente ? `${brl(vMensal)} / mês` : brl(p.valorTotal)}</Text>
+        </View>
+        {recorrente && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginTop: 8 }} wrap={false}>
+            <MensalCell label="Valor mensal" value={brl(vMensal)} />
+            <MensalCell label="Valor anual" value={brl(vMensal * 12)} />
+            {vMeses > 0 && <MensalCell label="Vigência" value={`${vMeses} meses`} />}
+            {vMeses > 0 && <MensalCell label="Valor estimado do contrato" value={brl(vMensal * vMeses)} />}
+          </View>
+        )}
+        <Paras paras={PRECOS_OBS} />
+      </Sec>
+    ),
+    infoCompra: () => (
+      <Sec k="infoCompra">
+        <View style={styles.infoBox}>
+          <Text style={{ fontSize: 9, marginBottom: 3 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Razão Social: </Text>{razao}</Text>
+          <Text style={{ fontSize: 9, marginBottom: 3 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>CNPJ: </Text>{companyProfile.cnpj}</Text>
+          <Text style={{ fontSize: 9, marginBottom: 3 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Endereço: </Text>{companyProfile.endereco}</Text>
+          {nv(companyProfile.telefone) && <Text style={{ fontSize: 9, marginBottom: 3 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Telefone: </Text>{companyProfile.telefone}</Text>}
+          {nv(companyProfile.email) && <Text style={{ fontSize: 9 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>E-mail: </Text>{companyProfile.email}</Text>}
+        </View>
+      </Sec>
+    ),
+    impostos: () => (
+      <Sec k="impostos">
+        <Paras paras={nv(p.impostos) ? [`Regime/observação: ${p.impostos}`, ...IMPOSTOS_OBS] : IMPOSTOS_OBS} />
+      </Sec>
+    ),
+    pagamento: () => (
+      <Sec k="pagamento">
+        {p.formasPagamento?.length || p.condicoesPagamento?.length ? (
+          <>
+            {p.formasPagamento && p.formasPagamento.length > 0 && (
+              <Text style={{ fontSize: 9, marginBottom: 4 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink, textTransform: 'uppercase' }}>Formas de pagamento aceitas: </Text>{p.formasPagamento.join(', ')}.</Text>
+            )}
+            {p.condicoesPagamento && p.condicoesPagamento.length > 0 && (
+              <>
+                <Text style={{ fontSize: 9, fontFamily: 'Roboto', fontWeight: 700, color: C.ink, textTransform: 'uppercase', marginBottom: 3 }}>Condições:</Text>
+                <Bullets itens={p.condicoesPagamento} />
+              </>
+            )}
+          </>
+        ) : (
+          <Text style={styles.para}>{nv(p.formaPagamento) ? p.formaPagamento : 'A combinar entre as partes.'}</Text>
+        )}
+        {nv(p.faturamento) && (
+          <Text style={{ fontSize: 9, marginTop: 4 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink, textTransform: 'uppercase' }}>Faturamento: </Text>{p.faturamento}</Text>
+        )}
+      </Sec>
+    ),
+    multas: () => <Sec k="multas"><Paras paras={MULTAS_ATRASO} /></Sec>,
+    limitacao: () => <Sec k="limitacao"><Paras paras={LIMITACAO_RESPONSABILIDADE} /></Sec>,
+    prazo: () => (
+      <Sec k="prazo">
+        <Text style={styles.para}>{nv(p.prazoExecucao) ? p.prazoExecucao : 'Prazo a ser definido após confirmação do pedido.'}</Text>
+      </Sec>
+    ),
+    garantia: () => (
+      <Sec k="garantia">
+        <View style={styles.greenCard} wrap={false}>
+          <Text style={styles.greenBadge}>Garantia Assegurada</Text>
+          <Text style={{ fontSize: 9, color: C.s700, textAlign: 'justify', lineHeight: 1.4 }}>{nv(p.garantia) ? p.garantia : 'Garantia de 90 (noventa) dias sobre os serviços de instalação e de 12 (doze) meses para os equipamentos fornecidos, contra defeitos de fabricação, a contar da entrega.'}</Text>
+        </View>
+      </Sec>
+    ),
+    confidencialidade: () => <Sec k="confidencialidade"><Paras paras={CONFIDENCIALIDADE} /></Sec>,
+    termoAceite: () => <Sec k="termoAceite"><Paras paras={TERMO_ACEITE} /></Sec>,
+    condicoesGerais: () => <Sec k="condicoesGerais"><Paras paras={CONDICOES_GERAIS} /></Sec>,
+    validade: () => (
+      <Sec k="validade">
+        <Text style={styles.para}>{`Os preços permanecem fixos dentro do período de validade desta proposta, que é de ${p.validadePropostaDias || 15} ${p.validadePropostaComplemento || 'dias corridos a partir da emissão'}. Após este período, eventuais variações na base de preços dos fabricantes poderão ser repactuadas.`}</Text>
+      </Sec>
+    ),
+    conclusao: () => (
+      <Sec k="conclusao">
+        <Text style={[styles.para, { fontStyle: 'italic' }]}>{nv(p.conclusao) ? p.conclusao : conclusaoPorTipo(p.tipoServico)}</Text>
+      </Sec>
+    ),
+  };
+  // Ordem do corpo = ordem de `secoes` sem Carta (página própria) e Aceite (fim fixo).
+  const bodyOrder = secoes.map((s) => s.key).filter((k) => k !== 'carta' && k !== 'aceite');
 
   return (
     <Document title={`Proposta ${numero}`} author={razao}>
@@ -1214,199 +1421,8 @@ export function PropostaDocument({
         <Header razao={fantasia} />
         <Footer cliente={clienteNome} numero={numero} data={dataEmissao} />
 
-        {on('historico') && (
-          <Sec k="historico">
-            <View style={{ borderWidth: 1, borderColor: C.s200, borderRadius: 4, overflow: 'hidden' }}>
-              <View style={styles.th}>
-                <Text style={[styles.thCell, { width: 100 }]}>Revisão / Número</Text>
-                <Text style={[styles.thCell, { width: 64 }]}>Data</Text>
-                <Text style={[styles.thCell, { width: 108 }]}>Elaborador</Text>
-                <Text style={[styles.thCell, { flex: 1 }]}>Motivo da Revisão</Text>
-              </View>
-              {(p.revisoes || []).map((rev, i) => (
-                <View key={i} style={[styles.tr, i % 2 === 1 ? styles.trAlt : {}]} wrap={false}>
-                  <Text style={[styles.td, { width: 100, fontFamily: 'Roboto', fontWeight: 700, color: C.ink }]}>{rev.numero}</Text>
-                  <Text style={[styles.td, { width: 64 }]}>{rev.data}</Text>
-                  <Text style={[styles.td, { width: 108 }]}>{rev.elaborador}</Text>
-                  <Text style={[styles.td, { flex: 1 }]}>{nv(rev.motivo) ? rev.motivo : '—'}</Text>
-                </View>
-              ))}
-              <View style={[styles.tr, { backgroundColor: '#fffbeb' }]} wrap={false}>
-                <Text style={[styles.td, { width: 100, fontFamily: 'Roboto', fontWeight: 700, color: C.ink }]}>{numero}</Text>
-                <Text style={[styles.td, { width: 64 }]}>{pedido.dataEmissao}</Text>
-                <Text style={[styles.td, { width: 108 }]}>{assinante}</Text>
-                <Text style={[styles.td, { flex: 1, color: C.ink, fontFamily: 'Roboto', fontWeight: 700 }]}>{(p.revisoes && p.revisoes.length > 0) ? 'Versão vigente' : 'Emissão inicial'}</Text>
-              </View>
-            </View>
-          </Sec>
-        )}
-
-        <Sec k="visao">
-          <Text style={styles.subTitle}>{`${num('visao')}.1. Introdução`}</Text>
-          <Text style={styles.para}>{nv(p.objetivo) ? p.objetivo : `Apresentamos nossa proposta para o fornecimento e execução dos serviços referentes a ${escopoTitulo}, para ${clienteNome}.`}</Text>
-          {lnv(p.diretrizesNormativas) && (
-            <>
-              <Text style={styles.subTitle}>Diretrizes normativas de referência</Text>
-              <Bullets itens={p.diretrizesNormativas} />
-            </>
-          )}
-        </Sec>
-
-        <Sec k="escopo">
-          <Text style={styles.subTitle}>{`${num('escopo')}.1. Descrição do escopo proposto`}</Text>
-          <View style={styles.scenarioCard}>
-            <Text style={{ fontSize: 9, color: C.s700, textAlign: 'justify', lineHeight: 1.4 }}>{nv(p.escopoServico) ? p.escopoServico : 'Escopo conforme especificação técnica acordada com o cliente.'}</Text>
-          </View>
-          {/* §17 — SLA em destaque (quando cadastrado) */}
-          <SlaBloco tabela={p.slaTabela} slaCritico={p.slaCritico} />
-        </Sec>
-
-        {/* Item 05 - Materiais e Serviços Ofertados. O orfão do título é evitado
-            pelo minPresenceAhead do próprio SecHead (48pt) + o da 1ª tabela (56pt);
-            valores altos aqui criavam um vão grande antes da seção. */}
-        <View style={styles.section}>
-          <SecHead n={num('itens')} titulo={secoes.find((s) => s.key === 'itens')!.titulo} />
-          <View>
-            {materiais.length > 0 && <ItensTable titulo="Materiais" itens={materiais} detailed={detailed} showMarca />}
-            {servicos.length > 0 && <ItensTable titulo="Serviços" itens={servicos} detailed={detailed} showMarca={false} accent={C.green} />}
-            {materiais.length === 0 && servicos.length === 0 && (
-              <Text style={{ fontSize: 9, color: C.s400, fontStyle: 'italic' }}>Itens conforme especificação técnica acordada.</Text>
-            )}
-            {detailed && (
-              <View style={styles.totalWrap} wrap={false}>
-                {(p.maoDeObra || 0) > 0 && (
-                  <View style={styles.totalRowLight}>
-                    <Text style={{ fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, color: C.ink, textTransform: 'uppercase', lineHeight: 1 }}>Mão de obra / Serviços adicionais</Text>
-                    <Text style={{ fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, color: C.ink, lineHeight: 1 }}>{brl(p.maoDeObra || 0)}</Text>
-                  </View>
-                )}
-                <View style={styles.totalRowNavy}>
-                  <Text style={styles.totalLabelGold}>VALOR TOTAL</Text>
-                  <Text style={styles.totalValue}>{brl(p.valorTotal)}</Text>
-                </View>
-              </View>
-            )}
-          </View>
-        </View>
-
-        <Sec k="premissas">
-          {lnv(p.premissas) ? <Bullets itens={p.premissas} /> : <Text style={{ fontSize: 9, color: C.s500, fontStyle: 'italic' }}>Premissas conforme rotinas padrão de execução.</Text>}
-          <InclusoExcluso incluso={p.incluso} naoIncluso={p.naoIncluso} />
-        </Sec>
-
-        <Sec k="servicos">
-          {SERVICOS_OFERTADOS.map((s, i) => (
-            <View key={i} minPresenceAhead={50}>
-              <Text style={styles.subTitle}>{`${num('servicos')}.${i + 1}. ${s.titulo}`}</Text>
-              <Bullets itens={s.itens} />
-            </View>
-          ))}
-          {lnv(p.entregaveis) && (
-            <View minPresenceAhead={50}>
-              <Text style={styles.subTitle}>Entregáveis do projeto</Text>
-              <Checks itens={p.entregaveis} />
-            </View>
-          )}
-          {lnv(p.responsabilidadesContratada) && (
-            <View minPresenceAhead={50}>
-              <Text style={styles.subTitle}>Responsabilidades da Contratada</Text>
-              <Bullets itens={p.responsabilidadesContratada} />
-            </View>
-          )}
-        </Sec>
-
-        {on('embalagem') && (
-          <Sec k="embalagem"><Paras paras={EMBALAGEM_TRANSPORTE} /></Sec>
-        )}
-        {on('seguranca') && (
-          <Sec k="seguranca"><Bullets itens={SEGURANCA_TRABALHO} /></Sec>
-        )}
-
-        <Sec k="obrigacoes">
-          {lnv(p.responsabilidadesContratante) ? (
-            <Bullets itens={p.responsabilidadesContratante} />
-          ) : (
-            <Bullets itens={['Liberação das frentes de trabalho e dos acessos necessários à equipe.', 'Fornecimento de ponto de energia elétrica 120/220 Vac para os serviços.', 'Local seguro e adequado para guarda de materiais e ferramentas.']} />
-          )}
-        </Sec>
-
-        {/* Item 09 - Preços em 2 Linhas limpas (Rótulo no topo, valor em baixo) */}
-        <Sec k="precos">
-          <View style={styles.precoCardBlock} wrap={false}>
-            <Text style={styles.precoCardLabel}>{recorrente ? 'INVESTIMENTO MENSAL' : 'INVESTIMENTO TOTAL'}</Text>
-            <Text style={styles.precoCardValue}>{recorrente ? `${brl(vMensal)} / mês` : brl(p.valorTotal)}</Text>
-          </View>
-          {recorrente && (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginTop: 8 }} wrap={false}>
-              <MensalCell label="Valor mensal" value={brl(vMensal)} />
-              <MensalCell label="Valor anual" value={brl(vMensal * 12)} />
-              {vMeses > 0 && <MensalCell label="Vigência" value={`${vMeses} meses`} />}
-              {vMeses > 0 && <MensalCell label="Valor estimado do contrato" value={brl(vMensal * vMeses)} />}
-            </View>
-          )}
-          <Paras paras={PRECOS_OBS} />
-        </Sec>
-
-        <Sec k="infoCompra">
-          <View style={styles.infoBox}>
-            <Text style={{ fontSize: 9, marginBottom: 3 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Razão Social: </Text>{razao}</Text>
-            <Text style={{ fontSize: 9, marginBottom: 3 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>CNPJ: </Text>{companyProfile.cnpj}</Text>
-            <Text style={{ fontSize: 9, marginBottom: 3 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Endereço: </Text>{companyProfile.endereco}</Text>
-            {nv(companyProfile.telefone) && <Text style={{ fontSize: 9, marginBottom: 3 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Telefone: </Text>{companyProfile.telefone}</Text>}
-            {nv(companyProfile.email) && <Text style={{ fontSize: 9 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>E-mail: </Text>{companyProfile.email}</Text>}
-          </View>
-        </Sec>
-
-        <Sec k="impostos">
-          <Paras paras={nv(p.impostos) ? [`Regime/observação: ${p.impostos}`, ...IMPOSTOS_OBS] : IMPOSTOS_OBS} />
-        </Sec>
-
-        <Sec k="pagamento">
-          {p.formasPagamento?.length || p.condicoesPagamento?.length ? (
-            <>
-              {p.formasPagamento && p.formasPagamento.length > 0 && (
-                <Text style={{ fontSize: 9, marginBottom: 4 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink, textTransform: 'uppercase' }}>Formas de pagamento aceitas: </Text>{p.formasPagamento.join(', ')}.</Text>
-              )}
-              {p.condicoesPagamento && p.condicoesPagamento.length > 0 && (
-                <>
-                  <Text style={{ fontSize: 9, fontFamily: 'Roboto', fontWeight: 700, color: C.ink, textTransform: 'uppercase', marginBottom: 3 }}>Condições:</Text>
-                  <Bullets itens={p.condicoesPagamento} />
-                </>
-              )}
-            </>
-          ) : (
-            <Text style={styles.para}>{nv(p.formaPagamento) ? p.formaPagamento : 'A combinar entre as partes.'}</Text>
-          )}
-          {nv(p.faturamento) && (
-            <Text style={{ fontSize: 9, marginTop: 4 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink, textTransform: 'uppercase' }}>Faturamento: </Text>{p.faturamento}</Text>
-          )}
-        </Sec>
-
-        {on('multas') && <Sec k="multas"><Paras paras={MULTAS_ATRASO} /></Sec>}
-        {on('limitacao') && <Sec k="limitacao"><Paras paras={LIMITACAO_RESPONSABILIDADE} /></Sec>}
-
-        <Sec k="prazo">
-          <Text style={styles.para}>{nv(p.prazoExecucao) ? p.prazoExecucao : 'Prazo a ser definido após confirmação do pedido.'}</Text>
-        </Sec>
-
-        <Sec k="garantia">
-          <View style={styles.greenCard} wrap={false}>
-            <Text style={styles.greenBadge}>Garantia Assegurada</Text>
-            <Text style={{ fontSize: 9, color: C.s700, textAlign: 'justify', lineHeight: 1.4 }}>{nv(p.garantia) ? p.garantia : 'Garantia de 90 (noventa) dias sobre os serviços de instalação e de 12 (doze) meses para os equipamentos fornecidos, contra defeitos de fabricação, a contar da entrega.'}</Text>
-          </View>
-        </Sec>
-
-        {on('confidencialidade') && <Sec k="confidencialidade"><Paras paras={CONFIDENCIALIDADE} /></Sec>}
-        {on('termoAceite') && <Sec k="termoAceite"><Paras paras={TERMO_ACEITE} /></Sec>}
-        {on('condicoesGerais') && <Sec k="condicoesGerais"><Paras paras={CONDICOES_GERAIS} /></Sec>}
-
-        <Sec k="validade">
-          <Text style={styles.para}>{`Os preços permanecem fixos dentro do período de validade desta proposta, que é de ${p.validadePropostaDias || 15} ${p.validadePropostaComplemento || 'dias corridos a partir da emissão'}. Após este período, eventuais variações na base de preços dos fabricantes poderão ser repactuadas.`}</Text>
-        </Sec>
-
-        <Sec k="conclusao">
-          <Text style={[styles.para, { fontStyle: 'italic' }]}>{nv(p.conclusao) ? p.conclusao : conclusaoPorTipo(p.tipoServico)}</Text>
-        </Sec>
+        {/* §12 — corpo renderizado na ordem de `secoes` (permite reordenar). */}
+        {bodyOrder.map((k) => (on(k) && bodyRenderers[k] ? <React.Fragment key={k}>{bodyRenderers[k]()}</React.Fragment> : null))}
 
         {/* Aceite: mantém junto para não quebrar no meio */}
         <View style={styles.section} minPresenceAhead={160} wrap={false}>

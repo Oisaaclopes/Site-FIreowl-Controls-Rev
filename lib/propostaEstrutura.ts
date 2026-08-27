@@ -39,6 +39,30 @@ export interface EstruturaCtx {
 
 const inc = (v?: boolean) => v !== false;
 
+/** Seções fixas: Carta abre (página própria) e Aceite fecha a proposta. */
+export const SECOES_FIXAS_INICIO = ['carta'];
+export const SECOES_FIXAS_FIM = ['aceite'];
+
+/**
+ * §12 — Aplica a ordem definida pelo usuário ao "miolo" da estrutura, mantendo
+ * Carta no início e Aceite no fim. Chaves não citadas em `ordem` seguem na
+ * ordem canônica, ao final. Sem `ordem`, devolve a estrutura como está.
+ */
+export function ordenarEstrutura(secoes: SecaoEstrutura[], ordem?: string[]): SecaoEstrutura[] {
+  if (!ordem || ordem.length === 0) return secoes;
+  const inicio = secoes.filter((s) => SECOES_FIXAS_INICIO.includes(s.key));
+  const fim = secoes.filter((s) => SECOES_FIXAS_FIM.includes(s.key));
+  const meio = secoes.filter((s) => !SECOES_FIXAS_INICIO.includes(s.key) && !SECOES_FIXAS_FIM.includes(s.key));
+  const restantes = new Map(meio.map((s) => [s.key, s]));
+  const ordenados: SecaoEstrutura[] = [];
+  for (const k of ordem) {
+    const s = restantes.get(k);
+    if (s) { ordenados.push(s); restantes.delete(k); }
+  }
+  for (const s of meio) if (restantes.has(s.key)) ordenados.push(s); // resto na ordem canônica
+  return [...inicio, ...ordenados, ...fim];
+}
+
 export function montarEstruturaProposta(p: EstruturaProposalLike, ctx: EstruturaCtx): SecaoEstrutura[] {
   return [
     { key: 'carta', titulo: 'Carta de Apresentação', visible: ctx.cartaVisivel, opcional: true },

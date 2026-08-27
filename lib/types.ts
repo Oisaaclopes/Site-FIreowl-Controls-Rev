@@ -68,6 +68,8 @@ export interface CommercialProposalData {
   tipoServico?: string;
   /** §37 — nível de apresentação: simples (enxuto), técnica (padrão), corporativa. */
   nivelProposta?: 'simples' | 'tecnica' | 'corporativa';
+  /** §12 — ordem das seções do corpo (chaves). Vazio/ausente = ordem padrão. */
+  ordemSecoes?: string[];
   objetivo: string;
   /** Carta de apresentação (opcional). Vazio → usa o texto institucional padrão. */
   cartaApresentacao?: string;
