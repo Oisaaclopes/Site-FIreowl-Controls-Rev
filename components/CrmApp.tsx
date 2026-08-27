@@ -79,6 +79,7 @@ import { fetchQuotes, insertQuote } from '@/lib/quotes';
 import { fetchSuppliers, upsertSupplier, deleteSupplier } from '@/lib/suppliers';
 import { fetchBrands, ensureBrand, deleteBrand, seedBrands } from '@/lib/brands';
 import { fetchClients, upsertClient } from '@/lib/clients';
+import { fetchCompanyProfile, upsertCompanyProfile } from '@/lib/companyProfile';
 import { fetchTransactions, upsertTransaction, deleteTransaction } from '@/lib/transactions';
 import { fetchContracts, upsertContract } from '@/lib/contracts';
 import { WorkSchedule } from '@/lib/schedule';
@@ -251,6 +252,9 @@ export function CrmApp({
     fetchContracts()
       .then((rows) => setContracts(rows))
       .catch((err) => console.warn('Contratos: falha ao carregar do Supabase.', err));
+    fetchCompanyProfile()
+      .then((cp) => { if (cp) setCompanyProfile(cp); })
+      .catch((err) => console.warn('Perfil da empresa: falha ao carregar do Supabase.', err));
   }, []);
 
   const handleUpdatePdfPrefs = (p: PdfPrefs) => {
@@ -391,6 +395,12 @@ export function CrmApp({
   const handleUpdateCompanyProfile = (cp: CompanyProfile) => {
     setCompanyProfile(cp);
     logAction('Atualização Cadastral', 'Conta', `Dados da empresa atualizados: ${cp.razaoSocial}`);
+    if (isSupabaseConfigured()) {
+      upsertCompanyProfile(cp).catch((err) => {
+        console.error('Falha ao salvar o perfil da empresa no Supabase:', err);
+        alert('Não foi possível salvar o perfil da empresa no banco. Salvo apenas nesta sessão.');
+      });
+    }
   };
 
   const handleAddPartnerBrand = (brand: PartnerBrand) => {
