@@ -206,7 +206,7 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
       )}
 
       {/* Áreas de Atuação */}
-      {showAreas && <AreasAtuacaoPage razao={fantasia} numero={numero} data={dataDoc} cliente={cliente} />}
+      {showAreas && <AreasAtuacaoPage razao={fantasia} numero={numero} data={dataDoc} cliente={cliente} areaIds={p.areaPrincipal} />}
 
       {/* Conteúdo */}
       <Page size="A4" style={styles.page}>

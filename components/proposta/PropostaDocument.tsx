@@ -1001,6 +1001,10 @@ export function PropostaDocument({
   // P1 — título dinâmico (área × tipo) e faixa de siglas (§3/§7).
   const tituloDin = gerarTituloProposta(p.areaPrincipal || [], p.tipoServico);
   const siglas = faixaSiglas(p.areaPrincipal || []);
+  // §22/§23 — Áreas de atuação contextuais (destaca as selecionadas).
+  const areaSel = new Set(p.areaPrincipal || []);
+  const temAreaSel = AREAS.some((a) => areaSel.has(a.kind));
+  const areasOrd = temAreaSel ? [...AREAS].sort((a, b) => (areaSel.has(b.kind) ? 1 : 0) - (areaSel.has(a.kind) ? 1 : 0)) : AREAS;
 
   const showLogo = options?.showLogo !== false;
   const detailed = options?.detailedSubtotal !== false;
@@ -1154,24 +1158,33 @@ export function PropostaDocument({
             <Text style={styles.areasEyebrow}>QUEM É A FIREOWL CONTROLS</Text>
             <Text style={styles.areasTitle}>Áreas de Atuação</Text>
             <View style={styles.areasBar} />
+            {temAreaSel && nv(siglas) ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#0E2647', borderLeftWidth: 3, borderLeftColor: '#F2A900', borderRadius: 6, paddingVertical: 7, paddingHorizontal: 12, marginBottom: 12 }}>
+                <Text style={{ color: '#F2A900', fontSize: 10, fontFamily: 'Poppins', fontWeight: 700, letterSpacing: 1.5 }}>{siglas}</Text>
+              </View>
+            ) : null}
             <Text style={styles.areasIntro}>
               Engenharia especializada em segurança eletrônica e proteção contra incêndio. Projetamos, instalamos,
               comissionamos e mantemos soluções integradas — do sensor de campo à central de supervisão.
             </Text>
             <View style={styles.areasGrid}>
-              {AREAS.map((a, i) => (
-                <View key={a.kind} style={styles.areaCard} wrap={false}>
-                  <View style={styles.areaCardHead}>
-                    <View style={styles.iconBadge}>
-                      <AreaIcon kind={a.kind} />
+              {areasOrd.map((a, i) => {
+                const on = areaSel.has(a.kind);
+                const destaque = temAreaSel && on;
+                return (
+                  <View key={a.kind} style={[styles.areaCard, destaque ? { borderColor: '#F2A900', borderWidth: 1.5 } : {}, temAreaSel && !on ? { opacity: 0.72 } : {}]} wrap={false}>
+                    <View style={styles.areaCardHead}>
+                      <View style={[styles.iconBadge, destaque ? { borderColor: '#F2A900' } : {}]}>
+                        <AreaIcon kind={a.kind} />
+                      </View>
+                      <Text style={[styles.areaIndex, destaque ? { color: '#F2A900' } : {}]}>{String(i + 1).padStart(2, '0')}</Text>
                     </View>
-                    <Text style={styles.areaIndex}>{String(i + 1).padStart(2, '0')}</Text>
+                    <Text style={styles.areaCardTitle}>{a.titulo}</Text>
+                    <View style={styles.areaDivider} />
+                    <Text style={styles.areaCardDesc}>{a.desc}</Text>
                   </View>
-                  <Text style={styles.areaCardTitle}>{a.titulo}</Text>
-                  <View style={styles.areaDivider} />
-                  <Text style={styles.areaCardDesc}>{a.desc}</Text>
-                </View>
-              ))}
+                );
+              })}
             </View>
             <View style={styles.chainStrip}>
               <Text style={styles.chainLabel}>Ciclo completo de engenharia</Text>

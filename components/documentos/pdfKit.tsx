@@ -332,37 +332,59 @@ export const SlaBloco = ({ tabela, slaCritico }: { tabela?: { situacao: string; 
   );
 };
 
-export const AreasAtuacaoPage = ({ razao, numero, data, cliente }: { razao?: string; numero: string; data: string; cliente: string }) => (
-  <Page size="A4" style={{ padding: 0, fontSize: 9, fontFamily: 'Roboto', color: C.white, backgroundColor: C.navy }}>
-    <BlueprintBg />
-    <PdfFooter numero={numero} data={data} cliente={cliente} />
-    <View style={{ flex: 1, paddingTop: 40, paddingHorizontal: 40, paddingBottom: 40 }}>
-      <Text style={{ color: g.gold, fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.6 }}>Quem é a {razao || 'Fireowl Controls'}</Text>
-      <Text style={{ color: C.white, fontSize: 24, fontFamily: 'Poppins', fontWeight: 700, letterSpacing: 0.3, marginTop: 5 }}>Áreas de Atuação</Text>
-      <View style={{ width: 52, height: 4, backgroundColor: g.red, borderRadius: 2, marginTop: 8, marginBottom: 10 }} />
-      <Text style={{ color: C.s300, fontSize: 9, lineHeight: 1.5, marginBottom: 18, maxWidth: 470 }}>
-        Engenharia especializada em segurança eletrônica e proteção contra incêndio. Projetamos, instalamos,
-        comissionamos e mantemos soluções integradas — do sensor de campo à central de supervisão.
-      </Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-        {AREAS.map((a, i) => (
-          <View key={a.kind} style={{ width: '48%', backgroundColor: g.navy2, borderRadius: 10, borderWidth: 1, borderColor: g.line2, padding: 14, marginBottom: 12, minHeight: 116 }} wrap={false}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 }}>
-              <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: g.deep, borderWidth: 1, borderColor: g.ring, alignItems: 'center', justifyContent: 'center' }}>
-                <AreaIcon kind={a.kind} />
-              </View>
-              <Text style={{ fontSize: 18, fontFamily: 'Poppins', fontWeight: 700, color: g.muteNum }}>{String(i + 1).padStart(2, '0')}</Text>
-            </View>
-            <Text style={{ color: C.white, fontSize: 10, fontFamily: 'Poppins', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>{a.titulo}</Text>
-            <View style={{ width: 22, height: 2, backgroundColor: g.red, borderRadius: 1, marginTop: 5, marginBottom: 6 }} />
-            <Text style={{ color: C.s300, fontSize: 7.8, lineHeight: 1.45 }}>{a.desc}</Text>
+const AREA_SIGLA: Record<string, string> = { sdai: 'SDAI', cftv: 'CFTV', acesso: 'ACESSO', alarme: 'ALARME', bms: 'BMS', integracao: 'INTEGRAÇÃO' };
+
+/**
+ * §22/§23 — Página institucional "Áreas de Atuação" contextual. Com áreas
+ * selecionadas (areaIds), destaca-as (ordena na frente, borda dourada) e mostra
+ * a faixa de siglas (§7). Sem seleção, mantém as 6 áreas com peso igual.
+ */
+export const AreasAtuacaoPage = ({ razao, numero, data, cliente, areaIds = [] }: { razao?: string; numero: string; data: string; cliente: string; areaIds?: string[] }) => {
+  const sel = new Set(areaIds);
+  const temSel = AREAS.some((a) => sel.has(a.kind));
+  const ordered = temSel ? [...AREAS].sort((a, b) => (sel.has(b.kind) ? 1 : 0) - (sel.has(a.kind) ? 1 : 0)) : AREAS;
+  const siglas = areaIds.map((id) => AREA_SIGLA[id]).filter(Boolean).join('    |    ');
+  return (
+    <Page size="A4" style={{ padding: 0, fontSize: 9, fontFamily: 'Roboto', color: C.white, backgroundColor: C.navy }}>
+      <BlueprintBg />
+      <PdfFooter numero={numero} data={data} cliente={cliente} />
+      <View style={{ flex: 1, paddingTop: 40, paddingHorizontal: 40, paddingBottom: 40 }}>
+        <Text style={{ color: g.gold, fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.6 }}>Quem é a {razao || 'Fireowl Controls'}</Text>
+        <Text style={{ color: C.white, fontSize: 24, fontFamily: 'Poppins', fontWeight: 700, letterSpacing: 0.3, marginTop: 5 }}>Áreas de Atuação</Text>
+        <View style={{ width: 52, height: 4, backgroundColor: g.red, borderRadius: 2, marginTop: 8, marginBottom: 10 }} />
+        {temSel && nv(siglas) ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: g.deep, borderLeftWidth: 3, borderLeftColor: g.gold, borderRadius: 6, paddingVertical: 7, paddingHorizontal: 12, marginBottom: 12 }}>
+            <Text style={{ color: g.gold, fontSize: 10, fontFamily: 'Poppins', fontWeight: 700, letterSpacing: 1.5 }}>{siglas}</Text>
           </View>
-        ))}
+        ) : null}
+        <Text style={{ color: C.s300, fontSize: 9, lineHeight: 1.5, marginBottom: 16, maxWidth: 470 }}>
+          Engenharia especializada em segurança eletrônica e proteção contra incêndio. Projetamos, instalamos,
+          comissionamos e mantemos soluções integradas — do sensor de campo à central de supervisão.
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+          {ordered.map((a, i) => {
+            const on = sel.has(a.kind);
+            const destaque = temSel && on;
+            return (
+              <View key={a.kind} style={{ width: '48%', backgroundColor: destaque ? g.navy2 : g.deep, borderRadius: 10, borderWidth: destaque ? 1.5 : 1, borderColor: destaque ? g.gold : g.line2, padding: 14, marginBottom: 12, minHeight: 116, opacity: temSel && !on ? 0.72 : 1 }} wrap={false}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 }}>
+                  <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: g.deep, borderWidth: 1, borderColor: destaque ? g.gold : g.ring, alignItems: 'center', justifyContent: 'center' }}>
+                    <AreaIcon kind={a.kind} />
+                  </View>
+                  <Text style={{ fontSize: 18, fontFamily: 'Poppins', fontWeight: 700, color: destaque ? g.gold : g.muteNum }}>{String(i + 1).padStart(2, '0')}</Text>
+                </View>
+                <Text style={{ color: C.white, fontSize: 10, fontFamily: 'Poppins', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>{a.titulo}</Text>
+                <View style={{ width: 22, height: 2, backgroundColor: g.red, borderRadius: 1, marginTop: 5, marginBottom: 6 }} />
+                <Text style={{ color: C.s300, fontSize: 7.8, lineHeight: 1.45 }}>{a.desc}</Text>
+              </View>
+            );
+          })}
+        </View>
+        <View style={{ marginTop: 4, backgroundColor: g.deep, borderLeftWidth: 3, borderLeftColor: g.gold, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 14 }}>
+          <Text style={{ color: C.s400, fontSize: 7, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 3 }}>Ciclo completo de engenharia</Text>
+          <Text style={{ color: C.white, fontSize: 8.5, fontFamily: 'Poppins', fontWeight: 600, letterSpacing: 0.6 }}>Projeto   ·   Instalação   ·   Comissionamento   ·   Manutenção   ·   Suporte</Text>
+        </View>
       </View>
-      <View style={{ marginTop: 4, backgroundColor: g.deep, borderLeftWidth: 3, borderLeftColor: g.gold, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 14 }}>
-        <Text style={{ color: C.s400, fontSize: 7, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 3 }}>Ciclo completo de engenharia</Text>
-        <Text style={{ color: C.white, fontSize: 8.5, fontFamily: 'Poppins', fontWeight: 600, letterSpacing: 0.6 }}>Projeto   ·   Instalação   ·   Comissionamento   ·   Manutenção   ·   Suporte</Text>
-      </View>
-    </View>
-  </Page>
-);
+    </Page>
+  );
+};
