@@ -377,6 +377,81 @@ const AREA_SIGLA: Record<string, string> = { sdai: 'SDAI', cftv: 'CFTV', acesso:
  * selecionadas (areaIds), destaca-as (ordena na frente, borda dourada) e mostra
  * a faixa de siglas (§7). Sem seleção, mantém as 6 áreas com peso igual.
  */
+// ===== §8/§18/§25 — Página institucional "Experiência e Capacidade Técnica" =====
+export interface ExpLogoItem { nome: string; logoDataUrl?: string; destaque?: boolean }
+
+/** Tile branco com o logo (contain, sem distorção); fallback = nome. */
+const LogoTile = ({ item, w, h }: { item: ExpLogoItem; w: string; h: number }) => (
+  <View style={{ width: w, height: h, backgroundColor: C.white, borderRadius: 6, borderWidth: item.destaque ? 1.5 : 1, borderColor: item.destaque ? g.gold : C.s200, alignItems: 'center', justifyContent: 'center', padding: 6, marginBottom: 8 }}>
+    {nv(item.logoDataUrl) ? (
+      <Image src={item.logoDataUrl!} style={{ maxWidth: '100%', maxHeight: h - 12, objectFit: 'contain' }} />
+    ) : (
+      <Text style={{ fontSize: 8.5, color: C.navy, fontFamily: 'Poppins', fontWeight: 600, textAlign: 'center' }}>{item.nome}</Text>
+    )}
+  </View>
+);
+
+const LogoGrid = ({ itens, perRow, h }: { itens: ExpLogoItem[]; perRow: number; h: number }) => {
+  const w = `${(100 / perRow) - 2}%`;
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start', gap: 0 }}>
+      {itens.map((it, i) => (
+        <View key={i} style={{ width: `${100 / perRow}%`, paddingRight: i % perRow === perRow - 1 ? 0 : 6 }}>
+          <LogoTile item={it} w={'100%'} h={h} />
+        </View>
+      ))}
+    </View>
+  );
+};
+
+export const ExperienciaParceriasPage = ({
+  fantasia, numero, data, cliente, titulo = 'Experiência e Capacidade Técnica', subtitulo,
+  expIntro, techIntro, empresas = [], marcas = [], segmentos = [],
+}: {
+  fantasia?: string; numero: string; data: string; cliente: string; titulo?: string; subtitulo?: string;
+  expIntro?: string; techIntro?: string; empresas?: ExpLogoItem[]; marcas?: ExpLogoItem[]; segmentos?: string[];
+}) => {
+  const destaques = empresas.filter((e) => e.destaque);
+  const outras = empresas.filter((e) => !e.destaque);
+  const sub = nv(subtitulo) ? subtitulo! : 'Empresas atendidas em diferentes segmentos e atuação com tecnologias reconhecidas.';
+  return (
+    <Page size="A4" style={{ padding: 0, fontSize: 9, fontFamily: 'Roboto', color: C.white, backgroundColor: C.navy }}>
+      <BlueprintBg />
+      <PdfFooter numero={numero} data={data} cliente={cliente} />
+      <View style={{ flex: 1, paddingTop: 40, paddingHorizontal: 40, paddingBottom: 40 }}>
+        <Text style={{ color: g.gold, fontSize: 8, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.6 }}>{fantasia || 'Fireowl Controls'}</Text>
+        <Text style={{ color: C.white, fontSize: 22, fontFamily: 'Poppins', fontWeight: 700, letterSpacing: 0.3, marginTop: 5 }}>{titulo}</Text>
+        <View style={{ width: 52, height: 4, backgroundColor: g.red, borderRadius: 2, marginTop: 8, marginBottom: 8 }} />
+        <Text style={{ color: C.s300, fontSize: 9, lineHeight: 1.5, maxWidth: 470, marginBottom: 14 }}>{sub}</Text>
+
+        {empresas.length > 0 ? (
+          <View minPresenceAhead={60}>
+            <Text style={{ color: g.gold, fontSize: 9, fontFamily: 'Poppins', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 5 }}>Empresas Atendidas</Text>
+            {nv(expIntro) ? <Text style={{ color: C.s400, fontSize: 8, lineHeight: 1.45, marginBottom: 8, maxWidth: 470 }}>{expIntro}</Text> : null}
+            {destaques.length > 0 ? <LogoGrid itens={destaques} perRow={4} h={50} /> : null}
+            {outras.length > 0 ? <LogoGrid itens={outras} perRow={5} h={38} /> : null}
+          </View>
+        ) : null}
+
+        {marcas.length > 0 ? (
+          <View minPresenceAhead={60} style={{ marginTop: 4 }}>
+            <Text style={{ color: g.gold, fontSize: 9, fontFamily: 'Poppins', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 5 }}>Marcas e Tecnologias</Text>
+            {nv(techIntro) ? <Text style={{ color: C.s400, fontSize: 8, lineHeight: 1.45, marginBottom: 8, maxWidth: 470 }}>{techIntro}</Text> : null}
+            <LogoGrid itens={marcas} perRow={5} h={38} />
+          </View>
+        ) : null}
+
+        {segmentos.length > 0 ? (
+          <View wrap={false} style={{ marginTop: 6, backgroundColor: g.deep, borderLeftWidth: 3, borderLeftColor: g.gold, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 14 }}>
+            <Text style={{ color: C.s400, fontSize: 7, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 3 }}>Segmentos de Atuação</Text>
+            <Text style={{ color: C.white, fontSize: 9, fontFamily: 'Poppins', fontWeight: 600, letterSpacing: 0.6 }}>{segmentos.map((s) => s.toUpperCase()).join('   ·   ')}</Text>
+          </View>
+        ) : null}
+      </View>
+    </Page>
+  );
+};
+
 export const AreasAtuacaoPage = ({ razao, numero, data, cliente, areaIds = [], intro }: { razao?: string; numero: string; data: string; cliente: string; areaIds?: string[]; intro?: string }) => {
   const sel = new Set(areaIds);
   const temSel = AREAS.some((a) => sel.has(a.kind));
