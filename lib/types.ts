@@ -333,6 +333,8 @@ export interface Client {
   createdByRole?: string;
   /** Foto da fachada (storage_path); usada como capa padrão das propostas do cliente. */
   fachadaPath?: string;
+  /** Logo do cliente (storage_path, PNG rasterizado). Distinta da fachada. */
+  logoPath?: string;
 }
 
 export interface PedidoOS {

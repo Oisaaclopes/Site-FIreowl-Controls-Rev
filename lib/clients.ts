@@ -19,6 +19,7 @@ function rowToClient(r: any): Client {
     pendenteValidacao: r.pendente_validacao ?? undefined,
     createdByRole: r.created_by_role ?? undefined,
     fachadaPath: r.fachada_path ?? undefined,
+    logoPath: r.logo_path ?? undefined,
   };
 }
 
@@ -43,6 +44,7 @@ function clientToRow(c: Client): Record<string, unknown> {
   if (c.createdByRole !== undefined) row.created_by_role = c.createdByRole;
   // Só envia quando presente (compatível com bancos sem a migração 0039).
   if (c.fachadaPath !== undefined) row.fachada_path = c.fachadaPath || null;
+  if (c.logoPath !== undefined) row.logo_path = c.logoPath || null;
   return row;
 }
 
