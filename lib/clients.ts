@@ -18,6 +18,7 @@ function rowToClient(r: any): Client {
     totalContractsValue: Number(r.total_contracts_value ?? 0),
     pendenteValidacao: r.pendente_validacao ?? undefined,
     createdByRole: r.created_by_role ?? undefined,
+    fachadaPath: r.fachada_path ?? undefined,
   };
 }
 
@@ -40,6 +41,8 @@ function clientToRow(c: Client): Record<string, unknown> {
   // com bancos sem a migração 0028_clients_provisional aplicada).
   if (c.pendenteValidacao !== undefined) row.pendente_validacao = c.pendenteValidacao;
   if (c.createdByRole !== undefined) row.created_by_role = c.createdByRole;
+  // Só envia quando presente (compatível com bancos sem a migração 0039).
+  if (c.fachadaPath !== undefined) row.fachada_path = c.fachadaPath || null;
   return row;
 }
 

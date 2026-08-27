@@ -18,6 +18,19 @@ export function propostaCapaPath(pedidoId: string): string {
   return `propostas/${pedidoId || 'sem-pedido'}/${year}/capa_${Date.now()}.jpg`;
 }
 
+/** Foto da fachada do cliente (mesmo bucket, prefixo clientes/). Retorna o storage_path. */
+export async function uploadClientFachada(file: Blob, clientId: string): Promise<string> {
+  const supabase = getSupabaseClient() as any;
+  const compressed = await compressImage(file, 2000, 0.85);
+  const year = new Date().getFullYear();
+  const path = `clientes/${clientId || 'sem-cliente'}/${year}/fachada_${Date.now()}.jpg`;
+  const { error } = await supabase.storage
+    .from(BUCKET)
+    .upload(path, compressed, { upsert: false, contentType: 'image/jpeg' });
+  if (error) throw error;
+  return path;
+}
+
 /** Comprime (capa: dimensão/qualidade maiores que fotos de relatório) e sobe. Retorna o storage_path. */
 export async function uploadPropostaCapa(file: Blob, pedidoId: string): Promise<string> {
   const supabase = getSupabaseClient() as any;

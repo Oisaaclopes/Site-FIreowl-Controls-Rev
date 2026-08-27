@@ -174,8 +174,9 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
 
   // Carrega (assíncrono) a imagem de capa persistida na proposta como data URI.
   const loadCapaIntoOptions = async (ped: Pedido) => {
-    // §20 — sem capa própria, cai na capa da área de atuação.
-    const path = ped.proposal?.capaImagemPath || capaAreaPath(companyProfile, ped.proposal?.areaPrincipal || []);
+    // Prioridade da capa: pedido → fachada do cliente → capa da área (§20) → blueprint.
+    const fachada = clients.find((c) => c.id === ped.clienteId)?.fachadaPath;
+    const path = ped.proposal?.capaImagemPath || fachada || capaAreaPath(companyProfile, ped.proposal?.areaPrincipal || []);
     if (!path) return;
     try {
       const dataUrl = await propostaCapaDataUrl(path);
@@ -219,8 +220,9 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   const openDocViewer = (ped: Pedido, doc: DocumentType, options: DocOptions) => {
     if (doc === 'orcamento') {
       setOrcamentoPedido({ pedido: ped, options });
-      // Reaproveita a capa da proposta; sem ela, usa a capa da área de atuação (§20).
-      const path = ped.proposal?.capaImagemPath || capaAreaPath(companyProfile, ped.proposal?.areaPrincipal || []);
+      // Capa: pedido → fachada do cliente → capa da área (§20) → blueprint.
+      const fachada = clients.find((c) => c.id === ped.clienteId)?.fachadaPath;
+      const path = ped.proposal?.capaImagemPath || fachada || capaAreaPath(companyProfile, ped.proposal?.areaPrincipal || []);
       if (path) {
         propostaCapaDataUrl(path)
           .then((url) => setOrcamentoPedido((prev) => (prev && prev.pedido.id === ped.id ? { ...prev, options: { ...prev.options, capaImagemUrl: url } } : prev)))

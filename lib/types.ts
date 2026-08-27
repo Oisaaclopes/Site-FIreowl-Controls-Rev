@@ -276,6 +276,8 @@ export interface Client {
   // Cliente provisório criado em campo — requer migração 0028_clients_provisional
   pendenteValidacao?: boolean;
   createdByRole?: string;
+  /** Foto da fachada (storage_path); usada como capa padrão das propostas do cliente. */
+  fachadaPath?: string;
 }
 
 export interface PedidoOS {

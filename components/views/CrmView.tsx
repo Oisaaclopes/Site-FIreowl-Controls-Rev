@@ -18,6 +18,7 @@ import { usePrivacy } from '@/lib/privacy';
 import { DevicesManager } from '@/components/reports/DevicesManager';
 import { EmptyState } from '@/components/EmptyState';
 import { fetchCnpjData } from '@/lib/cnpj';
+import { uploadClientFachada, removePropostaCapa } from '@/lib/propostaCapa';
 
 interface CrmViewProps {
   clients: Client[];
@@ -103,6 +104,24 @@ export const CrmView: React.FC<CrmViewProps> = ({
   const [nCity, setNCity] = useState('Londrina/PR');
   const [nAnnual, setNAnnual] = useState(0);
   const [nContacts, setNContacts] = useState<ContactForm[]>([emptyContact()]);
+  // Foto da fachada (capa padrão das propostas do cliente).
+  const [nFachada, setNFachada] = useState<string>('');
+  const [fachadaBusy, setFachadaBusy] = useState(false);
+  const handleFachadaUpload = async (file: File) => {
+    setFachadaBusy(true);
+    try {
+      const path = await uploadClientFachada(file, editingClient?.id || `c_${Date.now()}`);
+      setNFachada(path);
+    } catch {
+      alert('Não foi possível enviar a foto. Verifique a conexão com o Supabase.');
+    } finally {
+      setFachadaBusy(false);
+    }
+  };
+  const handleFachadaRemove = async () => {
+    if (nFachada) { try { await removePropostaCapa(nFachada); } catch { /* best-effort */ } }
+    setNFachada('');
+  };
 
   // Busca automática de CNPJ
   const [isSearchingCnpj, setIsSearchingCnpj] = useState(false);
@@ -181,6 +200,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
 
     setNAnnual(client.totalContractsValue || 0);
     setNContacts(client.contacts && client.contacts.length > 0 ? client.contacts : [emptyContact()]);
+    setNFachada(client.fachadaPath || '');
 
     const digits = (client.cnpj || '').replace(/\D/g, '');
     setNTipoPessoa(digits.length <= 11 ? 'PF' : 'PJ');
@@ -209,6 +229,8 @@ export const CrmView: React.FC<CrmViewProps> = ({
     setNCity('Londrina/PR');
     setNAnnual(0);
     setNContacts([emptyContact()]);
+    setNFachada('');
+    setFachadaBusy(false);
     setCnpjSearchError('');
     setIsSearchingCnpj(false);
   };
@@ -250,6 +272,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
       totalContractsValue: Number(nAnnual) || 0,
       pendenteValidacao: editingClient ? editingClient.pendenteValidacao : undefined,
       createdByRole: editingClient ? editingClient.createdByRole : undefined,
+      fachadaPath: nFachada || undefined,
     };
 
     onAddClient(payload);
@@ -709,6 +732,27 @@ export const CrmView: React.FC<CrmViewProps> = ({
                     <input type="number" min={0} step="0.01" inputMode="decimal" value={nAnnual} onChange={(e) => setNAnnual(Number(e.target.value))} className={`${inputCls} font-data-mono`} />
                   </div>
                 </div>
+              </section>
+
+              {/* Card: Foto da fachada (capa padrão das propostas do cliente) */}
+              <section className="rounded-xl border border-slate-200 bg-white p-3.5 space-y-2">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-sm text-[#1A1A72]">storefront</span> Foto da fachada
+                </p>
+                <p className="text-[11px] text-slate-400">Usada como capa padrão nas propostas e orçamentos deste cliente (dispensa subir por documento).</p>
+                {nFachada ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-emerald-600 flex items-center gap-1"><span className="material-symbols-outlined text-[16px]">check_circle</span>Foto definida</span>
+                    <button type="button" onClick={handleFachadaRemove} className="text-[11px] font-bold uppercase text-slate-400 hover:text-[#E63946]">Remover</button>
+                  </div>
+                ) : (
+                  <label className={`inline-flex items-center gap-1.5 text-xs font-semibold cursor-pointer ${fachadaBusy ? 'text-slate-400' : 'text-[#1A1A72] hover:text-[#E63946]'}`}>
+                    <span className="material-symbols-outlined text-[16px]">{fachadaBusy ? 'progress_activity' : 'add_a_photo'}</span>
+                    {fachadaBusy ? 'Enviando…' : 'Enviar foto da fachada'}
+                    <input type="file" accept="image/*" className="hidden" disabled={fachadaBusy}
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFachadaUpload(f); e.target.value = ''; }} />
+                  </label>
+                )}
               </section>
 
               {/* Card: Contatos */}
