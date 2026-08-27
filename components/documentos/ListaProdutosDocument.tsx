@@ -1,7 +1,7 @@
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
-import { C, nv, PdfHeader, PdfFooter, CamposExtras } from './pdfKit';
+import { C, nv, PdfHeader, PdfFooter, CamposExtras, CapaBanner } from './pdfKit';
 import { DocOptions } from '@/lib/documentos';
 
 export type ListaProdutosPdfOptions = Partial<DocOptions>;
@@ -73,6 +73,7 @@ export function ListaProdutosDocument({ pedido, companyProfile, options }: { ped
     <Document title={`Lista de Produtos ${numero}`} author={razao}>
       <Page size="A4" style={styles.page}>
         <PdfHeader razao={fantasia} label="Lista de Produtos" showLogo={showLogo} />
+        <CapaBanner capaImagemUrl={options?.capaImagemUrl} />
         <PdfFooter numero={numero} data={dataDoc} cliente={cliente} />
 
         <View style={styles.titleWrap}>

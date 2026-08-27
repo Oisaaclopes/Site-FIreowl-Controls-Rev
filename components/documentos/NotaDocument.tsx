@@ -1,7 +1,7 @@
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
-import { C, brl, nv, PdfHeader, PdfFooter, CamposExtras, itemTotal } from './pdfKit';
+import { C, brl, nv, PdfHeader, PdfFooter, CamposExtras, itemTotal, CapaBanner } from './pdfKit';
 import { DocOptions } from '@/lib/documentos';
 
 export type NotaVariante = 'servico' | 'produtos';
@@ -89,6 +89,7 @@ export function NotaDocument({ pedido, companyProfile, variante, options }: { pe
     <Document title={`${titulo} ${numero}`} author={razao}>
       <Page size="A4" style={styles.page}>
         <PdfHeader razao={fantasia} label={titulo} showLogo={showLogo} />
+        <CapaBanner capaImagemUrl={options?.capaImagemUrl} />
         <PdfFooter numero={numero} data={dataDoc} cliente={cliente} />
 
         <View style={styles.topRow}>

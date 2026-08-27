@@ -166,7 +166,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   const [notaPedido, setNotaPedido] = useState<{ pedido: Pedido; variante: NotaVariante; options: DocOptions } | null>(null);
   const [laudoPedido, setLaudoPedido] = useState<{ pedido: Pedido; options: DocOptions } | null>(null);
   const [personalizarPedido, setPersonalizarPedido] = useState<Pedido | null>(null);
-  const [personalizadoView, setPersonalizadoView] = useState<{ pedido: Pedido; data: PersonalizadoData } | null>(null);
+  const [personalizadoView, setPersonalizadoView] = useState<{ pedido: Pedido; data: PersonalizadoData; capaImagemUrl?: string } | null>(null);
   const [docConfig, setDocConfig] = useState<{ pedido: Pedido; doc: DocumentType } | null>(null);
   const [concluindoPedido, setConcluindoPedido] = useState<Pedido | null>(null);
   const [capaBusy, setCapaBusy] = useState(false);
@@ -218,22 +218,29 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
 
   // Abre o visualizador do documento (não proposta) com as opções escolhidas.
   const openDocViewer = (ped: Pedido, doc: DocumentType, options: DocOptions) => {
-    if (doc === 'orcamento') {
-      setOrcamentoPedido({ pedido: ped, options });
-      // Capa: pedido → fachada do cliente → capa da área (§20) → blueprint.
-      const fachada = clients.find((c) => c.id === ped.clienteId)?.fachadaPath;
-      const path = ped.proposal?.capaImagemPath || fachada || capaAreaPath(companyProfile, ped.proposal?.areaPrincipal || []);
-      if (path) {
-        propostaCapaDataUrl(path)
-          .then((url) => setOrcamentoPedido((prev) => (prev && prev.pedido.id === ped.id ? { ...prev, options: { ...prev.options, capaImagemUrl: url } } : prev)))
-          .catch(() => { /* sem imagem → grafismo blueprint */ });
-      }
-    }
+    if (doc === 'orcamento') setOrcamentoPedido({ pedido: ped, options });
     else if (doc === 'ordem_servico') setOsPedido({ pedido: ped, options });
     else if (doc === 'lista_produtos') setListaProdutosPedido({ pedido: ped, options });
     else if (doc === 'nota_servico') setNotaPedido({ pedido: ped, variante: 'servico', options });
     else if (doc === 'nota_produtos') setNotaPedido({ pedido: ped, variante: 'produtos', options });
     else if (doc === 'laudo_tecnico') setLaudoPedido({ pedido: ped, options });
+
+    // Foto do cliente na capa/topo de qualquer documento: pedido → fachada do
+    // cliente → capa da área (§20). Resolve o data URI e injeta na opção.
+    const fachada = clients.find((c) => c.id === ped.clienteId)?.fachadaPath;
+    const path = ped.proposal?.capaImagemPath || fachada || capaAreaPath(companyProfile, ped.proposal?.areaPrincipal || []);
+    if (path) {
+      propostaCapaDataUrl(path)
+        .then((url) => {
+          const inject = (prev: any) => (prev && prev.pedido.id === ped.id ? { ...prev, options: { ...prev.options, capaImagemUrl: url } } : prev);
+          if (doc === 'orcamento') setOrcamentoPedido(inject);
+          else if (doc === 'ordem_servico') setOsPedido(inject);
+          else if (doc === 'lista_produtos') setListaProdutosPedido(inject);
+          else if (doc === 'nota_servico' || doc === 'nota_produtos') setNotaPedido(inject);
+          else if (doc === 'laudo_tecnico') setLaudoPedido(inject);
+        })
+        .catch(() => { /* sem imagem → grafismo/topo padrão */ });
+    }
   };
 
   // Roteia a geração: proposta usa seu próprio modal de opções; os demais
@@ -1162,6 +1169,14 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
             // "campos personalizados" dos outros documentos.
             onSavePedido({ ...ped, proposal: { ...ped.proposal, tituloPersonalizado: data.titulo, camposPersonalizados: data.campos } });
             setPersonalizadoView({ pedido: ped, data });
+            // Foto do cliente na capa/topo (pedido → fachada → área).
+            const fachada = clients.find((c) => c.id === ped.clienteId)?.fachadaPath;
+            const path = ped.proposal?.capaImagemPath || fachada || capaAreaPath(companyProfile, ped.proposal?.areaPrincipal || []);
+            if (path) {
+              propostaCapaDataUrl(path)
+                .then((url) => setPersonalizadoView((prev) => (prev && prev.pedido.id === ped.id ? { ...prev, capaImagemUrl: url } : prev)))
+                .catch(() => { /* topo padrão */ });
+            }
           }}
         />
       )}
@@ -1173,6 +1188,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           companyProfile={companyProfile}
           data={personalizadoView.data}
           showLogo={pdfPrefs.showLogo}
+          capaImagemUrl={personalizadoView.capaImagemUrl}
           onClose={() => setPersonalizadoView(null)}
         />
       )}

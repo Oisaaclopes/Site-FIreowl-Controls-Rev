@@ -191,6 +191,10 @@ export const QrCode = ({ text, size = 68, fg = C.navy }: { text: string; size?: 
   );
 };
 
+/** Faixa com a foto do cliente no topo do documento (só aparece se houver imagem). */
+export const CapaBanner = ({ capaImagemUrl, height = 130 }: { capaImagemUrl?: string; height?: number }) =>
+  nv(capaImagemUrl) ? <Image src={capaImagemUrl!} style={{ width: '100%', height, borderRadius: 6, marginBottom: 10, objectFit: 'cover' }} /> : null;
+
 /** Rodapé fixo (barra marinho, texto centralizado, "Página X de Y"). */
 export const PdfFooter = ({ numero, data, cliente }: { numero: string; data: string; cliente: string }) => (
   <Text

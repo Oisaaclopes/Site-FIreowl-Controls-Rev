@@ -70,6 +70,8 @@ export interface DocOptions {
   showCamposPersonalizados: boolean;
   showAssinaturaCliente: boolean;
   showLogo: boolean;
+  /** Foto do cliente (data URI) para a capa/topo do documento; resolvida na geração. */
+  capaImagemUrl?: string;
 }
 
 export const DEFAULT_DOC_OPTIONS: DocOptions = {

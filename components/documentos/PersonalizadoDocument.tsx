@@ -1,7 +1,7 @@
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
-import { C, nv, PdfHeader, PdfFooter } from './pdfKit';
+import { C, nv, PdfHeader, PdfFooter, CapaBanner } from './pdfKit';
 import { PersonalizadoData } from './PersonalizadoConfigModal';
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
   data: PersonalizadoData;
   showLogo?: boolean;
   dataHoje?: boolean;
+  capaImagemUrl?: string;
 }
 
 const styles = StyleSheet.create({
@@ -48,7 +49,7 @@ const InfoCell = ({ label, value, full }: { label: string; value: string; full?:
   </View>
 );
 
-export function PersonalizadoDocument({ pedido, companyProfile, data, showLogo = true, dataHoje = false }: Props) {
+export function PersonalizadoDocument({ pedido, companyProfile, data, showLogo = true, dataHoje = false, capaImagemUrl }: Props) {
   const razao = companyProfile.razaoSocial || 'Fireowl Controls';
   const fantasia = companyProfile.nomeFantasia || razao;
   const numero = pedido.numeroPedido;
@@ -63,6 +64,7 @@ export function PersonalizadoDocument({ pedido, companyProfile, data, showLogo =
     <Document title={`${titulo} ${numero}`} author={razao}>
       <Page size="A4" style={styles.page}>
         <PdfHeader razao={fantasia} label={titulo} showLogo={showLogo} />
+        <CapaBanner capaImagemUrl={capaImagemUrl} />
         <PdfFooter numero={numero} data={dataDoc} cliente={cliente} />
 
         <View>

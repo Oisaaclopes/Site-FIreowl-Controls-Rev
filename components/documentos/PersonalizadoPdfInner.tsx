@@ -13,14 +13,15 @@ interface Props {
   companyProfile: CompanyProfile;
   data: PersonalizadoData;
   showLogo?: boolean;
+  capaImagemUrl?: string;
   onClose: () => void;
 }
 
 const slug = (s: string) => (s || 'documento').normalize('NFD').replace(/[^\w]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'documento';
 
-export default function PersonalizadoPdfInner({ pedido, companyProfile, data, showLogo, onClose }: Props) {
+export default function PersonalizadoPdfInner({ pedido, companyProfile, data, showLogo, capaImagemUrl, onClose }: Props) {
   const [downloading, setDownloading] = useState(false);
-  const doc = <PersonalizadoDocument pedido={pedido} companyProfile={companyProfile} data={data} showLogo={showLogo} />;
+  const doc = <PersonalizadoDocument pedido={pedido} companyProfile={companyProfile} data={data} showLogo={showLogo} capaImagemUrl={capaImagemUrl} />;
 
   const handleDownload = async () => {
     if (downloading) return;

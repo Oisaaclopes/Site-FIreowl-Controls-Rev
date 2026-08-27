@@ -1,7 +1,7 @@
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
-import { C, nv, lnv, PdfHeader, PdfFooter, CamposExtras } from './pdfKit';
+import { C, nv, lnv, PdfHeader, PdfFooter, CamposExtras, CapaBanner } from './pdfKit';
 import { DocOptions } from '@/lib/documentos';
 
 export type LaudoTecnicoPdfOptions = Partial<DocOptions>;
@@ -91,6 +91,7 @@ export function LaudoTecnicoDocument({ pedido, companyProfile, options }: { pedi
     <Document title={`Laudo Técnico ${numero}`} author={razao}>
       <Page size="A4" style={styles.page}>
         <PdfHeader razao={fantasia} label="Laudo Técnico" showLogo={showLogo} />
+        <CapaBanner capaImagemUrl={options?.capaImagemUrl} />
         <PdfFooter numero={numero} data={dataDoc} cliente={cliente} />
 
         <View style={styles.titleWrap}>

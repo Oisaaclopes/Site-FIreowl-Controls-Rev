@@ -2,7 +2,7 @@ import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import { SEGURANCA_TRABALHO } from '@/lib/propostaTextos';
-import { C, nv, lnv, PdfHeader, PdfFooter, CamposExtras } from './pdfKit';
+import { C, nv, lnv, PdfHeader, PdfFooter, CamposExtras, CapaBanner } from './pdfKit';
 import { DocOptions } from '@/lib/documentos';
 
 export type OrdemServicoPdfOptions = Partial<DocOptions>;
@@ -106,6 +106,7 @@ export function OrdemServicoDocument({ pedido, companyProfile, options }: { pedi
     <Document title={`Ordem de Serviço ${os}`} author={razao}>
       <Page size="A4" style={styles.page}>
         <PdfHeader razao={fantasia} label="Ordem de Serviço" showLogo={showLogo} />
+        <CapaBanner capaImagemUrl={options?.capaImagemUrl} />
         <PdfFooter numero={os} data={dataDoc} cliente={cliente} />
 
         <View style={styles.titleWrap}>

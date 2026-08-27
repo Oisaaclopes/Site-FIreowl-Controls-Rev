@@ -10,6 +10,7 @@ interface Props {
   companyProfile: CompanyProfile;
   data: PersonalizadoData;
   showLogo?: boolean;
+  capaImagemUrl?: string;
   onClose: () => void;
 }
 
@@ -25,6 +26,6 @@ const PersonalizadoPdfInner = dynamic(() => import('./PersonalizadoPdfInner'), {
   ),
 });
 
-export const PersonalizadoPDFView: React.FC<Props> = ({ pedido, companyProfile, data, showLogo, onClose }) => (
-  <PersonalizadoPdfInner pedido={pedido} companyProfile={companyProfile} data={data} showLogo={showLogo} onClose={onClose} />
+export const PersonalizadoPDFView: React.FC<Props> = ({ pedido, companyProfile, data, showLogo, capaImagemUrl, onClose }) => (
+  <PersonalizadoPdfInner pedido={pedido} companyProfile={companyProfile} data={data} showLogo={showLogo} capaImagemUrl={capaImagemUrl} onClose={onClose} />
 );
