@@ -230,6 +230,18 @@ const CATALOG: Record<string, string[]> = {
 
 const MACRO_CATEGORIES = Object.keys(CATALOG);
 
+const AREA_VISUAL: Record<string, { icon: string; tone: string }> = {
+  SDAI: { icon: 'local_fire_department', tone: 'border-red-200 bg-red-50 text-red-700' },
+  CFTV: { icon: 'videocam', tone: 'border-sky-200 bg-sky-50 text-sky-700' },
+  'Controle de Acesso': { icon: 'badge', tone: 'border-violet-200 bg-violet-50 text-violet-700' },
+  'Alarme de Intrusão': { icon: 'sensors', tone: 'border-amber-200 bg-amber-50 text-amber-700' },
+  'Elétrica & Energia': { icon: 'bolt', tone: 'border-yellow-200 bg-yellow-50 text-yellow-700' },
+  'Infraestrutura Metálica': { icon: 'construction', tone: 'border-slate-300 bg-slate-100 text-slate-700' },
+  'Infraestrutura PVC Antichama': { icon: 'plumbing', tone: 'border-orange-200 bg-orange-50 text-orange-700' },
+  'Cabeamento & Fios': { icon: 'cable', tone: 'border-indigo-200 bg-indigo-50 text-indigo-700' },
+  'Insumos & Fixação': { icon: 'build', tone: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
+};
+
 const DEFAULT_BRANDS = [
   'Intelbras',
   'Tecnohold',
@@ -807,6 +819,41 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   }, [inventory]);
 
+  // Navegação visual do catálogo: área → tipo de dispositivo → marca.
+  // Ela apenas preenche os mesmos filtros da listagem, sem criar um segundo
+  // estado de busca ou alterar a regra da aba de compras.
+  const areaSummaries = useMemo(() => {
+    const counts = new Map<string, number>();
+    inventory.forEach((item) => {
+      const area = item.category || 'Sem área';
+      counts.set(area, (counts.get(area) || 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .map(([area, count]) => ({ area, count, visual: AREA_VISUAL[area] || { icon: 'inventory_2', tone: 'border-slate-200 bg-slate-50 text-slate-700' } }))
+      .sort((a, b) => b.count - a.count || a.area.localeCompare(b.area, 'pt-BR'));
+  }, [inventory]);
+  const subgroupSummaries = useMemo(() => {
+    if (!filterCategory) return [];
+    const counts = new Map<string, number>();
+    inventory.filter((item) => item.category === filterCategory).forEach((item) => {
+      const subgroup = item.subcategory || 'Sem grupo definido';
+      counts.set(subgroup, (counts.get(subgroup) || 0) + 1);
+    });
+    return Array.from(counts.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'pt-BR'));
+  }, [filterCategory, inventory]);
+  const brandSummaries = useMemo(() => {
+    if (!filterCategory && !filterSubcategory) return [];
+    const counts = new Map<string, number>();
+    inventory
+      .filter((item) => !filterCategory || item.category === filterCategory)
+      .filter((item) => !filterSubcategory || item.subcategory === filterSubcategory)
+      .forEach((item) => {
+        const itemBrand = item.brand || 'Sem marca definida';
+        counts.set(itemBrand, (counts.get(itemBrand) || 0) + 1);
+      });
+    return Array.from(counts.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'pt-BR'));
+  }, [filterCategory, filterSubcategory, inventory]);
+
   // Autopreenchimento inteligente do nome (subcategoria + marca), sem
   // sobrescrever o que o usuário já digitou manualmente.
   useEffect(() => {
@@ -1380,6 +1427,102 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
             </button>
           )}
         </div>
+      )}
+
+      {/* Explorador visual: área → grupo de dispositivos → marca. */}
+      {tab === 'produtos' && !loading && (
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5 shadow-sm">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between mb-4">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[#E63946]">Navegar no catálogo</p>
+              <h2 className="text-sm font-bold text-slate-900">Encontre por área, dispositivo e marca</h2>
+            </div>
+            {(filterCategory || filterSubcategory || filterBrand) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterCategory('');
+                  setFilterSubcategory('');
+                  setFilterBrand('');
+                }}
+                className="self-start text-[11px] font-semibold text-[#1A1A72] hover:underline"
+              >
+                Ver todo o estoque
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setFilterCategory('');
+                setFilterSubcategory('');
+                setFilterBrand('');
+              }}
+              className={`min-h-[88px] rounded-xl border p-3 text-left transition-colors ${!filterCategory ? 'border-[#1A1A72] bg-[#1A1A72] text-white shadow-sm' : 'border-slate-200 hover:border-[#1A1A72]/40 hover:bg-slate-50 text-slate-700'}`}
+            >
+              <span className="material-symbols-outlined text-lg">apps</span>
+              <span className="mt-2 block text-[11px] font-bold leading-tight">Todas as áreas</span>
+              <span className={`mt-1 block text-[10px] ${!filterCategory ? 'text-white/70' : 'text-slate-400'}`}>{inventory.length} itens</span>
+            </button>
+            {areaSummaries.map(({ area, count, visual }) => {
+              const active = filterCategory === area;
+              return (
+                <button
+                  key={area}
+                  type="button"
+                  onClick={() => {
+                    setFilterCategory(area);
+                    setFilterSubcategory('');
+                    setFilterBrand('');
+                  }}
+                  className={`min-h-[88px] rounded-xl border p-3 text-left transition-all ${active ? 'border-[#1A1A72] ring-2 ring-[#1A1A72]/20 shadow-sm' : 'hover:-translate-y-0.5 hover:shadow-sm'} ${visual.tone}`}
+                >
+                  <span className="material-symbols-outlined text-lg">{visual.icon}</span>
+                  <span className="mt-2 block text-[11px] font-bold leading-tight line-clamp-2">{area}</span>
+                  <span className="mt-1 block text-[10px] opacity-70">{count} item{count === 1 ? '' : 's'}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {filterCategory && (
+            <div className="mt-5 pt-4 border-t border-slate-100">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="material-symbols-outlined text-base text-[#1A1A72]">category</span>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-600">Grupos de dispositivos em {filterCategory}</p>
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
+                <button type="button" onClick={() => { setFilterSubcategory(''); setFilterBrand(''); }} className={`shrink-0 rounded-lg border px-3 py-2 text-left text-[11px] font-semibold transition-colors ${!filterSubcategory ? 'border-[#1A1A72] bg-[#1A1A72] text-white' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                  Todos <span className="opacity-70">({subgroupSummaries.reduce((total, group) => total + group.count, 0)})</span>
+                </button>
+                {subgroupSummaries.map((group) => (
+                  <button key={group.name} type="button" onClick={() => { setFilterSubcategory(group.name); setFilterBrand(''); }} className={`shrink-0 max-w-56 rounded-lg border px-3 py-2 text-left text-[11px] font-semibold transition-colors ${filterSubcategory === group.name ? 'border-[#1A1A72] bg-[#1A1A72] text-white' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                    <span className="block truncate">{group.name}</span><span className="text-[10px] opacity-70">{group.count} item{group.count === 1 ? '' : 's'}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {brandSummaries.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-slate-100">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="material-symbols-outlined text-base text-[#1A1A72]">sell</span>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-600">Marcas {filterSubcategory ? `em ${filterSubcategory}` : 'da área'}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => setFilterBrand('')} className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${!filterBrand ? 'border-[#E63946] bg-[#E63946] text-white' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Todas</button>
+                {brandSummaries.map((item) => (
+                  <button key={item.name} type="button" onClick={() => setFilterBrand(item.name)} className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${filterBrand === item.name ? 'border-[#E63946] bg-[#E63946] text-white' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                    {item.name} <span className="opacity-70">{item.count}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
       )}
 
       {/* Catálogos de fornecedores prontos para importar (um por catálogo) */}
