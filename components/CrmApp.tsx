@@ -79,8 +79,8 @@ import { fetchPunches, insertPunch } from '@/lib/timepunch';
 import { fetchPedidos, upsertPedido, updatePedidoStatus, deletePedido } from '@/lib/pedidos';
 import { fetchQuotes, insertQuote } from '@/lib/quotes';
 import { fetchSuppliers, upsertSupplier, deleteSupplier } from '@/lib/suppliers';
-import { fetchBrands, ensureBrand, deleteBrand, seedBrands } from '@/lib/brands';
-import { fetchClients, upsertClient } from '@/lib/clients';
+import { fetchBrands, upsertBrand, deleteBrand, seedBrands } from '@/lib/brands';
+import { fetchClients, upsertClient, deleteClient } from '@/lib/clients';
 import { fetchCompanyProfile, upsertCompanyProfile } from '@/lib/companyProfile';
 import { fetchEmpresasAtendidas, upsertEmpresaAtendida, deleteEmpresaAtendida } from '@/lib/empresasAtendidas';
 import { fetchMarcasTecnologias, upsertMarcaTecnologia, deleteMarcaTecnologia } from '@/lib/marcasTecnologias';
@@ -442,11 +442,14 @@ export function CrmApp({
   };
 
   const handleAddPartnerBrand = (brand: PartnerBrand) => {
-    // Otimista + dedup por nome; persiste na tabela brands (idempotente).
-    setPartnerBrands((prev) => (prev.some((b) => b.name === brand.name) ? prev : [...prev, brand]));
+    // Otimista + dedup por nome; preserva logo e segmento no banco.
+    setPartnerBrands((prev) => {
+      const exists = prev.some((b) => b.name === brand.name);
+      return exists ? prev.map((b) => (b.name === brand.name ? { ...b, ...brand } : b)) : [...prev, brand];
+    });
     logAction('Cadastro de Marca', 'Conta', `Marca parceira homologada: ${brand.name}`);
     if (!isSupabaseConfigured()) return;
-    ensureBrand(brand.name, brand.category)
+    upsertBrand(brand)
       .then((saved) => setPartnerBrands((prev) => [...prev.filter((b) => b.name !== saved.name), saved]))
       .catch((err) => console.warn('Marca: falha ao salvar no Supabase.', err));
   };
@@ -475,6 +478,19 @@ export function CrmApp({
         console.error('Falha ao salvar cliente no Supabase:', err);
         alert('Não foi possível salvar o cliente no banco. Salvo apenas nesta sessão.');
       }
+    }
+  };
+
+  const handleDeleteClient = async (client: Client) => {
+    setClients((prev) => prev.filter((c) => c.id !== client.id));
+    logAction('Exclusão de Cliente', 'Clientes', `Cliente removido: ${client.name}`);
+    if (!isSupabaseConfigured()) return;
+    try {
+      await deleteClient(client.id);
+    } catch (err) {
+      console.error('Falha ao excluir cliente no Supabase:', err);
+      setClients((prev) => [client, ...prev]);
+      alert('Não foi possível excluir o cliente no banco. O cadastro foi restaurado.');
     }
   };
 
@@ -928,6 +944,7 @@ export function CrmApp({
               partnerBrands={partnerBrands}
               onAddPartnerBrand={handleAddPartnerBrand}
               onAddClient={handleAddClient}
+              onDeleteClient={handleDeleteClient}
               onAddOS={handleAddOS}
               onSelectClientForReport={handleSelectClientForReport}
               onNavigateToTab={setCurrentTab}

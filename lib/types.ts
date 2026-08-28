@@ -169,6 +169,8 @@ export interface PartnerBrand {
   name: string;
   category: string;
   logoUrl?: string;
+  /** Segmento/mercado atendido pela marca (ex.: incêndio, CFTV, automação). */
+  segment?: string;
 }
 
 // ===== Módulo "Experiência, Clientes e Marcas" (apresentação institucional) =====

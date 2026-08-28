@@ -32,7 +32,7 @@ import { WorkSchedule, DEFAULT_SCHEDULE, WEEKDAY_SHORT } from '@/lib/schedule';
 import { maskCpf } from '@/lib/utils';
 import { listEmployeeDocs, uploadEmployeeDoc, signedDocUrl, deleteEmployeeDoc, EmployeeDoc } from '@/lib/storage';
 import { uploadPropostaCapa, removePropostaCapa } from '@/lib/propostaCapa';
-import { uploadInstitucionalLogo, removeInstitucionalLogo } from '@/lib/institucional';
+import { uploadInstitucionalLogo, removeInstitucionalLogo, resolveLogoDataUrls } from '@/lib/institucional';
 
 interface ContaViewProps {
   logs: SystemAuditLog[];
@@ -522,7 +522,19 @@ export const ContaView: React.FC<ContaViewProps> = ({
 
   const [newBrandName, setNewBrandName] = useState('');
   const [newBrandCategory, setNewBrandCategory] = useState('');
+  const [newBrandSegment, setNewBrandSegment] = useState('');
   const [newBrandLogo, setNewBrandLogo] = useState('');
+  const [brandLogoUrls, setBrandLogoUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const paths = partnerBrands
+      .map((brand) => brand.logoUrl || '')
+      .filter((url) => url && !/^https?:\/\//i.test(url));
+    if (paths.length === 0) return;
+    let active = true;
+    resolveLogoDataUrls(paths).then((urls) => { if (active) setBrandLogoUrls(urls); });
+    return () => { active = false; };
+  }, [partnerBrands]);
 
   // Preferências (estado de UI — front-end)
   const [prefs, setPrefs] = useState({
@@ -545,9 +557,11 @@ export const ContaView: React.FC<ContaViewProps> = ({
       name: newBrandName.trim(),
       category: newBrandCategory.trim() || 'Equipamentos e Alarme',
       logoUrl: newBrandLogo.trim() || undefined,
+      segment: newBrandSegment.trim() || undefined,
     });
     setNewBrandName('');
     setNewBrandCategory('');
+    setNewBrandSegment('');
     setNewBrandLogo('');
   };
 
@@ -926,13 +940,20 @@ export const ContaView: React.FC<ContaViewProps> = ({
             </div>
 
             <form onSubmit={handleCreateBrand} className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2 text-xs mb-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                 <input
                   type="text"
                   required
                   placeholder="Nome (ex.: Edwards EST3X)"
                   value={newBrandName}
                   onChange={(e) => setNewBrandName(e.target.value)}
+                  className={inputCls}
+                />
+                <input
+                  type="text"
+                  placeholder="Segmento (ex.: Incêndio, CFTV)"
+                  value={newBrandSegment}
+                  onChange={(e) => setNewBrandSegment(e.target.value)}
                   className={inputCls}
                 />
                 <input
@@ -965,12 +986,19 @@ export const ContaView: React.FC<ContaViewProps> = ({
                 <DataListRow
                   key={pb.id}
                   leading={
-                    <span className="w-10 h-10 bg-[#1A1A72] text-[#FFD700] font-bold rounded-lg flex items-center justify-center text-xs shrink-0">
-                      {pb.name.slice(0, 2).toUpperCase()}
-                    </span>
+                    (() => {
+                      const logo = pb.logoUrl && (/^https?:\/\//i.test(pb.logoUrl) ? pb.logoUrl : brandLogoUrls[pb.logoUrl]);
+                      return logo ? (
+                        <img src={logo} alt={`Logo ${pb.name}`} className="w-10 h-10 rounded-lg border border-slate-100 bg-white object-contain p-1 shrink-0" />
+                      ) : (
+                        <span className="w-10 h-10 bg-[#1A1A72] text-[#FFD700] font-bold rounded-lg flex items-center justify-center text-xs shrink-0">
+                          {pb.name.slice(0, 2).toUpperCase()}
+                        </span>
+                      );
+                    })()
                   }
                   title={pb.name}
-                  meta={pb.category}
+                  meta={[pb.category, pb.segment].filter(Boolean).join(' · ')}
                   right={
                     <RowAction icon="delete" label="Remover marca" danger onClick={() => onDeletePartnerBrand(pb.id)} />
                   }

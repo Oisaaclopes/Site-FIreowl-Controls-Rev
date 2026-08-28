@@ -40,6 +40,7 @@ interface CrmViewProps {
   partnerBrands: PartnerBrand[];
   onAddPartnerBrand: (brand: PartnerBrand) => void;
   onAddClient: (client: Client) => void;
+  onDeleteClient: (client: Client) => Promise<void>;
   onAddOS: (os: PedidoOS) => void;
   onSelectClientForReport?: (clientName: string) => void;
   onNavigateToTab?: (tab: TabPath) => void;
@@ -93,6 +94,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
   partnerBrands,
   onAddPartnerBrand,
   onAddClient,
+  onDeleteClient,
   onSelectClientForReport,
   onNavigateToTab,
   userRole = 'ADMINISTRATIVO',
@@ -889,6 +891,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
             setSelectedClientDetail(null);
             startEditClient(c);
           }}
+          onDeleteClient={onDeleteClient}
           onOpenReport={(name) => {
             setSelectedClientDetail(null);
             onSelectClientForReport?.(name);
@@ -919,6 +922,7 @@ interface ClientDetailProps {
   onAddFabricante: (name: string) => void;
   onClose: () => void;
   onEditClient?: (c: Client) => void;
+  onDeleteClient: (client: Client) => Promise<void>;
   onOpenReport: (name: string) => void;
   onNavigateToTab: (tab: TabPath) => void;
   userRole: UserRole;
@@ -937,6 +941,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
   onAddFabricante,
   onClose,
   onEditClient,
+  onDeleteClient,
   onOpenReport,
   onNavigateToTab,
   userRole,
@@ -979,6 +984,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
 
     return {
       clientContracts,
+      clientPedidos,
       clientReceitas,
       propostasAceitas,
       propostasAbertas,
@@ -993,6 +999,19 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
   }, [client, contracts, pedidos, pedidosOS, transactions]);
 
   const brlM = (n: number) => maskMoney(brl(n));
+  const hasLinkedHistory =
+    data.clientContracts.length > 0 || data.clientPedidos.length > 0 || data.osRealizadas.length > 0 ||
+    data.osAndamento.length > 0 || clientReports.length > 0 || clientPendencias.length > 0;
+
+  const handleDelete = async () => {
+    if (hasLinkedHistory) {
+      alert('Este cliente possui histórico vinculado. Para preservar contratos, propostas, OS, relatórios e pendências, a exclusão não é permitida.');
+      return;
+    }
+    if (!window.confirm(`Excluir o cliente "${client.name}"? Esta ação não pode ser desfeita.`)) return;
+    await onDeleteClient(client);
+    onClose();
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -1025,6 +1044,15 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
                 title="Editar dados cadastrais deste cliente"
               >
                 <span className="material-symbols-outlined text-sm">edit</span> Editar dados
+              </button>
+            )}
+            {(userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR') && (
+              <button
+                onClick={() => void handleDelete()}
+                className="text-xs font-bold text-[#E63946] bg-red-50 hover:bg-[#E63946] hover:text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                title={hasLinkedHistory ? 'Clientes com histórico não podem ser excluídos' : 'Excluir cliente sem vínculos'}
+              >
+                <span className="material-symbols-outlined text-sm">delete</span> Excluir
               </button>
             )}
             <button onClick={onClose} className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none shrink-0 p-1">
