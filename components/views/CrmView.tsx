@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Client,
   PedidoOS,
@@ -20,6 +20,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { fetchCnpjData } from '@/lib/cnpj';
 import { uploadClientFachada, uploadClientLogo, removePropostaCapa } from '@/lib/propostaCapa';
 import { nomeFantasiaCliente } from '@/lib/utils';
+import { resolveLogoDataUrls } from '@/lib/institucional';
 
 interface CrmViewProps {
   clients: Client[];
@@ -93,6 +94,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterContractStatus, setFilterContractStatus] = useState<Client['contractStatus'] | ''>('');
   const [filterSegment, setFilterSegment] = useState('');
+  const [clientLogoUrls, setClientLogoUrls] = useState<Record<string, string>>({});
   const [showAddClientModal, setShowAddClientModal] = useState(false);
   const [selectedClientDetail, setSelectedClientDetail] = useState<Client | null>(null);
 
@@ -232,6 +234,11 @@ export const CrmView: React.FC<CrmViewProps> = ({
   };
 
   const clientSegments = useMemo(() => Array.from(new Set(clients.map((c) => c.segment).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR')), [clients]);
+  useEffect(() => {
+    let alive = true;
+    resolveLogoDataUrls(clients.map((c) => c.logoPath || '').filter(Boolean)).then((map) => { if (alive) setClientLogoUrls(map); }).catch(() => {});
+    return () => { alive = false; };
+  }, [clients]);
   const filteredClients = clients.filter((c) => {
     const q = searchTerm.toLowerCase();
     return (!q || c.name.toLowerCase().includes(q) || nomeFantasiaCliente(c.name).toLowerCase().includes(q) || c.code.toLowerCase().includes(q) || c.cnpj.includes(searchTerm))
@@ -421,11 +428,11 @@ export const CrmView: React.FC<CrmViewProps> = ({
                   <DataListRow
                     key={client.id}
                     onClick={() => setSelectedClientDetail(client)}
-                    leading={
-                      <span className="w-10 h-10 rounded-lg bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined text-lg">domain</span>
+                    leading={client.logoPath && clientLogoUrls[client.logoPath] ? (
+                      <span className="w-10 h-10 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0 p-1 overflow-hidden">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}<img src={clientLogoUrls[client.logoPath]} alt={`Logo ${nomeFantasiaCliente(client.name)}`} className="w-full h-full object-contain" />
                       </span>
-                    }
+                    ) : <span className="w-10 h-10 rounded-lg bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0"><span className="material-symbols-outlined text-lg">domain</span></span>}
                     title={<span className="uppercase">{nomeFantasiaCliente(client.name)}</span>}
                     meta={
                       <>

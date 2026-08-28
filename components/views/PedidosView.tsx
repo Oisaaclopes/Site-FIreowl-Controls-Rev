@@ -154,6 +154,15 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   const [filterTo, setFilterTo] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [showDefaultMenu, setShowDefaultMenu] = useState(false);
+  const [clientLogoUrls, setClientLogoUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let alive = true;
+    resolveLogoDataUrls(clients.map((client) => client.logoPath || '').filter(Boolean))
+      .then((map) => { if (alive) setClientLogoUrls(map); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [clients]);
 
   // Modais & Overlays
   const [isProposalModalOpen, setIsProposalModalOpen] = useState(false);
@@ -662,20 +671,24 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   const ProposalRow: React.FC<{ ped: Pedido }> = ({ ped }) => {
     const meta = STATUS_META[ped.status];
     const { num, ano } = numeroAno(ped);
+    const client = clients.find((item) => item.id === ped.clienteId || item.name === ped.clienteNome);
+    const clientLogo = client?.logoPath ? clientLogoUrls[client.logoPath] : undefined;
     return (
       <div
         className="bg-white rounded-xl shadow-sm border border-slate-100 border-l-4 flex flex-col md:flex-row md:items-center justify-between gap-3 p-4"
         style={{ borderLeftColor: meta.color }}
       >
         {/* Bloco esquerdo */}
-        <div className="min-w-0">
-          <p className="text-[11px] text-slate-400 font-data-mono">
+        <div className="min-w-0 flex items-center gap-3">
+          {clientLogo ? <span className="w-10 h-10 rounded-lg bg-white border border-slate-200 p-1 shrink-0"><img src={clientLogo} alt={`Logo ${nomeFantasiaCliente(ped.clienteNome)}`} className="w-full h-full object-contain" /></span> : <span className="w-10 h-10 rounded-lg bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0"><span className="material-symbols-outlined text-lg">domain</span></span>}
+          <div className="min-w-0"><p className="text-[11px] text-slate-400 font-data-mono">
             nº {num} - {ano}
           </p>
           <p className="text-[11px] text-slate-400">{dataCurta(ped)}</p>
           <p className="font-bold text-slate-900 text-sm truncate">{ped.referencia || 'Proposta comercial sem título'}</p>
           <p className="text-[11px] text-[#1A1A72] font-semibold truncate">{nomeFantasiaCliente(ped.clienteNome)}</p>
           {nomeFantasiaCliente(ped.clienteNome) !== razaoSocialCliente(ped.clienteNome) && <p className="text-[10px] text-slate-400 truncate">{razaoSocialCliente(ped.clienteNome)}</p>}
+          </div>
         </div>
 
         {/* Bloco direito */}
@@ -1068,11 +1081,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
               {filteredOS.map((p) => (
                 <DataListRow
                   key={p.id}
-                  leading={
-                    <span className="w-10 h-10 rounded-lg bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0">
-                      <Wrench className="w-5 h-5" />
-                    </span>
-                  }
+                  leading={(() => { const client = clients.find((item) => item.id === p.clientId || item.name === p.clientName); const logo = client?.logoPath ? clientLogoUrls[client.logoPath] : undefined; return logo ? <span className="w-10 h-10 rounded-lg bg-white border border-slate-200 p-1 shrink-0"><img src={logo} alt={`Logo ${nomeFantasiaCliente(p.clientName)}`} className="w-full h-full object-contain" /></span> : <span className="w-10 h-10 rounded-lg bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0"><Wrench className="w-5 h-5" /></span>; })()}
                   title={<span className="text-sm">{p.title || 'Ordem de serviço sem título'}</span>}
                   meta={
                     <>
