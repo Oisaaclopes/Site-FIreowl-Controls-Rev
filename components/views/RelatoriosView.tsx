@@ -165,7 +165,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const canManage = userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR'; // editar/excluir relatório
 
   const [mode, setMode] = useState<'index' | 'form'>('index');
-  const [board, setBoard] = useState<'relatorios' | 'pendencias'>('relatorios');
+  const [board, setBoard] = useState<'atendimentos' | 'relatorios' | 'pendencias'>('atendimentos');
   // Pré-visualização do PDF técnico (react-pdf). Fallback = método HTML antigo.
   const [reportPreview, setReportPreview] = useState<ReportInstance | null>(null);
   const [showProposta, setShowProposta] = useState(false);
@@ -572,16 +572,21 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   };
   const closeWizard = () => setWizardStep(0);
 
-  const startForm = () => {
+  const startForm = (preset?: { tipo: string; area: string; clienteId: string; osId?: string; contratoId?: string }) => {
+    const tipo = preset?.tipo || wTipo;
+    const area = preset?.area || wArea;
+    const clienteId = preset?.clienteId || wClienteId;
+    const osId = preset?.osId || wOsId;
+    const contratoId = preset?.contratoId || wContratoId;
     // Resolve o template pela combinação Tipo + Área.
     const loaded =
-      templates.find((t) => t.schema.tipo === wTipo && (t.schema.area || 'SDAI') === wArea) || null;
+      templates.find((t) => t.schema.tipo === tipo && (t.schema.area || 'SDAI') === area) || null;
     if (!loaded) return;
     const areaTemplate = (loaded.schema.area as Device['sistema']) || 'SDAI';
     setFormTemplate(loaded.schema);
     setFormTemplateId(loaded.id);
-    setFormCliente(clients.find((c) => c.id === wClienteId));
-    setFormContext({ osId: wOsId || undefined, contratoId: wContratoId || undefined });
+    setFormCliente(clients.find((c) => c.id === clienteId));
+    setFormContext({ osId: osId || undefined, contratoId: contratoId || undefined });
     // Preventiva: carrega o inventário do cliente, garante o ciclo de amostragem
     // vigente e semeia apenas a fatia da visita (dispositivos há mais tempo sem
     // teste). Outros tipos não usam devices/ciclo.
@@ -590,20 +595,20 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     setFormAreaDevices([]);
     // Corretiva: carrega os dispositivos da ÁREA escolhida (filtro por sistema),
     // que alimentam "dispositivos afetados". Ativos apenas.
-    if (loaded.schema.tipo === 'CORRETIVA' && wClienteId) {
-      fetchDevices(wClienteId)
+    if (loaded.schema.tipo === 'CORRETIVA' && clienteId) {
+      fetchDevices(clienteId)
         .then((ds) => setFormAreaDevices(ds.filter((d) => d.status === 'ativo' && d.sistema === areaTemplate)))
         .catch(() => setFormAreaDevices([]));
     }
-    if (loaded.schema.tipo === 'PREVENTIVA' && wClienteId) {
+    if (loaded.schema.tipo === 'PREVENTIVA' && clienteId) {
       (async () => {
         try {
-          const ativos = (await fetchDevices(wClienteId)).filter((d) => d.status === 'ativo');
+          const ativos = (await fetchDevices(clienteId)).filter((d) => d.status === 'ativo');
           if (ativos.length === 0) return;
           // Periodicidade/amostragem só quando há contrato COM ciclo já definido.
           // Preventiva avulsa (sem contrato) não impõe periodicidade: lista todos
           // os dispositivos ativos, sem amostragem.
-          const ciclo = wContratoId ? await fetchCicloAtivo(wClienteId) : null;
+          const ciclo = contratoId ? await fetchCicloAtivo(clienteId) : null;
           if (ciclo) {
             const quota = quotaPorVisita(ciclo);
             const amostra = [...ativos]
@@ -623,6 +628,18 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     }
     setWizardStep(0);
     setMode('form');
+  };
+
+  const iniciarAtendimentoDaOs = (os: OrdemServico) => {
+    if (!os.clienteId) {
+      alert('Esta OS não possui cliente vinculado. Complete o cadastro antes de iniciar o atendimento.');
+      return;
+    }
+    // OSs legadas ainda não possuem área própria. Inferimos pelo título apenas
+    // como compatibilidade e usamos SDAI como padrão seguro para corretivas.
+    const titulo = `${os.titulo || ''} ${os.descricao || ''}`.toUpperCase();
+    const area = titulo.includes('CFTV') ? 'CFTV' : titulo.includes('ACESSO') ? 'CONTROLE_ACESSO' : titulo.includes('BMS') ? 'BMS' : titulo.includes('ALARME') ? 'ALARME' : 'SDAI';
+    startForm({ tipo: 'CORRETIVA', area, clienteId: os.clienteId, osId: os.id, contratoId: os.contratoId });
   };
 
   // Catálogo do formulário: base + pendências aprovadas do cliente escolhido
@@ -1052,9 +1069,9 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         onGenerated={refresh}
       />
 
-      {/* Alternância Relatórios / Pendências */}
+      {/* Central de operação: o atendimento é o ponto de entrada principal em campo. */}
       <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 w-fit">
-        {(['relatorios', 'pendencias'] as const).map((b) => (
+        {(['atendimentos', 'relatorios', 'pendencias'] as const).map((b) => (
           <button
             key={b}
             onClick={() => setBoard(b)}
@@ -1062,10 +1079,38 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
               board === b ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            {b === 'relatorios' ? 'Relatórios' : 'Pendências'}
+            {b === 'atendimentos' ? 'Meus atendimentos' : b === 'relatorios' ? 'Relatórios' : 'Pendências'}
           </button>
         ))}
       </div>
+
+      {board === 'atendimentos' && (
+        <div className="space-y-3">
+          <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-xs text-indigo-900 flex items-center gap-2">
+            <span className="material-symbols-outlined">engineering</span>
+            <span><strong>Atendimento de campo.</strong> Escolha uma OS para abrir a corretiva já vinculada, sem redigitar cliente ou contexto.</span>
+          </div>
+          {ordens.filter((os) => ['aberta', 'agendada', 'em_execucao'].includes(os.status)).length === 0 ? (
+            <EmptyState variant="relatorio" title="Nenhum atendimento aberto" description="As Ordens de Serviço abertas aparecerão aqui para início rápido." />
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {ordens.filter((os) => ['aberta', 'agendada', 'em_execucao'].includes(os.status)).map((os) => {
+                const cliente = clients.find((c) => c.id === os.clienteId);
+                return (
+                  <article key={os.id} className="rounded-xl bg-white border border-slate-200 shadow-sm p-4 flex flex-col gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-11 h-11 shrink-0 rounded-xl bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center"><span className="material-symbols-outlined">business</span></div>
+                      <div className="min-w-0 flex-1"><p className="font-bold text-slate-900 truncate">{cliente?.name || 'Cliente não identificado'}</p><p className="text-[11px] text-slate-500 mt-0.5">{os.numero || os.id.slice(0, 8)} · Corretiva · {os.status.replace('_', ' ')}</p><p className="text-xs text-slate-600 mt-1 line-clamp-2">{os.titulo || `${os.pendenciaIds.length} pendência(s) vinculada(s)`}</p></div>
+                    </div>
+                    <button onClick={() => iniciarAtendimentoDaOs(os)} className="min-h-12 rounded-lg bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-bold uppercase tracking-wide flex items-center justify-center gap-2"><span className="material-symbols-outlined text-base">play_arrow</span>Iniciar atendimento</button>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+          <button onClick={openWizard} className="min-h-11 px-4 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold uppercase">Atendimento avulso</button>
+        </div>
+      )}
 
       {board === 'pendencias' && (
         <PendenciasBoard
@@ -1509,7 +1554,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
               )}
               {wizardStep === 3 && (
                 <button
-                  onClick={startForm}
+                  onClick={() => startForm()}
                   className="px-5 py-2 rounded-lg bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold uppercase tracking-wide"
                 >
                   Iniciar relatório
