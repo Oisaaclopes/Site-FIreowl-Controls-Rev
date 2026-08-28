@@ -54,6 +54,63 @@ export interface PedidoEquipmentItem {
   /** Classificação do item na proposta. Ausente = material (compatibilidade). */
   tipo?: 'material' | 'servico';
   precoUnitario?: number;
+  /** Origem técnica preservada internamente quando o item veio de levantamento. */
+  sourceOrigins?: TechnicalOrigin[];
+  /** Fotografia do saldo no momento da preparação; não reserva nem baixa estoque. */
+  stockSnapshot?: number;
+}
+
+export interface TechnicalOrigin {
+  type: 'finding' | 'device_failure' | 'structural_issue' | 'measurement' | 'general' | 'pending';
+  reportId: string;
+  reference?: string;
+  label: string;
+  quantity: number;
+}
+
+export interface RequiredMaterial {
+  id: string;
+  reportId: string;
+  catalogItemId?: string;
+  descricao: string;
+  marca?: string;
+  modelo?: string;
+  quantidade: number;
+  unidade: string;
+  observacao?: string;
+  origem: TechnicalOrigin;
+}
+
+export interface RequiredService {
+  id: string;
+  reportId: string;
+  serviceId?: string;
+  descricao: string;
+  quantidade: number;
+  unidade: string;
+  observacao?: string;
+  origem: TechnicalOrigin;
+}
+
+export interface SurveyMeasurement {
+  id: string;
+  reportId: string;
+  categoria: string;
+  descricao: string;
+  quantidade: number;
+  unidade: string;
+  local?: string;
+  observacao?: string;
+  catalogItemId?: string;
+  incluirNoPedido: boolean;
+  origem?: TechnicalOrigin;
+}
+
+export interface SurveyOrderLink {
+  id: string;
+  reportId: string;
+  pedidoId: string;
+  criadoEm?: string;
 }
 
 export interface PedidoBrand {
