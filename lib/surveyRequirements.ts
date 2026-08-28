@@ -24,6 +24,18 @@ export async function fetchSurveyOrderLinks(reportId: string): Promise<SurveyOrd
   return (data || []).map((r: any) => ({ id: r.id, reportId: r.report_id, pedidoId: r.pedido_id, criadoEm: r.created_at }));
 }
 
+/** Registra o vínculo de rastreabilidade depois que o Pedido foi criado. */
+export async function createSurveyOrderLink(reportId: string, pedidoId: string): Promise<SurveyOrderLink> {
+  const sb = getSupabaseClient() as any;
+  const { data, error } = await sb
+    .from('report_order_links')
+    .upsert({ report_id: reportId, pedido_id: pedidoId }, { onConflict: 'report_id,pedido_id' })
+    .select()
+    .single();
+  if (error) throw error;
+  return { id: data.id, reportId: data.report_id, pedidoId: data.pedido_id, criadoEm: data.created_at };
+}
+
 /** Materializa as respostas estruturadas do FormEngine. Não toca estoque. */
 export async function replaceSurveyRequirements(reportId: string, answers: { fieldKey: string; valor: unknown }[]): Promise<void> {
   const sb = getSupabaseClient() as any;
@@ -31,8 +43,19 @@ export async function replaceSurveyRequirements(reportId: string, answers: { fie
   const materials = Array.isArray(cards('materiais_necessarios')) ? cards('materiais_necessarios') as Record<string, unknown>[] : [];
   const services = Array.isArray(cards('servicos_necessarios')) ? cards('servicos_necessarios') as Record<string, unknown>[] : [];
   const measurements = Array.isArray(cards('medicoes')) ? cards('medicoes') as Record<string, unknown>[] : [];
-  await Promise.all(['report_required_materials', 'report_required_services', 'report_measurements'].map((table) => sb.from(table).delete().eq('report_id', reportId)));
-  if (materials.length) await sb.from('report_required_materials').insert(materials.map((c) => ({ report_id: reportId, catalog_item_id: c.item_catalogo_id || null, descricao: String(c.item || c.descricao || 'Material'), marca: c.marca || null, modelo: c.modelo || null, quantidade: Number(c.quantidade) || 1, unidade: c.unidade || 'un', observacao: c.observacao || null, source_type: c.source_type || 'general', source_reference: c.source_reference || null, source_label: c.source_label || 'Necessidade geral' })));
-  if (services.length) await sb.from('report_required_services').insert(services.map((c) => ({ report_id: reportId, service_id: c.service_id || null, descricao: String(c.servico || c.descricao || 'Serviço'), quantidade: Number(c.quantidade) || 1, unidade: c.unidade || 'un', observacao: c.observacao || null, source_type: c.source_type || 'general', source_reference: c.source_reference || null, source_label: c.source_label || 'Necessidade geral' })));
-  if (measurements.length) await sb.from('report_measurements').insert(measurements.map((c) => ({ report_id: reportId, categoria: c.categoria || 'outro', descricao: String(c.descricao || 'Medição'), quantidade: Number(c.quantidade) || 0, unidade: c.unidade || 'm', local: c.local || null, observacao: c.observacao || null, catalog_item_id: c.item_catalogo_id || null, incluir_no_pedido: c.incluir_no_pedido === true || c.incluir_no_pedido === 'Sim', source_type: c.source_type || null, source_reference: c.source_reference || null, source_label: c.source_label || null })));
+  const deletions = await Promise.all(['report_required_materials', 'report_required_services', 'report_measurements'].map((table) => sb.from(table).delete().eq('report_id', reportId)));
+  const deletionError = deletions.find((r: any) => r.error)?.error;
+  if (deletionError) throw deletionError;
+  if (materials.length) {
+    const { error } = await sb.from('report_required_materials').insert(materials.map((c) => ({ report_id: reportId, catalog_item_id: c.item_catalogo_id || null, descricao: String(c.item || c.descricao || 'Material'), marca: c.marca || null, modelo: c.modelo || null, quantidade: Number(c.quantidade) || 1, unidade: c.unidade || 'un', observacao: c.observacao || null, source_type: c.source_type || 'general', source_reference: c.source_reference || null, source_label: c.source_label || 'Necessidade geral' })));
+    if (error) throw error;
+  }
+  if (services.length) {
+    const { error } = await sb.from('report_required_services').insert(services.map((c) => ({ report_id: reportId, service_id: c.service_id || null, descricao: String(c.servico || c.descricao || 'Serviço'), quantidade: Number(c.quantidade) || 1, unidade: c.unidade || 'un', observacao: c.observacao || null, source_type: c.source_type || 'general', source_reference: c.source_reference || null, source_label: c.source_label || 'Necessidade geral' })));
+    if (error) throw error;
+  }
+  if (measurements.length) {
+    const { error } = await sb.from('report_measurements').insert(measurements.map((c) => ({ report_id: reportId, categoria: c.categoria || 'outro', descricao: String(c.descricao || 'Medição'), quantidade: Number(c.quantidade) || 0, unidade: c.unidade || 'm', local: c.local || null, observacao: c.observacao || null, catalog_item_id: c.item_catalogo_id || null, incluir_no_pedido: c.incluir_no_pedido === true || c.incluir_no_pedido === 'Sim', source_type: c.source_type || null, source_reference: c.source_reference || null, source_label: c.source_label || null })));
+    if (error) throw error;
+  }
 }

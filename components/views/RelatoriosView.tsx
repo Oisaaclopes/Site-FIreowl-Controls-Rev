@@ -33,6 +33,7 @@ import { gerarPdfExecucao } from '@/lib/reportPdf';
 import { ReportTechnicalPDFView } from '@/components/documentos/ReportTechnicalPDFView';
 import { NovaProposta } from '@/components/reports/NovaProposta';
 import { PendenciasBoard } from '@/components/reports/PendenciasBoard';
+import { createOrderFromSurvey } from '@/lib/surveyOrderConversion';
 
 /** Template disponível ao motor: o schema + o id no banco (quando veio do DB). */
 interface LoadedTemplate {
@@ -168,6 +169,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const [board, setBoard] = useState<'atendimentos' | 'relatorios' | 'pendencias'>('atendimentos');
   // Pré-visualização do PDF técnico (react-pdf). Fallback = método HTML antigo.
   const [reportPreview, setReportPreview] = useState<ReportInstance | null>(null);
+  const [creatingOrderFromReport, setCreatingOrderFromReport] = useState<string | null>(null);
   const [showProposta, setShowProposta] = useState(false);
   const [reports, setReports] = useState<ReportInstance[]>([]);
   const [pendencias, setPendencias] = useState<Pendencia[]>([]);
@@ -181,6 +183,25 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const [fTipo, setFTipo] = useState<string>('TODOS');
   const [fStatus, setFStatus] = useState<string>('TODOS');
   const [search, setSearch] = useState('');
+
+  const handleCreateOrderFromSurvey = async (report: ReportInstance) => {
+    setCreatingOrderFromReport(report.id);
+    try {
+      const result = await createOrderFromSurvey(report.id);
+      const warning = result.warnings.length
+        ? `\n\nRevise antes de enviar:\n• ${result.warnings.join('\n• ')}`
+        : '';
+      alert(result.alreadyExists
+        ? `Este levantamento já está vinculado ao Pedido ${result.pedido.numeroPedido}.`
+        : `Pedido ${result.pedido.numeroPedido} criado como rascunho.${warning}`);
+      refresh();
+    } catch (error) {
+      console.error('Falha ao criar pedido a partir do levantamento:', error);
+      alert(error instanceof Error ? error.message : 'Não foi possível criar o Pedido.');
+    } finally {
+      setCreatingOrderFromReport(null);
+    }
+  };
 
   // Wizard "+ Novo relatório"
   const [wizardStep, setWizardStep] = useState<0 | 1 | 2 | 3>(0);
@@ -1240,6 +1261,16 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                           <span className="material-symbols-outlined text-lg">picture_as_pdf</span>
                         </button>
                       )}
+                      {canManage && r.tipo === 'LEVANTAMENTO' && r.status === 'finalizado' && (
+                        <button
+                          onClick={() => handleCreateOrderFromSurvey(r)}
+                          disabled={creatingOrderFromReport === r.id}
+                          title="Criar pedido a partir das necessidades deste levantamento"
+                          className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#1A1A72] hover:bg-indigo-50 disabled:opacity-50 transition-colors"
+                        >
+                          <span className={`material-symbols-outlined text-lg ${creatingOrderFromReport === r.id ? 'animate-spin' : ''}`}>{creatingOrderFromReport === r.id ? 'progress_activity' : 'request_quote'}</span>
+                        </button>
+                      )}
                       {canManage && (
                         <>
                           <button
@@ -1293,6 +1324,16 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                       className="w-8 h-8 -my-1 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#E63946] hover:bg-red-50 transition-colors"
                     >
                       <span className="material-symbols-outlined text-lg">picture_as_pdf</span>
+                    </button>
+                  )}
+                  {canManage && r.tipo === 'LEVANTAMENTO' && r.status === 'finalizado' && (
+                    <button
+                      onClick={() => handleCreateOrderFromSurvey(r)}
+                      disabled={creatingOrderFromReport === r.id}
+                      title="Criar pedido deste levantamento"
+                      className="w-8 h-8 -my-1 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#1A1A72] hover:bg-indigo-50 disabled:opacity-50"
+                    >
+                      <span className={`material-symbols-outlined text-lg ${creatingOrderFromReport === r.id ? 'animate-spin' : ''}`}>{creatingOrderFromReport === r.id ? 'progress_activity' : 'request_quote'}</span>
                     </button>
                   )}
                   {canManage && (

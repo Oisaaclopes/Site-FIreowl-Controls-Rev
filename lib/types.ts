@@ -151,6 +151,13 @@ export interface CommercialProposalData {
    * migração de coluna). Usado para escolher o documento padrão ao gerar PDF.
    */
   pedidoTipo?: PedidoTipo;
+  /** Rastreabilidade do levantamento que originou este pedido (uso interno). */
+  surveyOrigin?: {
+    reportId: string;
+    reportNumber?: string;
+    reportArea?: string;
+    createdAt: string;
+  };
   /** Dados do recebimento quando a proposta é concluída (à vista/parcelado). */
   recebimento?: RecebimentoProposta;
   /** Documento Personalizado: título e campos livres (rótulo + valor). */
