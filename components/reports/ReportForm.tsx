@@ -170,15 +170,43 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   const [persistErr, setPersistErr] = useState<string | null>(null);
   const [savedInfo, setSavedInfo] = useState<{ reportId: string; count: number } | null>(null);
   const [offlineSaved, setOfflineSaved] = useState(false);
+  // Navegação em passos (uma seção por tela — modo campo).
+  const [currentIdx, setCurrentIdx] = useState(0);
   const [modoCampo, setModoCampo] = useState<'rapido' | 'completo'>(fieldMode);
+  const [pausado, setPausado] = useState(false);
+  const [rascunhoRestaurado, setRascunhoRestaurado] = useState(false);
   const [iniciadoEm] = useState(() => Date.now());
   const [agora, setAgora] = useState(() => Date.now());
 
+  const rascunhoKey = `fireowl_atendimento_rascunho:${template.codigo}:${cliente?.id || 'sem_cliente'}:${contexto?.osId || 'avulso'}`;
+
+  // Rascunho local de respostas: permite sair/retomar o atendimento mesmo
+  // antes da finalização. Mídias continuam sob gestão do registro de fotos e
+  // do bundle offline, que só é consolidado ao finalizar.
   useEffect(() => {
-    if (modoCampo !== 'rapido') return;
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem(rascunhoKey);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { values?: FormValues; currentIdx?: number };
+      if (saved.values) setValues((prev) => ({ ...saved.values, ...prev }));
+      if (typeof saved.currentIdx === 'number') setCurrentIdx(saved.currentIdx);
+      setRascunhoRestaurado(true);
+    } catch { /* rascunho inválido não bloqueia o atendimento */ }
+  // A chave representa um novo contexto de atendimento.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rascunhoKey]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try { window.localStorage.setItem(rascunhoKey, JSON.stringify({ values, currentIdx })); } catch { /* espaço/localStorage indisponível */ }
+  }, [rascunhoKey, values, currentIdx]);
+
+  useEffect(() => {
+    if (modoCampo !== 'rapido' || pausado) return;
     const timer = window.setInterval(() => setAgora(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, [modoCampo]);
+  }, [modoCampo, pausado]);
 
   // Estado da bandeja de fotos não classificadas (Seção 3.1)
   const [unclassifiedPhotos, setUnclassifiedPhotos] = useState<UnclassifiedPhoto[]>([]);
@@ -235,7 +263,6 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   }, [pendenciasAprovadas, template]);
 
   // Navegação em passos (uma seção por tela — modo campo, Partes 4.7/8)
-  const [currentIdx, setCurrentIdx] = useState(0);
   const [showPend, setShowPend] = useState(false);
   const [sectionErr, setSectionErr] = useState<string | null>(null);
   const camInputRef = React.useRef<HTMLInputElement>(null);
@@ -609,6 +636,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
     }
     if (!isSupabaseConfigured()) {
       setFinalized(true);
+      try { window.localStorage.removeItem(rascunhoKey); } catch { /* noop */ }
       onConsumeMaterials?.(collectConsumedMaterials(), { clienteNome: cliente?.name });
       return;
     }
@@ -644,6 +672,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       setOfflineSaved(!syncedNow);
       setSavedInfo({ reportId: syncedNow ? '' : bundle.clientUuid, count: bundle.pendCount });
       setFinalized(true);
+      try { window.localStorage.removeItem(rascunhoKey); } catch { /* noop */ }
       onSaved();
       // Baixa de estoque dos materiais aplicados (Corretiva).
       onConsumeMaterials?.(collectConsumedMaterials(), { numero: bundle.report.numero, clienteNome: cliente?.name });
@@ -697,6 +726,11 @@ export const ReportForm: React.FC<ReportFormProps> = ({
           <p className="text-sm font-bold text-slate-900 truncate">{tituloOperacional}</p>
         </div>
         {modoCampo === 'rapido' && <span className="font-data-mono text-xs font-bold text-[#1A1A72] shrink-0">{cronometro}</span>}
+        {modoCampo === 'rapido' && (
+          <button onClick={() => setPausado((v) => !v)} className={`min-h-9 px-2 rounded-lg text-[10px] font-bold uppercase shrink-0 ${pausado ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>
+            {pausado ? 'Retomar' : 'Pausar'}
+          </button>
+        )}
         <span
           title={geoInicio ? `${geoInicio.lat?.toFixed(5)}, ${geoInicio.lng?.toFixed(5)} (±${Math.round(geoInicio.accuracy || 0)} m)` : 'GPS indisponível'}
           className={`text-[10px] inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full font-semibold shrink-0 ${geoInicio ? 'text-[#1A1A72] bg-[#1A1A72]/5' : 'text-slate-400 bg-slate-100'}`}
@@ -709,6 +743,12 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       <div className="h-1 bg-slate-100 sticky top-[calc(4rem+57px)] z-20">
         <div className="h-full bg-[#1A1A72] transition-all" style={{ width: `${progresso}%` }} />
       </div>
+
+      {(pausado || rascunhoRestaurado) && (
+        <div className={`px-4 py-2 text-[11px] font-semibold ${pausado ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-800'}`}>
+          {pausado ? 'Atendimento pausado — o progresso está salvo neste aparelho.' : 'Rascunho recuperado — continue de onde parou.'}
+        </div>
+      )}
 
       {template.tipo === 'CORRETIVA' && (
         <div className="sticky top-[calc(4rem+61px)] z-20 bg-white border-b border-slate-100 px-4 py-2 flex items-center justify-between gap-3">
