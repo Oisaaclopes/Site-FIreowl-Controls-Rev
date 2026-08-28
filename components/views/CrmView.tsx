@@ -429,10 +429,10 @@ export const CrmView: React.FC<CrmViewProps> = ({
                     key={client.id}
                     onClick={() => setSelectedClientDetail(client)}
                     leading={client.logoPath && clientLogoUrls[client.logoPath] ? (
-                      <span className="w-10 h-10 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0 p-1 overflow-hidden">
+                      <span className="w-14 h-14 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 p-1.5 overflow-hidden">
                         {/* eslint-disable-next-line @next/next/no-img-element */}<img src={clientLogoUrls[client.logoPath]} alt={`Logo ${nomeFantasiaCliente(client.name)}`} className="w-full h-full object-contain" />
                       </span>
-                    ) : <span className="w-10 h-10 rounded-lg bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0"><span className="material-symbols-outlined text-lg">domain</span></span>}
+                    ) : <span className="w-14 h-14 rounded-xl bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0"><span className="material-symbols-outlined text-xl">domain</span></span>}
                     title={<span className="uppercase">{nomeFantasiaCliente(client.name)}</span>}
                     meta={
                       <>

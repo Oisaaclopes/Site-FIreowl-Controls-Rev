@@ -680,7 +680,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
       >
         {/* Bloco esquerdo */}
         <div className="min-w-0 flex items-center gap-3">
-          {clientLogo ? <span className="w-10 h-10 rounded-lg bg-white border border-slate-200 p-1 shrink-0"><img src={clientLogo} alt={`Logo ${nomeFantasiaCliente(ped.clienteNome)}`} className="w-full h-full object-contain" /></span> : <span className="w-10 h-10 rounded-lg bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0"><span className="material-symbols-outlined text-lg">domain</span></span>}
+          {clientLogo ? <span className="w-14 h-14 rounded-xl bg-white border border-slate-200 p-1.5 shrink-0"><img src={clientLogo} alt={`Logo ${nomeFantasiaCliente(ped.clienteNome)}`} className="w-full h-full object-contain" /></span> : <span className="w-14 h-14 rounded-xl bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0"><span className="material-symbols-outlined text-xl">domain</span></span>}
           <div className="min-w-0"><p className="text-[11px] text-slate-400 font-data-mono">
             nº {num} - {ano}
           </p>
@@ -1081,7 +1081,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
               {filteredOS.map((p) => (
                 <DataListRow
                   key={p.id}
-                  leading={(() => { const client = clients.find((item) => item.id === p.clientId || item.name === p.clientName); const logo = client?.logoPath ? clientLogoUrls[client.logoPath] : undefined; return logo ? <span className="w-10 h-10 rounded-lg bg-white border border-slate-200 p-1 shrink-0"><img src={logo} alt={`Logo ${nomeFantasiaCliente(p.clientName)}`} className="w-full h-full object-contain" /></span> : <span className="w-10 h-10 rounded-lg bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0"><Wrench className="w-5 h-5" /></span>; })()}
+                  leading={(() => { const client = clients.find((item) => item.id === p.clientId || item.name === p.clientName); const logo = client?.logoPath ? clientLogoUrls[client.logoPath] : undefined; return logo ? <span className="w-14 h-14 rounded-xl bg-white border border-slate-200 p-1.5 shrink-0"><img src={logo} alt={`Logo ${nomeFantasiaCliente(p.clientName)}`} className="w-full h-full object-contain" /></span> : <span className="w-14 h-14 rounded-xl bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0"><Wrench className="w-6 h-6" /></span>; })()}
                   title={<span className="text-sm">{p.title || 'Ordem de serviço sem título'}</span>}
                   meta={
                     <>
