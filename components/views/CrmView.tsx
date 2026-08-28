@@ -12,6 +12,9 @@ import {
   TabPath,
   PartnerBrand,
   Supplier,
+  UserRole,
+  ReportInstance,
+  Pendencia,
 } from '@/lib/types';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
 import { usePrivacy } from '@/lib/privacy';
@@ -21,6 +24,9 @@ import { fetchCnpjData } from '@/lib/cnpj';
 import { uploadClientFachada, uploadClientLogo, removePropostaCapa } from '@/lib/propostaCapa';
 import { nomeFantasiaCliente } from '@/lib/utils';
 import { resolveLogoDataUrls } from '@/lib/institucional';
+import { fetchReports } from '@/lib/reports';
+import { fetchPendencias } from '@/lib/pendencias';
+import { isSupabaseConfigured } from '@/lib/inventory';
 
 interface CrmViewProps {
   clients: Client[];
@@ -37,6 +43,7 @@ interface CrmViewProps {
   onAddOS: (os: PedidoOS) => void;
   onSelectClientForReport?: (clientName: string) => void;
   onNavigateToTab?: (tab: TabPath) => void;
+  userRole?: UserRole;
 }
 
 const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -86,6 +93,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
   onAddClient,
   onSelectClientForReport,
   onNavigateToTab,
+  userRole = 'ADMINISTRATIVO',
 }) => {
   const { maskMoney } = usePrivacy();
   // O CRM não clona o menu lateral: mostra só a base de Clientes. (Estoque,
@@ -887,6 +895,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
             setSelectedClientDetail(null);
             onNavigateToTab?.(tab);
           }}
+          userRole={userRole}
         />
       )}
     </div>
@@ -910,6 +919,7 @@ interface ClientDetailProps {
   onEditClient?: (c: Client) => void;
   onOpenReport: (name: string) => void;
   onNavigateToTab: (tab: TabPath) => void;
+  userRole: UserRole;
 }
 
 const ClientDetail: React.FC<ClientDetailProps> = ({
@@ -927,8 +937,19 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
   onEditClient,
   onOpenReport,
   onNavigateToTab,
+  userRole,
 }) => {
   const [showDevices, setShowDevices] = useState(false);
+  const [clientReports, setClientReports] = useState<ReportInstance[]>([]);
+  const [clientPendencias, setClientPendencias] = useState<Pendencia[]>([]);
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    let alive = true;
+    Promise.all([fetchReports({ clienteId: client.id }), fetchPendencias(userRole, { clienteId: client.id })])
+      .then(([reports, pendencias]) => { if (alive) { setClientReports(reports); setClientPendencias(pendencias); } })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [client.id, userRole]);
   const data = useMemo(() => {
     const belongsPedido = (p: Pedido) => p.clienteId === client.id || norm(p.clienteNome) === norm(client.name);
     const belongsOS = (o: PedidoOS) => o.clientId === client.id || norm(o.clientName) === norm(client.name);
@@ -1080,6 +1101,13 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
             {data.osRealizadas.length + data.osAndamento.length + data.osCanceladas.length === 0 && (
               <EmptyLine text="Nenhuma ordem de serviço para este cliente." />
             )}
+          </Section>
+
+          <Section title={`Histórico técnico (${clientReports.length} relatórios · ${clientPendencias.length} pendências)`} icon="history" onAction={() => onNavigateToTab('relatorios')} actionLabel="Ver relatórios">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div className="border border-slate-100 rounded-lg p-3"><p className="text-[10px] font-bold uppercase text-slate-400 mb-2">Relatórios</p>{clientReports.length ? clientReports.slice(0, 4).map((report) => <div key={report.id} className="py-1.5 border-b border-slate-50 last:border-0"><p className="font-semibold text-slate-800 truncate">{report.titulo || report.numero || report.tipo}</p><p className="text-[10px] text-slate-400">{report.tipo} · {report.status}</p></div>) : <p className="text-xs text-slate-400">Nenhum relatório disponível.</p>}</div>
+              <div className="border border-slate-100 rounded-lg p-3"><p className="text-[10px] font-bold uppercase text-slate-400 mb-2">Pendências</p>{clientPendencias.length ? clientPendencias.slice(0, 4).map((pendencia) => <div key={pendencia.id} className="py-1.5 border-b border-slate-50 last:border-0"><p className="font-semibold text-slate-800 truncate">{pendencia.descricao || pendencia.grupo || 'Pendência técnica'}</p><p className="text-[10px] text-slate-400">{pendencia.status}</p></div>) : <p className="text-xs text-slate-400">Nenhuma pendência disponível.</p>}</div>
+            </div>
           </Section>
 
           {/* Receitas */}

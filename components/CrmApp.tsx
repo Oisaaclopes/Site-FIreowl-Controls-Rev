@@ -931,6 +931,7 @@ export function CrmApp({
               onAddOS={handleAddOS}
               onSelectClientForReport={handleSelectClientForReport}
               onNavigateToTab={setCurrentTab}
+              userRole={userRole}
             />
           )}
 
