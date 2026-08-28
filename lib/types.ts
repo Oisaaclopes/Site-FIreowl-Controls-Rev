@@ -21,6 +21,8 @@ export type PedidoStatus =
   | 'em_revisao'
   | 'aprovado_interno'
   | 'enviado_ao_cliente'
+  | 'visualizado_cliente'
+  | 'em_negociacao'
   | 'aceito'
   | 'concluido'
   | 'recusado'

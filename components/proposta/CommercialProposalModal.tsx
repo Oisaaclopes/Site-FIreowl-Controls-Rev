@@ -928,6 +928,8 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                   <option value="rascunho">Rascunho</option>
                   <option value="em_revisao">Em Revisão</option>
                   <option value="enviado_ao_cliente">Enviado ao Cliente</option>
+                  <option value="visualizado_cliente">Visualizado pelo Cliente</option>
+                  <option value="em_negociacao">Em Negociação</option>
                   <option value="aceito">Aceito</option>
                   <option value="concluido">Concluída / Recebida</option>
                 </select>

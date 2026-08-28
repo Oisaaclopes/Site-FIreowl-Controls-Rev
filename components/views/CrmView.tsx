@@ -65,7 +65,7 @@ const emptyContact = (): ContactForm => ({ name: '', role: '', phone: '', email:
 
 // Agrupamento de status de propostas
 const PROPOSAL_ACEITO: Pedido['status'][] = ['aceito'];
-const PROPOSAL_ABERTO: Pedido['status'][] = ['rascunho', 'em_revisao', 'aprovado_interno', 'enviado_ao_cliente'];
+const PROPOSAL_ABERTO: Pedido['status'][] = ['rascunho', 'em_revisao', 'aprovado_interno', 'enviado_ao_cliente', 'visualizado_cliente', 'em_negociacao'];
 const PROPOSAL_CANCELADO: Pedido['status'][] = ['recusado', 'expirado'];
 
 const proposalStatusLabel: Record<Pedido['status'], string> = {
@@ -73,6 +73,8 @@ const proposalStatusLabel: Record<Pedido['status'], string> = {
   em_revisao: 'Em revisão',
   aprovado_interno: 'Aprovado interno',
   enviado_ao_cliente: 'Enviado ao cliente',
+  visualizado_cliente: 'Visualizada pelo cliente',
+  em_negociacao: 'Em negociação',
   aceito: 'Aceito',
   concluido: 'Concluída / Recebida',
   recusado: 'Recusado',

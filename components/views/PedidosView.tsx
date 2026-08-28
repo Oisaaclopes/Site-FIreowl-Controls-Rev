@@ -84,6 +84,8 @@ const STATUS_META: Record<PedidoStatus, { label: string; color: string }> = {
   em_revisao: { label: 'Em Revisão', color: '#b45309' },
   aprovado_interno: { label: 'Aprovado Interno', color: '#1d4ed8' },
   enviado_ao_cliente: { label: 'Enviado ao Cliente', color: '#7e22ce' },
+  visualizado_cliente: { label: 'Visualizado', color: '#6d28d9' },
+  em_negociacao: { label: 'Em Negociação', color: '#c2410c' },
   aceito: { label: 'Aceito', color: '#047857' },
   concluido: { label: 'Concluída / Recebida', color: '#059669' },
   recusado: { label: 'Recusado', color: '#dc2626' },
@@ -92,7 +94,7 @@ const STATUS_META: Record<PedidoStatus, { label: string; color: string }> = {
 const STATUS_ORDER = Object.keys(STATUS_META) as PedidoStatus[];
 
 // Mini-cards do funil (ordem enxuta e representativa)
-const PIPELINE: PedidoStatus[] = ['rascunho', 'em_revisao', 'enviado_ao_cliente', 'aceito', 'concluido'];
+const PIPELINE: PedidoStatus[] = ['rascunho', 'em_revisao', 'enviado_ao_cliente', 'visualizado_cliente', 'em_negociacao', 'aceito', 'concluido'];
 
 const DEFAULT_STATUS_KEY = 'fireowl_pedidos_default_status';
 
