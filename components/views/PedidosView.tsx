@@ -673,9 +673,9 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
             nº {num} - {ano}
           </p>
           <p className="text-[11px] text-slate-400">{dataCurta(ped)}</p>
-          <p className="font-bold text-slate-900 truncate uppercase">{nomeFantasiaCliente(ped.clienteNome)}</p>
+          <p className="font-bold text-slate-900 text-sm truncate">{ped.referencia || 'Proposta comercial sem título'}</p>
+          <p className="text-[11px] text-[#1A1A72] font-semibold truncate">{nomeFantasiaCliente(ped.clienteNome)}</p>
           {nomeFantasiaCliente(ped.clienteNome) !== razaoSocialCliente(ped.clienteNome) && <p className="text-[10px] text-slate-400 truncate">{razaoSocialCliente(ped.clienteNome)}</p>}
-          {ped.referencia && <p className="text-[11px] text-slate-400 truncate">{ped.referencia}</p>}
         </div>
 
         {/* Bloco direito */}
@@ -1073,13 +1073,13 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                       <Wrench className="w-5 h-5" />
                     </span>
                   }
-                  title={<span className="uppercase">{nomeFantasiaCliente(p.clientName)}</span>}
+                  title={<span className="text-sm">{p.title || 'Ordem de serviço sem título'}</span>}
                   meta={
                     <>
+                      <span className="text-[#1A1A72] font-semibold">{nomeFantasiaCliente(p.clientName)}</span>
                       {nomeFantasiaCliente(p.clientName) !== razaoSocialCliente(p.clientName) && <span className="text-slate-400 truncate">{razaoSocialCliente(p.clientName)}</span>}
                       <RowMeta label="OS" value={<span className="font-data-mono">{p.id}</span>} />
                       <RowMeta label="Pedido" value={<span className="font-data-mono">{p.pedidoId}</span>} />
-                      <span className="text-slate-500">{p.title}</span>
                       <Badge color="slate">{p.type}</Badge>
                     </>
                   }
