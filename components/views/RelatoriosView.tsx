@@ -14,6 +14,7 @@ import {
   CicloAmostragem,
   CompanyProfile,
   Supplier,
+  Pedido,
 } from '@/lib/types';
 import { ALL_TEMPLATES, seedReportTemplates } from '@/lib/reportTemplatesData';
 import { TemplateSchema } from '@/lib/reportSchema';
@@ -34,6 +35,7 @@ import { ReportTechnicalPDFView } from '@/components/documentos/ReportTechnicalP
 import { NovaProposta } from '@/components/reports/NovaProposta';
 import { PendenciasBoard } from '@/components/reports/PendenciasBoard';
 import { createOrderFromSurvey } from '@/lib/surveyOrderConversion';
+import { fetchPedidos } from '@/lib/pedidos';
 
 /** Template disponível ao motor: o schema + o id no banco (quando veio do DB). */
 interface LoadedTemplate {
@@ -66,6 +68,8 @@ interface RelatoriosViewProps {
     materials: { nome: string; quantidade: number }[],
     contexto?: { numero?: string; clienteNome?: string }
   ) => void | Promise<void>;
+  /** Navega para a aba comercial ao consultar o Pedido originado no levantamento. */
+  onNavigateToPedidos?: () => void;
 }
 
 const uniq = (arr: string[]) => Array.from(new Set(arr.filter(Boolean)));
@@ -159,6 +163,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   onUpdateSupplier,
   onDeletePartnerBrand,
   onConsumeMaterials,
+  onNavigateToPedidos,
 }) => {
   const isTecnico = userRole === 'TECNICO';
   const isFinanceiro = userRole === 'FINANCEIRO';
@@ -172,6 +177,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const [creatingOrderFromReport, setCreatingOrderFromReport] = useState<string | null>(null);
   const [showProposta, setShowProposta] = useState(false);
   const [reports, setReports] = useState<ReportInstance[]>([]);
+  const [surveyOrders, setSurveyOrders] = useState<Pedido[]>([]);
   const [pendencias, setPendencias] = useState<Pendencia[]>([]);
   const [ordens, setOrdens] = useState<OrdemServico[]>([]);
   const [loading, setLoading] = useState(false);
@@ -425,15 +431,17 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   };
 
   const clientName = (id?: string) => clients.find((c) => c.id === id)?.name || '—';
+  const surveyOrderFor = (reportId: string) => surveyOrders.find((pedido) => pedido.proposal?.surveyOrigin?.reportId === reportId);
 
   const refresh = () => {
     if (!isSupabaseConfigured()) return;
     setLoading(true);
-    Promise.all([fetchReports(), fetchPendencias(userRole), fetchOrdensServico()])
-      .then(([rs, ps, os]) => {
+    Promise.all([fetchReports(), fetchPendencias(userRole), fetchOrdensServico(), fetchPedidos().catch(() => [])])
+      .then(([rs, ps, os, pedidos]) => {
         setReports(rs);
         setPendencias(ps);
         setOrdens(os);
+        setSurveyOrders(pedidos);
       })
       .catch((err) => console.warn('Relatórios: falha ao carregar.', err))
       .finally(() => setLoading(false));
@@ -1256,6 +1264,11 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                   <td className="py-3 px-4 text-center font-data-mono font-bold text-[#E63946]">{pendCountByReport[r.id] || 0}</td>
                   <td className="py-3 px-4">
                     <div className="flex items-center justify-center gap-1">
+                      {surveyOrderFor(r.id) && (
+                        <button onClick={onNavigateToPedidos} title="Abrir Pedido comercial" className="h-8 rounded-lg bg-indigo-50 px-2 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100">
+                          {surveyOrderFor(r.id)?.numeroPedido}
+                        </button>
+                      )}
                       {r.status === 'finalizado' && (
                         <button
                           onClick={() => setReportPreview(r)}
@@ -1313,6 +1326,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                 </span>
               </div>
               <p className="font-bold text-slate-900 text-sm uppercase truncate mt-1">{clientName(r.clienteId)}</p>
+              {surveyOrderFor(r.id) && <button onClick={onNavigateToPedidos} className="mt-1 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">Pedido: {surveyOrderFor(r.id)?.numeroPedido}</button>}
               <div className="flex items-center justify-between gap-2 mt-1.5">
                 <span className="text-[11px] text-slate-500 font-data-mono truncate">
                   {TIPO_LABEL[r.tipo] || r.tipo} · {fmtDate(r.finalizadoEm || r.iniciadoEm)}

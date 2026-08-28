@@ -1004,6 +1004,7 @@ export function CrmApp({
               onUpdateSupplier={handleUpdateSupplier}
               onDeletePartnerBrand={handleDeletePartnerBrand}
               onConsumeMaterials={handleConsumeReportMaterials}
+              onNavigateToPedidos={() => setCurrentTab('pedidos')}
             />
           )}
 
