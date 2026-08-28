@@ -382,11 +382,11 @@ export async function montarReportPdfData(
 
   const data = assembleReportPdfData({ report, answers, media, signatures, pendencias, cliente, companyProfile, nivel, urlOf });
   data.logoFireowlUrl = urlOf(logoFireowlPath);
-  // Capa: prioriza uma evidência do próprio atendimento; na ausência, usa a
-  // fachada já cadastrada do cliente. Nunca inventa ou busca imagem externa.
+  // Capa: a identidade visual do documento é a foto cadastrada do cliente.
+  // Fotos do atendimento só entram como alternativa para cadastros antigos
+  // que ainda não possuam fachada. Nunca inventa nem busca imagem externa.
   const evidenciaCapa = media.find((m) => m.tipo === 'geral' || m.tipo === 'evidencia') || media[0];
-  data.capaImagemUrl = evidenciaCapa
-    ? urlOf(evidenciaCapa.storagePathMarcado || evidenciaCapa.storagePathOriginal)
-    : urlOf(cliente?.fachadaPath);
+  data.capaImagemUrl = urlOf(cliente?.fachadaPath)
+    || (evidenciaCapa ? urlOf(evidenciaCapa.storagePathMarcado || evidenciaCapa.storagePathOriginal) : undefined);
   return data;
 }
