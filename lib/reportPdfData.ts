@@ -7,6 +7,7 @@ import { formatGeo } from './geo';
 import { nomeFantasiaCliente, slugArquivo } from './utils';
 import { ALL_TEMPLATES } from './reportTemplatesData';
 import { FieldSchema } from './reportSchema';
+import { verificationUrl } from './documentVerification';
 
 /**
  * Camada de dados do PDF de Relatório Técnico (react-pdf). NÃO altera o motor de
@@ -90,6 +91,8 @@ export interface ReportPdfData {
   contatoFireowl?: string;
   logoFireowlUrl?: string;
   capaImagemUrl?: string;
+  /** Link público de autenticidade impresso no QR do documento. */
+  verificationUrl?: string;
 }
 
 // ------------------------------ helpers puros ------------------------------
@@ -388,5 +391,6 @@ export async function montarReportPdfData(
   const evidenciaCapa = media.find((m) => m.tipo === 'geral' || m.tipo === 'evidencia') || media[0];
   data.capaImagemUrl = urlOf(cliente?.fachadaPath)
     || (evidenciaCapa ? urlOf(evidenciaCapa.storagePathMarcado || evidenciaCapa.storagePathOriginal) : undefined);
+  data.verificationUrl = verificationUrl('relatorio', report.id);
   return data;
 }

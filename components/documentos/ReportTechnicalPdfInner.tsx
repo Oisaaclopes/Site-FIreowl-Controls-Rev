@@ -6,6 +6,7 @@ import { ArrowLeft, Download, Printer } from 'lucide-react';
 import { ReportTechnicalDocument } from './ReportTechnicalDocument';
 import { montarReportPdfData, nomeArquivoRelatorio, ReportPdfData, ReportNivel } from '@/lib/reportPdfData';
 import { ReportInstance, Client, CompanyProfile, UserRole } from '@/lib/types';
+import { publishDocumentVerification } from '@/lib/documentVerification';
 
 interface Props {
   report: ReportInstance;
@@ -46,6 +47,17 @@ export default function ReportTechnicalPdfInner({ report, cliente, companyProfil
     if (!data || downloading) return;
     setDownloading(true);
     try {
+      // Publica só os metadados mínimos consultados pelo QR. Falhas não
+      // impedem a emissão do PDF (útil durante a aplicação da migração).
+      try {
+        await publishDocumentVerification({
+          type: 'relatorio', sourceId: report.id, number: data.numero,
+          clientName: data.clienteNome, issuedAt: data.dataFim || data.dataInicio,
+          status: report.status,
+        });
+      } catch (verificationError) {
+        console.warn('Não foi possível publicar a validação do relatório:', verificationError);
+      }
       const blob = await pdf(docFor(data)).toBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');

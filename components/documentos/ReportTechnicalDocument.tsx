@@ -1,6 +1,6 @@
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet, Image } from '@react-pdf/renderer';
-import { C, A4, BlueprintBg, Logo, PdfFooter, nv } from './pdfKit';
+import { C, A4, BlueprintBg, Logo, PdfFooter, QrCode, nv } from './pdfKit';
 import { ReportPdfData, RpCard, RpFoto } from '@/lib/reportPdfData';
 
 /**
@@ -225,6 +225,12 @@ export function ReportTechnicalDocument({ data }: { data: ReportPdfData }) {
               ) : null}
             </View>
             <Text style={{ color: C.s400, fontSize: 7.5, marginTop: 12 }}>{`${d.razaoSocial}${nv(d.cnpjFireowl) ? ` — CNPJ ${d.cnpjFireowl}` : ''}`}</Text>
+            {nv(d.verificationUrl) ? (
+              <View style={{ position: 'absolute', right: 0, bottom: 0, alignItems: 'center' }}>
+                <QrCode text={d.verificationUrl!} size={44} fg={C.navy} />
+                <Text style={{ color: C.s400, fontSize: 5.5, marginTop: 2 }}>AUTENTICIDADE</Text>
+              </View>
+            ) : null}
           </View>
         </View>
       </Page>
