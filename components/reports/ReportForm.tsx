@@ -253,11 +253,20 @@ export const ReportForm: React.FC<ReportFormProps> = ({
     chamado: 'Chamado', diagnostico: 'Diagnóstico', servico_executado: 'Execução', materiais: 'Execução',
     testes: 'Resultado', pendencias_residuais: 'Fotos', encerramento: 'Finalizar',
   };
+  const etapaPreventiva: Record<string, string> = { identificacao: 'Preparação', central: 'Central', dispositivos: 'Próximo dispositivo', sinalizacao: 'Sinalização', infraestrutura: 'Infraestrutura', pendencias: 'Pendências', encerramento: 'Finalizar' };
+  const etapaLevantamento: Record<string, string> = { identificacao: 'Ambiente', inventario: 'Equipamento', sistema: 'Condição', apontamentos: 'Registro', encerramento: 'Finalizar' };
   const tituloOperacional = modoCampo === 'rapido' && template.tipo === 'CORRETIVA'
     ? (etapaRapida[currentSection?.key || ''] || currentSection?.titulo || 'Atendimento')
-    : currentSection?.titulo || 'Relatório';
+    : modoCampo === 'rapido' && template.tipo === 'PREVENTIVA'
+      ? (etapaPreventiva[currentSection?.key || ''] || currentSection?.titulo || 'Preventiva')
+      : modoCampo === 'rapido' && template.tipo === 'LEVANTAMENTO'
+        ? (etapaLevantamento[currentSection?.key || ''] || currentSection?.titulo || 'Levantamento')
+      : currentSection?.titulo || 'Relatório';
   const duracao = Math.max(0, Math.floor((agora - iniciadoEm) / 1000));
   const cronometro = `${String(Math.floor(duracao / 3600)).padStart(2, '0')}:${String(Math.floor((duracao % 3600) / 60)).padStart(2, '0')}`;
+  const dispositivoField = template.secoes.flatMap((s) => s.campos).find((f) => f.tipo === 'checklist_dispositivos');
+  const cardsDispositivos = dispositivoField && Array.isArray(values[dispositivoField.key]) ? values[dispositivoField.key] as RepeaterCard[] : [];
+  const dispositivosTestados = cardsDispositivos.filter((card) => ['Aprovado', 'Reprovado'].includes(String(card.teste_funcional))).length;
 
   const goPrev = () => {
     setSectionErr(null);
@@ -711,6 +720,20 @@ export const ReportForm: React.FC<ReportFormProps> = ({
           <button onClick={() => setModoCampo((m) => m === 'rapido' ? 'completo' : 'rapido')} className="shrink-0 text-[10px] font-bold text-[#1A1A72] uppercase">
             {modoCampo === 'rapido' ? 'Mais detalhes' : 'Modo rápido'}
           </button>
+        </div>
+      )}
+
+      {template.tipo === 'PREVENTIVA' && modoCampo === 'rapido' && (
+        <div className="sticky top-[calc(4rem+61px)] z-20 bg-white border-b border-slate-100 px-4 py-2 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0"><span className="material-symbols-outlined">fact_check</span></div>
+          <div className="min-w-0 flex-1"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Progresso da preventiva</p><p className="text-sm font-bold text-slate-900">{dispositivosTestados} / {cardsDispositivos.length || devices?.length || 0} dispositivos testados</p></div>
+          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full">Próximo recomendado</span>
+        </div>
+      )}
+
+      {template.tipo === 'LEVANTAMENTO' && modoCampo === 'rapido' && (
+        <div className="sticky top-[calc(4rem+61px)] z-20 bg-white border-b border-slate-100 px-4 py-2 flex items-center gap-2 overflow-x-auto text-[10px] font-bold uppercase whitespace-nowrap">
+          {['Ambiente', 'Equipamento', 'Condição', 'Registro', 'Finalizar'].map((etapa) => <span key={etapa} className={`px-2 py-1 rounded-full ${tituloOperacional === etapa ? 'bg-[#1A1A72] text-white' : 'bg-slate-100 text-slate-400'}`}>{etapa}</span>)}
         </div>
       )}
 
