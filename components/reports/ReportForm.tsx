@@ -40,6 +40,8 @@ interface ReportFormProps {
   userRole: UserRole;
   currentUserName?: string;
   contexto?: { osId?: string; contratoId?: string };
+  /** Experiência de campo: simplifica a orientação sem alterar regras/dados. */
+  fieldMode?: 'rapido' | 'completo';
   /** Inventário do cliente — semeia o checklist_dispositivos (Preventiva). */
   devices?: Device[];
   /** Pendências aprovadas do cliente — semeiam o checklist_pendencias (Corretiva). */
@@ -149,6 +151,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   userRole,
   currentUserName = '',
   contexto,
+  fieldMode = 'completo',
   devices,
   pendenciasAprovadas,
   ciclo,
@@ -167,6 +170,15 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   const [persistErr, setPersistErr] = useState<string | null>(null);
   const [savedInfo, setSavedInfo] = useState<{ reportId: string; count: number } | null>(null);
   const [offlineSaved, setOfflineSaved] = useState(false);
+  const [modoCampo, setModoCampo] = useState<'rapido' | 'completo'>(fieldMode);
+  const [iniciadoEm] = useState(() => Date.now());
+  const [agora, setAgora] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (modoCampo !== 'rapido') return;
+    const timer = window.setInterval(() => setAgora(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [modoCampo]);
 
   // Estado da bandeja de fotos não classificadas (Seção 3.1)
   const [unclassifiedPhotos, setUnclassifiedPhotos] = useState<UnclassifiedPhoto[]>([]);
@@ -237,6 +249,15 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   const currentSection = visibleSections[idx];
   const stepTemplate = { ...template, secoes: currentSection ? [currentSection] : [] };
   const isLast = idx >= visibleSections.length - 1;
+  const etapaRapida: Record<string, string> = {
+    chamado: 'Chamado', diagnostico: 'Diagnóstico', servico_executado: 'Execução', materiais: 'Execução',
+    testes: 'Resultado', pendencias_residuais: 'Fotos', encerramento: 'Finalizar',
+  };
+  const tituloOperacional = modoCampo === 'rapido' && template.tipo === 'CORRETIVA'
+    ? (etapaRapida[currentSection?.key || ''] || currentSection?.titulo || 'Atendimento')
+    : currentSection?.titulo || 'Relatório';
+  const duracao = Math.max(0, Math.floor((agora - iniciadoEm) / 1000));
+  const cronometro = `${String(Math.floor(duracao / 3600)).padStart(2, '0')}:${String(Math.floor((duracao % 3600) / 60)).padStart(2, '0')}`;
 
   const goPrev = () => {
     setSectionErr(null);
@@ -657,15 +678,16 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         </div>
       )}
 
-      {/* Topo fixo: sair, bloco, progresso, geo */}
+      {/* Topo fixo: contexto operacional, progresso e geolocalização. */}
       <div className="sticky top-16 z-20 bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
         <button onClick={onBack} title="Sair" className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 shrink-0">
           <span className="material-symbols-outlined">arrow_back</span>
         </button>
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] text-slate-500 uppercase tracking-wider truncate">{template.nome} · {cliente?.name || ''}</p>
-          <p className="text-sm font-bold text-slate-900 truncate">{currentSection?.titulo || 'Relatório'}</p>
+          <p className="text-[10px] text-slate-500 uppercase tracking-wider truncate">{cliente?.name || ''} {contexto?.osId ? '· OS vinculada' : ''}</p>
+          <p className="text-sm font-bold text-slate-900 truncate">{tituloOperacional}</p>
         </div>
+        {modoCampo === 'rapido' && <span className="font-data-mono text-xs font-bold text-[#1A1A72] shrink-0">{cronometro}</span>}
         <span
           title={geoInicio ? `${geoInicio.lat?.toFixed(5)}, ${geoInicio.lng?.toFixed(5)} (±${Math.round(geoInicio.accuracy || 0)} m)` : 'GPS indisponível'}
           className={`text-[10px] inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full font-semibold shrink-0 ${geoInicio ? 'text-[#1A1A72] bg-[#1A1A72]/5' : 'text-slate-400 bg-slate-100'}`}
@@ -678,6 +700,19 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       <div className="h-1 bg-slate-100 sticky top-[calc(4rem+57px)] z-20">
         <div className="h-full bg-[#1A1A72] transition-all" style={{ width: `${progresso}%` }} />
       </div>
+
+      {template.tipo === 'CORRETIVA' && (
+        <div className="sticky top-[calc(4rem+61px)] z-20 bg-white border-b border-slate-100 px-4 py-2 flex items-center justify-between gap-3">
+          <div className="flex gap-1 overflow-x-auto text-[10px] font-bold uppercase whitespace-nowrap">
+            {['Chamado', 'Diagnóstico', 'Execução', 'Resultado', 'Fotos', 'Finalizar'].map((etapa) => (
+              <span key={etapa} className={`px-2 py-1 rounded-full ${tituloOperacional === etapa ? 'bg-[#1A1A72] text-white' : 'bg-slate-100 text-slate-400'}`}>{etapa}</span>
+            ))}
+          </div>
+          <button onClick={() => setModoCampo((m) => m === 'rapido' ? 'completo' : 'rapido')} className="shrink-0 text-[10px] font-bold text-[#1A1A72] uppercase">
+            {modoCampo === 'rapido' ? 'Mais detalhes' : 'Modo rápido'}
+          </button>
+        </div>
+      )}
 
       {/* Amostragem: mostrado na seção de dispositivos quando há ciclo vigente */}
       {ciclo && (currentSection?.campos || []).some((f) => f.tipo === 'checklist_dispositivos') && (

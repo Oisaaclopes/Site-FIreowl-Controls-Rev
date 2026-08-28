@@ -961,6 +961,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         devices={formDevices}
         pendenciasAprovadas={formPendAprovadas}
         ciclo={formCiclo}
+        fieldMode={formContext.osId && formTemplate.tipo === 'CORRETIVA' ? 'rapido' : 'completo'}
         onCreateCatalogo={(origem, name) => {
           // Marca nova → abre a janela de cadastro de marca (não cria nada solto).
           if (origem === 'marcas') {
