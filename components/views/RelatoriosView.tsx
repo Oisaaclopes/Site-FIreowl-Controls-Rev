@@ -1068,7 +1068,13 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       </div>
 
       {board === 'pendencias' && (
-        <PendenciasBoard pendencias={pendencias} clients={clients} userRole={userRole} onChanged={refresh} />
+        <PendenciasBoard
+          pendencias={pendencias}
+          clients={clients}
+          userRole={userRole}
+          onChanged={refresh}
+          onCreateProposal={() => setShowProposta(true)}
+        />
       )}
 
       {board === 'relatorios' && (

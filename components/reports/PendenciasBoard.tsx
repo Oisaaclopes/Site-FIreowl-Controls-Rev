@@ -1,15 +1,16 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
-import { Client, Pendencia, PendenciaStatus, UserRole } from '@/lib/types';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Client, OrdemServico, OrdemServicoStatus, Pendencia, PendenciaStatus, UserRole } from '@/lib/types';
 import { updatePendenciaStatus } from '@/lib/pendencias';
-import { createOrdemServico, nextOsNumero } from '@/lib/ordensServico';
+import { createOrdemServico, fetchOrdensServico, nextOsNumero } from '@/lib/ordensServico';
 
 interface PendenciasBoardProps {
   pendencias: Pendencia[];
   clients: Client[];
   userRole: UserRole;
   onChanged: () => void;
+  onCreateProposal?: () => void;
 }
 
 const STATUS_ORDER: PendenciaStatus[] = ['aberta', 'orcada', 'aprovada', 'em_execucao', 'corrigida', 'cancelada', 'recusada_cliente'];
@@ -32,16 +33,48 @@ const STATUS_COLOR: Record<PendenciaStatus, string> = {
   recusada_cliente: 'bg-slate-100 text-slate-600',
 };
 const TERMINAIS: PendenciaStatus[] = ['corrigida', 'cancelada', 'recusada_cliente'];
+const OS_STATUS_LABEL: Record<OrdemServicoStatus, string> = {
+  aberta: 'Aberta',
+  agendada: 'Agendada',
+  em_execucao: 'Em execução',
+  concluida: 'Concluída',
+  cancelada: 'Cancelada',
+};
 
-export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, clients, userRole, onChanged }) => {
+export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, clients, userRole, onChanged, onCreateProposal }) => {
   const podeEditar = userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR';
   const [fStatus, setFStatus] = useState<string>('TODOS');
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [gerandoOs, setGerandoOs] = useState(false);
+  const [ordens, setOrdens] = useState<OrdemServico[]>([]);
+
+  const carregarOrdens = async () => {
+    try {
+      setOrdens(await fetchOrdensServico());
+    } catch (err) {
+      // A lista de pendências segue utilizável mesmo se a tabela de OS ainda
+      // não estiver disponível em uma instalação antiga.
+      console.warn('Não foi possível carregar vínculos de OS:', err);
+    }
+  };
+
+  useEffect(() => {
+    void carregarOrdens();
+  }, []);
 
   const clientName = (id?: string) => clients.find((c) => c.id === id)?.name || '—';
+
+  const osPorPendencia = useMemo(() => {
+    const mapa = new Map<string, OrdemServico>();
+    // A consulta vem da OS mais recente para a mais antiga. Preservamos a
+    // primeira associação caso exista histórico de reabertura da pendência.
+    ordens.forEach((os) => os.pendenciaIds.forEach((pendenciaId) => {
+      if (!mapa.has(pendenciaId)) mapa.set(pendenciaId, os);
+    }));
+    return mapa;
+  }, [ordens]);
 
   const toggleSelected = (id: string) =>
     setSelected((prev) => {
@@ -110,6 +143,7 @@ export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, cl
         await updatePendenciaStatus(p.id, 'em_execucao');
       }
       setSelected(new Set());
+      await carregarOrdens();
       onChanged();
       alert(`Ordem de Serviço ${numero} gerada com ${selecionadas.length} pendência(s).`);
     } catch (err) {
@@ -186,7 +220,19 @@ export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, cl
         </div>
       ) : (
         <div className="flex flex-col gap-2">
-          {filtered.map((p) => (
+          {filtered.map((p) => {
+            const os = osPorPendencia.get(p.id);
+            const proximoPasso = p.status === 'aberta' && !p.propostaId
+              ? 'Próximo passo: criar proposta'
+              : p.status === 'orcada'
+                ? 'Aguardando aprovação comercial'
+                : p.status === 'aprovada' && !os
+                  ? 'Selecione para gerar a OS'
+                  : p.status === 'em_execucao' && os
+                    ? `Em atendimento pela ${os.numero || 'OS vinculada'}`
+                    : null;
+
+            return (
             <div key={p.id} className="bg-white rounded-xl border border-slate-100 shadow-sm p-3 flex flex-col md:flex-row md:items-center gap-3">
               {podeEditar && p.status === 'aprovada' && (
                 <input
@@ -213,6 +259,33 @@ export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, cl
                   {p.acaoRecomendada ? `${p.acaoRecomendada} · ` : ''}
                   {p.quantidade ? `${p.quantidade} ${p.unidade || ''}` : ''}
                 </p>
+                {(p.propostaId || os || p.reportExecucaoId || proximoPasso) && (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[9px] font-semibold">
+                    {p.propostaId && (
+                      <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-800">Proposta {p.propostaId}</span>
+                    )}
+                    {os && (
+                      <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-indigo-800">
+                        {os.numero || 'OS vinculada'} · {OS_STATUS_LABEL[os.status]}
+                      </span>
+                    )}
+                    {p.reportExecucaoId && (
+                      <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-800">Execução registrada</span>
+                    )}
+                    {proximoPasso && (
+                      <span className="text-slate-400">{proximoPasso}</span>
+                    )}
+                    {p.status === 'aberta' && !p.propostaId && onCreateProposal && podeEditar && (
+                      <button
+                        type="button"
+                        onClick={onCreateProposal}
+                        className="rounded px-1.5 py-0.5 text-[#1A1A72] hover:bg-indigo-50"
+                      >
+                        Criar proposta
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${STATUS_COLOR[p.status]}`}>
@@ -233,7 +306,8 @@ export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, cl
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
           <p className="text-xs text-slate-500 px-1 pt-1">{filtered.length} pendência(s)</p>
         </div>
       )}
