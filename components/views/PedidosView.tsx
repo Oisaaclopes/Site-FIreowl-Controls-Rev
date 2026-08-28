@@ -4,6 +4,7 @@ import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { PedidoOS, Client, Pedido, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem, DocumentosPadrao, DocumentType, FinancialTransaction, RecebimentoProposta, EmpresaAtendida, MarcaTecnologia } from '@/lib/types';
 import { selecionarEmpresas, selecionarMarcas, experienciaAtiva } from '@/lib/experienciaSelecao';
 import { resolveLogoDataUrls } from '@/lib/institucional';
+import { nomeFantasiaCliente } from '@/lib/utils';
 
 type ExperienciaOpt = {
   empresas: { nome: string; logoDataUrl?: string; destaque?: boolean }[];
@@ -98,6 +99,7 @@ const DEFAULT_STATUS_KEY = 'fireowl_pedidos_default_status';
 const pad2 = (n: number) => n.toString().padStart(2, '0');
 const dateKeyOf = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 const brl = (v: number) => `R$ ${(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+const razaoSocialCliente = (name: string) => name.replace(/\s*\([^)]*\)\s*$/, '').trim();
 
 export const PedidosView: React.FC<PedidosViewProps> = ({
   pedidosOS,
@@ -671,7 +673,8 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
             nº {num} - {ano}
           </p>
           <p className="text-[11px] text-slate-400">{dataCurta(ped)}</p>
-          <p className="font-bold text-slate-900 truncate uppercase">{ped.clienteNome}</p>
+          <p className="font-bold text-slate-900 truncate uppercase">{nomeFantasiaCliente(ped.clienteNome)}</p>
+          {nomeFantasiaCliente(ped.clienteNome) !== razaoSocialCliente(ped.clienteNome) && <p className="text-[10px] text-slate-400 truncate">{razaoSocialCliente(ped.clienteNome)}</p>}
           {ped.referencia && <p className="text-[11px] text-slate-400 truncate">{ped.referencia}</p>}
         </div>
 
@@ -1070,9 +1073,10 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                       <Wrench className="w-5 h-5" />
                     </span>
                   }
-                  title={<span className="uppercase">{p.clientName}</span>}
+                  title={<span className="uppercase">{nomeFantasiaCliente(p.clientName)}</span>}
                   meta={
                     <>
+                      {nomeFantasiaCliente(p.clientName) !== razaoSocialCliente(p.clientName) && <span className="text-slate-400 truncate">{razaoSocialCliente(p.clientName)}</span>}
                       <RowMeta label="OS" value={<span className="font-data-mono">{p.id}</span>} />
                       <RowMeta label="Pedido" value={<span className="font-data-mono">{p.pedidoId}</span>} />
                       <span className="text-slate-500">{p.title}</span>

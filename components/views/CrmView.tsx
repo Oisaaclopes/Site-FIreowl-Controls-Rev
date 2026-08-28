@@ -19,6 +19,7 @@ import { DevicesManager } from '@/components/reports/DevicesManager';
 import { EmptyState } from '@/components/EmptyState';
 import { fetchCnpjData } from '@/lib/cnpj';
 import { uploadClientFachada, uploadClientLogo, removePropostaCapa } from '@/lib/propostaCapa';
+import { nomeFantasiaCliente } from '@/lib/utils';
 
 interface CrmViewProps {
   clients: Client[];
@@ -43,6 +44,7 @@ const inputCls =
   'w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#E63946]/20 focus:border-[#E63946]/40';
 
 const norm = (s: string) => (s || '').trim().toLowerCase();
+const razaoSocialCliente = (name: string) => name.replace(/\s*\([^)]*\)\s*$/, '').trim();
 
 interface ContactForm {
   name: string;
@@ -89,6 +91,8 @@ export const CrmView: React.FC<CrmViewProps> = ({
   // Pedidos e Serviços têm suas próprias abas.)
   const [crmSubTab] = useState<'clientes' | 'pedidos_os' | 'estoque' | 'servicos'>('clientes');
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterContractStatus, setFilterContractStatus] = useState<Client['contractStatus'] | ''>('');
+  const [filterSegment, setFilterSegment] = useState('');
   const [showAddClientModal, setShowAddClientModal] = useState(false);
   const [selectedClientDetail, setSelectedClientDetail] = useState<Client | null>(null);
 
@@ -227,12 +231,13 @@ export const CrmView: React.FC<CrmViewProps> = ({
     setShowAddClientModal(true);
   };
 
-  const filteredClients = clients.filter(
-    (c) =>
-      c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.cnpj.includes(searchTerm)
-  );
+  const clientSegments = useMemo(() => Array.from(new Set(clients.map((c) => c.segment).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR')), [clients]);
+  const filteredClients = clients.filter((c) => {
+    const q = searchTerm.toLowerCase();
+    return (!q || c.name.toLowerCase().includes(q) || nomeFantasiaCliente(c.name).toLowerCase().includes(q) || c.code.toLowerCase().includes(q) || c.cnpj.includes(searchTerm))
+      && (!filterContractStatus || c.contractStatus === filterContractStatus)
+      && (!filterSegment || c.segment === filterSegment);
+  });
 
   const resetClientForm = () => {
     setEditingClient(null);
@@ -314,8 +319,9 @@ export const CrmView: React.FC<CrmViewProps> = ({
           </h1>
         </div>
 
-        {/* Search Bar */}
-        <div className="relative w-full lg:w-96">
+        {/* Busca e filtros */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full lg:w-auto">
+        <div className="relative sm:col-span-3 lg:w-96">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">
             search
           </span>
@@ -326,6 +332,14 @@ export const CrmView: React.FC<CrmViewProps> = ({
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+        </div>
+          <select value={filterContractStatus} onChange={(e) => setFilterContractStatus(e.target.value as Client['contractStatus'] | '')} className="px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white">
+            <option value="">Todas as situações</option><option value="EM DIA">Em dia</option><option value="PENDENTE">Pendente</option><option value="ATRASADO">Atrasado</option>
+          </select>
+          <select value={filterSegment} onChange={(e) => setFilterSegment(e.target.value)} className="px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white">
+            <option value="">Todos os segmentos</option>{clientSegments.map((segment) => <option key={segment} value={segment}>{segment}</option>)}
+          </select>
+          {(searchTerm || filterContractStatus || filterSegment) && <button type="button" onClick={() => { setSearchTerm(''); setFilterContractStatus(''); setFilterSegment(''); }} className="text-xs font-semibold text-[#1A1A72] hover:underline">Limpar</button>}
         </div>
       </div>
 
@@ -412,9 +426,10 @@ export const CrmView: React.FC<CrmViewProps> = ({
                         <span className="material-symbols-outlined text-lg">domain</span>
                       </span>
                     }
-                    title={<span className="uppercase">{client.name}</span>}
+                    title={<span className="uppercase">{nomeFantasiaCliente(client.name)}</span>}
                     meta={
                       <>
+                        {nomeFantasiaCliente(client.name) !== razaoSocialCliente(client.name) && <span className="text-slate-400 truncate">{razaoSocialCliente(client.name)}</span>}
                         <RowMeta label="CNPJ" value={<span className="font-data-mono">{client.cnpj}</span>} />
                         <RowMeta label="Código" value={<span className="font-data-mono">{client.code}</span>} />
                         <RowMeta label="Segmento" value={client.segment} />
