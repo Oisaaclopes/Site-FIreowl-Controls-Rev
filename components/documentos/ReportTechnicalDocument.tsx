@@ -82,6 +82,14 @@ const Header = ({ d }: { d: ReportPdfData }) => (
       <Text style={styles.headerBrand}>{(d.fantasiaFireowl || d.razaoSocial || 'FIREOWL CONTROLS').toUpperCase()}</Text>
     </View>
     <View style={{ flex: 1 }} />
+    {nv(d.clienteLogoUrl) ? (
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 10, paddingRight: 10, borderRightWidth: 1, borderRightColor: C.s200 }}>
+        <View style={{ width: 30, height: 24, backgroundColor: C.white, borderWidth: 1, borderColor: C.s200, borderRadius: 3, alignItems: 'center', justifyContent: 'center', padding: 2 }}>
+          <Image src={d.clienteLogoUrl!} style={{ maxWidth: '100%', maxHeight: 19, objectFit: 'contain' }} />
+        </View>
+        <Text style={{ fontSize: 6.5, color: C.s500, marginLeft: 4, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase' }}>Cliente</Text>
+      </View>
+    ) : null}
     <Text style={styles.headerRight}>{d.tipoLabel}</Text>
   </View>
 );
@@ -180,8 +188,9 @@ export function ReportTechnicalDocument({ data }: { data: ReportPdfData }) {
               </View>
               <View style={{ flex: 1 }} />
               {nv(d.clienteLogoUrl) ? (
-                <View style={{ backgroundColor: C.white, borderRadius: 6, padding: 4, width: 60, height: 40, alignItems: 'center', justifyContent: 'center' }}>
-                  <Image src={d.clienteLogoUrl!} style={{ maxWidth: '100%', maxHeight: 32, objectFit: 'contain' }} />
+                <View style={{ backgroundColor: C.white, borderRadius: 7, padding: 5, width: 96, height: 56, alignItems: 'center', justifyContent: 'center' }}>
+                  <Image src={d.clienteLogoUrl!} style={{ maxWidth: '100%', maxHeight: 39, objectFit: 'contain' }} />
+                  <Text style={{ color: C.s600, fontSize: 5.5, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: .5, marginTop: 2 }}>Cliente</Text>
                 </View>
               ) : null}
             </View>
