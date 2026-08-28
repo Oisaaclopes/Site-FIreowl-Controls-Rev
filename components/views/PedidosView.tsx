@@ -1159,6 +1159,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
       {validacao && (
         <ProposalValidationModal
           numero={validacao.pedido.numeroPedido}
+          pedido={validacao.pedido}
           docLabel={DOCUMENT_TYPE_LABELS[validacao.doc]}
           issues={validacao.issues}
           onClose={() => setValidacao(null)}

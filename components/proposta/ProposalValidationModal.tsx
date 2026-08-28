@@ -3,9 +3,11 @@
 import React from 'react';
 import { AlertTriangle, AlertCircle, Pencil, FileWarning, X } from 'lucide-react';
 import { ValidationIssue } from '@/lib/proposalValidation';
+import { Pedido } from '@/lib/types';
 
 interface Props {
   numero: string;
+  pedido: Pedido;
   docLabel: string;
   issues: ValidationIssue[];
   onClose: () => void;
@@ -15,7 +17,7 @@ interface Props {
   onRevisar: () => void;
 }
 
-export const ProposalValidationModal: React.FC<Props> = ({ numero, docLabel, issues, onClose, onGenerate, onRevisar }) => {
+export const ProposalValidationModal: React.FC<Props> = ({ numero, pedido, docLabel, issues, onClose, onGenerate, onRevisar }) => {
   const erros = issues.filter((i) => i.level === 'erro');
   const alertas = issues.filter((i) => i.level === 'alerta');
   const checklist = ['Objetivo', 'Escopo', 'Prazo', 'Garantia', 'SLA'].map((campo) => ({ campo, issue: issues.find((i) => i.campo === campo) }));
@@ -42,6 +44,17 @@ export const ProposalValidationModal: React.FC<Props> = ({ numero, docLabel, iss
 
         {/* Corpo */}
         <div className="p-5 overflow-y-auto space-y-4">
+          <div className="rounded-xl border border-[#1A1A72]/15 bg-[#1A1A72]/5 p-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[#1A1A72] mb-2">Resumo executivo</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
+              <div><span className="block text-slate-400 uppercase text-[9px]">Cliente</span><strong className="text-slate-800">{pedido.clienteNome || 'Não informado'}</strong></div>
+              <div><span className="block text-slate-400 uppercase text-[9px]">Valor</span><strong className="text-emerald-700">R$ {(pedido.proposal.valorTotal || pedido.proposal.valorMensal || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></div>
+              <div><span className="block text-slate-400 uppercase text-[9px]">Áreas</span><strong className="text-slate-800">{pedido.proposal.areaPrincipal?.join(', ') || 'Não informadas'}</strong></div>
+              <div><span className="block text-slate-400 uppercase text-[9px]">Prazo</span><strong className="text-slate-800">{pedido.proposal.prazoExecucao || 'Não informado'}</strong></div>
+              <div><span className="block text-slate-400 uppercase text-[9px]">SLA</span><strong className="text-slate-800">{pedido.proposal.slaCritico || (pedido.proposal.slaTabela?.length ? `${pedido.proposal.slaTabela.length} níveis definidos` : 'Não informado')}</strong></div>
+              <div><span className="block text-slate-400 uppercase text-[9px]">Vigência / validade</span><strong className="text-slate-800">{pedido.proposal.recorrente ? `${pedido.proposal.vigenciaMeses || 0} meses` : `${pedido.proposal.validadePropostaDias || 0} dias`}</strong></div>
+            </div>
+          </div>
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
             <div className="flex items-center justify-between mb-2"><span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Completude operacional</span><strong className="text-sm text-[#1A1A72]">{Math.round((completos / checklist.length) * 100)}%</strong></div>
             <div className="space-y-1.5">{checklist.map((item) => <div key={item.campo} className={`flex items-center gap-2 text-xs ${item.issue ? item.issue.level === 'erro' ? 'text-red-700' : 'text-amber-700' : 'text-emerald-700'}`}><span>{item.issue ? item.issue.level === 'erro' ? '🔴' : '🟡' : '🟢'}</span><span>{item.campo}{item.issue ? ` — ${item.issue.mensagem}` : ' preenchido'}</span></div>)}</div>
