@@ -119,6 +119,14 @@ export function validateProposal(pedido: Pedido, companyProfile?: CompanyProfile
 
   if (!(p.validadePropostaDias > 0)) issues.push({ id: 'req-validade', level: 'erro', campo: 'Validade', mensagem: 'Validade da proposta não informada.' });
 
+  // Checklist operacional: não bloqueia a emissão, mas evita que uma proposta
+  // tecnicamente pobre chegue ao cliente sem escopo, prazo ou garantia claros.
+  if (!nv(p.objetivo)) issues.push({ id: 'check-objetivo', level: 'alerta', campo: 'Objetivo', mensagem: 'Objetivo do atendimento não informado.' });
+  if (!nv(p.escopoServico) && !(p.equipmentItems || []).length) issues.push({ id: 'check-escopo', level: 'alerta', campo: 'Escopo', mensagem: 'Escopo técnico ou itens/equipamentos não informados.' });
+  if (!nv(p.prazoExecucao)) issues.push({ id: 'check-prazo', level: 'alerta', campo: 'Prazo', mensagem: 'Prazo de execução não informado.' });
+  if (!nv(p.garantia)) issues.push({ id: 'check-garantia', level: 'alerta', campo: 'Garantia', mensagem: 'Garantia não informada.' });
+  if (!nv(p.slaCritico) && !(p.slaTabela || []).length && recorrente) issues.push({ id: 'check-sla', level: 'alerta', campo: 'SLA', mensagem: 'Contrato recorrente sem SLA informado.' });
+
   if (companyProfile && !nv(companyProfile.cnpj)) {
     issues.push({ id: 'req-cnpj', level: 'alerta', campo: 'CNPJ', mensagem: 'CNPJ da empresa não cadastrado (Conta → Perfil da empresa).' });
   }

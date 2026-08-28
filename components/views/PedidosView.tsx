@@ -598,6 +598,24 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     setEditingPedido(revisado);
     setIsProposalModalOpen(true);
   };
+  // Cria uma nova proposta a partir da estrutura atual, sem reutilizar número,
+  // status, recebimento ou histórico de revisões do documento de origem.
+  const handleDuplicate = (ped: Pedido) => {
+    const now = new Date().toISOString();
+    const copy: Pedido = {
+      ...ped,
+      id: `ped_${Date.now()}`,
+      numeroPedido: `PED-${new Date().getFullYear()}-${nextProposalNumber}`,
+      referencia: `${ped.referencia || 'Proposta comercial'} (cópia)`,
+      dataEmissao: now.slice(0, 10),
+      status: 'rascunho',
+      createdAt: now,
+      updatedAt: now,
+      proposal: { ...ped.proposal, revisoes: undefined, recebimento: undefined },
+    };
+    setEditingPedido(copy);
+    setIsProposalModalOpen(true);
+  };
   const handleDelete = (ped: Pedido) => {
     if (!onDeletePedido) return;
     if (window.confirm(`Excluir a proposta ${ped.numeroPedido} de ${ped.clienteNome}? Esta ação não pode ser desfeita.`))
@@ -750,6 +768,13 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
             className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-amber-600 hover:bg-amber-50 transition-colors"
           >
             <History className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => handleDuplicate(ped)}
+            title="Duplicar proposta"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-[#1A1A72] hover:bg-slate-100 transition-colors"
+          >
+            <Files className="w-4 h-4" />
           </button>
           {onDeletePedido && (
             <button

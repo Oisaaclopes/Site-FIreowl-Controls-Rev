@@ -18,6 +18,8 @@ interface Props {
 export const ProposalValidationModal: React.FC<Props> = ({ numero, docLabel, issues, onClose, onGenerate, onRevisar }) => {
   const erros = issues.filter((i) => i.level === 'erro');
   const alertas = issues.filter((i) => i.level === 'alerta');
+  const checklist = ['Objetivo', 'Escopo', 'Prazo', 'Garantia', 'SLA'].map((campo) => ({ campo, issue: issues.find((i) => i.campo === campo) }));
+  const completos = checklist.filter((item) => !item.issue).length;
 
   return (
     <div className="fixed inset-0 z-[60] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
@@ -40,6 +42,10 @@ export const ProposalValidationModal: React.FC<Props> = ({ numero, docLabel, iss
 
         {/* Corpo */}
         <div className="p-5 overflow-y-auto space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="flex items-center justify-between mb-2"><span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Completude operacional</span><strong className="text-sm text-[#1A1A72]">{Math.round((completos / checklist.length) * 100)}%</strong></div>
+            <div className="space-y-1.5">{checklist.map((item) => <div key={item.campo} className={`flex items-center gap-2 text-xs ${item.issue ? item.issue.level === 'erro' ? 'text-red-700' : 'text-amber-700' : 'text-emerald-700'}`}><span>{item.issue ? item.issue.level === 'erro' ? '🔴' : '🟡' : '🟢'}</span><span>{item.campo}{item.issue ? ` — ${item.issue.mensagem}` : ' preenchido'}</span></div>)}</div>
+          </div>
           <p className="text-xs text-slate-500">
             Encontramos {issues.length} ponto{issues.length > 1 ? 's' : ''} para conferir. Nada foi alterado — a decisão é sua.
           </p>
