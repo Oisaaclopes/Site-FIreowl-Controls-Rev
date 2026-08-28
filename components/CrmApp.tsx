@@ -975,6 +975,7 @@ export function CrmApp({
               contracts={contracts}
               brands={partnerBrands}
               userRole={userRole}
+              companyProfile={companyProfile}
               currentUserName={userName}
               onAddClient={handleAddClient}
               onAddBrand={(name, category) => handleAddPartnerBrand({ id: `pb_${Date.now()}`, name, category: category || 'SDAI' })}

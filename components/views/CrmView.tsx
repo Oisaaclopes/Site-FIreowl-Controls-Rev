@@ -18,7 +18,7 @@ import { usePrivacy } from '@/lib/privacy';
 import { DevicesManager } from '@/components/reports/DevicesManager';
 import { EmptyState } from '@/components/EmptyState';
 import { fetchCnpjData } from '@/lib/cnpj';
-import { uploadClientFachada, removePropostaCapa } from '@/lib/propostaCapa';
+import { uploadClientFachada, uploadClientLogo, removePropostaCapa } from '@/lib/propostaCapa';
 
 interface CrmViewProps {
   clients: Client[];
@@ -106,7 +106,9 @@ export const CrmView: React.FC<CrmViewProps> = ({
   const [nContacts, setNContacts] = useState<ContactForm[]>([emptyContact()]);
   // Foto da fachada (capa padrão das propostas do cliente).
   const [nFachada, setNFachada] = useState<string>('');
+  const [nLogo, setNLogo] = useState<string>('');
   const [fachadaBusy, setFachadaBusy] = useState(false);
+  const [logoBusy, setLogoBusy] = useState(false);
   const handleFachadaUpload = async (file: File) => {
     setFachadaBusy(true);
     try {
@@ -121,6 +123,21 @@ export const CrmView: React.FC<CrmViewProps> = ({
   const handleFachadaRemove = async () => {
     if (nFachada) { try { await removePropostaCapa(nFachada); } catch { /* best-effort */ } }
     setNFachada('');
+  };
+  const handleLogoUpload = async (file: File) => {
+    setLogoBusy(true);
+    try {
+      const path = await uploadClientLogo(file, editingClient?.id || `c_${Date.now()}`);
+      setNLogo(path);
+    } catch {
+      alert('Não foi possível enviar a logo. Verifique a conexão com o Supabase.');
+    } finally {
+      setLogoBusy(false);
+    }
+  };
+  const handleLogoRemove = async () => {
+    if (nLogo) { try { await removePropostaCapa(nLogo); } catch { /* best-effort */ } }
+    setNLogo('');
   };
 
   // Busca automática de CNPJ
@@ -201,6 +218,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
     setNAnnual(client.totalContractsValue || 0);
     setNContacts(client.contacts && client.contacts.length > 0 ? client.contacts : [emptyContact()]);
     setNFachada(client.fachadaPath || '');
+    setNLogo(client.logoPath || '');
 
     const digits = (client.cnpj || '').replace(/\D/g, '');
     setNTipoPessoa(digits.length <= 11 ? 'PF' : 'PJ');
@@ -230,7 +248,9 @@ export const CrmView: React.FC<CrmViewProps> = ({
     setNAnnual(0);
     setNContacts([emptyContact()]);
     setNFachada('');
+    setNLogo('');
     setFachadaBusy(false);
+    setLogoBusy(false);
     setCnpjSearchError('');
     setIsSearchingCnpj(false);
   };
@@ -273,6 +293,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
       pendenteValidacao: editingClient ? editingClient.pendenteValidacao : undefined,
       createdByRole: editingClient ? editingClient.createdByRole : undefined,
       fachadaPath: nFachada || undefined,
+      logoPath: nLogo || undefined,
     };
 
     onAddClient(payload);
@@ -751,6 +772,27 @@ export const CrmView: React.FC<CrmViewProps> = ({
                     {fachadaBusy ? 'Enviando…' : 'Enviar foto da fachada'}
                     <input type="file" accept="image/*" className="hidden" disabled={fachadaBusy}
                       onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFachadaUpload(f); e.target.value = ''; }} />
+                  </label>
+                )}
+              </section>
+
+              {/* Logo corporativa do cliente: distinta da fachada e usada no PDF técnico. */}
+              <section className="rounded-xl border border-slate-200 bg-white p-3.5 space-y-2">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-sm text-[#1A1A72]">branding_watermark</span> Logo do cliente
+                </p>
+                <p className="text-[11px] text-slate-400">Aceita SVG ou PNG. A imagem é preservada em PNG transparente para uso seguro no PDF.</p>
+                {nLogo ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-emerald-600 flex items-center gap-1"><span className="material-symbols-outlined text-[16px]">check_circle</span>Logo definida</span>
+                    <button type="button" onClick={handleLogoRemove} className="text-[11px] font-bold uppercase text-slate-400 hover:text-[#E63946]">Remover</button>
+                  </div>
+                ) : (
+                  <label className={`inline-flex items-center gap-1.5 text-xs font-semibold cursor-pointer ${logoBusy ? 'text-slate-400' : 'text-[#1A1A72] hover:text-[#E63946]'}`}>
+                    <span className={`material-symbols-outlined text-[16px] ${logoBusy ? 'animate-spin' : ''}`}>{logoBusy ? 'progress_activity' : 'upload_file'}</span>
+                    {logoBusy ? 'Enviando…' : 'Enviar logo'}
+                    <input type="file" accept="image/png,image/svg+xml" className="hidden" disabled={logoBusy}
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f); e.target.value = ''; }} />
                   </label>
                 )}
               </section>

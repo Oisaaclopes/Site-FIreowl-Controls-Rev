@@ -132,16 +132,17 @@ const CardTecnico = ({ c }: { c: RpCard }) => (
         {nv(c.qtd) ? `Qtd: ${c.qtd}` : ''}
       </Text>
     ) : null}
-    {c.fotos.length === 2 ? (
+    {c.fotos.some((f) => f.tipo === 'antes') && c.fotos.some((f) => f.tipo === 'depois') ? (
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
-        <FotoBox url={c.fotos[0]} w="48.5%" h={110} label="Antes" />
-        <FotoBox url={c.fotos[1]} w="48.5%" h={110} label="Depois" />
+        <FotoBox url={c.fotos.find((f) => f.tipo === 'antes')?.url} w="48.5%" h={110} label="Antes" />
+        <FotoBox url={c.fotos.find((f) => f.tipo === 'depois')?.url} w="48.5%" h={110} label="Depois" />
       </View>
     ) : c.fotos.length > 0 ? (
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start', marginTop: 6 }}>
         {c.fotos.map((f, i) => (
           <View key={i} style={{ width: '32%', marginRight: i % 3 === 2 ? 0 : '2%' }}>
-            <FotoBox url={f} w="100%" h={78} />
+            <FotoBox url={f.url} w="100%" h={78} label={f.tipo === 'antes' ? 'Antes' : f.tipo === 'depois' ? 'Depois' : undefined} />
+            {nv(f.legenda) ? <Text style={styles.legenda}>{f.legenda}</Text> : null}
           </View>
         ))}
       </View>
@@ -155,6 +156,7 @@ export function ReportTechnicalDocument({ data }: { data: ReportPdfData }) {
   const showResumo = nivel !== 'simples';
   const showPend = nivel !== 'simples';
   const showConclusao = nivel !== 'simples';
+  const showInstitucional = nivel === 'corporativo' && (nv(d.razaoSocial) || nv(d.contatoFireowl) || nv(d.cnpjFireowl));
   const temExec = d.secoes.some((s) => s.cards.length > 0);
 
   // Numeração dinâmica das seções (só as que aparecem).
@@ -264,13 +266,34 @@ export function ReportTechnicalDocument({ data }: { data: ReportPdfData }) {
         ) : null}
 
         {/* Execução — cards por seção/grupo */}
-        {temExec ? (
+          {temExec ? (
           <>
             <SecHead n={num()} titulo={d.tipo === 'LEVANTAMENTO' ? 'Levantamento e Apontamentos' : d.tipo === 'PREVENTIVA' ? 'Inspeção e Apontamentos' : 'Serviços Executados e Apontamentos'} />
             {d.secoes.filter((s) => s.cards.length > 0).map((s) => (
               <View key={s.key}>
                 <Text style={{ fontSize: 9, fontFamily: 'Poppins', fontWeight: 700, color: C.navy, borderBottomWidth: 2, borderBottomColor: gold, paddingBottom: 2, marginTop: 8, marginBottom: 6 }} minPresenceAhead={40}>{s.titulo}</Text>
                 {s.cards.map((c, i) => <CardTecnico key={i} c={c} />)}
+              </View>
+            ))}
+          </>
+          ) : null}
+
+        {/* Checklist e respostas escalares: usa os títulos oficiais do template,
+            preservando a estrutura de Corretiva, Preventiva e Levantamento. */}
+        {d.respostasPorSecao.length > 0 ? (
+          <>
+            <SecHead n={num()} titulo={d.tipo === 'PREVENTIVA' ? 'Checklist e Verificações' : d.tipo === 'CORRETIVA' ? 'Diagnóstico e Encerramento' : 'Informações do Levantamento'} />
+            {d.respostasPorSecao.map((secao, i) => (
+              <View key={i} wrap={false} style={{ marginBottom: 8 }}>
+                <Text style={{ fontSize: 9, fontFamily: 'Poppins', fontWeight: 700, color: C.navy, borderBottomWidth: 2, borderBottomColor: gold, paddingBottom: 2, marginBottom: 5 }} minPresenceAhead={36}>{secao.titulo}</Text>
+                <View style={styles.infoGrid}>
+                  {secao.campos.map((campo, j) => (
+                    <View key={j} style={[styles.infoCell, campo.reprovado ? { borderColor: C.red, backgroundColor: '#FCF1F1' } : {}]}>
+                      <Text style={styles.infoLabel}>{campo.label}</Text>
+                      <Text style={[styles.infoValue, campo.reprovado ? { color: C.red } : {}]}>{campo.valor}</Text>
+                    </View>
+                  ))}
+                </View>
               </View>
             ))}
           </>
@@ -286,7 +309,7 @@ export function ReportTechnicalDocument({ data }: { data: ReportPdfData }) {
                 <View key={i} style={[styles.pendCard, { borderLeftColor: pv.cor, backgroundColor: pv.bg }]} wrap={false}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Text style={{ fontSize: 9, fontFamily: 'Roboto', fontWeight: 700, color: C.navy }}>{p.grupo}</Text>
-                    <Text style={{ fontSize: 7.5, fontFamily: 'Roboto', fontWeight: 700, color: pv.cor, textTransform: 'uppercase', letterSpacing: 0.5 }}>{pv.label}{p.criticidade ? `  ·  Crit. ${p.criticidade}` : ''}</Text>
+                    <Text style={{ fontSize: 7.5, fontFamily: 'Roboto', fontWeight: 700, color: pv.cor, textTransform: 'uppercase', letterSpacing: 0.5 }}>{pv.label}</Text>
                   </View>
                   {nv(p.descricao) ? <Text style={{ fontSize: 8.5, color: C.s700, marginTop: 2 }}>{p.descricao}</Text> : null}
                   {(nv(p.acao) || nv(p.norma)) ? (
@@ -295,6 +318,7 @@ export function ReportTechnicalDocument({ data }: { data: ReportPdfData }) {
                       {nv(p.norma) ? `Norma: ${p.norma}` : ''}
                     </Text>
                   ) : null}
+                  {nv(p.fotoUrl) ? <View style={{ marginTop: 5, width: '34%' }}><FotoBox url={p.fotoUrl} w="100%" h={72} label="Evidência associada" /></View> : null}
                 </View>
               );
             })}
@@ -309,8 +333,10 @@ export function ReportTechnicalDocument({ data }: { data: ReportPdfData }) {
               {d.registroFotografico.map((f: RpFoto, i) => (
                 <View key={i} style={{ width: '32%', marginRight: i % 3 === 2 ? 0 : '2%', marginBottom: 8 }} wrap={false}>
                   <FotoBox url={f.url} w="100%" h={92} />
+                  {nv(f.contexto) ? <Text style={[styles.legenda, { color: C.navy, fontFamily: 'Roboto', fontWeight: 700 }]}>{f.contexto}</Text> : null}
                   {nv(f.legenda) ? <Text style={styles.legenda}>{f.legenda}</Text> : null}
                   {nv(f.nota) ? <Text style={[styles.legenda, { color: C.s500 }]}>{f.nota}</Text> : null}
+                  {nv(f.marcadaUrl) ? <Text style={[styles.legenda, { color: C.navy }]}>Imagem com marcação técnica</Text> : null}
                 </View>
               ))}
             </View>
@@ -322,6 +348,16 @@ export function ReportTechnicalDocument({ data }: { data: ReportPdfData }) {
           <View minPresenceAhead={60} wrap={false}>
             <SecHead n={num()} titulo="Conclusão Técnica" />
             <Text style={[styles.para, { fontStyle: 'italic' }]}>{d.conclusaoTexto}</Text>
+          </View>
+        ) : null}
+
+        {/* No nível corporativo, identifica a emissora sem transformar o
+            relatório técnico em material comercial. */}
+        {showInstitucional ? (
+          <View minPresenceAhead={70} wrap={false} style={{ backgroundColor: C.s50, borderLeftWidth: 3, borderLeftColor: C.navy, padding: 10, marginTop: 8 }}>
+            <Text style={{ fontSize: 9, fontFamily: 'Poppins', fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: 0.5 }}>Identificação Institucional</Text>
+            <Text style={[styles.cardMeta, { marginTop: 4 }]}>{d.razaoSocial}{nv(d.cnpjFireowl) ? `  ·  CNPJ ${d.cnpjFireowl}` : ''}</Text>
+            {nv(d.contatoFireowl) ? <Text style={styles.cardMeta}>{d.contatoFireowl}</Text> : null}
           </View>
         ) : null}
 

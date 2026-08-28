@@ -12,6 +12,7 @@ import {
   Device,
   OrdemServico,
   CicloAmostragem,
+  CompanyProfile,
   Supplier,
 } from '@/lib/types';
 import { ALL_TEMPLATES, seedReportTemplates } from '@/lib/reportTemplatesData';
@@ -29,6 +30,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { GRUPOS_FALHA, falhasPorArea, AreaFalha } from '@/lib/catalogoFalhas';
 import { fetchTemplates } from '@/lib/reportTemplates';
 import { gerarPdfExecucao } from '@/lib/reportPdf';
+import { ReportTechnicalPDFView } from '@/components/documentos/ReportTechnicalPDFView';
 import { NovaProposta } from '@/components/reports/NovaProposta';
 import { PendenciasBoard } from '@/components/reports/PendenciasBoard';
 
@@ -45,6 +47,7 @@ interface RelatoriosViewProps {
   contracts: Contract[];
   brands: { id?: string; name: string; category?: string }[];
   userRole: UserRole;
+  companyProfile?: CompanyProfile;
   currentUserName?: string;
   onAddClient?: (newClient: Client) => void;
   /** Cadastra uma nova marca (usado pelo "Cadastrar nova marca" dos comboboxes). */
@@ -146,6 +149,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   contracts,
   brands,
   userRole,
+  companyProfile,
   currentUserName = '',
   onAddClient,
   onAddBrand,
@@ -162,6 +166,8 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 
   const [mode, setMode] = useState<'index' | 'form'>('index');
   const [board, setBoard] = useState<'relatorios' | 'pendencias'>('relatorios');
+  // Pré-visualização do PDF técnico (react-pdf). Fallback = método HTML antigo.
+  const [reportPreview, setReportPreview] = useState<ReportInstance | null>(null);
   const [showProposta, setShowProposta] = useState(false);
   const [reports, setReports] = useState<ReportInstance[]>([]);
   const [pendencias, setPendencias] = useState<Pendencia[]>([]);
@@ -953,6 +959,24 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   // ===== Índice =====
   return (
     <div className="flex flex-col w-full p-3 md:p-6 gap-3 md:gap-4">
+      {/* Pré-visualização do PDF técnico (react-pdf) com fallback p/ impressão */}
+      {reportPreview && (
+        <ReportTechnicalPDFView
+          report={reportPreview}
+          cliente={clients.find((c) => c.id === reportPreview.clienteId)}
+          companyProfile={companyProfile}
+          userRole={userRole}
+          onClose={() => setReportPreview(null)}
+          onFallback={() => {
+            const r = reportPreview;
+            setReportPreview(null);
+            gerarPdfExecucao(r, clientName(r.clienteId), userRole).catch((e) => {
+              console.error(e);
+              alert('Falha ao gerar o PDF.');
+            });
+          }}
+        />
+      )}
       {/* Header */}
       <div className="flex flex-row items-center justify-between gap-3 border-b border-slate-200 pb-3">
         <div className="min-w-0">
@@ -1147,13 +1171,8 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                     <div className="flex items-center justify-center gap-1">
                       {r.status === 'finalizado' && (
                         <button
-                          onClick={() =>
-                            gerarPdfExecucao(r, clientName(r.clienteId), userRole).catch((e) => {
-                              console.error(e);
-                              alert('Falha ao gerar o PDF.');
-                            })
-                          }
-                          title="Gerar PDF de execução"
+                          onClick={() => setReportPreview(r)}
+                          title="Gerar PDF do relatório"
                           className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#E63946] hover:bg-red-50 transition-colors"
                         >
                           <span className="material-symbols-outlined text-lg">picture_as_pdf</span>
@@ -1207,13 +1226,8 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                   )}
                   {r.status === 'finalizado' && (
                     <button
-                      onClick={() =>
-                        gerarPdfExecucao(r, clientName(r.clienteId), userRole).catch((e) => {
-                          console.error(e);
-                          alert('Falha ao gerar o PDF.');
-                        })
-                      }
-                      title="Gerar PDF de execução"
+                      onClick={() => setReportPreview(r)}
+                      title="Gerar PDF do relatório"
                       className="w-8 h-8 -my-1 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#E63946] hover:bg-red-50 transition-colors"
                     >
                       <span className="material-symbols-outlined text-lg">picture_as_pdf</span>

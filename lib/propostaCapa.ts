@@ -1,5 +1,6 @@
 import { getSupabaseClient } from './supabaseClient';
 import { compressImage } from './reportMedia';
+import { rasterizeLogoToPng } from './institucional';
 
 /**
  * Imagem opcional da capa da Proposta Técnico-Comercial.
@@ -27,6 +28,20 @@ export async function uploadClientFachada(file: Blob, clientId: string): Promise
   const { error } = await supabase.storage
     .from(BUCKET)
     .upload(path, compressed, { upsert: false, contentType: 'image/jpeg' });
+  if (error) throw error;
+  return path;
+}
+
+/** Logo do cliente para documentos técnicos. SVG/PNG é normalizado para PNG
+ * transparente, formato que o @react-pdf/renderer suporta de forma estável. */
+export async function uploadClientLogo(file: Blob, clientId: string): Promise<string> {
+  const supabase = getSupabaseClient() as any;
+  const png = await rasterizeLogoToPng(file);
+  const year = new Date().getFullYear();
+  const path = `clientes/${clientId || 'sem-cliente'}/${year}/logo_${Date.now()}.png`;
+  const { error } = await supabase.storage
+    .from(BUCKET)
+    .upload(path, png, { upsert: false, contentType: 'image/png' });
   if (error) throw error;
   return path;
 }
