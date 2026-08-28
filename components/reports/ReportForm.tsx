@@ -66,6 +66,31 @@ interface PendenciaPreview {
   origem: string;
 }
 
+const QUICK_DIAGNOSIS = ['Falha de alimentação', 'Falha de cabeamento', 'Mau contato', 'Bateria', 'Programação', 'Configuração', 'Dispositivo em alarme', 'Dispositivo em falha', 'Sujeira / manutenção', 'Infraestrutura', 'Não identificado'];
+const QUICK_EXECUTION = ['Testado', 'Ajustado', 'Reprogramado', 'Reconfigurado', 'Substituído', 'Reparado', 'Limpo', 'Resetado', 'Refeito cabeamento', 'Religado', 'Sem intervenção'];
+
+const QuickCorrectiveActions = ({ sectionKey, values, onChange }: { sectionKey: string; values: FormValues; onChange: (key: string, value: unknown) => void }) => {
+  if (sectionKey === 'diagnostico') {
+    const selected = String(values.causa || '');
+    return <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50 p-3"><p className="text-xs font-bold text-[#1A1A72] uppercase">O que foi encontrado?</p><div className="mt-2 grid grid-cols-2 gap-2">{QUICK_DIAGNOSIS.map((item) => <button key={item} type="button" onClick={() => onChange('causa', item)} className={`min-h-12 rounded-lg border px-2 text-left text-[11px] font-semibold ${selected === item ? 'border-[#1A1A72] bg-[#1A1A72] text-white' : 'border-slate-200 bg-white text-slate-700'}`}>{item}</button>)}</div></div>;
+  }
+  if (sectionKey === 'servico_executado') {
+    const cards = Array.isArray(values.intervencoes) ? values.intervencoes as RepeaterCard[] : [];
+    const current = String(cards[0]?.acao_executada || '');
+    const choose = (item: string) => {
+      const first = cards[0] || { quantidade: 1 };
+      onChange('intervencoes', [{ ...first, acao_executada: item }, ...cards.slice(1)]);
+    };
+    return <div className="mb-4 rounded-xl border border-emerald-100 bg-emerald-50 p-3"><p className="text-xs font-bold text-emerald-800 uppercase">O que foi feito?</p><div className="mt-2 grid grid-cols-2 gap-2">{QUICK_EXECUTION.map((item) => <button key={item} type="button" onClick={() => choose(item)} className={`min-h-12 rounded-lg border px-2 text-left text-[11px] font-semibold ${current === item ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-200 bg-white text-slate-700'}`}>{item}</button>)}</div></div>;
+  }
+  if (sectionKey === 'testes') {
+    const current = String(values.sistema_operante || '');
+    const choices = [['Sim', '✓ Resolvido', 'border-emerald-600 bg-emerald-600'], ['Sim, com ressalvas', '⚠ Parcialmente resolvido', 'border-amber-500 bg-amber-500'], ['Não', '✕ Não resolvido', 'border-red-600 bg-red-600']];
+    return <div className="mb-4"><p className="text-xs font-bold text-slate-800 uppercase">Qual foi o resultado?</p><div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">{choices.map(([value, label, color]) => <button key={value} type="button" onClick={() => onChange('sistema_operante', value)} className={`min-h-14 rounded-xl border-2 px-3 text-left text-xs font-bold ${current === value ? `${color} text-white` : 'border-slate-200 bg-white text-slate-700'}`}>{label}</button>)}</div></div>;
+  }
+  return null;
+};
+
 const firstDigit = (s: unknown): number | undefined => {
   const m = /(\d)/.exec(String(s ?? ''));
   return m ? Number(m[1]) : undefined;
@@ -790,6 +815,9 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       {/* Conteúdo: uma seção por vez */}
       <div className="flex-1 p-4 md:p-8 pb-28">
         {currentSection?.descricao && <p className="text-[11px] text-slate-500 mb-3">{currentSection.descricao}</p>}
+        {modoCampo === 'rapido' && template.tipo === 'CORRETIVA' && currentSection && (
+          <QuickCorrectiveActions sectionKey={currentSection.key} values={values} onChange={handleChange} />
+        )}
         <FormEngine
           template={stepTemplate}
           values={values}
