@@ -10,6 +10,7 @@ import { isSupabaseConfigured } from '@/lib/inventory';
 import { fetchHolidays, Holiday } from '@/lib/holidays';
 import { fetchDayEntries, createDayEntry, deleteDayEntry, DayEntry, DayEntryKind } from '@/lib/dayentries';
 import { uploadCertificate, signedDocUrl } from '@/lib/storage';
+import { TimecardPDFView } from '@/components/documentos/TimecardPDFView';
 
 interface PontoViewProps {
   punches: TimePunch[];
@@ -21,7 +22,6 @@ interface PontoViewProps {
 }
 
 // Escala fixa (poderia vir do cadastro do funcionário)
-const SCALE = { start: '08:00', end: '17:48', lunchStart: '12:00', lunchEnd: '13:00' };
 
 type PunchType = TimePunch['type'];
 
@@ -178,6 +178,7 @@ export const PontoView: React.FC<PontoViewProps> = ({
 }) => {
   const isManager = userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR';
   const sched = useMemo(() => normalizeSchedule(schedule ?? DEFAULT_SCHEDULE), [schedule]);
+  const scheduleLabel = `${sched[1].start} às ${sched[1].end} · intervalo ${sched[1].lunchMinutes} min`;
   const [now, setNow] = useState(() => new Date());
   const [punching, setPunching] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -185,6 +186,10 @@ export const PontoView: React.FC<PontoViewProps> = ({
   const [online, setOnline] = useState(true);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [showEspelho, setShowEspelho] = useState(false);
+  const [showTimecardPdf, setShowTimecardPdf] = useState(false);
+  const [recordPeriod, setRecordPeriod] = useState('');
+  const [recordType, setRecordType] = useState<'TODOS' | PunchType>('TODOS');
+  const [recordGps, setRecordGps] = useState<'TODOS' | 'COM_GPS' | 'SEM_GPS'>('TODOS');
 
   // Solicitações de ajuste de ponto
   const [adjustments, setAdjustments] = useState<PunchAdjustment[]>([]);
@@ -557,6 +562,12 @@ export const PontoView: React.FC<PontoViewProps> = ({
     () => Array.from(new Set(punches.map((p) => p.employeeName).filter(Boolean))).sort(),
     [punches]
   );
+  const filteredRecentPunches = useMemo(() => punches.filter((p) => {
+    const period = p.at ? new Date(p.at).toISOString().slice(0, 7) : '';
+    return (!recordPeriod || period === recordPeriod)
+      && (recordType === 'TODOS' || p.type === recordType)
+      && (recordGps === 'TODOS' || (recordGps === 'COM_GPS' ? hasGps(p) : !hasGps(p)));
+  }), [punches, recordGps, recordPeriod, recordType]);
 
   const monthPunches = punches
     .filter((p) => {
@@ -855,7 +866,7 @@ export const PontoView: React.FC<PontoViewProps> = ({
         <table style="border-collapse:collapse;width:100%;font-size:13px">
           ${row('Nome', currentUser)}
           ${row('Período', '01 a 31 (mês atual)')}
-          ${row('Jornada', `${SCALE.start} às ${SCALE.end} (almoço ${SCALE.lunchStart}–${SCALE.lunchEnd})`)}
+          ${row('Jornada', scheduleLabel)}
           ${row('Banco de horas', week.banco)}
         </table>
       </body></html>`;
@@ -925,7 +936,7 @@ export const PontoView: React.FC<PontoViewProps> = ({
           </button>
         ))}
         <button
-          onClick={() => setShowEspelho(true)}
+          onClick={() => setShowTimecardPdf(true)}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1A1A72] text-white hover:bg-[#12124f] text-xs font-semibold transition-colors ml-auto"
         >
           <span className="material-symbols-outlined text-base">description</span>
@@ -1350,15 +1361,22 @@ export const PontoView: React.FC<PontoViewProps> = ({
 
       {/* ===== Registros recentes ===== */}
       <div id="card-registros">
-        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Registros recentes de frequência</h3>
-        {punches.length === 0 ? (
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 mb-3">
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Registros recentes de frequência</h3>
+          <div className="grid grid-cols-3 gap-2 w-full sm:w-auto">
+            <input aria-label="Mês dos registros" type="month" value={recordPeriod} onChange={(e) => setRecordPeriod(e.target.value)} className="min-w-0 border border-slate-200 rounded-lg px-2 py-2 text-[11px]" />
+            <select aria-label="Tipo de batida" value={recordType} onChange={(e) => setRecordType(e.target.value as 'TODOS' | PunchType)} className="min-w-0 border border-slate-200 rounded-lg px-2 py-2 text-[11px]"><option value="TODOS">Tipos</option><option value="ENTRADA">Entrada</option><option value="PAUSA">Almoço</option><option value="RETORNO">Retorno</option><option value="SAIDA">Saída</option></select>
+            <select aria-label="Situação da localização" value={recordGps} onChange={(e) => setRecordGps(e.target.value as 'TODOS' | 'COM_GPS' | 'SEM_GPS')} className="min-w-0 border border-slate-200 rounded-lg px-2 py-2 text-[11px]"><option value="TODOS">Localização</option><option value="COM_GPS">Com GPS</option><option value="SEM_GPS">Sem GPS</option></select>
+          </div>
+        </div>
+        {filteredRecentPunches.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm py-16 text-center text-slate-400">
             <span className="material-symbols-outlined text-4xl text-slate-300">schedule</span>
             <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">Nenhuma batida registrada</p>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {punches.map((p) => (
+            {filteredRecentPunches.map((p) => (
               <DataListRow
                 key={p.id}
                 leading={
@@ -1371,7 +1389,7 @@ export const PontoView: React.FC<PontoViewProps> = ({
                   <>
                     <span className="flex items-center gap-1">
                       <span className="material-symbols-outlined text-sm text-slate-400">location_on</span>
-                      <span className="font-data-mono">{hasGps(p) ? `${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}` : 'Sem GPS'}</span>
+                      <span className="font-data-mono">{hasGps(p) ? `GPS confirmado${p.accuracy ? ` · ±${p.accuracy}m` : ''}` : 'Sem localização'}</span>
                     </span>
                     {p.accuracy ? <span className="text-slate-400">Precisão ~{p.accuracy}m</span> : null}
                     {hasGps(p) && (
@@ -1595,7 +1613,7 @@ export const PontoView: React.FC<PontoViewProps> = ({
             <div className="font-data-mono text-xs space-y-2.5 bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6">
               <div><strong className="text-slate-900">NOME:</strong> {currentUser}</div>
               <div><strong className="text-slate-900">PERÍODO:</strong> 01 A 31 (mês atual)</div>
-              <div><strong className="text-slate-900">JORNADA:</strong> {SCALE.start} às {SCALE.end} (almoço {SCALE.lunchStart}–{SCALE.lunchEnd})</div>
+              <div><strong className="text-slate-900">JORNADA:</strong> {scheduleLabel}</div>
               <div><strong className="text-slate-900">BANCO DE HORAS:</strong> {week.banco}</div>
             </div>
             <div className="flex gap-2">
@@ -1615,6 +1633,13 @@ export const PontoView: React.FC<PontoViewProps> = ({
           </div>
         </div>
       )}
+      {nextType && (
+        <div className="md:hidden fixed bottom-[4.5rem] left-3 right-3 z-30 rounded-xl bg-white/95 backdrop-blur border border-slate-200 shadow-xl p-2 flex items-center gap-2">
+          <div className="min-w-0 flex-1 pl-2"><p className="text-[10px] text-slate-500">Próxima batida</p><p className="text-xs font-bold text-slate-800 truncate">{NEXT_INFO[nextType].label}</p></div>
+          <button onClick={handleBaterPonto} disabled={punching || locating} className={`shrink-0 px-4 py-3 rounded-lg text-white text-xs font-bold ${NEXT_INFO[nextType].classes}`}>{locating ? 'GPS…' : 'Registrar'}</button>
+        </div>
+      )}
+      {showTimecardPdf && <TimecardPDFView employee={currentUser} punches={punches.filter((p) => p.employeeName === currentUser)} scheduleLabel={scheduleLabel} bank={week.banco} onClose={() => setShowTimecardPdf(false)} />}
     </div>
   );
 };
