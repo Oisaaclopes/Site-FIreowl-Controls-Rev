@@ -16,7 +16,7 @@ const META: Record<string, { label: string; icon: string }> = {
 };
 
 // Ordem no bottom bar (Início, e Relatórios em destaque — foco do técnico).
-const TECH_ORDER: TabPath[] = ['painel', 'agenda', 'relatorios', 'ponto'];
+const TECH_ORDER: TabPath[] = ['painel', 'agenda', 'relatorios', 'pedidos', 'ponto'];
 
 interface BottomNavProps {
   currentTab: TabPath;

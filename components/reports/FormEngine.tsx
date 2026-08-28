@@ -2,7 +2,7 @@
 
 // Motor de formulário por template (renderer). onCreateCatalogo é threadeado
 // FormEngine -> Repeater/FieldControl para o "Cadastrar novo…" dos comboboxes.
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   TemplateSchema,
   SectionSchema,
@@ -40,7 +40,17 @@ export interface CatalogSources {
   pendenciasAbertas: { id: string; label: string }[];
   /** Lista pré-pronta de dispositivos por categoria (ex.: catálogo SDAI do
    * Estoque) para adição rápida no checklist da preventiva. */
-  dispositivosPadrao?: { grupo: string; itens: string[] }[];
+  dispositivosPadrao?: {
+    grupo: string;
+    itens: {
+      id: string;
+      nome: string;
+      marca?: string;
+      modelo?: string;
+      quantidade: number;
+      unidade?: string;
+    }[];
+  }[];
 }
 
 interface FormEngineProps {
@@ -331,7 +341,11 @@ const Repeater: React.FC<{
 }> = ({ field, cards, onCards, catalog, role, onCreateCatalogo }) => {
   const schema = field.card_schema || [];
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [addedCount, setAddedCount] = useState(0);
+  const [pickerQuery, setPickerQuery] = useState('');
+  const [pickerSubcategory, setPickerSubcategory] = useState('');
+  const [pickerBrand, setPickerBrand] = useState('');
+  const [onlyAvailable, setOnlyAvailable] = useState(false);
+  const [selectedDeviceIds, setSelectedDeviceIds] = useState<Set<string>>(() => new Set());
   // Lista pré-pronta só faz sentido no checklist de dispositivos (preventiva).
   const dispositivosPadrao =
     field.tipo === 'checklist_dispositivos' ? catalog.dispositivosPadrao || [] : [];
@@ -345,14 +359,56 @@ const Repeater: React.FC<{
     onCards([...cards, blank]);
   };
   // Adiciona um card a partir da lista pré-pronta, preenchendo o "dispositivo".
-  const addFromPadrao = (nome: string) => {
+  const makeDeviceCard = (item: (typeof dispositivosPadrao)[number]['itens'][number]) => {
     const blank: RepeaterCard = {};
     schema.forEach((f) => {
       if (f.default !== undefined) blank[f.key] = f.default;
     });
-    blank['dispositivo'] = nome;
-    onCards([...cards, blank]);
-    setAddedCount((n) => n + 1);
+    blank['dispositivo'] = item.nome;
+    // Mantém o vínculo do item para impedir repetição mesmo quando dois
+    // produtos cadastrados possuem o mesmo nome.
+    blank['inventory_item_id'] = item.id;
+    return blank;
+  };
+  const existingDeviceIds = new Set(cards.map((card) => String(card.inventory_item_id || '')).filter(Boolean));
+  // Relatórios antigos não têm o id do estoque; nesses casos o nome ainda é a
+  // melhor proteção contra repetição. Os novos usam o id e aceitam itens com
+  // nomes iguais, porém cadastros diferentes.
+  const existingLegacyDeviceNames = new Set(
+    cards.filter((card) => !card.inventory_item_id).map((card) => String(card.dispositivo || '')).filter(Boolean)
+  );
+  const flatDevices = useMemo(
+    () => dispositivosPadrao.flatMap((group) => group.itens.map((item) => ({ ...item, grupo: group.grupo }))),
+    [dispositivosPadrao]
+  );
+  const subcategories = useMemo(
+    () => Array.from(new Set(flatDevices.map((item) => item.grupo))).sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [flatDevices]
+  );
+  const brands = useMemo(
+    () => Array.from(new Set(flatDevices.map((item) => item.marca).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [flatDevices]
+  );
+  const filteredDevices = useMemo(() => {
+    const query = pickerQuery.trim().toLocaleLowerCase('pt-BR');
+    return flatDevices.filter((item) => {
+      const haystack = [item.nome, item.marca, item.modelo, item.grupo].filter(Boolean).join(' ').toLocaleLowerCase('pt-BR');
+      return (!pickerSubcategory || item.grupo === pickerSubcategory)
+        && (!pickerBrand || item.marca === pickerBrand)
+        && (!onlyAvailable || item.quantidade > 0)
+        && (!query || haystack.includes(query));
+    });
+  }, [flatDevices, onlyAvailable, pickerBrand, pickerQuery, pickerSubcategory]);
+  const toggleDevice = (id: string) => setSelectedDeviceIds((current) => {
+    const next = new Set(current);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+  const addSelectedDevices = () => {
+    const toAdd = flatDevices.filter((item) => selectedDeviceIds.has(item.id) && !existingDeviceIds.has(item.id) && !existingLegacyDeviceNames.has(item.nome));
+    if (toAdd.length) onCards([...cards, ...toAdd.map(makeDeviceCard)]);
+    setSelectedDeviceIds(new Set());
+    setPickerOpen(false);
   };
   const updateCard = (idx: number, key: string, v: unknown) => {
     onCards(cards.map((c, i) => (i === idx ? { ...c, [key]: v } : c)));
@@ -439,7 +495,11 @@ const Repeater: React.FC<{
           <button
             type="button"
             onClick={() => {
-              setAddedCount(0);
+              setPickerQuery('');
+              setPickerSubcategory('');
+              setPickerBrand('');
+              setOnlyAvailable(false);
+              setSelectedDeviceIds(new Set());
               setPickerOpen(true);
             }}
             className="flex-1 py-2 rounded-lg border border-[#E63946]/50 bg-[#E63946]/5 text-[11px] font-semibold text-[#E63946] hover:bg-[#E63946]/10 transition-colors flex items-center justify-center gap-1.5"
@@ -460,11 +520,11 @@ const Repeater: React.FC<{
       {/* Seletor da lista pré-pronta (dispositivos por categoria) */}
       {pickerOpen && (
         <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl max-h-[85vh] flex flex-col shadow-2xl">
+          <div className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl max-h-[90vh] flex flex-col shadow-2xl">
             <div className="flex items-center justify-between p-4 border-b border-slate-100">
               <div>
-                <h4 className="text-sm font-bold text-slate-900 uppercase">Lista de dispositivos</h4>
-                <p className="text-[11px] text-slate-500">Toque para adicionar ao checklist</p>
+                <h4 className="text-sm font-bold text-slate-900 uppercase">Selecionar dispositivos</h4>
+                <p className="text-[11px] text-slate-500">Filtre o estoque da área e adicione em lote ao checklist</p>
               </div>
               <button
                 type="button"
@@ -474,42 +534,57 @@ const Repeater: React.FC<{
                 ✕
               </button>
             </div>
-            <div className="overflow-y-auto p-4 space-y-4">
-              {dispositivosPadrao.map((g) => (
-                <div key={g.grupo}>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">{g.grupo}</p>
-                  <div className="flex flex-col gap-1.5">
-                    {g.itens.map((nome) => (
-                      <button
-                        key={nome}
-                        type="button"
-                        onClick={() => addFromPadrao(nome)}
-                        className="w-full flex items-center justify-between gap-2 text-left px-3 py-2 rounded-lg border border-slate-200 hover:border-[#1A1A72] hover:bg-[#1A1A72]/5 transition-colors"
-                      >
-                        <span className="text-xs text-slate-700">{nome}</span>
-                        <span className="material-symbols-outlined text-base text-[#1A1A72] shrink-0">add_circle</span>
-                      </button>
-                    ))}
-                  </div>
+            <div className="overflow-y-auto p-4 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="relative sm:col-span-3">
+                  <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-base">search</span>
+                  <input value={pickerQuery} onChange={(e) => setPickerQuery(e.target.value)} placeholder="Buscar por nome, marca ou modelo…" className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20" />
                 </div>
-              ))}
+                <select value={pickerSubcategory} onChange={(e) => setPickerSubcategory(e.target.value)} className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white">
+                  <option value="">Todas as subcategorias</option>
+                  {subcategories.map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+                <select value={pickerBrand} onChange={(e) => setPickerBrand(e.target.value)} className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white">
+                  <option value="">Todas as marcas</option>
+                  {brands.map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+                <label className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg cursor-pointer">
+                  <input type="checkbox" checked={onlyAvailable} onChange={(e) => setOnlyAvailable(e.target.checked)} className="accent-[#1A1A72]" /> Em estoque
+                </label>
+              </div>
+              <div className="flex items-center justify-between text-[11px] text-slate-500">
+                <span><strong className="text-slate-800">{filteredDevices.length}</strong> dispositivo(s) encontrado(s)</span>
+                {selectedDeviceIds.size > 0 && <button type="button" onClick={() => setSelectedDeviceIds(new Set())} className="font-semibold text-[#1A1A72] hover:underline">Limpar seleção</button>}
+              </div>
+              <div className="flex flex-col gap-1.5">
+                {filteredDevices.map((item) => {
+                  const alreadyAdded = existingDeviceIds.has(item.id) || existingLegacyDeviceNames.has(item.nome);
+                  const selected = selectedDeviceIds.has(item.id);
+                  return (
+                    <button key={item.id} type="button" disabled={alreadyAdded} onClick={() => toggleDevice(item.id)} className={`w-full flex items-center gap-3 text-left px-3 py-2.5 rounded-lg border transition-colors ${alreadyAdded ? 'bg-slate-50 border-slate-100 text-slate-400 cursor-not-allowed' : selected ? 'border-[#1A1A72] bg-[#1A1A72]/5' : 'border-slate-200 hover:border-[#1A1A72]/50 hover:bg-slate-50'}`}>
+                      <span className={`material-symbols-outlined text-lg ${selected ? 'text-[#1A1A72]' : 'text-slate-400'}`}>{alreadyAdded ? 'check_circle' : selected ? 'check_box' : 'check_box_outline_blank'}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-xs font-semibold text-slate-700 truncate">{item.nome}</span>
+                        <span className="block text-[10px] text-slate-500 truncate">{[item.grupo, item.marca, item.modelo].filter(Boolean).join(' · ') || 'Sem detalhes de catálogo'}</span>
+                      </span>
+                      <span className={`shrink-0 text-[10px] font-bold ${item.quantidade > 0 ? 'text-emerald-700' : 'text-amber-700'}`}>{alreadyAdded ? 'Já adicionado' : `${item.quantidade} ${item.unidade || 'un.'}`}</span>
+                    </button>
+                  );
+                })}
+                {filteredDevices.length === 0 && <p className="py-8 text-center text-xs text-slate-400">Nenhum dispositivo corresponde aos filtros.</p>}
+              </div>
             </div>
             <div className="flex items-center justify-between p-4 border-t border-slate-100">
               <span className="text-[11px] text-slate-500">
-                {addedCount > 0 ? (
-                  <>
-                    <strong className="text-slate-800">{addedCount}</strong> adicionado(s)
-                  </>
-                ) : (
-                  'Nenhum adicionado ainda'
-                )}
+                <strong className="text-slate-800">{selectedDeviceIds.size}</strong> selecionado(s)
               </span>
               <button
                 type="button"
-                onClick={() => setPickerOpen(false)}
-                className="px-5 py-2 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] text-white text-xs font-semibold uppercase tracking-wide"
+                onClick={addSelectedDevices}
+                disabled={selectedDeviceIds.size === 0}
+                className="px-5 py-2 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold uppercase tracking-wide"
               >
-                Concluir
+                Adicionar selecionados
               </button>
             </div>
           </div>
@@ -642,4 +717,3 @@ export const FormEngine: React.FC<FormEngineProps & {
     </div>
   );
 };
-

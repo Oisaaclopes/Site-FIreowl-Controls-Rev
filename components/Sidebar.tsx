@@ -10,6 +10,7 @@ interface SidebarProps {
   currentTab: TabPath;
   onSelectTab: (tab: TabPath) => void;
   userRole: UserRole;
+  userName: string;
   onOpenAuthModal: () => void;
   onLogout?: () => void;
   canSwitchRole?: boolean;
@@ -26,6 +27,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentTab,
   onSelectTab,
   userRole,
+  userName,
   onOpenAuthModal,
   onLogout,
   canSwitchRole = false,
@@ -227,7 +229,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
         <div className={`flex items-center justify-between bg-white/10 p-2.5 rounded-lg border border-white/10 ${isCollapsed ? 'lg:hidden' : ''}`}>
           <div className="flex flex-col">
-            <span className="text-xs text-white font-bold">Admin Fireowl</span>
+            <span className="text-xs text-white font-bold truncate max-w-36">{userName}</span>
             <span className="font-label-caps text-[9px] text-white/60">{userRole}</span>
           </div>
           <span className="material-symbols-outlined text-white/60 text-base">badge</span>

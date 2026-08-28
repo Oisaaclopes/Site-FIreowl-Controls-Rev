@@ -809,6 +809,7 @@ export function CrmApp({
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
         userRole={userRole}
+        userName={userName}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
         onLogout={onLogout}
         canSwitchRole={canSwitchRole}
@@ -824,6 +825,7 @@ export function CrmApp({
         {/* Fixed Header */}
         <Header
           userRole={userRole}
+          userName={userName}
           onOpenAuthModal={() => setIsAuthModalOpen(true)}
           onOpenMenu={() => setSidebarOpen(true)}
           canSwitchRole={canSwitchRole}

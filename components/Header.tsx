@@ -7,6 +7,7 @@ import { pendingCount, isOnline } from '@/lib/offline/reportSync';
 
 interface HeaderProps {
   userRole: UserRole;
+  userName: string;
   onOpenAuthModal: () => void;
   onQuickSearchClick?: () => void;
   onOpenMenu?: () => void;
@@ -17,6 +18,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   userRole,
+  userName,
   onOpenAuthModal,
   onQuickSearchClick,
   onOpenMenu,
@@ -117,34 +119,38 @@ export const Header: React.FC<HeaderProps> = ({
             title="Notificações do Sistema"
           >
             <span className="material-symbols-outlined">notifications</span>
-            <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-[#E63946] rounded-full ring-2 ring-white"></div>
+            {(!online || pend > 0) && <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-[#E63946] rounded-full ring-2 ring-white"></div>}
           </button>
 
           {showNotifications && (
             <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-lg shadow-xl z-50 p-4 text-xs">
               <div className="flex justify-between items-center border-b border-slate-200 pb-3 mb-3">
-                <span className="font-bold text-slate-800 uppercase text-xs">Notificações Críticas</span>
-                <span className="font-data-mono text-[10px] bg-red-100 text-[#E63946] px-2 py-0.5 rounded-full font-bold">3 Alertas</span>
+                <span className="font-bold text-slate-800 uppercase text-xs">Avisos do sistema</span>
+                <span className={`font-data-mono text-[10px] px-2 py-0.5 rounded-full font-bold ${!online || pend > 0 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{!online || pend > 0 ? 'Atenção' : 'Em dia'}</span>
               </div>
               <div className="space-y-2.5">
-                <div className="p-2.5 bg-red-50 border-l-4 border-[#E63946] rounded-r-md">
-                  <p className="font-bold text-[#E63946] uppercase text-[11px]">OS Atrasada - Condomínio Solar</p>
-                  <p className="text-[11px] text-slate-600 mt-0.5">Aferição de baterias 24V pendente há 10 dias.</p>
-                </div>
-                <div className="p-2.5 bg-slate-50 border-l-4 border-slate-800 rounded-r-md">
-                  <p className="font-bold text-slate-900 uppercase text-[11px]">Preventiva Catuaí Shopping</p>
-                  <p className="text-[11px] text-slate-600 mt-0.5">Agendada inspeção do laço 02 hoje às 14:30.</p>
-                </div>
-                <div className="p-2.5 bg-amber-50 border-l-4 border-amber-500 rounded-r-md">
-                  <p className="font-bold text-amber-900 uppercase text-[11px]">Estoque Mínimo - Botoeiras</p>
-                  <p className="text-[11px] text-slate-600 mt-0.5">Apenas 12 unidades em estoque. Reposição recomendada.</p>
-                </div>
+                {!online ? (
+                  <div className="p-2.5 bg-slate-100 border-l-4 border-slate-500 rounded-r-md">
+                    <p className="font-bold text-slate-800 uppercase text-[11px]">Sem conexão</p>
+                    <p className="text-[11px] text-slate-600 mt-0.5">Os dados continuam salvos neste aparelho e serão enviados quando a conexão voltar.</p>
+                  </div>
+                ) : pend > 0 ? (
+                  <div className="p-2.5 bg-amber-50 border-l-4 border-amber-500 rounded-r-md">
+                    <p className="font-bold text-amber-900 uppercase text-[11px]">Envio pendente</p>
+                    <p className="text-[11px] text-slate-600 mt-0.5">{pend} relatório(s) aguardando sincronização com o servidor.</p>
+                  </div>
+                ) : (
+                  <div className="p-2.5 bg-emerald-50 border-l-4 border-emerald-500 rounded-r-md">
+                    <p className="font-bold text-emerald-900 uppercase text-[11px]">Tudo sincronizado</p>
+                    <p className="text-[11px] text-slate-600 mt-0.5">Não há relatórios aguardando envio neste aparelho.</p>
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => setShowNotifications(false)}
                 className="w-full mt-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded text-center text-[11px]"
               >
-                Marcar todas como lidas
+                Fechar
               </button>
             </div>
           )}
@@ -169,7 +175,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* User Profile Info */}
         <div className="flex items-center gap-3 border-l border-slate-200 pl-4">
           <div className="text-right hidden sm:block">
-            <p className="font-bold text-slate-800 text-xs">Admin Fireowl</p>
+            <p className="font-bold text-slate-800 text-xs truncate max-w-36">{userName}</p>
             <p className="font-label-caps text-slate-500 text-[10px]">{userRole}</p>
           </div>
           {canSwitchRole ? (

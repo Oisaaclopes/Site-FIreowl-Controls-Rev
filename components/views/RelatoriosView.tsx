@@ -639,16 +639,26 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   // oferece os dispositivos SDAI cadastrados (ex.: catálogo Intelbras/Vision).
   const areaCategory = AREA_TO_CATEGORY[formArea] || '';
   const dispositivosPadrao = (() => {
-    const grouped: Record<string, string[]> = {};
+    type DefaultDeviceItems = NonNullable<CatalogSources['dispositivosPadrao']>[number]['itens'];
+    const grouped: Record<string, DefaultDeviceItems> = {};
     inventory
       .filter((i) => areaCategory && i.category === areaCategory)
       .forEach((i) => {
         const g = i.subcategory || 'Outros';
         if (!grouped[g]) grouped[g] = [];
-        if (!grouped[g].includes(i.name)) grouped[g].push(i.name);
+        if (!grouped[g].some((item) => item.id === i.id)) {
+          grouped[g].push({
+            id: i.id,
+            nome: i.name,
+            marca: i.brand,
+            modelo: i.model,
+            quantidade: i.quantity,
+            unidade: i.unit,
+          });
+        }
       });
     return Object.entries(grouped)
-      .map(([grupo, itens]) => ({ grupo, itens: itens.sort((a, b) => a.localeCompare(b, 'pt-BR')) }))
+      .map(([grupo, itens]) => ({ grupo, itens: itens.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')) }))
       .sort((a, b) => a.grupo.localeCompare(b.grupo, 'pt-BR'));
   })();
   const formCatalog: CatalogSources = {
