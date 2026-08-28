@@ -138,6 +138,15 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
                     {(it.unidade || 'un').toUpperCase()} · {it.quantidade}× {brl(it.precoUnitario || 0)}
                     {it.desconto ? <span className="text-[#E63946]"> · desc {brl(it.desconto)}</span> : null}
                   </p>
+                  {(it.sourceOrigins?.length || it.stockSnapshot !== undefined) ? (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {it.sourceOrigins?.slice(0, 2).map((origin, originIndex) => (
+                        <span key={`${origin.reportId}-${originIndex}`} title={origin.reference || origin.label} className="max-w-full truncate rounded bg-indigo-50 px-1.5 py-0.5 text-[9px] font-semibold text-indigo-700">Origem: {origin.label}</span>
+                      ))}
+                      {(it.sourceOrigins?.length || 0) > 2 && <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[9px] font-semibold text-indigo-700">+{(it.sourceOrigins?.length || 0) - 2} origem(ns)</span>}
+                      {it.stockSnapshot !== undefined && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">Saldo consultado: {it.stockSnapshot}</span>}
+                    </div>
+                  ) : null}
                 </div>
                 {/* Menu de opções */}
                 <div className="relative shrink-0">

@@ -523,6 +523,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           ? motivoRecusa.trim() || undefined
           : undefined,
         capaImagemPath: initialPedido?.proposal?.capaImagemPath,
+        surveyOrigin: initialPedido?.proposal?.surveyOrigin,
         pedidoTipo: pedidoTipo || undefined,
         diretrizesNormativas: diretrizes,
         escopoServico,
@@ -709,6 +710,12 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
 
         {/* Corpo: rolagem vertical contínua com sanfonas */}
         <div className="p-4 md:p-6 overflow-y-auto flex-1 space-y-4">
+          {initialPedido?.proposal?.surveyOrigin && (
+            <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 flex items-start gap-2 text-xs text-indigo-950">
+              <span className="material-symbols-outlined text-indigo-700">fact_check</span>
+              <div><strong>Pedido originado de levantamento técnico.</strong> {initialPedido.proposal.surveyOrigin.reportNumber || 'Relatório sem número'} · os itens abaixo preservam a origem para conferência comercial.</div>
+            </div>
+          )}
           {/* ---- Informações do Pedido (sempre visível) ---- */}
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
             <h3 className="font-bold text-[#0B1E38] uppercase text-sm flex items-center gap-2 mb-4">

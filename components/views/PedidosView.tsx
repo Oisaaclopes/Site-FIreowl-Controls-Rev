@@ -708,6 +708,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           <p className="font-bold text-slate-900 text-sm truncate">{ped.referencia || 'Proposta comercial sem título'}</p>
           <p className="text-[11px] text-[#1A1A72] font-semibold truncate">{nomeFantasiaCliente(ped.clienteNome)}</p>
           {nomeFantasiaCliente(ped.clienteNome) !== razaoSocialCliente(ped.clienteNome) && <p className="text-[10px] text-slate-400 truncate">{razaoSocialCliente(ped.clienteNome)}</p>}
+          {ped.proposal?.surveyOrigin && <p className="mt-1 inline-flex items-center gap-1 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700"><span className="material-symbols-outlined text-xs">fact_check</span>Levantamento {ped.proposal.surveyOrigin.reportNumber || 'técnico'}</p>}
           {ped.proposal.motivoRecusa && (ped.status === 'recusado' || ped.status === 'expirado') && (
             <p className="text-[10px] text-red-600 truncate" title={ped.proposal.motivoRecusa}>Motivo: {ped.proposal.motivoRecusa}</p>
           )}

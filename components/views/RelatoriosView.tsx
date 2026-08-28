@@ -502,6 +502,10 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     () => ({
       categorias: uniq([...GRUPOS_FALHA, ...inventory.map((i) => i.category), ...services.map((s) => s.category)]),
       itens: uniq([...inventory.map((i) => i.name), ...services.map((s) => s.title)]),
+      itensDetalhados: [
+        ...inventory.map((i) => ({ id: i.id, label: i.name, tipo: 'material' as const, marca: i.brand, modelo: i.model, unidade: i.unit })),
+        ...services.map((s) => ({ id: s.id, label: s.title, tipo: 'servico' as const, unidade: 'vb' })),
+      ],
       marcas: uniqCI([...brands.map((b) => b.name), ...inventory.map((i) => i.brand || '')]),
       // Modelo do produto; quando o item não tem "modelo" preenchido (ex.: os
       // catálogos importados de Intelbras/Tecnohold), cai para o NOME — assim a

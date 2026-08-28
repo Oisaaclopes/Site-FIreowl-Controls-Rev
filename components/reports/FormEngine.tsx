@@ -30,6 +30,15 @@ import { SignatureCanvas } from '@/components/reports/SignatureCanvas';
 export interface CatalogSources {
   categorias: string[];
   itens: string[]; // Estoque + Serviços (labels)
+  /** Metadados opcionais para preservar o vínculo ao escolher um item no formulário. */
+  itensDetalhados?: {
+    id: string;
+    label: string;
+    tipo: 'material' | 'servico';
+    marca?: string;
+    modelo?: string;
+    unidade?: string;
+  }[];
   marcas: string[];
   modelos?: string[]; // modelos cadastrados no estoque (lista completa)
   /** Modelos agrupados por marca (do estoque), para filtrar o campo modelo. */
@@ -411,7 +420,29 @@ const Repeater: React.FC<{
     setPickerOpen(false);
   };
   const updateCard = (idx: number, key: string, v: unknown) => {
-    onCards(cards.map((c, i) => (i === idx ? { ...c, [key]: v } : c)));
+    onCards(cards.map((c, i) => {
+      if (i !== idx) return c;
+      const next: RepeaterCard = { ...c, [key]: v };
+      // Necessidades do levantamento: a escolha no catálogo deve carregar o
+      // identificador persistente, não apenas o texto visível.
+      if (key === 'item' || key === 'servico') {
+        const tipo = key === 'item' ? 'material' : 'servico';
+        const candidates = (catalog.itensDetalhados || []).filter((item) => item.tipo === tipo && item.label === String(v));
+        const match = candidates.length === 1 ? candidates[0] : undefined;
+        if (match) {
+          if (tipo === 'material') {
+            next.item_catalogo_id = match.id;
+            if (!next.marca && match.marca) next.marca = match.marca;
+            if (!next.modelo && match.modelo) next.modelo = match.modelo;
+          } else next.service_id = match.id;
+          if (!next.unidade && match.unidade) next.unidade = match.unidade;
+        } else {
+          if (tipo === 'material') delete next.item_catalogo_id;
+          else delete next.service_id;
+        }
+      }
+      return next;
+    }));
   };
   // Aplica vários campos de uma vez (usado pelo seletor de falha padrão).
   const patchCard = (idx: number, patch: Record<string, unknown>) => {
