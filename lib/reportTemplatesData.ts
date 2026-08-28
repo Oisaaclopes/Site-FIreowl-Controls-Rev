@@ -148,6 +148,19 @@ export const LEVANTAMENTO_SDAI: TemplateSchema = {
       campos: [apontamentosRepeater(1)],
     },
     {
+      key: 'necessidades', titulo: 'Necessidades para Orçamento', descricao: 'Registre quantidades técnicas. Isto não baixa nem reserva estoque.', campos: [
+        { key: 'materiais_necessarios', tipo: 'repeater', label: 'Materiais necessários', botao_adicionar: '+ Adicionar material', card_schema: [
+          { key: 'item', tipo: 'autocomplete_catalogo', origem: 'estoque_servicos', label: 'Material', permite_texto_livre: true }, { key: 'marca', tipo: 'autocomplete_catalogo', origem: 'marcas', label: 'Marca' }, { key: 'modelo', tipo: 'texto', label: 'Modelo' }, { key: 'quantidade', tipo: 'numero', label: 'Quantidade', default: 1 }, { key: 'unidade', tipo: 'texto', label: 'Unidade' }, { key: 'source_label', tipo: 'texto', label: 'Origem técnica' }, { key: 'observacao', tipo: 'texto', label: 'Observação' },
+        ] },
+        { key: 'servicos_necessarios', tipo: 'repeater', label: 'Serviços necessários', botao_adicionar: '+ Adicionar serviço', card_schema: [
+          { key: 'servico', tipo: 'autocomplete_catalogo', origem: 'estoque_servicos', label: 'Serviço', permite_texto_livre: true }, { key: 'quantidade', tipo: 'numero', label: 'Quantidade', default: 1 }, { key: 'unidade', tipo: 'texto', label: 'Unidade' }, { key: 'source_label', tipo: 'texto', label: 'Origem técnica' }, { key: 'observacao', tipo: 'texto', label: 'Observação' },
+        ] },
+        { key: 'medicoes', tipo: 'repeater', label: 'Medições', botao_adicionar: '+ Adicionar medição', card_schema: [
+          { key: 'categoria', tipo: 'select', label: 'Tipo', opcoes: ['Cabo', 'Eletroduto', 'Canaleta', 'Fibra', 'UTP', 'Percurso', 'Altura', 'Distância', 'Outro'] }, { key: 'descricao', tipo: 'texto', label: 'Descrição' }, { key: 'quantidade', tipo: 'numero', label: 'Quantidade' }, { key: 'unidade', tipo: 'texto', label: 'Unidade' }, { key: 'local', tipo: 'texto', label: 'Local' }, { key: 'incluir_no_pedido', tipo: 'select', label: 'Incluir no pedido?', opcoes: ['Sim', 'Não'] },
+        ] },
+      ]
+    },
+    {
       key: 'encerramento',
       titulo: 'Encerramento',
       campos: [

@@ -7,6 +7,7 @@ import { marcarTesteFuncional } from '../devices';
 import { insertPendencia, updatePendenciaStatus } from '../pendencias';
 import { PendenciaStatus } from '../types';
 import { fetchCicloAtivo, registrarTestesNoCiclo } from '../ciclos';
+import { replaceSurveyRequirements } from '../surveyRequirements';
 import { idbPut, idbGetAll, idbDelete, idbCount, idbAvailable, STORE_OUTBOX } from './idb';
 
 /* ---------------------------------------------------------------------------
@@ -194,6 +195,7 @@ export async function persistReportBundle(b: ReportBundle): Promise<{ reportId?:
   for (const a of b.answers) {
     await upsertAnswer({ id: '', reportId: report.id, secao: a.secao, fieldKey: a.fieldKey, valor: clean(a.valor) });
   }
+  if (b.report.tipo === 'LEVANTAMENTO') await replaceSurveyRequirements(report.id, b.answers);
 
   for (const p of b.pendencias) {
     await insertPendencia({ ...p, reportOrigemId: report.id });
