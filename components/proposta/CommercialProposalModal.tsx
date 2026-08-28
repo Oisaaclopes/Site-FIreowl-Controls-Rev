@@ -291,6 +291,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     initialPedido?.responsavelComercialNome || 'Isaac Lopes'
   );
   const [status, setStatus] = useState<PedidoStatus>(initialPedido?.status || 'rascunho');
+  const [motivoRecusa, setMotivoRecusa] = useState<string>(initialPedido?.proposal?.motivoRecusa || '');
 
   const [objetivo, setObjetivo] = useState<string>(
     initialPedido?.proposal?.objetivo ||
@@ -518,6 +519,9 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         objetivo,
         cartaApresentacao,
         revisoes: initialPedido?.proposal?.revisoes,
+        motivoRecusa: (overrideStatus || status) === 'recusado' || (overrideStatus || status) === 'expirado'
+          ? motivoRecusa.trim() || undefined
+          : undefined,
         capaImagemPath: initialPedido?.proposal?.capaImagemPath,
         pedidoTipo: pedidoTipo || undefined,
         diretrizesNormativas: diretrizes,
@@ -932,9 +936,23 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                   <option value="em_negociacao">Em Negociação</option>
                   <option value="aceito">Aceito</option>
                   <option value="concluido">Concluída / Recebida</option>
+                  <option value="recusado">Recusada</option>
+                  <option value="expirado">Expirada</option>
                 </select>
               </div>
             </div>
+            {(status === 'recusado' || status === 'expirado') && (
+              <div className="mt-3">
+                <label className={labelCls}>{status === 'recusado' ? 'Motivo da recusa' : 'Observação sobre a expiração'}</label>
+                <textarea
+                  value={motivoRecusa}
+                  onChange={(e) => setMotivoRecusa(e.target.value)}
+                  rows={2}
+                  placeholder="Ex.: valor fora do orçamento, escopo adiado, fornecedor concorrente…"
+                  className={inputCls}
+                />
+              </div>
+            )}
           </div>
 
           {/* ---- Lista de Materiais (puxa do Estoque) ---- */}
