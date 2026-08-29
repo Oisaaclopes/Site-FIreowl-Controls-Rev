@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { InventoryItem, StockMovement, Supplier } from '@/lib/types';
 import { insertStockMovement, fetchStockMovements, isSupabaseConfigured } from '@/lib/inventory';
 import { PRODUCT_CATALOGS, CatalogoConfig } from '@/lib/catalogosProdutos';
+import { applyTechnicalCatalogPlan, planTechnicalCatalogImport, TechnicalCatalogPlan } from '@/lib/catalogSeed/importer';
 
 interface EstoqueViewProps {
   inventory: InventoryItem[];
@@ -758,6 +759,7 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
   const [showUnitModal, setShowUnitModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [technicalPlan, setTechnicalPlan] = useState<TechnicalCatalogPlan | null>(null);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [errors, setErrors] = useState<{ name?: boolean; category?: boolean; unit?: boolean }>({});
   const fileRef = useRef<HTMLInputElement>(null);
@@ -1238,6 +1240,22 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     }
   };
 
+  const handleApplyTechnicalCatalog = async () => {
+    if (!technicalPlan || importing) return;
+    setImporting(true);
+    try {
+      await applyTechnicalCatalogPlan(technicalPlan, {
+        insert: async (item) => { await onAddInventoryItem(item); },
+        update: async (item) => { await onUpdateInventoryItem?.(item); },
+      });
+      alert(`Catálogo técnico atualizado: ${technicalPlan.toInsert.length} novo(s) e ${technicalPlan.safeUpdates.length} complemento(s) seguro(s).`);
+      setTechnicalPlan(null);
+    } catch (error) {
+      console.error('Falha ao aplicar catálogo técnico:', error);
+      alert('Não foi possível concluir a importação. Nenhum saldo, preço, custo ou fornecedor foi alterado.');
+    } finally { setImporting(false); }
+  };
+
   const SaveButton = (
     <button
       type="button"
@@ -1335,6 +1353,9 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                   </button>
                   <div className="my-1 h-px bg-slate-100" />
                   <p className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Importar catálogo</p>
+                  <button onClick={() => { setShowHeaderMenu(false); setTechnicalPlan(planTechnicalCatalogImport(inventory)); }} disabled={importing} className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-[#1A1A72] font-semibold disabled:opacity-60">
+                    <span className="material-symbols-outlined text-base">fact_check</span> Auditar catálogo técnico
+                  </button>
                   {PRODUCT_CATALOGS.map((cfg) => (
                     <button
                       key={cfg.key}
@@ -1526,6 +1547,14 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
       )}
 
       {/* Catálogos de fornecedores prontos para importar (um por catálogo) */}
+      {technicalPlan && (
+        <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 flex flex-col gap-3">
+          <div className="flex items-start justify-between gap-3"><div className="text-xs text-indigo-950"><strong>Prévia do catálogo técnico:</strong> {technicalPlan.analyzed} analisados · {technicalPlan.existing} já existentes · {technicalPlan.toInsert.length} novos · {technicalPlan.safeUpdates.length} complementos seguros · {technicalPlan.possibleDuplicates.length} possível(is) duplicidade(s).</div><button onClick={() => setTechnicalPlan(null)} className="text-indigo-700">✕</button></div>
+          <div className="flex flex-wrap gap-2">{Object.entries(technicalPlan.byBrand).map(([brand, value]) => <span key={brand} className="rounded bg-white px-2 py-1 text-[10px] font-semibold text-indigo-800">{brand}: {value.insert} novo(s), {value.existing} existente(s)</span>)}</div>
+          {technicalPlan.possibleDuplicates.length > 0 && <p className="text-[11px] text-amber-800">Possíveis duplicidades foram preservadas fora da importação para revisão manual.</p>}
+          <div><button onClick={handleApplyTechnicalCatalog} disabled={importing} className="rounded-lg bg-[#1A1A72] px-4 py-2 text-[11px] font-bold uppercase text-white disabled:opacity-60">{importing ? 'Importando…' : 'Aplicar importação segura'}</button></div>
+        </div>
+      )}
       {catalogosPendentes.map(({ cfg, faltam }) => (
         <div
           key={cfg.key}
