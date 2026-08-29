@@ -13,15 +13,16 @@ Registro atualizado em 29/08/2026. Itens concluídos não entram nesta lista.
 - Indicadores comerciais de conversão, perdas, validade e tempo médio estimado até aceite.
 - Conversão guiada de proposta aceita em OS e, quando recorrente, em contrato com vínculo de origem.
 - Conversão de proposta aceita não recorrente em pedido interno de fornecimento com itens, valores e vínculo de origem.
+- Aba de fornecimento com acompanhamento de fornecedor, cotação, compra e recebimento.
 
 ## Pendências reais
 
 1. Decidir a política de emissão offline: hoje o documento é emitido mesmo se o registro público de QR não puder ser publicado.
 2. Adicionar notas e eventos de comunicação à linha do tempo do cliente.
-3. Criar uma lista operacional própria para acompanhar status, fornecedor, compra e recebimento dos pedidos de fornecimento.
+3. Integrar o recebimento do pedido de fornecimento ao estoque para atualizar quantidades após conferência.
 4. Validar a comparação lado a lado de revisões com textos extensos e histórico de múltiplas versões.
 5. Validar as notificações proativas de vencimento no uso real.
-6. Aplicar a migration 0049 e validar os fluxos ponta a ponta com dados reais em desktop e celular, especialmente permissões/RLS e o catálogo técnico após o seed.
+6. Aplicar as migrations 0049 e 0050 e validar os fluxos ponta a ponta com dados reais em desktop e celular, especialmente permissões/RLS e o catálogo técnico após o seed.
 
 ## Princípio de segurança
 
