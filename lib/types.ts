@@ -587,6 +587,18 @@ export interface InventoryItem {
   catalogOnly?: boolean;
   notes?: string;
   datasheetUrl?: string;
+  /** Ficha técnica estruturada; campos ausentes permanecem ausentes, nunca estimados. */
+  technicalSpecs?: Record<string, string | number | boolean | string[] | null>;
+  shortDescription?: string;
+  commercialDescription?: string;
+  technicalDescription?: string;
+  recommendedUse?: string;
+  technicalNotes?: string;
+  manufacturerUrl?: string;
+  specSourceUrl?: string;
+  specLastVerifiedAt?: string;
+  systemType?: string;
+  marketSegment?: 'PROFESSIONAL' | 'RESIDENTIAL' | 'SMART_HOME';
 }
 
 export interface StockMovement {

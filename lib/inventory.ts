@@ -50,6 +50,17 @@ function rowToItem(r: any): InventoryItem {
     catalogOnly: r.catalog_only ?? undefined,
     notes: r.notes ?? undefined,
     datasheetUrl: r.datasheet_url ?? undefined,
+    technicalSpecs: r.technical_specs ?? undefined,
+    shortDescription: r.short_description ?? undefined,
+    commercialDescription: r.commercial_description ?? undefined,
+    technicalDescription: r.technical_description ?? undefined,
+    recommendedUse: r.recommended_use ?? undefined,
+    technicalNotes: r.technical_notes ?? undefined,
+    manufacturerUrl: r.manufacturer_url ?? undefined,
+    specSourceUrl: r.spec_source_url ?? undefined,
+    specLastVerifiedAt: r.spec_last_verified_at ?? undefined,
+    systemType: r.system_type ?? undefined,
+    marketSegment: r.market_segment ?? undefined,
   };
 }
 
@@ -85,6 +96,17 @@ function itemToRow(i: InventoryItem): Record<string, unknown> {
     catalog_only: i.catalogOnly ?? false,
     notes: i.notes || null,
     datasheet_url: i.datasheetUrl || null,
+    technical_specs: i.technicalSpecs ?? null,
+    short_description: i.shortDescription || null,
+    commercial_description: i.commercialDescription || null,
+    technical_description: i.technicalDescription || null,
+    recommended_use: i.recommendedUse || null,
+    technical_notes: i.technicalNotes || null,
+    manufacturer_url: i.manufacturerUrl || null,
+    spec_source_url: i.specSourceUrl || null,
+    spec_last_verified_at: i.specLastVerifiedAt || null,
+    system_type: i.systemType || null,
+    market_segment: i.marketSegment || null,
   };
 }
 

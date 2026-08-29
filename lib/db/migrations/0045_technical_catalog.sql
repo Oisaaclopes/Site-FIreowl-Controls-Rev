@@ -6,4 +6,15 @@ alter table public.inventory_items add column if not exists product_type text no
 alter table public.inventory_items add column if not exists catalog_only boolean not null default false;
 alter table public.inventory_items add column if not exists notes text;
 alter table public.inventory_items add column if not exists datasheet_url text;
+alter table public.inventory_items add column if not exists technical_specs jsonb;
+alter table public.inventory_items add column if not exists short_description text;
+alter table public.inventory_items add column if not exists commercial_description text;
+alter table public.inventory_items add column if not exists technical_description text;
+alter table public.inventory_items add column if not exists recommended_use text;
+alter table public.inventory_items add column if not exists technical_notes text;
+alter table public.inventory_items add column if not exists manufacturer_url text;
+alter table public.inventory_items add column if not exists spec_source_url text;
+alter table public.inventory_items add column if not exists spec_last_verified_at timestamptz;
+alter table public.inventory_items add column if not exists system_type text;
+alter table public.inventory_items add column if not exists market_segment text;
 create index if not exists inventory_items_catalog_lookup_idx on public.inventory_items (category, brand, model);
