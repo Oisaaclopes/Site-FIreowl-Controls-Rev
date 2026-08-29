@@ -579,6 +579,14 @@ export interface InventoryItem {
   /** Cadastro provisório iniciado em campo (relatório). O marcador persistido é
    * o código "PROV-…"; este flag é a conveniência em memória na sessão. */
   pendenteValidacao?: boolean;
+  /** Metadados do catálogo técnico; não significam saldo físico. */
+  productLine?: string;
+  technologies?: string[];
+  catalogStatus?: 'ATIVO' | 'LEGADO' | 'DESCONTINUADO' | 'A_VALIDAR';
+  productType?: 'EQUIPMENT' | 'MATERIAL' | 'ACCESSORY' | 'SOFTWARE' | 'LICENSE' | 'CONSUMABLE' | 'INFRASTRUCTURE';
+  catalogOnly?: boolean;
+  notes?: string;
+  datasheetUrl?: string;
 }
 
 export interface StockMovement {

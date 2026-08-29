@@ -43,6 +43,13 @@ function rowToItem(r: any): InventoryItem {
     brand: r.brand ?? undefined,
     model: r.model ?? undefined,
     description: r.description ?? undefined,
+    productLine: r.product_line ?? undefined,
+    technologies: Array.isArray(r.technologies) ? r.technologies : undefined,
+    catalogStatus: r.catalog_status ?? undefined,
+    productType: r.product_type ?? undefined,
+    catalogOnly: r.catalog_only ?? undefined,
+    notes: r.notes ?? undefined,
+    datasheetUrl: r.datasheet_url ?? undefined,
   };
 }
 
@@ -71,6 +78,13 @@ function itemToRow(i: InventoryItem): Record<string, unknown> {
     brand: i.brand || null,
     model: i.model || null,
     description: i.description || null,
+    product_line: i.productLine || null,
+    technologies: i.technologies ?? null,
+    catalog_status: i.catalogStatus || 'ATIVO',
+    product_type: i.productType || 'EQUIPMENT',
+    catalog_only: i.catalogOnly ?? false,
+    notes: i.notes || null,
+    datasheet_url: i.datasheetUrl || null,
   };
 }
 
