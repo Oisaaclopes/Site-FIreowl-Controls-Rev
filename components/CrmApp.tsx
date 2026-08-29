@@ -386,16 +386,22 @@ export function CrmApp({
 
   const handleGenerateOSFromPedido = (pedido: Pedido) => {
     const seq = getNextSeq();
+    const area = pedido.proposal.areaPrincipal?.[0] || '';
+    const serviceType = pedido.proposal.tipoServico || '';
+    const type: PedidoOS['type'] = /cftv/i.test(area) ? 'Instalação CFTV'
+      : /preventiva|manutencao/i.test(serviceType) ? 'Preventiva SDAI'
+      : /inspecao/i.test(serviceType) ? 'Inspeção NBR 17240'
+      : 'Corretiva Urgente';
     const newOS: PedidoOS = {
       id: `OS-2026-${seq}`,
       pedidoId: pedido.numeroPedido,
       clientId: pedido.clienteId,
       clientName: pedido.clienteNome,
-      title: pedido.referencia || 'Execução do Projeto e Proposta Aceita',
-      type: 'Preventiva SDAI',
+      title: `${pedido.referencia || 'Execução de proposta aceita'}${pedido.proposal.surveyOrigin?.reportNumber ? ` · origem ${pedido.proposal.surveyOrigin.reportNumber}` : ''}`,
+      type,
       technicianName: pedido.responsavelComercialNome || 'Isaac Lopes',
       scheduledDate: `${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).toUpperCase()} | 08:30`,
-      status: 'EM ANDAMENTO',
+      status: 'ABERTA',
       priority: 'ALTA',
       value: pedido.proposal.valorTotal || 0,
     };
