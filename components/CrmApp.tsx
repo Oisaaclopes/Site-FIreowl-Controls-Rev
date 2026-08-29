@@ -175,15 +175,18 @@ export function CrmApp({
   const [marcasTecnologias, setMarcasTecnologias] = useState<MarcaTecnologia[]>([]);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(INITIAL_COMPANY_PROFILE);
   const [templates, setTemplates] = useState<PedidoTemplate[]>(INITIAL_TEMPLATES);
+  const [templatesReady, setTemplatesReady] = useState(false);
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem('fireowl_pedido_templates');
       if (saved) setTemplates(JSON.parse(saved) as PedidoTemplate[]);
     } catch { /* mantém os modelos empacotados se o navegador não tiver dados válidos */ }
+    finally { setTemplatesReady(true); }
   }, []);
   useEffect(() => {
+    if (!templatesReady) return;
     try { window.localStorage.setItem('fireowl_pedido_templates', JSON.stringify(templates)); } catch { /* armazenamento pode estar indisponível */ }
-  }, [templates]);
+  }, [templates, templatesReady]);
   const [contracts, setContracts] = useState<Contract[]>(isSupabaseConfigured() ? [] : INITIAL_CONTRACTS);
   const [equipmentList, setEquipmentList] = useState<ClientEquipment[]>(INITIAL_EQUIPMENT);
   const [punches, setPunches] = useState<TimePunch[]>(
