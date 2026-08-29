@@ -2,8 +2,9 @@ import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import { SEGURANCA_TRABALHO } from '@/lib/propostaTextos';
-import { C, nv, lnv, PdfHeader, PdfFooter, CamposExtras, CapaBanner } from './pdfKit';
+import { C, nv, lnv, PdfHeader, PdfFooter, CamposExtras, CapaBanner, AuthenticityStamp } from './pdfKit';
 import { DocOptions } from '@/lib/documentos';
+import { verificationUrl } from '@/lib/documentVerification';
 
 export type OrdemServicoPdfOptions = Partial<DocOptions>;
 
@@ -97,6 +98,7 @@ export function OrdemServicoDocument({ pedido, companyProfile, options }: { pedi
   const materiais = itens.filter((e) => e.tipo !== 'servico');
   const servicos = itens.filter((e) => e.tipo === 'servico');
   const prazo = nv(p.prazoExecucao) ? p.prazoExecucao : 'A definir com a equipe técnica';
+  const authenticityUrl = verificationUrl('ordem_servico', pedido.id);
 
   const preRequisitos = lnv(p.responsabilidadesContratante)
     ? p.responsabilidadesContratante
@@ -123,6 +125,7 @@ export function OrdemServicoDocument({ pedido, companyProfile, options }: { pedi
           <InfoCell label="Prazo Previsto" value={prazo} />
           <InfoCell label="Responsável Técnico" value={responsavel} full />
         </View>
+        <AuthenticityStamp url={authenticityUrl} />
 
         <SecHead n="01" titulo="Serviços a Executar" />
         <View style={styles.card}>

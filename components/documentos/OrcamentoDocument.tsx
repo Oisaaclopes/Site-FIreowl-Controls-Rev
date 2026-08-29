@@ -1,9 +1,10 @@
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
-import { C, brl, nv, lnv, PdfHeader, PdfFooter, CamposExtras, itemTotal, DocCover, AreasAtuacaoPage, InclusoExcluso, ResumoExecutivoPage, SlaBloco, QrCode, contatoQrUrl } from './pdfKit';
+import { C, brl, nv, lnv, PdfHeader, PdfFooter, CamposExtras, itemTotal, DocCover, AreasAtuacaoPage, InclusoExcluso, ResumoExecutivoPage, SlaBloco, QrCode, contatoQrUrl, AuthenticityStamp } from './pdfKit';
 import { gerarTituloProposta, apresentacaoAreas } from '@/lib/propostaTitulo';
 import { DocOptions } from '@/lib/documentos';
+import { verificationUrl } from '@/lib/documentVerification';
 
 export type OrcamentoPdfOptions = Partial<DocOptions> & {
   capaImagemUrl?: string;
@@ -179,6 +180,7 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
 
   const contato = [companyProfile.telefone, companyProfile.email].filter(nv).join('  •  ');
   const qrUrl = contatoQrUrl(companyProfile.telefone, companyProfile.email); // §32
+  const authenticityUrl = verificationUrl('orcamento', pedido.id);
   // P1 — título dinâmico (área × tipo) usado como subtítulo da capa.
   const tituloDin = gerarTituloProposta(p.areaPrincipal || [], p.tipoServico);
 
@@ -232,6 +234,7 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
           <InfoCell label="Validade" value={validade} />
           <InfoCell label="Responsável" value={assinante} full />
         </View>
+        <AuthenticityStamp url={authenticityUrl} />
 
         {(nv(p.objetivo) || nv(p.escopoServico)) && (
           <View minPresenceAhead={50}>

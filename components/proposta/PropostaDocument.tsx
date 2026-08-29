@@ -1,7 +1,8 @@
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet, Svg, Path, Line, Rect, Circle, Image, Font } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
-import { InclusoExcluso, ResumoExecutivoPage, SlaBloco, QrCode, contatoQrUrl, ExperienciaParceriasPage } from '@/components/documentos/pdfKit';
+import { InclusoExcluso, ResumoExecutivoPage, SlaBloco, QrCode, contatoQrUrl, ExperienciaParceriasPage, AuthenticityStamp } from '@/components/documentos/pdfKit';
+import { verificationUrl } from '@/lib/documentVerification';
 import { experienciaAtiva } from '@/lib/experienciaSelecao';
 import { gerarTituloProposta, faixaSiglas, tituloEscopo, conclusaoPorTipo, apresentacaoAreas } from '@/lib/propostaTitulo';
 import { montarEstruturaProposta, ordenarEstrutura } from '@/lib/propostaEstrutura';
@@ -1010,6 +1011,7 @@ export function PropostaDocument({
   const objetoBase = nv(p.objetivo) ? p.objetivo : nv(p.escopoServico) ? p.escopoServico : (pedido.referencia || '');
   const objetoResumo = objetoBase.length > 320 ? `${objetoBase.slice(0, 317)}…` : objetoBase;
   const numero = pedido.numeroPedido;
+  const authenticityUrl = verificationUrl('proposta', pedido.id);
   const dataEmissao = pedido.dataEmissao || '';
   const clienteNome = pedido.clienteNome || '';
   const assinante = pedido.responsavelComercialNome || 'Responsável Comercial';
@@ -1541,6 +1543,7 @@ export function PropostaDocument({
                 </View>
               </View>
             ) : null}
+            <AuthenticityStamp url={authenticityUrl} />
           </View>
         </Page>
       )}

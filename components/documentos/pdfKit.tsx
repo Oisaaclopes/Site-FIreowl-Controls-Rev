@@ -196,6 +196,20 @@ export const QrCode = ({ text, size = 68, fg = C.navy }: { text: string; size?: 
   );
 };
 
+/** Selo compacto para documentos cuja autenticidade pode ser conferida publicamente. */
+export const AuthenticityStamp = ({ url }: { url?: string }) => {
+  if (!nv(url)) return null;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: C.s50, borderWidth: 1, borderColor: C.s200, borderLeftWidth: 3, borderLeftColor: C.green, borderRadius: 5, padding: 6, marginTop: 8 }}>
+      <QrCode text={url!} size={34} />
+      <View style={{ marginLeft: 7, flex: 1 }}>
+        <Text style={{ color: C.green, fontSize: 7, fontFamily: 'Roboto', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Documento verificável</Text>
+        <Text style={{ color: C.s600, fontSize: 7.2, marginTop: 1 }}>Aponte a câmera para conferir a autenticidade.</Text>
+      </View>
+    </View>
+  );
+};
+
 /** Faixa com a foto do cliente no topo do documento (só aparece se houver imagem). */
 export const CapaBanner = ({ capaImagemUrl, height = 130 }: { capaImagemUrl?: string; height?: number }) =>
   nv(capaImagemUrl) ? <Image src={capaImagemUrl!} style={{ width: '100%', height, borderRadius: 6, marginBottom: 10, objectFit: 'cover' }} /> : null;

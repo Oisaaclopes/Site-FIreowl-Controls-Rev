@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { PDFViewer, pdf } from '@react-pdf/renderer';
 import { PropostaDocument, PropostaPdfOptions } from './PropostaDocument';
 import { Pedido, CompanyProfile } from '@/lib/types';
 import { nomeArquivoPdf } from '@/lib/utils';
 import { ArrowLeft, Download, Send } from 'lucide-react';
+import { publishDocumentVerification } from '@/lib/documentVerification';
 
 interface Props {
   pedido: Pedido;
@@ -18,6 +19,9 @@ interface Props {
 export default function PropostaPdfInner({ pedido, companyProfile, options, onClose, onSendEmail }: Props) {
   const [downloading, setDownloading] = useState(false);
   const doc = <PropostaDocument pedido={pedido} companyProfile={companyProfile} options={options} />;
+  useEffect(() => {
+    publishDocumentVerification({ type: 'proposta', sourceId: pedido.id, number: pedido.numeroPedido, clientName: pedido.clienteNome, issuedAt: pedido.dataEmissao, status: pedido.status, version: pedido.proposal.revisoes?.at(-1)?.numero }).catch((error) => console.warn('Não foi possível publicar a validação da proposta:', error));
+  }, [pedido]);
 
   const handleDownload = async () => {
     if (downloading) return;

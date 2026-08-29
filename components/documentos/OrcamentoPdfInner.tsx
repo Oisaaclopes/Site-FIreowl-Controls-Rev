@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { PDFViewer, pdf } from '@react-pdf/renderer';
 import { OrcamentoDocument, OrcamentoPdfOptions } from './OrcamentoDocument';
 import { Pedido, CompanyProfile } from '@/lib/types';
 import { nomeArquivoPdf } from '@/lib/utils';
 import { ArrowLeft, Download } from 'lucide-react';
+import { publishDocumentVerification } from '@/lib/documentVerification';
 
 interface Props {
   pedido: Pedido;
@@ -17,6 +18,9 @@ interface Props {
 export default function OrcamentoPdfInner({ pedido, companyProfile, options, onClose }: Props) {
   const [downloading, setDownloading] = useState(false);
   const doc = <OrcamentoDocument pedido={pedido} companyProfile={companyProfile} options={options} />;
+  useEffect(() => {
+    publishDocumentVerification({ type: 'orcamento', sourceId: pedido.id, number: pedido.numeroPedido, clientName: pedido.clienteNome, issuedAt: pedido.dataEmissao, status: pedido.status, version: pedido.proposal.revisoes?.at(-1)?.numero }).catch((error) => console.warn('Não foi possível publicar a validação do orçamento:', error));
+  }, [pedido]);
 
   const handleDownload = async () => {
     if (downloading) return;
