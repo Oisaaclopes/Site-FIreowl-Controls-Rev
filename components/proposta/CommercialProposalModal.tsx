@@ -520,8 +520,29 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   };
 
   // ----------------- montar / salvar -----------------
+  const revisionChanges = (): string[] => {
+    if (!initialPedido?.proposal?.revisoes?.length) return [];
+    const before = initialPedido.proposal;
+    const changed: string[] = [];
+    if (initialPedido.referencia !== referencia) changed.push('referência');
+    if (initialPedido.clienteId !== (selectedClient?.id || '')) changed.push('cliente');
+    if (Number(before.valorTotal || 0) !== Number(effectiveValorTotal || 0)) changed.push('valor');
+    if ((before.objetivo || '') !== objetivo) changed.push('objetivo');
+    if ((before.escopoServico || '') !== escopoServico) changed.push('escopo');
+    if ((before.prazoExecucao || '') !== prazoExecucao) changed.push('prazo de execução');
+    if ((before.garantia || '') !== garantia) changed.push('garantia');
+    if (Number(before.validadePropostaDias || 0) !== Number(validadeDias || 0)) changed.push('validade');
+    if (JSON.stringify(before.equipmentItems || []) !== JSON.stringify(equipmentItems || [])) changed.push('itens e quantidades');
+    if (JSON.stringify(before.formasPagamento || []) !== JSON.stringify(formasPagamento || []) || JSON.stringify(before.condicoesPagamento || []) !== JSON.stringify(condicoesPagamento || [])) changed.push('condições de pagamento');
+    return changed;
+  };
   const buildCurrentPedido = (overrideStatus?: PedidoStatus): Pedido => {
     const now = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
+    const existingRevisions = initialPedido?.proposal?.revisoes || [];
+    const changes = revisionChanges();
+    const revisoes = existingRevisions.length
+      ? existingRevisions.map((revision, index) => index === existingRevisions.length - 1 ? { ...revision, alteracoes: changes } : revision)
+      : undefined;
     return {
       id: initialPedido?.id || `ped_${Date.now()}`,
       numeroPedido,
@@ -546,7 +567,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         experienciaMarcasIds: experienciaAuto ? undefined : experienciaMarcasIds,
         objetivo,
         cartaApresentacao,
-        revisoes: initialPedido?.proposal?.revisoes,
+        revisoes,
         motivoRecusa: (overrideStatus || status) === 'recusado' || (overrideStatus || status) === 'expirado'
           ? motivoRecusa.trim() || undefined
           : undefined,

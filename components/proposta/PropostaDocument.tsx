@@ -1084,7 +1084,7 @@ export function PropostaDocument({
               <Text style={[styles.td, { width: 100, fontFamily: 'Roboto', fontWeight: 700, color: C.ink }]}>{rev.numero}</Text>
               <Text style={[styles.td, { width: 64 }]}>{rev.data}</Text>
               <Text style={[styles.td, { width: 108 }]}>{rev.elaborador}</Text>
-              <Text style={[styles.td, { flex: 1 }]}>{nv(rev.motivo) ? rev.motivo : '—'}</Text>
+              <Text style={[styles.td, { flex: 1 }]}>{[nv(rev.motivo) ? rev.motivo : '', rev.alteracoes?.length ? `Alterações: ${rev.alteracoes.join(', ')}` : ''].filter(Boolean).join('\n') || '—'}</Text>
             </View>
           ))}
           <View style={[styles.tr, { backgroundColor: '#fffbeb' }]} wrap={false}>
