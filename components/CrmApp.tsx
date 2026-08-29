@@ -38,6 +38,7 @@ import {
   PdfPrefs,
   DocumentosPadrao
 } from '@/lib/types';
+import { createOrdemServico, nextOsNumero } from '@/lib/ordensServico';
 
 import {
   INITIAL_CLIENTS,
@@ -384,7 +385,7 @@ export function CrmApp({
     logAction('Exclusão de Proposta', 'Pedidos CRM', `Removida proposta ${ped?.numeroPedido || pedidoId}`);
   };
 
-  const handleGenerateOSFromPedido = (pedido: Pedido) => {
+  const handleGenerateOSFromPedido = async (pedido: Pedido) => {
     const seq = getNextSeq();
     const area = pedido.proposal.areaPrincipal?.[0] || '';
     const serviceType = pedido.proposal.tipoServico || '';
@@ -406,6 +407,20 @@ export function CrmApp({
       value: pedido.proposal.valorTotal || 0,
     };
     handleAddOS(newOS);
+    // Também persiste no módulo operacional usado pela fila de atendimentos de campo.
+    if (isSupabaseConfigured()) {
+      try {
+        const numero = await nextOsNumero();
+        await createOrdemServico({
+          id: '', numero, clienteId: pedido.clienteId, tipo: type === 'Instalação CFTV' ? 'instalacao' : type === 'Preventiva SDAI' ? 'preventiva' : 'corretiva',
+          titulo: newOS.title, descricao: `Gerada do Pedido ${pedido.numeroPedido}.`, status: 'aberta', prioridade: 'alta', pendenciaIds: [],
+          dataAbertura: new Date().toISOString().slice(0, 10), dataPrevista: undefined, criadoPor: pedido.responsavelComercialNome,
+        });
+      } catch (error) {
+        console.error('Falha ao persistir OS operacional:', error);
+        alert('A OS foi criada na sessão comercial, mas não pôde ser enviada para a fila de campo.');
+      }
+    }
     alert(`Ordem de Serviço (${newOS.id}) gerada com sucesso a partir da Proposta ${pedido.numeroPedido}!`);
     setCurrentTab('pedidos');
   };
