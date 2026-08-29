@@ -39,6 +39,7 @@ import {
   DocumentosPadrao
 } from '@/lib/types';
 import { createOrdemServico, nextOsNumero } from '@/lib/ordensServico';
+import { fetchPendencias } from '@/lib/pendencias';
 
 import {
   INITIAL_CLIENTS,
@@ -411,9 +412,15 @@ export function CrmApp({
     if (isSupabaseConfigured()) {
       try {
         const numero = await nextOsNumero();
+        const pendencias = await fetchPendencias(userRole, { clienteId: pedido.clienteId });
+        const originId = pedido.proposal.surveyOrigin?.reportId;
+        const pendenciaIds = pendencias
+          .filter((p) => ['aberta', 'orcada', 'aprovada'].includes(p.status))
+          .filter((p) => p.propostaId === pedido.numeroPedido || (originId && p.reportOrigemId === originId))
+          .map((p) => p.id);
         await createOrdemServico({
           id: '', numero, clienteId: pedido.clienteId, tipo: type === 'Instalação CFTV' ? 'instalacao' : type === 'Preventiva SDAI' ? 'preventiva' : 'corretiva',
-          titulo: newOS.title, descricao: `Gerada do Pedido ${pedido.numeroPedido}.`, status: 'aberta', prioridade: 'alta', pendenciaIds: [],
+          titulo: newOS.title, descricao: `Gerada do Pedido ${pedido.numeroPedido}.`, status: 'aberta', prioridade: 'alta', pendenciaIds,
           dataAbertura: new Date().toISOString().slice(0, 10), dataPrevista: undefined, criadoPor: pedido.responsavelComercialNome,
         });
       } catch (error) {
