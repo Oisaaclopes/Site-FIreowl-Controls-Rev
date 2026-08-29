@@ -168,6 +168,11 @@ function movementRowToObj(r: any): StockMovement {
       : Number(r.resulting_balance),
     note: r.note ?? undefined,
     createdAt: r.created_at ?? undefined,
+    supplyOrderId: r.supply_order_id ?? undefined,
+    unitCost: r.unit_cost === null || r.unit_cost === undefined ? undefined : Number(r.unit_cost),
+    reversesMovementId: r.reverses_movement_id ?? undefined,
+    reversalReason: r.reversal_reason ?? undefined,
+    createdBy: r.created_by ?? undefined,
   };
 }
 

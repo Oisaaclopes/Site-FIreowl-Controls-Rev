@@ -729,6 +729,13 @@ export interface StockMovement {
   resultingBalance?: number;
   note?: string;
   createdAt?: string;
+  /** Origem do movimento (rastreabilidade): pedido de fornecimento. */
+  supplyOrderId?: string;
+  unitCost?: number;
+  /** Estorno: movimento que este movimento reverte + motivo/usuário. */
+  reversesMovementId?: string;
+  reversalReason?: string;
+  createdBy?: string;
 }
 
 export interface SystemAuditLog {

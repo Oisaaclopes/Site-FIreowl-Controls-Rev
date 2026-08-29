@@ -16,6 +16,7 @@ type ExperienciaOpt = {
 import { uploadPropostaCapa, removePropostaCapa, propostaCapaDataUrl, blobToDataUrl, readImageSize } from '@/lib/propostaCapa';
 import { CommercialProposalModal } from '@/components/proposta/CommercialProposalModal';
 import { SupplyReceivingModal } from '@/components/fornecimento/SupplyReceivingModal';
+import { SupplyPurchaseModal } from '@/components/fornecimento/SupplyPurchaseModal';
 import { CommercialProposalPDFView } from '@/components/proposta/CommercialProposalPDFView';
 import { ConclusaoModal } from '@/components/proposta/ConclusaoModal';
 import { DocumentTypeModal } from '@/components/proposta/DocumentTypeModal';
@@ -151,6 +152,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
 }) => {
   const { maskMoney } = usePrivacy();
   const [receivingOrder, setReceivingOrder] = useState<SupplyOrder | null>(null);
+  const [purchasingOrder, setPurchasingOrder] = useState<SupplyOrder | null>(null);
   const isTecnico = userRole === 'TECNICO';
 
   // Aba inicial: atalho "Nova OS" força OS; técnico começa em OS; demais em propostas
@@ -1163,9 +1165,14 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
               <select value={order.status} onChange={(event) => { const status = event.target.value as SupplyOrder['status']; onUpdateSupplyOrder?.({ ...order, status, purchaseDate: status === 'COMPRADO' && !order.purchaseDate ? new Date().toISOString().slice(0, 10) : order.purchaseDate, receivedAt: status === 'RECEBIDO' && !order.receivedAt ? new Date().toISOString() : order.receivedAt }); }} className="w-full lg:w-36 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-semibold"><option value="ABERTO">Aberto</option><option value="EM_COTACAO">Em cotação</option><option value="COMPRADO">Comprado</option><option value="RECEBIDO">Recebido</option><option value="CANCELADO">Cancelado</option></select>
               <div className="text-right shrink-0"><p className="font-data-mono font-bold text-emerald-600">{maskMoney(brl(order.totalValue))}</p><p className="text-[10px] text-slate-400">{order.receivedAt ? 'Recebido' : order.purchaseDate ? `Compra ${order.purchaseDate}` : 'Aguardando compra'}</p></div>
               {order.status !== 'CANCELADO' && order.items.some((it) => it.tipo !== 'servico') && (
-                <button onClick={() => setReceivingOrder(order)} className="shrink-0 inline-flex items-center gap-1.5 bg-[#0B1E38] hover:bg-[#13315C] text-white text-[11px] font-bold uppercase tracking-wide rounded-lg px-3 py-2" title="Registrar recebimento e dar entrada no estoque">
-                  <span className="material-symbols-outlined text-base">inventory_2</span> Receber
-                </button>
+                <div className="flex gap-1.5 shrink-0">
+                  <button onClick={() => setPurchasingOrder(order)} className="inline-flex items-center gap-1 border border-slate-300 hover:border-[#0B1E38] text-slate-600 text-[11px] font-bold uppercase tracking-wide rounded-lg px-2.5 py-2" title="Registrar compra">
+                    <span className="material-symbols-outlined text-base">shopping_cart</span> Comprar
+                  </button>
+                  <button onClick={() => setReceivingOrder(order)} className="inline-flex items-center gap-1 bg-[#0B1E38] hover:bg-[#13315C] text-white text-[11px] font-bold uppercase tracking-wide rounded-lg px-2.5 py-2" title="Registrar recebimento e dar entrada no estoque">
+                    <span className="material-symbols-outlined text-base">inventory_2</span> Receber
+                  </button>
+                </div>
               )}
             </div>
           ))}</div>}
@@ -1179,6 +1186,14 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           currentUserName={currentUserName}
           onClose={() => setReceivingOrder(null)}
           onPosted={() => onSupplyChanged?.()}
+        />
+      )}
+      {purchasingOrder && (
+        <SupplyPurchaseModal
+          order={purchasingOrder}
+          inventory={inventory}
+          onClose={() => setPurchasingOrder(null)}
+          onSaved={() => onSupplyChanged?.()}
         />
       )}
 

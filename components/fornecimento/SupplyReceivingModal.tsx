@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { SupplyOrder, InventoryItem, SupplyReceipt, RejectionReason } from '@/lib/types';
-import { fetchReceipts, createReceipt, postReceiptToStock, recebidoPorChave, keyOf, validaConferencia, excedente, PostItemResult } from '@/lib/supplyReceipts';
+import { fetchReceipts, createReceipt, postReceiptToStock, syncSupplyOrderStatus, recebidoPorChave, keyOf, validaConferencia, excedente, PostItemResult } from '@/lib/supplyReceipts';
 import { isSupabaseConfigured } from '@/lib/inventory';
 
 interface Props {
@@ -127,6 +127,7 @@ export const SupplyReceivingModal: React.FC<Props> = ({ order, inventory, curren
         }))
       );
       const res = await postReceiptToStock(receipt, currentUserName);
+      try { await syncSupplyOrderStatus(order); } catch { /* status derivado é best-effort */ }
       setResults(res);
       setStep('done');
       onPosted?.();

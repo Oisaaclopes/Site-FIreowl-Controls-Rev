@@ -1,5 +1,6 @@
 import { getSupabaseClient } from './supabaseClient';
 import { SupplyReceipt, SupplyReceiptItem, SupplyOrder, SupplyPurchase, PedidoEquipmentItem } from './types';
+import { fetchPurchases } from './supplyPurchases';
 
 /**
  * Recebimentos de fornecimento (parciais) + entrada SEGURA no estoque.
@@ -135,6 +136,35 @@ export async function postReceiptToStock(receipt: SupplyReceipt, postedBy?: stri
     await supabase.from(RECEIPTS).update({ status: 'lancado', stock_posted_at: new Date().toISOString(), stock_posted_by: postedBy || null, updated_at: new Date().toISOString() }).eq('id', receipt.id);
   }
   return results;
+}
+
+/**
+ * Recalcula o status do pedido (deriveSupplyStatus) a partir de recebimentos +
+ * compras reais e persiste se mudou. Fonte de verdade (§35) — chamado após
+ * registrar compra ou dar entrada.
+ */
+export async function syncSupplyOrderStatus(order: SupplyOrder): Promise<SupplyOrder['status']> {
+  const supabase = getSupabaseClient() as any;
+  const [receipts, purchases] = await Promise.all([fetchReceipts(order.id), fetchPurchases(order.id)]);
+  const st = deriveSupplyStatus(order, receipts, purchases);
+  if (st !== order.status) {
+    await supabase.from('supply_orders').update({ status: st, updated_at: new Date().toISOString() }).eq('id', order.id);
+  }
+  return st;
+}
+
+export interface ReverseResult { alreadyReversed: boolean; movementId?: string; skipped?: boolean }
+
+/**
+ * §46/§47 — Estorno seguro de um item já lançado. Gera movimento de SAÍDA
+ * inverso (nunca apaga), exige motivo + usuário, bloqueia saldo negativo,
+ * idempotente. Usa a RPC transacional reverse_supply_receipt_item (0054).
+ */
+export async function reverseReceiptItem(receiptItemId: string, reason: string, user?: string): Promise<ReverseResult> {
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase.rpc('reverse_supply_receipt_item', { p_item_id: receiptItemId, p_reason: reason, p_user: user || null });
+  if (error) throw error;
+  return { alreadyReversed: !!data?.already_reversed, movementId: data?.movement_id || undefined, skipped: !!data?.skipped };
 }
 
 // ---------------------------- derivação pura ----------------------------
