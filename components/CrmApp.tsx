@@ -90,7 +90,7 @@ import { fetchEmpresasAtendidas, upsertEmpresaAtendida, deleteEmpresaAtendida } 
 import { fetchMarcasTecnologias, upsertMarcaTecnologia, deleteMarcaTecnologia } from '@/lib/marcasTecnologias';
 import { fetchTransactions, upsertTransaction, deleteTransaction } from '@/lib/transactions';
 import { fetchContracts, upsertContract } from '@/lib/contracts';
-import { fetchSupplyOrders, insertSupplyOrder } from '@/lib/supplyOrders';
+import { fetchSupplyOrders, insertSupplyOrder, updateSupplyOrder } from '@/lib/supplyOrders';
 import { WorkSchedule } from '@/lib/schedule';
 
 let idSeq = 1000;
@@ -594,6 +594,15 @@ export function CrmApp({
     }
     alert(`Pedido de fornecimento ${order.id} criado. Os itens e valores foram copiados da proposta.`);
   };
+  const handleUpdateSupplyOrder = async (order: SupplyOrder) => {
+    const previous = supplyOrders;
+    setSupplyOrders((orders) => orders.map((item) => item.id === order.id ? order : item));
+    if (!isSupabaseConfigured()) return;
+    try {
+      const stored = await updateSupplyOrder(order);
+      setSupplyOrders((orders) => orders.map((item) => item.id === stored.id ? stored : item));
+    } catch (error) { setSupplyOrders(previous); console.error('Falha ao atualizar pedido de fornecimento:', error); alert('Não foi possível atualizar o pedido de fornecimento.'); }
+  };
 
   const handleDeleteClient = async (client: Client) => {
     setClients((prev) => prev.filter((c) => c.id !== client.id));
@@ -1007,6 +1016,7 @@ export function CrmApp({
               onGenerateOSFromPedido={handleGenerateOSFromPedido}
               onGenerateContractFromPedido={handleGenerateContractFromPedido}
               onGenerateSupplyOrderFromPedido={handleGenerateSupplyOrderFromPedido}
+              onUpdateSupplyOrder={handleUpdateSupplyOrder}
               onSelectClientForReport={handleSelectClientForReport}
               onAddClient={handleAddClient}
               onAddTransaction={handleAddTransaction}

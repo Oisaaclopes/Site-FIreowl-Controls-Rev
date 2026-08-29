@@ -431,6 +431,9 @@ export interface SupplyOrder {
   clientName: string;
   title: string;
   status: 'ABERTO' | 'EM_COTACAO' | 'COMPRADO' | 'RECEBIDO' | 'CANCELADO';
+  supplier?: string;
+  purchaseDate?: string;
+  receivedAt?: string;
   items: PedidoEquipmentItem[];
   totalValue: number;
   createdAt: string;

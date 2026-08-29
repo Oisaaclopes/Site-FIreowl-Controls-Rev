@@ -72,6 +72,7 @@ interface PedidosViewProps {
   onGenerateOSFromPedido: (pedido: Pedido) => void;
   onGenerateContractFromPedido?: (pedido: Pedido) => void;
   onGenerateSupplyOrderFromPedido?: (pedido: Pedido) => void;
+  onUpdateSupplyOrder?: (order: SupplyOrder) => void;
   onSelectClientForReport?: (clientName: string) => void;
   onAddClient?: (client: Client) => void;
   pdfPrefs: PdfPrefs;
@@ -131,6 +132,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   onGenerateOSFromPedido,
   onGenerateContractFromPedido,
   onGenerateSupplyOrderFromPedido,
+  onUpdateSupplyOrder,
   onSelectClientForReport,
   onAddClient,
   onAddTransaction,
@@ -145,7 +147,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   const isTecnico = userRole === 'TECNICO';
 
   // Aba inicial: atalho "Nova OS" força OS; técnico começa em OS; demais em propostas
-  const [viewTab, setViewTab] = useState<'propostas' | 'ordens_servico'>(
+  const [viewTab, setViewTab] = useState<'propostas' | 'ordens_servico' | 'fornecimento'>(
     initialView ?? (isTecnico ? 'ordens_servico' : 'propostas')
   );
 
@@ -932,6 +934,9 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
         >
           <Wrench className="w-4 h-4 text-emerald-400" /> Ordens de Serviço (Campo) ({pedidosOS.length})
         </button>
+        <button onClick={() => { setViewTab('fornecimento'); setFilterStatus('TODOS'); }} className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all ${viewTab === 'fornecimento' ? 'bg-[#0B1E38] text-white shadow-md' : 'text-slate-600 hover:text-slate-900'}`}>
+          <span className="material-symbols-outlined text-base text-sky-600">shopping_cart</span> Fornecimento ({supplyOrders.length})
+        </button>
       </div>
 
       {/* ===================== PROPOSTAS ===================== */}
@@ -1136,6 +1141,23 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
             </div>
           )}
         </>
+      )}
+
+      {/* ===================== FORNECIMENTO ===================== */}
+      {viewTab === 'fornecimento' && !isTecnico && (
+        <section className="space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {(['ABERTO', 'EM_COTACAO', 'COMPRADO', 'RECEBIDO'] as SupplyOrder['status'][]).map((status) => <div key={status} className="bg-white border border-slate-200 rounded-xl p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{status.replace('_', ' ')}</p><p className="mt-1 font-data-mono text-2xl font-bold text-slate-800">{supplyOrders.filter((order) => order.status === status).length}</p></div>)}
+          </div>
+          {supplyOrders.length === 0 ? <div className="bg-white rounded-xl border border-slate-200 py-16 text-center text-slate-400"><span className="material-symbols-outlined text-4xl">shopping_cart</span><p className="mt-2 text-sm font-bold">Nenhum pedido de fornecimento</p><p className="text-xs mt-1">Gere a partir de uma proposta aceita.</p></div> : <div className="space-y-3">{supplyOrders.map((order) => (
+            <div key={order.id} className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col lg:flex-row lg:items-center gap-3">
+              <div className="min-w-0 flex-1"><p className="font-data-mono text-[11px] text-sky-700 font-bold">{order.id}</p><p className="font-bold text-slate-900 truncate">{order.title}</p><p className="text-xs text-slate-500 truncate">{order.clientName} · {order.items.length} item(ns) · origem {order.sourcePedidoId}</p></div>
+              <input value={order.supplier || ''} onChange={(event) => onUpdateSupplyOrder?.({ ...order, supplier: event.target.value })} placeholder="Fornecedor" className="w-full lg:w-36 border border-slate-200 rounded-lg px-2.5 py-2 text-xs" />
+              <select value={order.status} onChange={(event) => { const status = event.target.value as SupplyOrder['status']; onUpdateSupplyOrder?.({ ...order, status, purchaseDate: status === 'COMPRADO' && !order.purchaseDate ? new Date().toISOString().slice(0, 10) : order.purchaseDate, receivedAt: status === 'RECEBIDO' && !order.receivedAt ? new Date().toISOString() : order.receivedAt }); }} className="w-full lg:w-36 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-semibold"><option value="ABERTO">Aberto</option><option value="EM_COTACAO">Em cotação</option><option value="COMPRADO">Comprado</option><option value="RECEBIDO">Recebido</option><option value="CANCELADO">Cancelado</option></select>
+              <div className="text-right shrink-0"><p className="font-data-mono font-bold text-emerald-600">{maskMoney(brl(order.totalValue))}</p><p className="text-[10px] text-slate-400">{order.receivedAt ? 'Recebido' : order.purchaseDate ? `Compra ${order.purchaseDate}` : 'Aguardando compra'}</p></div>
+            </div>
+          ))}</div>}
+        </section>
       )}
 
       {/* ===================== ORDENS DE SERVIÇO ===================== */}
