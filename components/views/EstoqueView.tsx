@@ -1414,7 +1414,7 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
             className="w-full sm:w-56 px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
           >
             <option value="">Todas as categorias</option>
-            {MACRO_CATEGORIES.map((c) => (
+            {Array.from(new Set([...MACRO_CATEGORIES, ...inventory.map((item) => item.category).filter(Boolean)])).sort().map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>
@@ -1427,7 +1427,7 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
             className="w-full sm:w-64 px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#E63946]/20 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
           >
             <option value="">{filterCategory ? 'Todas as subcategorias' : 'Escolha a categoria'}</option>
-            {(filterCategory ? CATALOG[filterCategory] || [] : []).map((s) => (
+            {(filterCategory ? Array.from(new Set([...(CATALOG[filterCategory] || []), ...inventory.filter((item) => item.category === filterCategory).map((item) => item.subcategory).filter(Boolean) as string[]])).sort() : []).map((s) => (
               <option key={s} value={s}>
                 {s}
               </option>
