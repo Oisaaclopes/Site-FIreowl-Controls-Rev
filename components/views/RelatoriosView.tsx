@@ -272,6 +272,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const [formDevices, setFormDevices] = useState<Device[] | undefined>(undefined);
   const [formCiclo, setFormCiclo] = useState<CicloAmostragem | undefined>(undefined);
   const [formAreaDevices, setFormAreaDevices] = useState<Device[]>([]); // corretiva: dispositivos da área
+  const [formOsPendenciaIds, setFormOsPendenciaIds] = useState<string[]>([]);
   const [offlinePend, setOfflinePend] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [online, setOnline] = useState(true);
@@ -632,6 +633,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     setFormTemplateId(loaded.id);
     setFormCliente(clients.find((c) => c.id === clienteId));
     setFormContext({ osId: osId || undefined, contratoId: contratoId || undefined });
+    setFormOsPendenciaIds(osId ? (ordens.find((os) => os.id === osId)?.pendenciaIds || []) : []);
     // Preventiva: carrega o inventário do cliente, garante o ciclo de amostragem
     // vigente e semeia apenas a fatia da visita (dispositivos há mais tempo sem
     // teste). Outros tipos não usam devices/ciclo.
@@ -733,13 +735,13 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       label: `${d.tipoDispositivo || 'Dispositivo'} · ${[d.central, d.laco, d.endereco].filter(Boolean).join('/')}`,
     })),
     pendenciasAprovadas: pendencias
-      .filter((p) => p.status === 'aprovada' && p.clienteId === formCliente?.id)
+      .filter((p) => formOsPendenciaIds.length ? formOsPendenciaIds.includes(p.id) : p.status === 'aprovada' && p.clienteId === formCliente?.id)
       .map((p) => ({ id: p.id, label: `${p.grupo || 'Pendência'} — ${p.descricao || ''}`.slice(0, 60) })),
   };
 
   // Pendências aprovadas do cliente do formulário — semeiam o checklist da Corretiva.
   const formPendAprovadas = pendencias
-    .filter((p) => p.status === 'aprovada' && p.clienteId === formCliente?.id)
+    .filter((p) => formOsPendenciaIds.length ? formOsPendenciaIds.includes(p.id) : p.status === 'aprovada' && p.clienteId === formCliente?.id)
     .map((p) => ({ id: p.id, descricao: p.descricao, grupo: p.grupo }));
 
   const clienteContratos = contracts.filter((c) => clientName(wClienteId) === c.clientName);
