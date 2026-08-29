@@ -11,15 +11,16 @@ Registro atualizado em 29/08/2026. Itens concluídos não entram nesta lista.
 - Ficha consolidada do cliente com contratos, propostas, OS, relatórios, pendências, receitas e linha do tempo única.
 - Revisões de proposta com motivo, responsável e alterações comerciais relevantes registradas no PDF.
 - Indicadores comerciais de conversão, perdas, validade e tempo médio estimado até aceite.
+- Conversão guiada de proposta aceita em OS e, quando recorrente, em contrato com vínculo de origem.
 
 ## Pendências reais
 
 1. Decidir a política de emissão offline: hoje o documento é emitido mesmo se o registro público de QR não puder ser publicado.
 2. Adicionar notas e eventos de comunicação à linha do tempo do cliente.
-3. Fazer conversão guiada de proposta aprovada para pedido, OS ou contrato conforme o tipo comercial, com confirmação de dados antes de criar os documentos.
+3. Completar a conversão por tipo comercial com criação de pedido de fornecimento quando o escopo não for de execução nem recorrente.
 4. Ampliar a comparação de revisões para textos extensos e exibir uma comparação lado a lado na interface.
 5. Implementar notificações proativas de vencimento (além dos alertas visuais já presentes na aba de propostas).
-6. Aplicar as migrations 0046 e 0047 e validar os fluxos ponta a ponta com dados reais em desktop e celular, especialmente permissões/RLS e o catálogo técnico após o seed.
+6. Aplicar as migrations 0046, 0047 e 0048 e validar os fluxos ponta a ponta com dados reais em desktop e celular, especialmente permissões/RLS e o catálogo técnico após o seed.
 
 ## Princípio de segurança
 
