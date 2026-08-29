@@ -626,6 +626,15 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     setEditingPedido(revisado);
     setIsProposalModalOpen(true);
   };
+  const confirmGenerateOS = (ped: Pedido) => {
+    const details = [
+      `Cliente: ${ped.clienteNome}`,
+      `Escopo: ${ped.referencia || 'Não informado'}`,
+      `Valor: ${brl(ped.proposal.valorTotal || 0)}`,
+      ped.proposal.surveyOrigin?.reportNumber ? `Origem: levantamento ${ped.proposal.surveyOrigin.reportNumber}` : '',
+    ].filter(Boolean).join('\n');
+    if (window.confirm(`Confirmar geração da Ordem de Serviço?\n\n${details}\n\nA OS entrará na fila de atendimento de campo.`)) onGenerateOSFromPedido(ped);
+  };
   // Cria uma nova proposta a partir da estrutura atual, sem reutilizar número,
   // status, recebimento ou histórico de revisões do documento de origem.
   const handleDuplicate = (ped: Pedido) => {
@@ -719,6 +728,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     const { num, ano } = numeroAno(ped);
     const client = clients.find((item) => item.id === ped.clienteId || item.name === ped.clienteNome);
     const clientLogo = client?.logoPath ? clientLogoUrls[client.logoPath] : undefined;
+    const existingOs = pedidosOS.find((os) => os.pedidoId === ped.numeroPedido);
     return (
       <div
         className="bg-white rounded-xl shadow-sm border border-slate-100 border-l-4 flex flex-col md:flex-row md:items-center justify-between gap-3 p-4"
@@ -764,11 +774,12 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
 
           {ped.status === 'aceito' && (
             <button
-              onClick={() => onGenerateOSFromPedido(ped)}
-              title="Gerar Ordem de Serviço"
-              className="px-2.5 py-1.5 bg-[#E63946] hover:bg-[#a51515] text-white rounded-lg text-[10px] font-bold uppercase flex items-center gap-1"
+              onClick={() => { if (!existingOs) confirmGenerateOS(ped); }}
+              title={existingOs ? `OS ${existingOs.id} já foi gerada desta proposta` : 'Gerar Ordem de Serviço'}
+              disabled={!!existingOs}
+              className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1 ${existingOs ? 'bg-emerald-100 text-emerald-700 cursor-not-allowed' : 'bg-[#E63946] hover:bg-[#a51515] text-white'}`}
             >
-              <Wrench className="w-3 h-3" /> Gerar OS
+              <Wrench className="w-3 h-3" /> {existingOs ? 'OS gerada' : 'Gerar OS'}
             </button>
           )}
 
