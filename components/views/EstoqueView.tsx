@@ -506,6 +506,7 @@ const StockItemCard: React.FC<{
   onSaveInline: (item: InventoryItem) => void | Promise<void>;
 }> = ({ item, onMovement, onHistory, onEdit, onDelete, onSaveInline }) => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [technicalSheetOpen, setTechnicalSheetOpen] = useState(false);
   const price = item.salePrice ?? item.unitPrice ?? 0;
   const esgotado = item.quantity <= 0;
   // Produto criado provisoriamente em campo (relatório): falta finalizar
@@ -544,6 +545,16 @@ const StockItemCard: React.FC<{
       <span className="text-slate-600 font-semibold">{value}</span>
     </span>
   );
+
+  const hasTechnicalSheet = Boolean(
+    item.shortDescription || item.technicalDescription || item.commercialDescription ||
+    item.recommendedUse || item.technologies?.length || Object.keys(item.technicalSpecs ?? {}).length,
+  );
+  const technicalSpecValue = (value: string | number | boolean | string[] | null) => {
+    if (Array.isArray(value)) return value.join(' · ');
+    if (typeof value === 'boolean') return value ? 'Sim' : 'Não';
+    return value ?? '—';
+  };
 
   return (
     <div className={`bg-white rounded-xl border p-4 flex flex-col md:flex-row md:items-center gap-4 hover:shadow-md transition-all ${provisorio ? 'border-amber-300 bg-amber-50/40 hover:border-amber-400' : 'border-slate-200 hover:border-slate-300'}`}>
@@ -590,6 +601,38 @@ const StockItemCard: React.FC<{
             <Meta label="Código" value={<span className="font-data-mono">{item.code}</span>} />
           </div>
           {(item.shortDescription || item.technologies?.length) && <p className="mt-1 text-[11px] text-slate-500 line-clamp-2">{item.shortDescription || item.technologies?.join(' · ')}</p>}
+          {hasTechnicalSheet && (
+            <>
+              <button
+                type="button"
+                onClick={() => setTechnicalSheetOpen((open) => !open)}
+                aria-expanded={technicalSheetOpen}
+                className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-[#1A1A72] hover:underline"
+              >
+                <span className="material-symbols-outlined text-sm">description</span>
+                {technicalSheetOpen ? 'Ocultar ficha técnica' : 'Ver ficha técnica'}
+                <span className="material-symbols-outlined text-sm">{technicalSheetOpen ? 'expand_less' : 'expand_more'}</span>
+              </button>
+              {technicalSheetOpen && (
+                <div className="mt-2 rounded-lg border border-[#1A1A72]/15 bg-slate-50 p-2.5 text-[11px] text-slate-600 space-y-1.5">
+                  {item.commercialDescription && <p><span className="font-bold text-slate-700">Comercial:</span> {item.commercialDescription}</p>}
+                  {item.technicalDescription && <p><span className="font-bold text-slate-700">Técnica:</span> {item.technicalDescription}</p>}
+                  {item.recommendedUse && <p><span className="font-bold text-slate-700">Uso recomendado:</span> {item.recommendedUse}</p>}
+                  {item.technologies?.length ? <p><span className="font-bold text-slate-700">Tecnologias:</span> {item.technologies.join(' · ')}</p> : null}
+                  {Object.keys(item.technicalSpecs ?? {}).length > 0 && (
+                    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 pt-1 border-t border-slate-200">
+                      {Object.entries(item.technicalSpecs ?? {}).map(([label, value]) => (
+                        <div key={label} className="min-w-0">
+                          <dt className="text-slate-400">{label}</dt>
+                          <dd className="font-medium text-slate-700 break-words">{technicalSpecValue(value)}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
 
@@ -649,7 +692,7 @@ const StockItemCard: React.FC<{
               className="mt-0.5 flex items-center justify-end gap-1 text-[11px] text-slate-400 hover:text-[#1A1A72] group/fin w-full"
             >
               <span className="font-data-mono">
-                Custo: {brl(item.costPrice ?? 0)} · Margem: {round2(item.profitMargin ?? 0)}% · Markup:{' '}
+                Custo: {item.costPrice == null ? 'Não cadastrado' : brl(item.costPrice)} · Margem: {round2(item.profitMargin ?? 0)}% · Markup:{' '}
                 {round2(item.markup ?? 0)}%
               </span>
               <span className="material-symbols-outlined text-xs opacity-0 group-hover/fin:opacity-100 transition-opacity">
