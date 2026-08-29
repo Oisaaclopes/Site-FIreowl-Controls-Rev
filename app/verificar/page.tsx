@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { findPublicDocumentVerification, PublicDocumentVerification } from '@/lib/documentVerification';
 
-const LABEL: Record<string, string> = { relatorio: 'Relatório técnico', proposta: 'Proposta comercial', orcamento: 'Orçamento', ordem_servico: 'Ordem de serviço' };
+const LABEL: Record<string, string> = { relatorio: 'Relatório técnico', proposta: 'Proposta comercial', orcamento: 'Orçamento', ordem_servico: 'Ordem de serviço', contrato: 'Contrato' };
 
 export default function VerificarDocumentoPage() {
   const [result, setResult] = useState<PublicDocumentVerification | null | undefined>(undefined);

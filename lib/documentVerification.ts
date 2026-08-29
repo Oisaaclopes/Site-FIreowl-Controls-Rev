@@ -1,6 +1,6 @@
 import { getSupabaseClient } from './supabaseClient';
 
-export type VerificationDocumentType = 'relatorio' | 'proposta' | 'orcamento' | 'ordem_servico';
+export type VerificationDocumentType = 'relatorio' | 'proposta' | 'orcamento' | 'ordem_servico' | 'contrato';
 
 export interface DocumentVerificationInput {
   type: VerificationDocumentType;

@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
+import QRCode from 'qrcode';
 import { Contract, Client } from '@/lib/types';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
 import { usePrivacy } from '@/lib/privacy';
+import { publishDocumentVerification, verificationUrl } from '@/lib/documentVerification';
 
 interface ContratosViewProps {
   contracts: Contract[];
@@ -104,7 +106,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
   const totalMonthlyRec = contracts.reduce((acc, c) => acc + c.monthlyValue, 0);
 
   // Imprime o resumo do contrato numa janela nova (imprimir → salvar como PDF).
-  const printContract = (ctr: Contract) => {
+  const printContract = async (ctr: Contract) => {
     const esc = (s: unknown) =>
       String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
     const row = (label: string, valor: string) =>
@@ -112,6 +114,12 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
         <td style="padding:8px 10px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:bold;width:40%">${esc(label)}</td>
         <td style="padding:8px 10px;border:1px solid #e2e8f0;font-family:monospace">${valor}</td>
       </tr>`;
+    const authenticityUrl = verificationUrl('contrato', ctr.id);
+    let qrDataUrl = '';
+    try {
+      await publishDocumentVerification({ type: 'contrato', sourceId: ctr.id, number: ctr.id, clientName: ctr.clientName, issuedAt: ctr.startDate, status: ctr.status });
+      qrDataUrl = await QRCode.toDataURL(authenticityUrl, { width: 112, margin: 1, errorCorrectionLevel: 'M' });
+    } catch (error) { console.warn('Não foi possível publicar a validação do contrato:', error); }
     const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
       <title>Contrato ${esc(ctr.id)} — Fireowl Controls</title></head>
       <body style="font-family:Arial,sans-serif;color:#0f172a;padding:24px;max-width:800px;margin:0 auto">
@@ -132,6 +140,10 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
           ${row('Registro ART CREA', esc(ctr.artDocumentRef))}
           ${row('Status', esc(ctr.status))}
         </table>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:22px;padding:10px;border:1px solid #bbf7d0;border-left:3px solid #059669;background:#f0fdf4;border-radius:6px">
+          ${qrDataUrl ? `<img src="${qrDataUrl}" width="66" height="66" alt="QR de autenticidade">` : ''}
+          <div><strong style="font-size:11px;color:#047857;text-transform:uppercase">Contrato verificável</strong><p style="margin:4px 0 0;font-size:11px;color:#475569">${qrDataUrl ? 'Aponte a câmera para confirmar a autenticidade deste documento.' : `Validação: ${esc(authenticityUrl)}`}</p></div>
+        </div>
         <p style="margin-top:24px;font-size:11px;color:#94a3b8">Emitido em ${new Date().toLocaleDateString('pt-BR')} · Fireowl Controls</p>
       </body></html>`;
     const w = window.open('', '_blank');
@@ -468,7 +480,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
 
             <div className="flex justify-end gap-2">
               <button
-                onClick={() => printContract(selectedPdfContract)}
+                onClick={() => void printContract(selectedPdfContract)}
                 className="bg-[#E63946] hover:bg-[#a51515] text-white font-semibold px-5 py-2 rounded-lg text-xs uppercase"
               >
                 Imprimir Documento
