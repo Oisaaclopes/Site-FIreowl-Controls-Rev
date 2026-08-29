@@ -41,6 +41,8 @@ function itemFromRow(r: any): SupplyReceiptItem {
     unitCost: r.unit_cost === null || r.unit_cost === undefined ? undefined : Number(r.unit_cost),
     stockMovementId: r.stock_movement_id || undefined,
     postedAt: r.posted_at || undefined,
+    reversedAt: r.reversed_at || undefined,
+    reversalMovementId: r.reversal_movement_id || undefined,
   };
 }
 
@@ -258,4 +260,83 @@ export function excedente(faltaReceber: number, receberAgora: number): number {
 /** Total de uma lista de itens de compra (Σ quantidade × custo unitário). */
 export function totalCompra(items: { quantity?: number; unitCost?: number }[]): number {
   return items.reduce((s, it) => s + Number(it.quantity || 0) * Number(it.unitCost || 0), 0);
+}
+
+export interface ResumoItem {
+  key: string;
+  descricao: string;
+  inventoryItemId?: string;
+  vinculado: boolean;
+  pedido: number;
+  estoque?: number;
+  comprado: number;
+  recebido: number;
+  aceito: number;
+  rejeitado: number;
+  entrada: number;        // lançado no estoque, líquido de estorno
+  estornado: number;
+  pendenteRecebimento: number;
+  pendenteEntrada: number; // aceito conferido, ainda não lançado
+}
+
+/** §5/§6 — resumo por item do fornecimento (números não ambíguos). */
+export function resumoItensFornecimento(
+  order: SupplyOrder,
+  purchases: SupplyPurchase[],
+  receipts: SupplyReceipt[],
+  inventory: { id: string; quantity: number }[]
+): ResumoItem[] {
+  const compradoPorChave: Record<string, number> = {};
+  purchases.filter((p) => p.status !== 'cancelada').forEach((p) => (p.items || []).forEach((it) => {
+    const k = it.orderItemKey || it.inventoryItemId || '';
+    if (k) compradoPorChave[k] = (compradoPorChave[k] || 0) + Number(it.quantity || 0);
+  }));
+  // Agregados de recebimento por chave.
+  const agg: Record<string, { recebido: number; aceito: number; rejeitado: number; entrada: number; estornado: number; naoLancado: number }> = {};
+  receipts.filter((r) => r.status !== 'cancelado').forEach((r) => (r.items || []).forEach((it) => {
+    const k = it.orderItemKey || it.inventoryItemId || '';
+    if (!k) return;
+    const a = (agg[k] = agg[k] || { recebido: 0, aceito: 0, rejeitado: 0, entrada: 0, estornado: 0, naoLancado: 0 });
+    a.recebido += Number(it.quantityReceived || 0);
+    a.aceito += Number(it.quantityAccepted || 0);
+    a.rejeitado += Number(it.quantityRejected || 0);
+    if (it.stockMovementId && !it.reversedAt) a.entrada += Number(it.quantityAccepted || 0);
+    if (it.reversedAt) a.estornado += Number(it.quantityAccepted || 0);
+    if (!it.stockMovementId && Number(it.quantityAccepted || 0) > 0) a.naoLancado += Number(it.quantityAccepted || 0);
+  }));
+  return (order.items || []).map((it, i) => ({ it, i })).filter((x) => x.it.tipo !== 'servico').map(({ it, i }) => {
+    const key = keyOf(it, i);
+    const inv = it.vinculoEstoqueId ? inventory.find((s) => s.id === it.vinculoEstoqueId) : undefined;
+    const a = agg[key] || { recebido: 0, aceito: 0, rejeitado: 0, entrada: 0, estornado: 0, naoLancado: 0 };
+    const pedido = qtyItem(it);
+    return {
+      key,
+      descricao: it.descricao || 'Item',
+      inventoryItemId: it.vinculoEstoqueId,
+      vinculado: !!inv,
+      pedido,
+      estoque: inv?.quantity,
+      comprado: compradoPorChave[key] || 0,
+      recebido: a.recebido,
+      aceito: a.aceito,
+      rejeitado: a.rejeitado,
+      entrada: a.entrada,
+      estornado: a.estornado,
+      pendenteRecebimento: Math.max(0, pedido - a.recebido),
+      pendenteEntrada: a.naoLancado,
+    };
+  });
+}
+
+/** §52 — traduz erros técnicos (P0001/23505/permission denied) para o usuário. */
+export function mensagemErroFornecimento(err: unknown): string {
+  const m = (typeof err === 'string' ? err : (err as any)?.message || '').toLowerCase();
+  if (!m) return 'Não foi possível concluir a operação. Tente novamente.';
+  if (m.includes('already') || m.includes('duplicate') || m.includes('23505')) return 'Esta operação já foi registrada.';
+  if (m.includes('permission denied') || m.includes('42501') || m.includes('rls') || m.includes('policy')) return 'Você não tem permissão para esta ação.';
+  if (m.includes('vincul') || m.includes('sem vinculo') || m.includes('nao foi lancado')) return 'O produto precisa estar vinculado ao estoque.';
+  if (m.includes('saldo negativo') || m.includes('negativo')) return 'Não é possível estornar: o saldo disponível é insuficiente.';
+  if (m.includes('motivo')) return 'Informe o motivo.';
+  if (m.includes('not found')) return 'Registro não encontrado (recarregue a página).';
+  return 'Não foi possível concluir a operação. Tente novamente.';
 }

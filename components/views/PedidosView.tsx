@@ -17,6 +17,9 @@ import { uploadPropostaCapa, removePropostaCapa, propostaCapaDataUrl, blobToData
 import { CommercialProposalModal } from '@/components/proposta/CommercialProposalModal';
 import { SupplyReceivingModal } from '@/components/fornecimento/SupplyReceivingModal';
 import { SupplyPurchaseModal } from '@/components/fornecimento/SupplyPurchaseModal';
+import { SupplyOrderDetailModal } from '@/components/fornecimento/SupplyOrderDetailModal';
+
+const SUPPLY_STATUS_LABEL: Record<string, string> = { ABERTO: 'Aberto', EM_COTACAO: 'Em cotação', AGUARDANDO_COMPRA: 'Aguardando compra', COMPRADO: 'Comprado', RECEBIMENTO_PARCIAL: 'Recebimento parcial', RECEBIDO: 'Recebido', ENTRADA_PARCIAL_ESTOQUE: 'Entrada parcial', CONCLUIDO: 'Concluído', CANCELADO: 'Cancelado' };
 import { CommercialProposalPDFView } from '@/components/proposta/CommercialProposalPDFView';
 import { ConclusaoModal } from '@/components/proposta/ConclusaoModal';
 import { DocumentTypeModal } from '@/components/proposta/DocumentTypeModal';
@@ -153,6 +156,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   const { maskMoney } = usePrivacy();
   const [receivingOrder, setReceivingOrder] = useState<SupplyOrder | null>(null);
   const [purchasingOrder, setPurchasingOrder] = useState<SupplyOrder | null>(null);
+  const [detailOrder, setDetailOrder] = useState<SupplyOrder | null>(null);
   const isTecnico = userRole === 'TECNICO';
 
   // Aba inicial: atalho "Nova OS" força OS; técnico começa em OS; demais em propostas
@@ -1161,19 +1165,11 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           {supplyOrders.length === 0 ? <div className="bg-white rounded-xl border border-slate-200 py-16 text-center text-slate-400"><span className="material-symbols-outlined text-4xl">shopping_cart</span><p className="mt-2 text-sm font-bold">Nenhum pedido de fornecimento</p><p className="text-xs mt-1">Gere a partir de uma proposta aceita.</p></div> : <div className="space-y-3">{supplyOrders.map((order) => (
             <div key={order.id} className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col lg:flex-row lg:items-center gap-3">
               <div className="min-w-0 flex-1"><p className="font-data-mono text-[11px] text-sky-700 font-bold">{order.id}</p><p className="font-bold text-slate-900 truncate">{order.title}</p><p className="text-xs text-slate-500 truncate">{order.clientName} · {order.items.length} item(ns) · origem {order.sourcePedidoId}</p></div>
-              <input value={order.supplier || ''} onChange={(event) => onUpdateSupplyOrder?.({ ...order, supplier: event.target.value })} placeholder="Fornecedor" className="w-full lg:w-36 border border-slate-200 rounded-lg px-2.5 py-2 text-xs" />
-              <select value={order.status} onChange={(event) => { const status = event.target.value as SupplyOrder['status']; onUpdateSupplyOrder?.({ ...order, status, purchaseDate: status === 'COMPRADO' && !order.purchaseDate ? new Date().toISOString().slice(0, 10) : order.purchaseDate, receivedAt: status === 'RECEBIDO' && !order.receivedAt ? new Date().toISOString() : order.receivedAt }); }} className="w-full lg:w-36 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-semibold"><option value="ABERTO">Aberto</option><option value="EM_COTACAO">Em cotação</option><option value="COMPRADO">Comprado</option><option value="RECEBIDO">Recebido</option><option value="CANCELADO">Cancelado</option></select>
-              <div className="text-right shrink-0"><p className="font-data-mono font-bold text-emerald-600">{maskMoney(brl(order.totalValue))}</p><p className="text-[10px] text-slate-400">{order.receivedAt ? 'Recebido' : order.purchaseDate ? `Compra ${order.purchaseDate}` : 'Aguardando compra'}</p></div>
-              {order.status !== 'CANCELADO' && order.items.some((it) => it.tipo !== 'servico') && (
-                <div className="flex gap-1.5 shrink-0">
-                  <button onClick={() => setPurchasingOrder(order)} className="inline-flex items-center gap-1 border border-slate-300 hover:border-[#0B1E38] text-slate-600 text-[11px] font-bold uppercase tracking-wide rounded-lg px-2.5 py-2" title="Registrar compra">
-                    <span className="material-symbols-outlined text-base">shopping_cart</span> Comprar
-                  </button>
-                  <button onClick={() => setReceivingOrder(order)} className="inline-flex items-center gap-1 bg-[#0B1E38] hover:bg-[#13315C] text-white text-[11px] font-bold uppercase tracking-wide rounded-lg px-2.5 py-2" title="Registrar recebimento e dar entrada no estoque">
-                    <span className="material-symbols-outlined text-base">inventory_2</span> Receber
-                  </button>
-                </div>
-              )}
+              <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${order.status === 'CONCLUIDO' ? 'bg-emerald-50 text-emerald-700' : order.status === 'CANCELADO' ? 'bg-slate-100 text-slate-400' : order.status.startsWith('RECEB') || order.status.startsWith('ENTRADA') ? 'bg-amber-50 text-amber-700' : 'bg-sky-50 text-sky-700'}`}>{SUPPLY_STATUS_LABEL[order.status] || order.status.replace(/_/g, ' ')}</span>
+              <div className="text-right shrink-0"><p className="font-data-mono font-bold text-emerald-600">{maskMoney(brl(order.totalValue))}</p><p className="text-[10px] text-slate-400">{order.supplier || 'Fornecimento'}</p></div>
+              <button onClick={() => setDetailOrder(order)} className="shrink-0 inline-flex items-center gap-1 bg-[#0B1E38] hover:bg-[#13315C] text-white text-[11px] font-bold uppercase tracking-wide rounded-lg px-3 py-2" title="Abrir detalhe do fornecimento">
+                <span className="material-symbols-outlined text-base">open_in_full</span> Abrir
+              </button>
             </div>
           ))}</div>}
         </section>
@@ -1194,6 +1190,17 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           inventory={inventory}
           onClose={() => setPurchasingOrder(null)}
           onSaved={() => onSupplyChanged?.()}
+        />
+      )}
+      {detailOrder && (
+        <SupplyOrderDetailModal
+          order={detailOrder}
+          inventory={inventory}
+          currentUserName={currentUserName}
+          userRole={userRole}
+          onClose={() => setDetailOrder(null)}
+          onUpdateSupplyOrder={onUpdateSupplyOrder}
+          onSupplyChanged={onSupplyChanged}
         />
       )}
 

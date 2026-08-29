@@ -508,6 +508,9 @@ export interface SupplyReceiptItem {
   /** Preenchido quando lançado no estoque — impede lançar duas vezes. */
   stockMovementId?: string;
   postedAt?: string;
+  /** Estorno (0054): quando a entrada deste item foi estornada. */
+  reversedAt?: string;
+  reversalMovementId?: string;
 }
 
 /** Recebimento (pode haver vários por pedido de fornecimento — entrega parcial). */
