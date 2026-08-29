@@ -338,6 +338,8 @@ export interface CompanyProfile {
 export interface PedidoTemplate {
   id: string;
   name: string;
+  /** Ausente = modelo geral. Preenchido = modelo favorito daquele cliente. */
+  clientId?: string;
   objetivo: string;
   diretrizesNormativas: string[];
   escopoServico: string;

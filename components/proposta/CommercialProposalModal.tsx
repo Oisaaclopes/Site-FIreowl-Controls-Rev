@@ -251,6 +251,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   empresasAtendidas = [],
   marcasTecnologias = [],
   onAddClient,
+  onSaveTemplate,
   onPreviewPDF,
   nextProposalNumber = 249,
 }) => {
@@ -458,6 +459,26 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     setGarantia(template.garantia);
     setConclusao(template.conclusao);
     alert(`Modelo "${template.name}" aplicado ao formulário!`);
+  };
+  const handleSaveCurrentTemplate = () => {
+    if (!onSaveTemplate) return;
+    const name = window.prompt('Nome do modelo favorito:', referencia || 'Modelo comercial');
+    if (!name?.trim()) return;
+    onSaveTemplate({
+      id: `tmpl_${Date.now()}`,
+      name: name.trim(),
+      clientId: selectedClient?.id,
+      objetivo,
+      diretrizesNormativas: diretrizes,
+      escopoServico,
+      entregaveis,
+      premissas,
+      responsabilidadesContratada: respContratada,
+      responsabilidadesContratante: respContratante,
+      garantia,
+      conclusao,
+    });
+    alert(selectedClient ? `Modelo salvo para ${selectedClient.name}.` : 'Modelo geral salvo.');
   };
 
   // ----------------- cadastro rápido de cliente -----------------
@@ -1240,13 +1261,19 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           </Accordion>
 
           {/* ---- Modelos reutilizáveis ---- */}
-          {templates.length > 0 && (
+          {(templates.length > 0 || onSaveTemplate) && (
             <Accordion title="Modelos Reutilizáveis" icon={<Sparkles className="w-4 h-4 text-[#F2A900]" />} open={!!open.modelos} onToggle={() => toggle('modelos')}>
+              {onSaveTemplate && (
+                <button type="button" onClick={handleSaveCurrentTemplate} className="mb-3 w-full sm:w-auto px-3 py-2 border border-[#1A1A72]/25 text-[#1A1A72] hover:bg-[#1A1A72]/5 rounded-lg text-xs font-bold uppercase flex items-center justify-center gap-1.5">
+                  <Save className="w-3.5 h-3.5" /> Salvar preenchimento como modelo{selectedClient ? ' deste cliente' : ''}
+                </button>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {templates.map((tmpl) => (
+                {templates.filter((tmpl) => !tmpl.clientId || tmpl.clientId === selectedClient?.id).map((tmpl) => (
                   <div key={tmpl.id} className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-col justify-between gap-2">
                     <div>
                       <h4 className="font-bold text-slate-900 text-xs uppercase">{tmpl.name}</h4>
+                      {tmpl.clientId && <p className="text-[10px] font-bold uppercase tracking-wide text-[#1A1A72] mt-1">Modelo do cliente</p>}
                       <p className="text-[11px] text-slate-500 line-clamp-2 mt-1">{tmpl.objetivo}</p>
                     </div>
                     <button type="button" onClick={() => handleLoadTemplate(tmpl)} className="px-3 py-2 bg-[#0B1E38] hover:bg-slate-800 text-white rounded-lg text-xs font-bold uppercase flex items-center justify-center gap-1.5">

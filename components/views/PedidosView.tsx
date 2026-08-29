@@ -57,6 +57,7 @@ interface PedidosViewProps {
   inventory: InventoryItem[];
   partnerBrands: PartnerBrand[];
   templates: PedidoTemplate[];
+  onSaveTemplate?: (template: PedidoTemplate) => void;
   services?: ServiceCatalogItem[];
   companyProfile: any;
   empresasAtendidas?: EmpresaAtendida[];
@@ -110,6 +111,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   inventory,
   partnerBrands,
   templates,
+  onSaveTemplate,
   services = [],
   companyProfile,
   empresasAtendidas = [],
@@ -1199,6 +1201,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
         inventory={inventory}
         partnerBrands={partnerBrands}
         templates={templates}
+        onSaveTemplate={onSaveTemplate}
         services={services}
         empresasAtendidas={empresasAtendidas}
         marcasTecnologias={marcasTecnologias}
