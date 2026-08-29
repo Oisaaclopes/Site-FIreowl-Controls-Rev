@@ -132,9 +132,17 @@ export const SupplyOrderDetailModal: React.FC<Props> = ({ order: orderProp, inve
         <div className="p-4 sm:p-5 overflow-y-auto space-y-4">
           {erro && <div className="text-xs bg-red-50 border border-red-200 text-red-700 rounded-lg p-2.5">{erro}</div>}
           {!online && <div className="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-2.5">Sem conexão com o servidor — dados podem estar incompletos.</div>}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Ações</p>
-            {primaria()}
+            <div className="flex items-center gap-2">
+              {primaria()}
+              {(userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR') && statusDerivado !== 'CANCELADO' && statusDerivado !== 'CONCLUIDO' && (
+                <button
+                  onClick={() => { if (window.confirm('Cancelar este fornecimento? Compras, recebimentos e movimentações de estoque já feitos são preservados.')) { const upd = { ...order, status: 'CANCELADO' as const }; setOrder(upd); onUpdateSupplyOrder?.(upd); } }}
+                  className="text-[11px] font-bold uppercase text-slate-400 hover:text-[#E63946] px-2 py-2"
+                >Cancelar</button>
+              )}
+            </div>
           </div>
 
           {/* Resumo dos itens (§5/§6) */}
