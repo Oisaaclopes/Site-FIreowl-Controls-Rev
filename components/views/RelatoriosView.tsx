@@ -126,8 +126,11 @@ function buildProvisionalInventory(data: {
     brand: data.brand || undefined,
     model: data.model || undefined,
     description: data.description ? `${note} — ${data.description}` : note,
-    stockManaged: true,
-    salePrice: 0,
+    stockManaged: false,
+    // Cadastro iniciado em campo é catálogo técnico, não saldo físico.
+    catalogOnly: true,
+    catalogStatus: 'A_VALIDAR',
+    salePrice: undefined,
     costPrice: undefined,
     pendenteValidacao: true,
   };
