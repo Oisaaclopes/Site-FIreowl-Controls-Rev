@@ -528,6 +528,13 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         if (!acc[marca].includes(modelo)) acc[marca].push(modelo);
         return acc;
       }, {}),
+      modelosPorGrupo: {
+        centrais_sdai: uniqCI(inventory.filter((i) => i.category === 'SDAI' && /central|painel/i.test(`${i.subcategory || ''} ${i.name}`)).map((i) => i.model || i.name)),
+        gravadores_cftv: uniqCI(inventory.filter((i) => i.category === 'CFTV' && /gravador|nvr|dvr|nvd|mhdx|invd/i.test(`${i.subcategory || ''} ${i.name} ${i.model || ''}`)).map((i) => i.model || i.name)),
+        controladoras_acesso: uniqCI(inventory.filter((i) => /controle de acesso/i.test(i.category) && /controladora|painel/i.test(`${i.subcategory || ''} ${i.name}`)).map((i) => i.model || i.name)),
+        controladores_bms: uniqCI(inventory.filter((i) => i.category === 'BMS' && /controlador|clp|servidor/i.test(`${i.subcategory || ''} ${i.name}`)).map((i) => i.model || i.name)),
+        centrais_alarme: uniqCI(inventory.filter((i) => i.category === 'ALARME' && /central/i.test(`${i.subcategory || ''} ${i.name}`)).map((i) => i.model || i.name)),
+      },
       devices: [],
       contratos: contracts.map((c) => ({ id: c.id, label: `${c.contractType || c.unit} (${c.id})` })),
       pendenciasAprovadas: [],

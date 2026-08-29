@@ -57,7 +57,7 @@ export const LEVANTAMENTO_SDAI: TemplateSchema = {
       campos: [
         { key: 'possui_sdai', tipo: 'select', label: 'O local possui SDAI instalado?', opcoes: ['Sim, completo', 'Sim, parcial', 'Não possui'], obrigatorio: true },
         { key: 'central_fabricante', tipo: 'autocomplete_catalogo', origem: 'marcas', label: 'Fabricante da central', permite_texto_livre: true },
-        { key: 'central_modelo', tipo: 'autocomplete_catalogo', origem: 'modelos', label: 'Modelo da central', permite_texto_livre: true, filtro_por: 'central_fabricante' },
+        { key: 'central_modelo', tipo: 'autocomplete_catalogo', origem: 'modelos', label: 'Modelo da central', permite_texto_livre: true, filtro_por: 'central_fabricante', catalogo_grupo: 'centrais_sdai' },
         { key: 'tipo_central', tipo: 'select', label: 'Tipo de central', opcoes: ['Convencional', 'Endereçável', 'Não identificado'] },
         { key: 'qtd_lacos', tipo: 'numero', label: 'Quantidade de laços/zonas' },
         { key: 'central_operante', tipo: 'select', label: 'A central está operante no momento da visita?', opcoes: ['Sim', 'Sim, com falhas ativas', 'Não', 'Não foi possível acessar'], abre_pendencia_se: ['Não', 'Sim, com falhas ativas'], pendencia_sugerida: { grupo: 'SDAI > Central', acao: 'reparar', descricao: 'Central com falha ativa / inoperante na visita.' } },
@@ -515,7 +515,7 @@ function corretivaDisciplina(area: string, codigo: string, nome: string): Templa
 const ID_CFTV: FieldSchema[] = [
   { key: 'possui', tipo: 'select', label: 'O local possui CFTV instalado?', opcoes: ['Sim, completo', 'Sim, parcial', 'Não possui'], obrigatorio: true },
   { key: 'tecnologia', tipo: 'select', label: 'Tecnologia', opcoes: ['Analógico / HD (HDCVI/AHD/TVI)', 'IP', 'Híbrido', 'Não identificado'] },
-  { key: 'gravador', tipo: 'autocomplete_catalogo', origem: 'marcas', label: 'Gravador (marca/modelo DVR/NVR)', permite_texto_livre: true },
+  { key: 'gravador', tipo: 'autocomplete_catalogo', origem: 'modelos', label: 'Gravador (DVR/NVR)', permite_texto_livre: true, catalogo_grupo: 'gravadores_cftv' },
   { key: 'qtd_canais', tipo: 'numero', label: 'Nº de canais do gravador' },
   { key: 'qtd_cameras', tipo: 'numero', label: 'Nº de câmeras ativas' },
   { key: 'armazenamento', tipo: 'texto', label: 'Armazenamento (HDs / capacidade)' },
@@ -524,7 +524,7 @@ const ID_CFTV: FieldSchema[] = [
 ];
 const ID_CA: FieldSchema[] = [
   { key: 'possui', tipo: 'select', label: 'O local possui controle de acesso?', opcoes: ['Sim, completo', 'Sim, parcial', 'Não possui'], obrigatorio: true },
-  { key: 'controladora', tipo: 'autocomplete_catalogo', origem: 'marcas', label: 'Controladora (marca/modelo)', permite_texto_livre: true },
+  { key: 'controladora', tipo: 'autocomplete_catalogo', origem: 'modelos', label: 'Controladora', permite_texto_livre: true, catalogo_grupo: 'controladoras_acesso' },
   { key: 'qtd_portas', tipo: 'numero', label: 'Nº de portas / acessos controlados' },
   { key: 'tipo_leitor', tipo: 'multiselect', label: 'Tipo de leitor', opcoes: ['Biométrico', 'RFID / proximidade', 'Facial', 'Teclado / senha'] },
   { key: 'bloqueios', tipo: 'multiselect', label: 'Ferragens / bloqueios', opcoes: ['Eletroímã', 'Fechadura solenoide', 'Catraca', 'Cancela', 'Torniquete'] },
@@ -533,7 +533,7 @@ const ID_CA: FieldSchema[] = [
 ];
 const ID_BMS: FieldSchema[] = [
   { key: 'possui', tipo: 'select', label: 'O local possui automação predial (BMS)?', opcoes: ['Sim, completo', 'Sim, parcial', 'Não possui'], obrigatorio: true },
-  { key: 'controlador', tipo: 'autocomplete_catalogo', origem: 'marcas', label: 'Controlador / CLP (marca/modelo)', permite_texto_livre: true },
+  { key: 'controlador', tipo: 'autocomplete_catalogo', origem: 'modelos', label: 'Controlador / CLP', permite_texto_livre: true, catalogo_grupo: 'controladores_bms' },
   { key: 'protocolo', tipo: 'multiselect', label: 'Protocolo de comunicação', opcoes: ['BACnet', 'Modbus', 'RS-485', 'KNX', 'Proprietário', 'Não identificado'] },
   { key: 'supervisorio', tipo: 'texto', label: 'Supervisório / IHM (SCADA)' },
   { key: 'sistemas', tipo: 'texto', label: 'Sistemas monitorados (HVAC, bombas, iluminação...)' },
@@ -541,7 +541,7 @@ const ID_BMS: FieldSchema[] = [
 ];
 const ID_ALARME: FieldSchema[] = [
   { key: 'possui', tipo: 'select', label: 'O local possui alarme de intrusão?', opcoes: ['Sim, completo', 'Sim, parcial', 'Não possui'], obrigatorio: true },
-  { key: 'central', tipo: 'autocomplete_catalogo', origem: 'marcas', label: 'Central (marca/modelo)', permite_texto_livre: true },
+  { key: 'central', tipo: 'autocomplete_catalogo', origem: 'modelos', label: 'Central', permite_texto_livre: true, catalogo_grupo: 'centrais_alarme' },
   { key: 'qtd_zonas', tipo: 'numero', label: 'Nº de zonas / partições' },
   { key: 'tecnologia', tipo: 'multiselect', label: 'Tecnologia', opcoes: ['Com fio', 'Sem fio (RF)', 'Híbrido'] },
   { key: 'comunicacao', tipo: 'multiselect', label: 'Comunicação com monitoramento', opcoes: ['GPRS / 4G', 'Ethernet / IP', 'Linha telefônica', 'Sem monitoramento'] },

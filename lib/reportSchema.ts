@@ -48,6 +48,8 @@ export interface FieldSchema {
   /** autocomplete_catalogo origem='modelos': filtra os modelos pela marca escolhida
    * em outro campo (irmão). Ex.: central_modelo.filtro_por = 'central_fabricante'. */
   filtro_por?: string;
+  /** Grupo técnico de modelos (ex.: centrais_sdai), além do filtro por marca. */
+  catalogo_grupo?: string;
   /** select_interno: perfis que enxergam o campo. Ex.: ['admin','gestor']. */
   visivel_para?: string[];
   /** Referência normativa fica no help text, nunca no corpo da pergunta. */
@@ -193,4 +195,3 @@ export function validateFinalize(
   }
   return issues;
 }
-

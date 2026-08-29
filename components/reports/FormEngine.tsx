@@ -43,6 +43,8 @@ export interface CatalogSources {
   modelos?: string[]; // modelos cadastrados no estoque (lista completa)
   /** Modelos agrupados por marca (do estoque), para filtrar o campo modelo. */
   modelosPorMarca?: Record<string, string[]>;
+  /** Modelos já filtrados por família técnica para campos de identificação. */
+  modelosPorGrupo?: Record<string, string[]>;
   devices: { id: string; label: string }[];
   contratos: { id: string; label: string }[];
   pendenciasAprovadas: { id: string; label: string }[];
@@ -88,12 +90,13 @@ function catalogOptions(field: FieldSchema, catalog: CatalogSources, filtroValor
       // Se o campo filtra por marca e há marca escolhida, mostra só os modelos
       // daquela marca (do estoque). Sem marca escolhida, mostra todos.
       const marca = (filtroValor || '').trim();
+      const base = field.catalogo_grupo ? (catalog.modelosPorGrupo?.[field.catalogo_grupo] || []) : (catalog.modelos || []);
       if (field.filtro_por && marca) {
         const doGrupo = catalog.modelosPorMarca?.[marca];
-        if (doGrupo && doGrupo.length > 0) return doGrupo;
+        if (doGrupo && doGrupo.length > 0) return doGrupo.filter((model) => base.includes(model));
         return []; // marca escolhida sem modelos cadastrados → lista vazia (só "cadastrar novo")
       }
-      return catalog.modelos || [];
+      return base;
     }
     case 'devices':
       return catalog.devices.map((d) => d.label);
