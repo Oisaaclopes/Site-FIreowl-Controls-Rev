@@ -535,6 +535,11 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         controladores_bms: uniqCI(inventory.filter((i) => i.category === 'BMS' && /controlador|clp|servidor/i.test(`${i.subcategory || ''} ${i.name}`)).map((i) => i.model || i.name)),
         centrais_alarme: uniqCI(inventory.filter((i) => i.category === 'ALARME' && /central/i.test(`${i.subcategory || ''} ${i.name}`)).map((i) => i.model || i.name)),
       },
+      detalhesModelo: inventory.reduce<Record<string, { marca?: string; linha?: string; resumo?: string; tecnologias?: string[]; indicacao?: string }>>((acc, item) => {
+        const model = (item.model || item.name || '').trim();
+        if (model && !acc[model]) acc[model] = { marca: item.brand, linha: item.productLine, resumo: item.shortDescription || item.technicalDescription, tecnologias: item.technologies, indicacao: item.recommendedUse };
+        return acc;
+      }, {}),
       devices: [],
       contratos: contracts.map((c) => ({ id: c.id, label: `${c.contractType || c.unit} (${c.id})` })),
       pendenciasAprovadas: [],

@@ -45,6 +45,7 @@ export interface CatalogSources {
   modelosPorMarca?: Record<string, string[]>;
   /** Modelos já filtrados por família técnica para campos de identificação. */
   modelosPorGrupo?: Record<string, string[]>;
+  detalhesModelo?: Record<string, { marca?: string; linha?: string; resumo?: string; tecnologias?: string[]; indicacao?: string }>;
   devices: { id: string; label: string }[];
   contratos: { id: string; label: string }[];
   pendenciasAprovadas: { id: string; label: string }[];
@@ -223,6 +224,7 @@ const FieldControl: React.FC<{
       const opts = catalogOptions(field, catalog, filtroValor);
       const known = opts.includes((value as string) || '');
       const createLabel = createLabelFor(field.origem);
+      const detail = field.origem === 'modelos' ? catalog.detalhesModelo?.[String(value || '')] : undefined;
       return (
         <>
           <Combobox
@@ -237,6 +239,14 @@ const FieldControl: React.FC<{
             <p className="mt-1 text-[10px] font-semibold text-amber-600 flex items-center gap-1">
               <span className="material-symbols-outlined text-[13px]">new_releases</span> Fora do catálogo — sinalizado para cadastro
             </p>
+          )}
+          {detail && (
+            <div className="mt-2 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-[10px] text-indigo-950">
+              <p className="font-bold">{[detail.marca, detail.linha].filter(Boolean).join(' · ')}</p>
+              {detail.resumo && <p className="mt-0.5 text-indigo-800">{detail.resumo}</p>}
+              {detail.tecnologias?.length ? <p className="mt-1 font-semibold text-indigo-700">{detail.tecnologias.join(' · ')}</p> : null}
+              {detail.indicacao && <p className="mt-1 text-indigo-800">Indicação: {detail.indicacao}</p>}
+            </div>
           )}
         </>
       );
