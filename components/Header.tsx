@@ -110,28 +110,10 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       <div className="flex items-center gap-3 md:gap-4">
-        {/* Indicador de sincronização (fila offline) */}
-        <div
-          title={
-            online
-              ? pend > 0
-                ? `${pend} relatório(s) aguardando envio ao servidor`
-                : 'Tudo sincronizado'
-              : 'Sem conexão — dados salvos no aparelho'
-          }
-          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${
-            !online
-              ? 'bg-slate-200 text-slate-600'
-              : pend > 0
-                ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-          }`}
-        >
-          <span className="material-symbols-outlined text-base">
-            {online ? (pend > 0 ? 'cloud_upload' : 'cloud_done') : 'cloud_off'}
-          </span>
-          <span className="hidden sm:inline">{online ? (pend > 0 ? `${pend} p/ enviar` : 'Sync') : 'Offline'}</span>
-        </div>
+        {/* O status de sincronização (fila offline) continua sendo monitorado e
+            é exibido de forma contextual dentro do sino de notificações — o
+            motor de sync/offline-first permanece intacto, apenas o badge fixo
+            "SYNC/nuvem" foi removido do cabeçalho. */}
 
         {/* Notifications Icon with Popup */}
         <div className="relative">

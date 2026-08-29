@@ -24,7 +24,13 @@ export const DOCUMENT_TYPE_ICONS: Record<DocumentType, string> = {
   personalizado: 'tune',
 };
 
-/** Ordem de exibição das opções no modal. */
+/**
+ * Ordem de exibição das opções no modal do PEDIDO.
+ * O Laudo Técnico NÃO é gerado a partir de Pedido/Orçamento (depende de
+ * diagnóstico, evidências, medições, ART) — ele nasce de Relatório Técnico /
+ * Atendimento / Inspeção. O tipo `laudo_tecnico` e seu gerador continuam
+ * existindo para que laudos já emitidos sigam renderizando normalmente.
+ */
 export const DOCUMENT_TYPE_ORDER: DocumentType[] = [
   'orcamento',
   'proposta_comercial',
@@ -32,7 +38,6 @@ export const DOCUMENT_TYPE_ORDER: DocumentType[] = [
   'lista_produtos',
   'nota_servico',
   'nota_produtos',
-  'laudo_tecnico',
   'personalizado',
 ];
 
