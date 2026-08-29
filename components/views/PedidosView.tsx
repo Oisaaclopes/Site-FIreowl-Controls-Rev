@@ -489,8 +489,22 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
 
   // Data parseável da proposta (para período e agrupamento)
   const pedDate = (p: Pedido): Date | null => {
-    const d = new Date(p.createdAt || p.dataEmissao);
-    return isNaN(d.getTime()) ? null : d;
+    const parse = (value?: string) => {
+      if (!value) return null;
+      const d = new Date(value);
+      if (!Number.isNaN(d.getTime())) return d;
+      const br = value.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      return br ? new Date(Number(br[3]), Number(br[2]) - 1, Number(br[1])) : null;
+    };
+    return parse(p.createdAt) || parse(p.dataEmissao);
+  };
+  const validityDaysLeft = (p: Pedido): number | null => {
+    const issued = pedDate(p);
+    const validity = Number(p.proposal.validadePropostaDias || 0);
+    if (!issued || !validity || ['aceito', 'concluido', 'recusado', 'expirado'].includes(p.status)) return null;
+    const deadline = new Date(issued); deadline.setHours(0, 0, 0, 0); deadline.setDate(deadline.getDate() + validity);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return Math.ceil((deadline.getTime() - today.getTime()) / 86400000);
   };
 
   const clientNames = useMemo(
@@ -546,20 +560,21 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     const decided = base.filter((p) => ['aceito', 'concluido', 'recusado', 'expirado'].includes(p.status));
     const won = base.filter((p) => p.status === 'aceito' || p.status === 'concluido');
     const lost = base.filter((p) => p.status === 'recusado' || p.status === 'expirado');
-    const now = new Date(); now.setHours(0, 0, 0, 0);
-    const inSevenDays = new Date(now); inSevenDays.setDate(inSevenDays.getDate() + 7);
     const expiring = base.filter((p) => {
       if (['aceito', 'concluido', 'recusado', 'expirado'].includes(p.status)) return false;
-      const date = pedDate(p);
-      const days = Number(p.proposal.validadePropostaDias || 0);
-      if (!date || !days) return false;
-      const deadline = new Date(date); deadline.setDate(deadline.getDate() + days);
-      return deadline >= now && deadline <= inSevenDays;
+      const remaining = validityDaysLeft(p);
+      return remaining !== null && remaining >= 0 && remaining <= 7;
     });
     const reasons = lost.map((p) => p.proposal.motivoRecusa?.trim()).filter(Boolean) as string[];
     const topReason = reasons.reduce<Record<string, number>>((acc, reason) => ({ ...acc, [reason]: (acc[reason] || 0) + 1 }), {});
     const topReasonLabel = Object.entries(topReason).sort((a, b) => b[1] - a[1])[0]?.[0];
-    return { won: won.length, lost: lost.length, conversion: decided.length ? Math.round((won.length / decided.length) * 100) : 0, expiring: expiring.length, topReason: topReasonLabel };
+    const approvalDays = won.map((p) => {
+      const start = pedDate(p)?.getTime();
+      const end = new Date(p.updatedAt || '').getTime();
+      return start && !Number.isNaN(end) && end >= start ? Math.round((end - start) / 86400000) : null;
+    }).filter((days): days is number => days !== null);
+    const averageApprovalDays = approvalDays.length ? Math.round(approvalDays.reduce((sum, days) => sum + days, 0) / approvalDays.length) : null;
+    return { won: won.length, lost: lost.length, conversion: decided.length ? Math.round((won.length / decided.length) * 100) : 0, expiring: expiring.length, topReason: topReasonLabel, averageApprovalDays };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pedidos, filterClient, filterFrom, filterTo, searchTerm]);
 
@@ -729,6 +744,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     const client = clients.find((item) => item.id === ped.clienteId || item.name === ped.clienteNome);
     const clientLogo = client?.logoPath ? clientLogoUrls[client.logoPath] : undefined;
     const existingOs = pedidosOS.find((os) => os.pedidoId === ped.numeroPedido);
+    const daysLeft = validityDaysLeft(ped);
     return (
       <div
         className="bg-white rounded-xl shadow-sm border border-slate-100 border-l-4 flex flex-col md:flex-row md:items-center justify-between gap-3 p-4"
@@ -745,6 +761,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           <p className="text-[11px] text-[#1A1A72] font-semibold truncate">{nomeFantasiaCliente(ped.clienteNome)}</p>
           {nomeFantasiaCliente(ped.clienteNome) !== razaoSocialCliente(ped.clienteNome) && <p className="text-[10px] text-slate-400 truncate">{razaoSocialCliente(ped.clienteNome)}</p>}
           {ped.proposal?.surveyOrigin && <p className="mt-1 inline-flex items-center gap-1 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700"><span className="material-symbols-outlined text-xs">fact_check</span>Levantamento {ped.proposal.surveyOrigin.reportNumber || 'técnico'}</p>}
+          {daysLeft !== null && daysLeft <= 7 && <p className={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold ${daysLeft < 0 ? 'bg-red-50 text-red-700' : daysLeft <= 2 ? 'bg-amber-100 text-amber-800' : 'bg-amber-50 text-amber-700'}`}><span className="material-symbols-outlined text-xs">schedule</span>{daysLeft < 0 ? `Vencida há ${Math.abs(daysLeft)} dia(s)` : daysLeft === 0 ? 'Vence hoje' : `Vence em ${daysLeft} dia(s)`}</p>}
           {ped.proposal.motivoRecusa && (ped.status === 'recusado' || ped.status === 'expirado') && (
             <p className="text-[10px] text-red-600 truncate" title={ped.proposal.motivoRecusa}>Motivo: {ped.proposal.motivoRecusa}</p>
           )}
@@ -1045,11 +1062,12 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
             <InsightCard label="Conversão" value={`${commercialInsights.conversion}%`} detail={`${commercialInsights.won} ganha(s) · ${commercialInsights.lost} perdida(s)`} tone="emerald" />
             <InsightCard label="A vencer em 7 dias" value={String(commercialInsights.expiring)} detail="Propostas abertas" tone={commercialInsights.expiring ? 'amber' : 'slate'} />
             <InsightCard label="Maior motivo de perda" value={commercialInsights.topReason ? 'Registrado' : '—'} detail={commercialInsights.topReason || 'Sem motivo informado'} tone="red" />
             <InsightCard label="Volume em análise" value={maskMoney(brl(volumeFiltrado))} detail={`${filteredPedidos.length} proposta(s) no filtro`} tone="navy" />
+            <InsightCard label="Tempo até aceite" value={commercialInsights.averageApprovalDays === null ? '—' : `${commercialInsights.averageApprovalDays} d`} detail="Média estimada pelo histórico" tone="slate" />
           </div>
 
           {/* Lista / Timeline */}
