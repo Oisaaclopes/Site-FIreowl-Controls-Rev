@@ -755,6 +755,8 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
   const [filterCategory, setFilterCategory] = useState('');
   const [filterSubcategory, setFilterSubcategory] = useState('');
   const [filterBrand, setFilterBrand] = useState('');
+  const [filterLine, setFilterLine] = useState('');
+  const [filterCatalogStatus, setFilterCatalogStatus] = useState('');
   const [showPanel, setShowPanel] = useState(false);
   const [showUnitModal, setShowUnitModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1078,12 +1080,17 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     .filter((item) => (filterCategory ? item.category === filterCategory : true))
     .filter((item) => (filterSubcategory ? item.subcategory === filterSubcategory : true))
     .filter((item) => (filterBrand ? (item.brand || '').toLowerCase() === filterBrand.toLowerCase() : true))
+    .filter((item) => (filterLine ? item.productLine === filterLine : true))
+    .filter((item) => (filterCatalogStatus ? item.catalogStatus === filterCatalogStatus : true))
     .filter(
       (item) =>
         item.name.toLowerCase().includes(term) ||
         item.code.toLowerCase().includes(term) ||
         (item.serialBP || '').toLowerCase().includes(term) ||
         (item.brand || '').toLowerCase().includes(term) ||
+        (item.model || '').toLowerCase().includes(term) ||
+        (item.productLine || '').toLowerCase().includes(term) ||
+        (item.technologies || []).some((tag) => tag.toLowerCase().includes(term)) ||
         (item.subcategory || '').toLowerCase().includes(term) ||
         item.category.toLowerCase().includes(term)
     );
@@ -1433,7 +1440,14 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
               </option>
             ))}
           </select>
-          {(filterCategory || filterSubcategory || filterBrand || searchTerm) && (
+          <select value={filterLine} onChange={(e) => setFilterLine(e.target.value)} className="w-full sm:w-48 px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white">
+            <option value="">Todas as linhas</option>
+            {Array.from(new Set(inventory.map((item) => item.productLine).filter(Boolean) as string[])).sort().map((line) => <option key={line} value={line}>{line}</option>)}
+          </select>
+          <select value={filterCatalogStatus} onChange={(e) => setFilterCatalogStatus(e.target.value)} className="w-full sm:w-40 px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white">
+            <option value="">Todos os status</option>{['ATIVO', 'LEGADO', 'DESCONTINUADO', 'A_VALIDAR'].map((status) => <option key={status} value={status}>{status}</option>)}
+          </select>
+          {(filterCategory || filterSubcategory || filterBrand || filterLine || filterCatalogStatus || searchTerm) && (
             <button
               type="button"
               onClick={() => {
@@ -1441,6 +1455,8 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                 setFilterCategory('');
                 setFilterSubcategory('');
                 setFilterBrand('');
+                setFilterLine('');
+                setFilterCatalogStatus('');
               }}
               className="text-xs font-semibold text-[#1A1A72] hover:underline shrink-0"
             >
