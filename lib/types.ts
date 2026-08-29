@@ -442,6 +442,16 @@ export interface Contract {
   paymentDay?: number; // dia de vencimento da mensalidade
 }
 
+/** Evento manual do relacionamento com o cliente (nota, contato ou decisão). */
+export interface ClientEvent {
+  id: string;
+  clientId: string;
+  type: 'nota' | 'contato' | 'negociacao' | 'visita';
+  content: string;
+  authorName?: string;
+  createdAt: string;
+}
+
 export interface ClientEquipment {
   id: string; // EQ-SDAI-091
   clientName: string;

@@ -15,6 +15,7 @@ import {
   UserRole,
   ReportInstance,
   Pendencia,
+  ClientEvent,
 } from '@/lib/types';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
 import { usePrivacy } from '@/lib/privacy';
@@ -27,6 +28,7 @@ import { resolveLogoDataUrls } from '@/lib/institucional';
 import { fetchReports } from '@/lib/reports';
 import { fetchPendencias } from '@/lib/pendencias';
 import { isSupabaseConfigured } from '@/lib/inventory';
+import { fetchClientEvents, insertClientEvent } from '@/lib/clientEvents';
 
 interface CrmViewProps {
   clients: Client[];
@@ -949,14 +951,34 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
   const [showDevices, setShowDevices] = useState(false);
   const [clientReports, setClientReports] = useState<ReportInstance[]>([]);
   const [clientPendencias, setClientPendencias] = useState<Pendencia[]>([]);
+  const [clientEvents, setClientEvents] = useState<ClientEvent[]>([]);
+  const [eventContent, setEventContent] = useState('');
+  const [eventType, setEventType] = useState<ClientEvent['type']>('nota');
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
     let alive = true;
-    Promise.all([fetchReports({ clienteId: client.id }), fetchPendencias(userRole, { clienteId: client.id })])
-      .then(([reports, pendencias]) => { if (alive) { setClientReports(reports); setClientPendencias(pendencias); } })
+    Promise.all([fetchReports({ clienteId: client.id }), fetchPendencias(userRole, { clienteId: client.id }), fetchClientEvents(client.id)])
+      .then(([reports, pendencias, events]) => { if (alive) { setClientReports(reports); setClientPendencias(pendencias); setClientEvents(events); } })
       .catch(() => {});
     return () => { alive = false; };
   }, [client.id, userRole]);
+  const addClientEvent = async () => {
+    const content = eventContent.trim();
+    if (!content) return;
+    const draft: ClientEvent = { id: `evt_${Date.now()}`, clientId: client.id, type: eventType, content, authorName: userRole, createdAt: new Date().toISOString() };
+    setClientEvents((events) => [draft, ...events]);
+    setEventContent('');
+    if (!isSupabaseConfigured()) return;
+    try {
+      const stored = await insertClientEvent(draft);
+      setClientEvents((events) => [stored, ...events.filter((event) => event.id !== draft.id)]);
+    } catch (error) {
+      setClientEvents((events) => events.filter((event) => event.id !== draft.id));
+      setEventContent(content);
+      console.warn('Não foi possível salvar o evento do cliente:', error);
+      alert('Não foi possível registrar a nota agora. Tente novamente.');
+    }
+  };
   const data = useMemo(() => {
     const belongsPedido = (p: Pedido) => p.clienteId === client.id || norm(p.clienteNome) === norm(client.name);
     const belongsOS = (o: PedidoOS) => o.clientId === client.id || norm(o.clientName) === norm(client.name);
@@ -1013,6 +1035,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
       ...data.osRealizadas.concat(data.osAndamento, data.osCanceladas).map((o) => ({ id: `os-${o.id}`, date: o.scheduledDate, type: 'OS', icon: 'engineering', title: o.title || o.id, detail: `${o.status} · ${o.technicianName || 'Sem responsável'}`, tone: 'text-amber-700 bg-amber-50' })),
       ...clientReports.map((r) => ({ id: `report-${r.id}`, date: r.finalizadoEm || r.iniciadoEm, type: 'Relatório', icon: 'assignment', title: r.numero || r.titulo || r.tipo, detail: `${r.tipo} · ${r.status}`, tone: 'text-violet-700 bg-violet-50' })),
       ...data.clientReceitas.map((t) => ({ id: `income-${t.id}`, date: t.date, type: 'Receita', icon: 'payments', title: t.description || t.id, detail: `${brlM(t.amount)} · ${t.status}`, tone: 'text-emerald-700 bg-emerald-50' })),
+      ...clientEvents.map((event) => ({ id: `event-${event.id}`, date: event.createdAt, type: event.type === 'contato' ? 'Contato' : event.type === 'negociacao' ? 'Negociação' : event.type === 'visita' ? 'Visita' : 'Nota', icon: event.type === 'contato' ? 'phone_in_talk' : event.type === 'visita' ? 'location_on' : 'sticky_note_2', title: event.content, detail: event.authorName ? `Registrado por ${event.authorName}` : 'Registro manual', tone: 'text-sky-700 bg-sky-50' })),
     ];
     return entries.sort((a, b) => toTime(b.date) - toTime(a.date)).slice(0, 14);
   }, [data, clientReports]);
@@ -1086,6 +1109,16 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
             <SummaryTile label="Propostas em aberto" value={brlM(data.volumeAberto)} tone="amber" />
             <SummaryTile label="OS realizadas" value={String(data.osRealizadas.length)} tone="slate" />
           </div>
+
+          <Section title="Registrar nota ou contato" icon="edit_note">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <select value={eventType} onChange={(e) => setEventType(e.target.value as ClientEvent['type'])} className="border border-slate-200 rounded-lg px-2.5 py-2 text-xs bg-white sm:w-32">
+                <option value="nota">Nota</option><option value="contato">Contato</option><option value="negociacao">Negociação</option><option value="visita">Visita</option>
+              </select>
+              <input value={eventContent} onChange={(e) => setEventContent(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void addClientEvent(); }} placeholder="Ex.: comprador pediu retorno na sexta-feira" className="flex-1 min-w-0 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+              <button type="button" onClick={() => void addClientEvent()} className="px-3 py-2 rounded-lg bg-[#1A1A72] hover:bg-[#0B1E38] text-white text-xs font-bold">Registrar</button>
+            </div>
+          </Section>
 
           <Section title={`Linha do tempo (${timeline.length})`} icon="timeline">
             {timeline.length === 0 ? <EmptyLine text="Ainda não há eventos vinculados a este cliente." /> : (
