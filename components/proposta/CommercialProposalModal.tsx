@@ -53,6 +53,7 @@ interface CommercialProposalModalProps {
   empresasAtendidas?: EmpresaAtendida[];
   marcasTecnologias?: MarcaTecnologia[];
   onSaveTemplate?: (template: PedidoTemplate) => void;
+  onDeleteTemplate?: (templateId: string) => void;
   onAddClient?: (client: Client) => void;
   onPreviewPDF: (pedido: Pedido) => void;
   /** Próximo número sequencial para novas propostas (default do campo). */
@@ -252,6 +253,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   marcasTecnologias = [],
   onAddClient,
   onSaveTemplate,
+  onDeleteTemplate,
   onPreviewPDF,
   nextProposalNumber = 249,
 }) => {
@@ -479,6 +481,11 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
       conclusao,
     });
     alert(selectedClient ? `Modelo salvo para ${selectedClient.name}.` : 'Modelo geral salvo.');
+  };
+  const handleRenameTemplate = (template: PedidoTemplate) => {
+    if (!onSaveTemplate) return;
+    const name = window.prompt('Novo nome do modelo:', template.name);
+    if (name?.trim()) onSaveTemplate({ ...template, name: name.trim() });
   };
 
   // ----------------- cadastro rápido de cliente -----------------
@@ -1279,6 +1286,12 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                     <button type="button" onClick={() => handleLoadTemplate(tmpl)} className="px-3 py-2 bg-[#0B1E38] hover:bg-slate-800 text-white rounded-lg text-xs font-bold uppercase flex items-center justify-center gap-1.5">
                       <Copy className="w-3.5 h-3.5 text-[#F2A900]" /> Aplicar modelo
                     </button>
+                    {(onSaveTemplate || onDeleteTemplate) && (
+                      <div className="flex justify-end gap-1">
+                        {onSaveTemplate && <button type="button" onClick={() => handleRenameTemplate(tmpl)} className="px-2 py-1 text-[10px] font-semibold text-slate-500 hover:text-[#1A1A72]">Renomear</button>}
+                        {onDeleteTemplate && <button type="button" onClick={() => { if (window.confirm(`Excluir o modelo \"${tmpl.name}\"?`)) onDeleteTemplate(tmpl.id); }} className="p-1 text-slate-400 hover:text-red-600" title="Excluir modelo"><Trash2 className="w-3.5 h-3.5" /></button>}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

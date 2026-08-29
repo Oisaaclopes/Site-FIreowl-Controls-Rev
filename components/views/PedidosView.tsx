@@ -58,6 +58,7 @@ interface PedidosViewProps {
   partnerBrands: PartnerBrand[];
   templates: PedidoTemplate[];
   onSaveTemplate?: (template: PedidoTemplate) => void;
+  onDeleteTemplate?: (templateId: string) => void;
   services?: ServiceCatalogItem[];
   companyProfile: any;
   empresasAtendidas?: EmpresaAtendida[];
@@ -112,6 +113,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   partnerBrands,
   templates,
   onSaveTemplate,
+  onDeleteTemplate,
   services = [],
   companyProfile,
   empresasAtendidas = [],
@@ -1231,6 +1233,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
         partnerBrands={partnerBrands}
         templates={templates}
         onSaveTemplate={onSaveTemplate}
+        onDeleteTemplate={onDeleteTemplate}
         services={services}
         empresasAtendidas={empresasAtendidas}
         marcasTecnologias={marcasTecnologias}

@@ -917,6 +917,7 @@ export function CrmApp({
               partnerBrands={partnerBrands}
               templates={templates}
               onSaveTemplate={(template) => setTemplates((current) => [template, ...current.filter((item) => item.id !== template.id)])}
+              onDeleteTemplate={(templateId) => setTemplates((current) => current.filter((item) => item.id !== templateId))}
               services={services}
               companyProfile={companyProfile}
               empresasAtendidas={empresasAtendidas}
