@@ -999,6 +999,23 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
   }, [client, contracts, pedidos, pedidosOS, transactions]);
 
   const brlM = (n: number) => maskMoney(brl(n));
+  const timeline = useMemo(() => {
+    const toTime = (value?: string) => {
+      if (!value) return 0;
+      const parsed = Date.parse(value);
+      if (!Number.isNaN(parsed)) return parsed;
+      const br = value.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      return br ? new Date(Number(br[3]), Number(br[2]) - 1, Number(br[1])).getTime() : 0;
+    };
+    const entries: { id: string; date?: string; type: string; icon: string; title: string; detail: string; tone: string }[] = [
+      ...data.clientPedidos.map((p) => ({ id: `ped-${p.id}`, date: p.dataEmissao, type: 'Proposta', icon: 'description', title: p.numeroPedido, detail: `${p.referencia} · ${p.status}`, tone: 'text-[#1A1A72] bg-[#1A1A72]/10' })),
+      ...data.clientContracts.map((c) => ({ id: `contract-${c.id}`, date: c.startDate || c.renewalDate, type: 'Contrato', icon: 'handshake', title: c.contractType || c.id, detail: `${c.status} · renovação ${c.renewalDate || 'não informada'}`, tone: 'text-emerald-700 bg-emerald-50' })),
+      ...data.osRealizadas.concat(data.osAndamento, data.osCanceladas).map((o) => ({ id: `os-${o.id}`, date: o.scheduledDate, type: 'OS', icon: 'engineering', title: o.title || o.id, detail: `${o.status} · ${o.technicianName || 'Sem responsável'}`, tone: 'text-amber-700 bg-amber-50' })),
+      ...clientReports.map((r) => ({ id: `report-${r.id}`, date: r.finalizadoEm || r.iniciadoEm, type: 'Relatório', icon: 'assignment', title: r.numero || r.titulo || r.tipo, detail: `${r.tipo} · ${r.status}`, tone: 'text-violet-700 bg-violet-50' })),
+      ...data.clientReceitas.map((t) => ({ id: `income-${t.id}`, date: t.date, type: 'Receita', icon: 'payments', title: t.description || t.id, detail: `${brlM(t.amount)} · ${t.status}`, tone: 'text-emerald-700 bg-emerald-50' })),
+    ];
+    return entries.sort((a, b) => toTime(b.date) - toTime(a.date)).slice(0, 14);
+  }, [data, clientReports]);
   const hasLinkedHistory =
     data.clientContracts.length > 0 || data.clientPedidos.length > 0 || data.osRealizadas.length > 0 ||
     data.osAndamento.length > 0 || clientReports.length > 0 || clientPendencias.length > 0;
@@ -1069,6 +1086,21 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
             <SummaryTile label="Propostas em aberto" value={brlM(data.volumeAberto)} tone="amber" />
             <SummaryTile label="OS realizadas" value={String(data.osRealizadas.length)} tone="slate" />
           </div>
+
+          <Section title={`Linha do tempo (${timeline.length})`} icon="timeline">
+            {timeline.length === 0 ? <EmptyLine text="Ainda não há eventos vinculados a este cliente." /> : (
+              <div className="relative ml-2 border-l border-slate-200 pl-4 space-y-3">
+                {timeline.map((event) => (
+                  <div key={event.id} className="relative min-w-0">
+                    <span className={`absolute -left-[1.65rem] top-0.5 w-5 h-5 rounded-full flex items-center justify-center ${event.tone}`}><span className="material-symbols-outlined text-[13px]">{event.icon}</span></span>
+                    <div className="flex items-baseline justify-between gap-3"><p className="font-semibold text-slate-800 truncate">{event.title}</p><span className="shrink-0 text-[10px] font-data-mono text-slate-400">{event.date || 'Sem data'}</span></div>
+                    <p className="text-[10px] uppercase tracking-wide text-slate-400 mt-0.5">{event.type}</p>
+                    <p className="text-[11px] text-slate-500 truncate">{event.detail}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
 
           {/* Dados cadastrais + contatos */}
           <Section title="Dados cadastrais" icon="badge">
