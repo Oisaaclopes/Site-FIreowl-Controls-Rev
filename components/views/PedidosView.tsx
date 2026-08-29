@@ -73,6 +73,7 @@ interface PedidosViewProps {
   onGenerateContractFromPedido?: (pedido: Pedido) => void;
   onGenerateSupplyOrderFromPedido?: (pedido: Pedido) => void;
   onUpdateSupplyOrder?: (order: SupplyOrder) => void;
+  onReceiveSupplyOrderIntoStock?: (order: SupplyOrder) => void;
   onSelectClientForReport?: (clientName: string) => void;
   onAddClient?: (client: Client) => void;
   pdfPrefs: PdfPrefs;
@@ -133,6 +134,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   onGenerateContractFromPedido,
   onGenerateSupplyOrderFromPedido,
   onUpdateSupplyOrder,
+  onReceiveSupplyOrderIntoStock,
   onSelectClientForReport,
   onAddClient,
   onAddTransaction,

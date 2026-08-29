@@ -603,6 +603,31 @@ export function CrmApp({
       setSupplyOrders((orders) => orders.map((item) => item.id === stored.id ? stored : item));
     } catch (error) { setSupplyOrders(previous); console.error('Falha ao atualizar pedido de fornecimento:', error); alert('Não foi possível atualizar o pedido de fornecimento.'); }
   };
+  const handleReceiveSupplyOrderIntoStock = async (order: SupplyOrder) => {
+    if (order.stockReceivedAt) return;
+    const items = order.items.filter((item) => item.tipo !== 'servico' && item.vinculoEstoqueId);
+    if (!items.length) { alert('Este pedido não possui materiais vinculados ao Estoque. Vincule os itens na proposta antes de dar entrada.'); return; }
+    const updates = items.map((item) => ({ item, inventoryItem: inventory.find((stock) => stock.id === item.vinculoEstoqueId) })).filter((entry): entry is { item: typeof items[number]; inventoryItem: InventoryItem } => !!entry.inventoryItem);
+    if (!updates.length) { alert('Não encontrei no Estoque os itens vinculados a este pedido.'); return; }
+    const receivedAt = new Date().toISOString();
+    try {
+      for (const { item, inventoryItem } of updates) {
+        const updated = { ...inventoryItem, quantity: inventoryItem.quantity + Number(item.quantidade || 0) };
+        if (isSupabaseConfigured()) {
+          const saved = await updateInventoryItem(updated);
+          await insertStockMovement({ id: `mov_${Date.now()}_${inventoryItem.id}`, itemId: saved.id, itemCode: saved.code, itemName: saved.name, type: 'entrada', quantity: Number(item.quantidade || 0), resultingBalance: saved.quantity, note: `Recebimento do pedido de fornecimento ${order.id}` });
+          setInventory((stock) => stock.map((current) => current.id === saved.id ? saved : current));
+        } else setInventory((stock) => stock.map((current) => current.id === updated.id ? updated : current));
+      }
+      const completed = { ...order, stockReceivedAt: receivedAt };
+      if (isSupabaseConfigured()) {
+        const savedOrder = await updateSupplyOrder(completed);
+        setSupplyOrders((orders) => orders.map((current) => current.id === savedOrder.id ? savedOrder : current));
+      } else setSupplyOrders((orders) => orders.map((current) => current.id === completed.id ? completed : current));
+      const missing = items.length - updates.length;
+      alert(`Entrada de estoque concluída para ${updates.length} item(ns).${missing ? ` ${missing} item(ns) não estavam vinculados e não foram movimentados.` : ''}`);
+    } catch (error) { console.error('Falha ao receber fornecimento no estoque:', error); alert('Não foi possível concluir a entrada no estoque. Nenhuma nova tentativa deve ser feita antes de conferir os saldos.'); }
+  };
 
   const handleDeleteClient = async (client: Client) => {
     setClients((prev) => prev.filter((c) => c.id !== client.id));
@@ -1017,6 +1042,7 @@ export function CrmApp({
               onGenerateContractFromPedido={handleGenerateContractFromPedido}
               onGenerateSupplyOrderFromPedido={handleGenerateSupplyOrderFromPedido}
               onUpdateSupplyOrder={handleUpdateSupplyOrder}
+              onReceiveSupplyOrderIntoStock={handleReceiveSupplyOrderIntoStock}
               onSelectClientForReport={handleSelectClientForReport}
               onAddClient={handleAddClient}
               onAddTransaction={handleAddTransaction}

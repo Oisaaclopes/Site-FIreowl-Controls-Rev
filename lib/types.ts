@@ -430,13 +430,70 @@ export interface SupplyOrder {
   clientId?: string;
   clientName: string;
   title: string;
-  status: 'ABERTO' | 'EM_COTACAO' | 'COMPRADO' | 'RECEBIDO' | 'CANCELADO';
+  status:
+    | 'ABERTO'
+    | 'EM_COTACAO'
+    | 'AGUARDANDO_COMPRA'
+    | 'COMPRADO'
+    | 'RECEBIMENTO_PARCIAL'
+    | 'RECEBIDO'
+    | 'ENTRADA_PARCIAL_ESTOQUE'
+    | 'CONCLUIDO'
+    | 'CANCELADO';
   supplier?: string;
   purchaseDate?: string;
   receivedAt?: string;
+  /** Data da entrada confirmada no estoque; impede lançar o mesmo recebimento duas vezes. */
+  stockReceivedAt?: string;
   items: PedidoEquipmentItem[];
   totalValue: number;
   createdAt: string;
+}
+
+// ===== Recebimento de fornecimento (parcial) + conferência + entrada no estoque =====
+export type SupplyReceiptStatus = 'recebido' | 'conferido' | 'lancado' | 'cancelado';
+export type RejectionReason =
+  | 'avariado'
+  | 'produto_incorreto'
+  | 'quantidade_divergente'
+  | 'modelo_divergente'
+  | 'embalagem_comprometida'
+  | 'faltante'
+  | 'outro';
+
+/** Item de um recebimento: recebido / aceito / rejeitado; lançado no estoque via RPC idempotente. */
+export interface SupplyReceiptItem {
+  id: string;
+  receiptId: string;
+  /** Chave estável do item do pedido (vinculoEstoqueId ou índice). */
+  orderItemKey?: string;
+  /** inventory_items.id (quando o item está vinculado ao Estoque). */
+  inventoryItemId?: string;
+  descricao?: string;
+  quantityReceived: number;
+  quantityAccepted: number;
+  quantityRejected: number;
+  rejectionReason?: RejectionReason;
+  unitCost?: number;
+  /** Preenchido quando lançado no estoque — impede lançar duas vezes. */
+  stockMovementId?: string;
+  postedAt?: string;
+}
+
+/** Recebimento (pode haver vários por pedido de fornecimento — entrega parcial). */
+export interface SupplyReceipt {
+  id: string;
+  supplyOrderId: string;
+  supplier?: string;
+  supplierId?: string;
+  receivedAt: string;
+  receivedBy?: string;
+  notes?: string;
+  status: SupplyReceiptStatus;
+  stockPostedAt?: string;
+  stockPostedBy?: string;
+  createdAt?: string;
+  items?: SupplyReceiptItem[];
 }
 
 export interface Contract {
