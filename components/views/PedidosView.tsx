@@ -177,6 +177,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   // Modais & Overlays
   const [isProposalModalOpen, setIsProposalModalOpen] = useState(false);
   const [editingPedido, setEditingPedido] = useState<Pedido | null>(null);
+  const [comparisonPedido, setComparisonPedido] = useState<Pedido | null>(null);
   // P4 — validação antes de gerar (proposta/orçamento).
   const [validacao, setValidacao] = useState<{ pedido: Pedido; doc: DocumentType; issues: ValidationIssue[] } | null>(null);
   const [pdfPreviewPedido, setPdfPreviewPedido] = useState<Pedido | null>(null);
@@ -631,6 +632,13 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
       elaborador: ped.responsavelComercialNome || '',
       motivo: motivo.trim() || undefined,
       status: ped.status,
+      snapshot: {
+        referencia: ped.referencia || '', valorTotal: Number(ped.proposal.valorTotal || 0), objetivo: ped.proposal.objetivo || '',
+        escopoServico: ped.proposal.escopoServico || '', prazoExecucao: ped.proposal.prazoExecucao || '', garantia: ped.proposal.garantia || '',
+        validadeDias: Number(ped.proposal.validadePropostaDias || 0),
+        itens: (ped.proposal.equipmentItems || []).map((item) => `${item.quantidade}x ${item.descricao || item.marcaModelo || 'Item'}`).join(' · '),
+        pagamento: [ped.proposal.formasPagamento?.join(', '), ped.proposal.condicoesPagamento?.join(' · ')].filter(Boolean).join(' — '),
+      },
     };
     const revisoes = [...(ped.proposal?.revisoes || []), entradaAtual];
     const base = ped.numeroPedido.replace(/-R\d+$/, '');
@@ -812,6 +820,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
               <span className="material-symbols-outlined text-sm">handshake</span>{existingContract ? 'Contrato criado' : 'Criar contrato'}
             </button>
           )}
+          {ped.proposal.revisoes?.some((revision) => revision.snapshot) && <button onClick={() => setComparisonPedido(ped)} title="Comparar revisão anterior com a proposta atual" className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-violet-700 hover:bg-violet-50"><History className="w-4 h-4" /></button>}
 
           {/* Ações: gerar documento, editar, excluir */}
           <button
@@ -1284,6 +1293,8 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
         nextProposalNumber={nextProposalNumber}
       />
 
+      {comparisonPedido && <RevisionComparisonModal pedido={comparisonPedido} onClose={() => setComparisonPedido(null)} />}
+
       {/* Modal "Qual documento gerar?" (quando não há padrão, ou via "Gerar outro documento") */}
       <DocumentTypeModal
         isOpen={!!docModalPedido}
@@ -1569,5 +1580,32 @@ const InsightCard: React.FC<{ label: string; value: string; detail: string; tone
     <p className="text-[10px] font-bold uppercase tracking-wide opacity-75">{label}</p>
     <p className="mt-1 font-data-mono text-lg font-bold truncate">{value}</p>
     <p className="mt-0.5 text-[10px] truncate opacity-80" title={detail}>{detail}</p>
+  </div>;
+};
+
+const RevisionComparisonModal: React.FC<{ pedido: Pedido; onClose: () => void }> = ({ pedido, onClose }) => {
+  const revision = [...(pedido.proposal.revisoes || [])].reverse().find((item) => item.snapshot);
+  const before = revision?.snapshot;
+  if (!before) return null;
+  const current = {
+    referencia: pedido.referencia || '', valorTotal: Number(pedido.proposal.valorTotal || 0), objetivo: pedido.proposal.objetivo || '',
+    escopoServico: pedido.proposal.escopoServico || '', prazoExecucao: pedido.proposal.prazoExecucao || '', garantia: pedido.proposal.garantia || '',
+    validadeDias: Number(pedido.proposal.validadePropostaDias || 0),
+    itens: (pedido.proposal.equipmentItems || []).map((item) => `${item.quantidade}x ${item.descricao || item.marcaModelo || 'Item'}`).join(' · '),
+    pagamento: [pedido.proposal.formasPagamento?.join(', '), pedido.proposal.condicoesPagamento?.join(' · ')].filter(Boolean).join(' — '),
+  };
+  const fields: { label: string; before: string; current: string }[] = [
+    { label: 'Referência', before: before.referencia, current: current.referencia }, { label: 'Valor total', before: brl(before.valorTotal), current: brl(current.valorTotal) },
+    { label: 'Objetivo', before: before.objetivo, current: current.objetivo }, { label: 'Escopo', before: before.escopoServico, current: current.escopoServico },
+    { label: 'Prazo', before: before.prazoExecucao, current: current.prazoExecucao }, { label: 'Garantia', before: before.garantia, current: current.garantia },
+    { label: 'Validade', before: `${before.validadeDias || '—'} dias`, current: `${current.validadeDias || '—'} dias` }, { label: 'Itens', before: before.itens, current: current.itens },
+    { label: 'Pagamento', before: before.pagamento, current: current.pagamento },
+  ];
+  return <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="bg-white w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-xl shadow-2xl flex flex-col">
+      <div className="p-5 border-b border-slate-200 flex items-start justify-between"><div><p className="text-[10px] font-bold text-violet-700 uppercase tracking-wide">Comparação de revisão</p><h3 className="font-bold text-slate-900 mt-1">{revision.numero} → {pedido.numeroPedido}</h3><p className="text-xs text-slate-500 mt-1">{revision.motivo || 'Revisão comercial'}</p></div><button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-xl">×</button></div>
+      <div className="overflow-y-auto p-5"><div className="grid grid-cols-[9rem_1fr_1fr] gap-px bg-slate-200 border border-slate-200 rounded-lg overflow-hidden text-xs"><div className="bg-slate-100 p-2 font-bold text-slate-500">Campo</div><div className="bg-slate-100 p-2 font-bold text-slate-500">Versão anterior</div><div className="bg-slate-100 p-2 font-bold text-slate-500">Versão atual</div>{fields.map((field) => { const changed = field.before !== field.current; return <React.Fragment key={field.label}><div className="bg-white p-2 font-semibold text-slate-700">{field.label}</div><div className={`bg-white p-2 whitespace-pre-wrap break-words ${changed ? 'text-red-700 bg-red-50/40' : 'text-slate-600'}`}>{field.before || '—'}</div><div className={`bg-white p-2 whitespace-pre-wrap break-words ${changed ? 'text-emerald-700 bg-emerald-50/50 font-medium' : 'text-slate-600'}`}>{field.current || '—'}</div></React.Fragment>; })}</div></div>
+      <div className="p-4 border-t border-slate-200 flex justify-end"><button onClick={onClose} className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-bold">Fechar</button></div>
+    </div>
   </div>;
 };

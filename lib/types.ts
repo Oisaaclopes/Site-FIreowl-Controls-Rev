@@ -141,7 +141,7 @@ export interface CommercialProposalData {
   /** Carta de apresentação (opcional). Vazio → usa o texto institucional padrão. */
   cartaApresentacao?: string;
   /** Histórico de revisões da proposta (aparece na seção "Histórico de Propostas"). */
-  revisoes?: { numero: string; data: string; elaborador: string; motivo?: string; status?: string; alteracoes?: string[] }[];
+  revisoes?: { numero: string; data: string; elaborador: string; motivo?: string; status?: string; alteracoes?: string[]; snapshot?: { referencia: string; valorTotal: number; objetivo: string; escopoServico: string; prazoExecucao: string; garantia: string; validadeDias: number; itens: string; pagamento: string } }[];
   /** Motivo comercial registrado quando a proposta é recusada ou expira. */
   motivoRecusa?: string;
   /** Caminho no Storage (bucket report-media) da imagem opcional da capa do PDF. */
