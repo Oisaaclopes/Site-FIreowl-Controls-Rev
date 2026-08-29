@@ -579,10 +579,12 @@ const StockItemCard: React.FC<{
           )}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] mt-1">
             {item.brand && <Meta label="Marca" value={item.brand} />}
+            {item.productLine && <Meta label="Linha" value={item.productLine} />}
             {item.model && <Meta label="Modelo" value={item.model} />}
             <Meta label="Qtd." value={`${item.quantity}${item.unit ? ' ' + item.unit.split(' ')[0] : ''}`} />
             <Meta label="Código" value={<span className="font-data-mono">{item.code}</span>} />
           </div>
+          {(item.shortDescription || item.technologies?.length) && <p className="mt-1 text-[11px] text-slate-500 line-clamp-2">{item.shortDescription || item.technologies?.join(' · ')}</p>}
         </div>
       </div>
 
@@ -590,9 +592,7 @@ const StockItemCard: React.FC<{
       <div className="flex items-center justify-between md:justify-end gap-4 shrink-0">
         {/* Preço + dados financeiros (com edição in-line) */}
         <div className="text-right min-w-[190px]">
-          <p className="font-data-mono font-bold text-emerald-600 text-base md:text-lg">
-            {brl(editingFin ? liveSale : price)}
-          </p>
+          <p className="font-data-mono font-bold text-emerald-600 text-base md:text-lg">{editingFin ? brl(liveSale) : item.salePrice == null && item.unitPrice === 0 ? 'Não cadastrado' : brl(price)}</p>
           {editingFin ? (
             <div className="mt-1 flex items-center justify-end gap-2 text-[11px]" onClick={(e) => e.stopPropagation()}>
               <label className="flex items-center gap-1 text-slate-500">
