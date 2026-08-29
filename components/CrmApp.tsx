@@ -937,6 +937,8 @@ export function CrmApp({
           onOpenMenu={() => setSidebarOpen(true)}
           canSwitchRole={canSwitchRole}
           sidebarCollapsed={isSidebarCollapsed}
+          pedidos={pedidos}
+          onOpenPedidos={() => setCurrentTab('pedidos')}
         />
 
         {/* View Switcher — padding inferior no mobile do técnico p/ o BottomNav */}

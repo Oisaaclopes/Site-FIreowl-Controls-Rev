@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { UserRole } from '@/lib/types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Pedido, UserRole } from '@/lib/types';
 import { usePrivacy } from '@/lib/privacy';
 import { pendingCount, isOnline } from '@/lib/offline/reportSync';
 
@@ -14,6 +14,8 @@ interface HeaderProps {
   canSwitchRole?: boolean;
   /** Recolhe o offset esquerdo do header quando a sidebar está minimizada. */
   sidebarCollapsed?: boolean;
+  pedidos?: Pedido[];
+  onOpenPedidos?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -24,14 +26,34 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenMenu,
   canSwitchRole = false,
   sidebarCollapsed = false,
+  pedidos = [],
+  onOpenPedidos,
 }) => {
   const { isPrivacyModeActive, togglePrivacy } = usePrivacy();
   const [currentDateTime, setCurrentDateTime] = useState('24 Mai 2024 | 14:30');
   const [showNotifications, setShowNotifications] = useState(false);
+  const proposalAlerts = useMemo(() => {
+    const parse = (value?: string) => {
+      if (!value) return null;
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date;
+    };
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return pedidos.map((pedido) => {
+      if (['aceito', 'concluido', 'recusado', 'expirado'].includes(pedido.status)) return null;
+      const issued = parse(pedido.createdAt) || parse(pedido.dataEmissao);
+      const validity = Number(pedido.proposal?.validadePropostaDias || 0);
+      if (!issued || !validity) return null;
+      issued.setHours(0, 0, 0, 0); issued.setDate(issued.getDate() + validity);
+      const days = Math.ceil((issued.getTime() - today.getTime()) / 86400000);
+      return days <= 7 ? { pedido, days } : null;
+    }).filter((item): item is { pedido: Pedido; days: number } => !!item).sort((a, b) => a.days - b.days);
+  }, [pedidos]);
 
   // Indicador de sincronização (fila offline do IndexedDB)
   const [online, setOnline] = useState(true);
   const [pend, setPend] = useState(0);
+  const attentionCount = (!online ? 1 : 0) + pend + proposalAlerts.length;
   useEffect(() => {
     const refresh = () => pendingCount().then(setPend).catch(() => {});
     setOnline(isOnline());
@@ -119,14 +141,14 @@ export const Header: React.FC<HeaderProps> = ({
             title="Notificações do Sistema"
           >
             <span className="material-symbols-outlined">notifications</span>
-            {(!online || pend > 0) && <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-[#E63946] rounded-full ring-2 ring-white"></div>}
+            {attentionCount > 0 && <div className="absolute top-1 right-1 min-w-2.5 h-2.5 px-0.5 bg-[#E63946] rounded-full ring-2 ring-white text-[8px] leading-[10px] text-white font-bold">{attentionCount > 9 ? '9+' : attentionCount}</div>}
           </button>
 
           {showNotifications && (
             <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-lg shadow-xl z-50 p-4 text-xs">
               <div className="flex justify-between items-center border-b border-slate-200 pb-3 mb-3">
                 <span className="font-bold text-slate-800 uppercase text-xs">Avisos do sistema</span>
-                <span className={`font-data-mono text-[10px] px-2 py-0.5 rounded-full font-bold ${!online || pend > 0 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{!online || pend > 0 ? 'Atenção' : 'Em dia'}</span>
+                <span className={`font-data-mono text-[10px] px-2 py-0.5 rounded-full font-bold ${attentionCount > 0 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{attentionCount > 0 ? 'Atenção' : 'Em dia'}</span>
               </div>
               <div className="space-y-2.5">
                 {!online ? (
@@ -145,7 +167,15 @@ export const Header: React.FC<HeaderProps> = ({
                     <p className="text-[11px] text-slate-600 mt-0.5">Não há relatórios aguardando envio neste aparelho.</p>
                   </div>
                 )}
+                {proposalAlerts.slice(0, 3).map(({ pedido, days }) => (
+                  <div key={pedido.id} className={`p-2.5 rounded-r-md border-l-4 ${days < 0 ? 'bg-red-50 border-red-500' : 'bg-amber-50 border-amber-500'}`}>
+                    <p className={`font-bold uppercase text-[11px] ${days < 0 ? 'text-red-800' : 'text-amber-900'}`}>{days < 0 ? 'Proposta vencida' : days === 0 ? 'Proposta vence hoje' : 'Vencimento próximo'}</p>
+                    <p className="text-[11px] text-slate-600 mt-0.5 truncate">{pedido.numeroPedido} · {pedido.clienteNome}</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">{days < 0 ? `Vencida há ${Math.abs(days)} dia(s)` : `Vence em ${days} dia(s)`}</p>
+                  </div>
+                ))}
               </div>
+              {proposalAlerts.length > 0 && onOpenPedidos && <button onClick={() => { setShowNotifications(false); onOpenPedidos(); }} className="w-full mt-3 py-1.5 bg-[#1A1A72] hover:bg-[#0B1E38] text-white font-semibold rounded text-center text-[11px]">Ver propostas com alerta</button>}
               <button
                 onClick={() => setShowNotifications(false)}
                 className="w-full mt-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded text-center text-[11px]"
