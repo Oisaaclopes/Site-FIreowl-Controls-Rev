@@ -72,7 +72,7 @@ export async function createOrderFromSurvey(reportId: string): Promise<SurveyOrd
     if (!price) warnings.push(`Preço pendente para: ${material.descricao}.`);
     appendGroupedItem(grouped, `m:${material.catalogItemId || [material.descricao, brandModel, material.unidade].map(normalize).join('|')}`, {
       descricao: material.descricao,
-      descricaoDetalhada: material.observacao,
+      descricaoDetalhada: material.observacao || inventoryItem?.commercialDescription || inventoryItem?.shortDescription || inventoryItem?.description,
       marcaModelo: brandModel,
       unidade: material.unidade || inventoryItem?.unit || 'un',
       quantidade: numeric(material.quantidade, 1),
@@ -92,7 +92,7 @@ export async function createOrderFromSurvey(reportId: string): Promise<SurveyOrd
     if (!price) warnings.push(`Preço pendente para: ${measurement.descricao}.`);
     appendGroupedItem(grouped, `med:${measurement.catalogItemId || [measurement.descricao, measurement.unidade].map(normalize).join('|')}`, {
       descricao: measurement.descricao,
-      descricaoDetalhada: [measurement.local, measurement.observacao].filter(Boolean).join(' — ') || undefined,
+      descricaoDetalhada: [measurement.local, measurement.observacao, inventoryItem?.commercialDescription || inventoryItem?.shortDescription].filter(Boolean).join(' — ') || undefined,
       marcaModelo: [inventoryItem?.brand, inventoryItem?.model].filter(Boolean).join(' · '),
       unidade: measurement.unidade || inventoryItem?.unit || 'un',
       quantidade: numeric(measurement.quantidade),

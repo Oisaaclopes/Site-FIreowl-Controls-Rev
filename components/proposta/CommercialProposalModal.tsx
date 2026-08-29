@@ -979,7 +979,13 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               resolveCatalogo={(id) => {
                 const inv = inventory.find((i) => i.id === id);
                 if (!inv) return undefined;
-                return { descricao: inv.name, marcaModelo: inv.brand || inv.supplier || inv.category, precoUnitario: inv.salePrice ?? inv.unitPrice, unidade: 'un' };
+                return {
+                  descricao: inv.name,
+                  descricaoDetalhada: inv.commercialDescription || inv.shortDescription || inv.description,
+                  marcaModelo: [inv.brand, inv.model].filter(Boolean).join(' · ') || inv.supplier || inv.category,
+                  precoUnitario: inv.salePrice ?? inv.unitPrice,
+                  unidade: inv.unit || 'un',
+                };
               }}
               onAdd={handleAddEquipmentItem}
               onUpdate={handleUpdateEquipmentPatch}
