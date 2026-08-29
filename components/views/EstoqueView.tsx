@@ -575,6 +575,11 @@ const StockItemCard: React.FC<{
                   {item.subcategory}
                 </span>
               )}
+              {item.catalogStatus && (
+                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${item.catalogStatus === 'ATIVO' ? 'bg-emerald-50 text-emerald-700' : item.catalogStatus === 'LEGADO' ? 'bg-amber-50 text-amber-800' : item.catalogStatus === 'DESCONTINUADO' ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
+                  {item.catalogStatus}
+                </span>
+              )}
             </div>
           )}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] mt-1">
