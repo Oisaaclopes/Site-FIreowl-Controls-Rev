@@ -443,11 +443,39 @@ export interface SupplyOrder {
   supplier?: string;
   purchaseDate?: string;
   receivedAt?: string;
-  /** Data da entrada confirmada no estoque; impede lançar o mesmo recebimento duas vezes. */
+  /** @deprecated fluxo simples antigo (0051). A verdade agora é supply_receipts + supply_receipt_items.stock_movement_id. Não usar como fonte de verdade. */
   stockReceivedAt?: string;
   items: PedidoEquipmentItem[];
   totalValue: number;
   createdAt: string;
+}
+
+// ===== Compra (subetapa opcional: pedido -> compra -> recebimento) =====
+export type SupplyPurchaseStatus = 'registrada' | 'recebida_parcial' | 'recebida' | 'cancelada';
+
+export interface SupplyPurchaseItem {
+  id: string;
+  purchaseId: string;
+  orderItemKey?: string;
+  inventoryItemId?: string;
+  descricao?: string;
+  quantity: number;
+  unitCost?: number;
+  total?: number;
+}
+
+export interface SupplyPurchase {
+  id: string;
+  supplyOrderId: string;
+  supplierId?: string;
+  supplier?: string;
+  status: SupplyPurchaseStatus;
+  purchaseDate?: string;
+  expectedDate?: string;
+  notes?: string;
+  totalValue?: number;
+  createdAt?: string;
+  items?: SupplyPurchaseItem[];
 }
 
 // ===== Recebimento de fornecimento (parcial) + conferência + entrada no estoque =====
@@ -469,6 +497,8 @@ export interface SupplyReceiptItem {
   orderItemKey?: string;
   /** inventory_items.id (quando o item está vinculado ao Estoque). */
   inventoryItemId?: string;
+  /** Link opcional ao item da compra (rastreabilidade compra -> recebimento). */
+  purchaseItemId?: string;
   descricao?: string;
   quantityReceived: number;
   quantityAccepted: number;
@@ -486,6 +516,7 @@ export interface SupplyReceipt {
   supplyOrderId: string;
   supplier?: string;
   supplierId?: string;
+  purchaseId?: string;
   receivedAt: string;
   receivedBy?: string;
   notes?: string;

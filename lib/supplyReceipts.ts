@@ -1,5 +1,5 @@
 import { getSupabaseClient } from './supabaseClient';
-import { SupplyReceipt, SupplyReceiptItem, SupplyOrder, PedidoEquipmentItem } from './types';
+import { SupplyReceipt, SupplyReceiptItem, SupplyOrder, SupplyPurchase, PedidoEquipmentItem } from './types';
 
 /**
  * Recebimentos de fornecimento (parciais) + entrada SEGURA no estoque.
@@ -171,9 +171,10 @@ export function lancadoPorChave(receipts: SupplyReceipt[]): Record<string, numbe
 
 /**
  * §25 — status automático do pedido a partir das quantidades. Não rebaixa um
- * pedido cancelado. Materiais = itens não-serviço.
+ * pedido cancelado. Materiais = itens não-serviço. Uma compra registrada (0053)
+ * ou o campo legado purchaseDate marcam COMPRADO.
  */
-export function deriveSupplyStatus(order: SupplyOrder, receipts: SupplyReceipt[]): SupplyOrder['status'] {
+export function deriveSupplyStatus(order: SupplyOrder, receipts: SupplyReceipt[], purchases: SupplyPurchase[] = []): SupplyOrder['status'] {
   if (order.status === 'CANCELADO') return 'CANCELADO';
   const materiais = (order.items || []).map((it, i) => ({ it, i })).filter((x) => x.it.tipo !== 'servico');
   const totalPrevisto = materiais.reduce((s, x) => s + qtyItem(x.it), 0);
@@ -182,7 +183,7 @@ export function deriveSupplyStatus(order: SupplyOrder, receipts: SupplyReceipt[]
   const totalRecebido = materiais.reduce((s, x) => s + (rec[keyOf(x.it, x.i)] || 0), 0);
   const totalLancado = materiais.reduce((s, x) => s + (lan[keyOf(x.it, x.i)] || 0), 0);
 
-  const comprou = !!order.purchaseDate || order.status === 'COMPRADO';
+  const comprou = purchases.some((p) => p.status !== 'cancelada') || !!order.purchaseDate || order.status === 'COMPRADO';
   if (totalPrevisto <= 0) return order.status;
 
   if (totalLancado >= totalPrevisto && totalRecebido >= totalPrevisto) return 'CONCLUIDO';
@@ -192,4 +193,39 @@ export function deriveSupplyStatus(order: SupplyOrder, receipts: SupplyReceipt[]
   if (comprou) return 'COMPRADO';
   if (order.status === 'EM_COTACAO') return 'EM_COTACAO';
   return 'ABERTO';
+}
+
+// ---------------------------- helpers puros (§51) ----------------------------
+
+/** Falta receber por chave: previsto (vendido) − já recebido. Nunca negativo. */
+export function remainingToReceive(order: SupplyOrder, receipts: SupplyReceipt[]): Record<string, number> {
+  const rec = recebidoPorChave(receipts);
+  const out: Record<string, number> = {};
+  (order.items || []).forEach((it, i) => {
+    if (it.tipo === 'servico') return;
+    const k = keyOf(it, i);
+    out[k] = Math.max(0, qtyItem(it) - (rec[k] || 0));
+  });
+  return out;
+}
+
+/** §8/§17 — necessidade de compra sugerida: pedido − estoque atual (nunca < 0). */
+export function sugestaoCompra(quantidadePedido: number, estoqueAtual: number): number {
+  return Math.max(0, Number(quantidadePedido || 0) - Number(estoqueAtual || 0));
+}
+
+/** §30 — conferência válida: aceito + rejeitado = recebido, todos ≥ 0. */
+export function validaConferencia(recebido: number, aceito: number, rejeitado: number): boolean {
+  const r = Number(recebido || 0), a = Number(aceito || 0), j = Number(rejeitado || 0);
+  return a >= 0 && j >= 0 && a + j === r;
+}
+
+/** §26 — excedente ao receber: quanto passa do que ainda falta receber. */
+export function excedente(faltaReceber: number, receberAgora: number): number {
+  return Math.max(0, Number(receberAgora || 0) - Number(faltaReceber || 0));
+}
+
+/** Total de uma lista de itens de compra (Σ quantidade × custo unitário). */
+export function totalCompra(items: { quantity?: number; unitCost?: number }[]): number {
+  return items.reduce((s, it) => s + Number(it.quantity || 0) * Number(it.unitCost || 0), 0);
 }
