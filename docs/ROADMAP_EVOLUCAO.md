@@ -4,7 +4,7 @@ Registro atualizado em 29/08/2026. Itens concluídos não entram nesta lista.
 
 ## Entregue nesta etapa
 
-- QR de autenticidade para relatório, proposta, orçamento e ordem de serviço.
+- QR de autenticidade para relatório, proposta, orçamento, ordem de serviço e contrato.
 - Modelos favoritos gerais e por cliente: salvar, aplicar, renomear e excluir, persistidos no Supabase pela migration 0046.
 - Indicadores comerciais de conversão, perdas, propostas próximas do vencimento e volume.
 - Fluxo operacional base: levantamento → proposta → OS de campo → relatório → correção de pendência.
@@ -12,7 +12,7 @@ Registro atualizado em 29/08/2026. Itens concluídos não entram nesta lista.
 
 ## Pendências reais
 
-1. Estender QR de autenticidade para contratos e impedir emissão quando o registro público não puder ser publicado (hoje a geração continua disponível offline).
+1. Decidir a política de emissão offline: hoje o documento é emitido mesmo se o registro público de QR não puder ser publicado.
 2. Adicionar notas e eventos de comunicação à linha do tempo do cliente.
 3. Fazer conversão guiada de proposta aprovada para pedido, OS ou contrato conforme o tipo comercial, com confirmação de dados antes de criar os documentos.
 4. Comparar revisões por campo, registrar o autor e exibir diferenças entre versões.
