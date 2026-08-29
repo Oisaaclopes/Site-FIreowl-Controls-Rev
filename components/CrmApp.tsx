@@ -37,6 +37,7 @@ import {
   PedidoStatus,
   PdfPrefs,
   DocumentosPadrao
+  ,SupplyOrder
 } from '@/lib/types';
 import { createOrdemServico, nextOsNumero } from '@/lib/ordensServico';
 import { fetchPendencias } from '@/lib/pendencias';
@@ -89,6 +90,7 @@ import { fetchEmpresasAtendidas, upsertEmpresaAtendida, deleteEmpresaAtendida } 
 import { fetchMarcasTecnologias, upsertMarcaTecnologia, deleteMarcaTecnologia } from '@/lib/marcasTecnologias';
 import { fetchTransactions, upsertTransaction, deleteTransaction } from '@/lib/transactions';
 import { fetchContracts, upsertContract } from '@/lib/contracts';
+import { fetchSupplyOrders, insertSupplyOrder } from '@/lib/supplyOrders';
 import { WorkSchedule } from '@/lib/schedule';
 
 let idSeq = 1000;
@@ -171,6 +173,7 @@ export function CrmApp({
   const [clients, setClients] = useState<Client[]>(isSupabaseConfigured() ? [] : INITIAL_CLIENTS);
   const [pedidosOS, setPedidosOS] = useState<PedidoOS[]>(INITIAL_PEDIDOS_OS);
   const [pedidos, setPedidos] = useState<Pedido[]>(isSupabaseConfigured() ? [] : INITIAL_PEDIDOS);
+  const [supplyOrders, setSupplyOrders] = useState<SupplyOrder[]>([]);
   const [partnerBrands, setPartnerBrands] = useState<PartnerBrand[]>(INITIAL_PARTNER_BRANDS);
   const [empresasAtendidas, setEmpresasAtendidas] = useState<EmpresaAtendida[]>([]);
   const [marcasTecnologias, setMarcasTecnologias] = useState<MarcaTecnologia[]>([]);
@@ -296,6 +299,9 @@ export function CrmApp({
     fetchContracts()
       .then((rows) => setContracts(rows))
       .catch((err) => console.warn('Contratos: falha ao carregar do Supabase.', err));
+    fetchSupplyOrders()
+      .then((rows) => setSupplyOrders(rows))
+      .catch((err) => console.warn('Pedidos de fornecimento: falha ao carregar do Supabase.', err));
     fetchCompanyProfile()
       .then((cp) => { if (cp) setCompanyProfile(cp); })
       .catch((err) => console.warn('Perfil da empresa: falha ao carregar do Supabase.', err));
@@ -570,6 +576,23 @@ export function CrmApp({
       sourcePedidoId: pedido.id,
     });
     alert(`Contrato criado a partir da proposta ${pedido.numeroPedido}. Confira vigência, horas e dados técnicos na aba Contratos.`);
+  };
+  const handleGenerateSupplyOrderFromPedido = async (pedido: Pedido) => {
+    if (supplyOrders.some((order) => order.sourcePedidoId === pedido.id)) return;
+    const order: SupplyOrder = { id: `FORN-${new Date().getFullYear()}-${getNextSeq()}`, sourcePedidoId: pedido.id, clientId: pedido.clienteId, clientName: pedido.clienteNome, title: pedido.referencia || 'Fornecimento originado de proposta', status: 'ABERTO', items: pedido.proposal.equipmentItems || [], totalValue: Number(pedido.proposal.valorTotal || 0), createdAt: new Date().toISOString() };
+    setSupplyOrders((orders) => [order, ...orders]);
+    if (isSupabaseConfigured()) {
+      try {
+        const stored = await insertSupplyOrder(order);
+        setSupplyOrders((orders) => [stored, ...orders.filter((item) => item.id !== order.id)]);
+      } catch (error) {
+        setSupplyOrders((orders) => orders.filter((item) => item.id !== order.id));
+        console.error('Falha ao salvar pedido de fornecimento:', error);
+        alert('Não foi possível criar o pedido de fornecimento no Supabase.');
+        return;
+      }
+    }
+    alert(`Pedido de fornecimento ${order.id} criado. Os itens e valores foram copiados da proposta.`);
   };
 
   const handleDeleteClient = async (client: Client) => {
@@ -965,6 +988,7 @@ export function CrmApp({
             <PedidosView
               pedidosOS={pedidosOS}
               pedidos={pedidos}
+              supplyOrders={supplyOrders}
               contracts={contracts}
               clients={clients}
               inventory={inventory}
@@ -982,6 +1006,7 @@ export function CrmApp({
               onDeletePedido={handleDeletePedido}
               onGenerateOSFromPedido={handleGenerateOSFromPedido}
               onGenerateContractFromPedido={handleGenerateContractFromPedido}
+              onGenerateSupplyOrderFromPedido={handleGenerateSupplyOrderFromPedido}
               onSelectClientForReport={handleSelectClientForReport}
               onAddClient={handleAddClient}
               onAddTransaction={handleAddTransaction}

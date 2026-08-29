@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { PedidoOS, Client, Pedido, Contract, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem, DocumentosPadrao, DocumentType, FinancialTransaction, RecebimentoProposta, EmpresaAtendida, MarcaTecnologia } from '@/lib/types';
+import { PedidoOS, SupplyOrder, Client, Pedido, Contract, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem, DocumentosPadrao, DocumentType, FinancialTransaction, RecebimentoProposta, EmpresaAtendida, MarcaTecnologia } from '@/lib/types';
 import { selecionarEmpresas, selecionarMarcas, experienciaAtiva } from '@/lib/experienciaSelecao';
 import { resolveLogoDataUrls } from '@/lib/institucional';
 import { nomeFantasiaCliente } from '@/lib/utils';
@@ -53,6 +53,7 @@ import {
 interface PedidosViewProps {
   pedidosOS: PedidoOS[];
   pedidos: Pedido[];
+  supplyOrders?: SupplyOrder[];
   contracts?: Contract[];
   clients: Client[];
   inventory: InventoryItem[];
@@ -70,6 +71,7 @@ interface PedidosViewProps {
   onDeletePedido?: (pedidoId: string) => void;
   onGenerateOSFromPedido: (pedido: Pedido) => void;
   onGenerateContractFromPedido?: (pedido: Pedido) => void;
+  onGenerateSupplyOrderFromPedido?: (pedido: Pedido) => void;
   onSelectClientForReport?: (clientName: string) => void;
   onAddClient?: (client: Client) => void;
   pdfPrefs: PdfPrefs;
@@ -110,6 +112,7 @@ const razaoSocialCliente = (name: string) => name.replace(/\s*\([^)]*\)\s*$/, ''
 export const PedidosView: React.FC<PedidosViewProps> = ({
   pedidosOS,
   pedidos,
+  supplyOrders = [],
   contracts = [],
   clients,
   inventory,
@@ -127,6 +130,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   onDeletePedido,
   onGenerateOSFromPedido,
   onGenerateContractFromPedido,
+  onGenerateSupplyOrderFromPedido,
   onSelectClientForReport,
   onAddClient,
   onAddTransaction,
@@ -665,6 +669,10 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   const confirmGenerateContract = (ped: Pedido) => {
     if (window.confirm(`Criar contrato recorrente a partir desta proposta?\n\nCliente: ${ped.clienteNome}\nEscopo: ${ped.referencia || 'Não informado'}\nValor mensal: ${brl(ped.proposal.valorMensal || ped.proposal.valorTotal || 0)}\nVigência: ${ped.proposal.vigenciaMeses || 12} meses\n\nVocê poderá completar horas, reajuste e dados técnicos na aba Contratos.`)) onGenerateContractFromPedido?.(ped);
   };
+  const confirmGenerateSupplyOrder = (ped: Pedido) => {
+    const count = ped.proposal.equipmentItems?.length || 0;
+    if (window.confirm(`Criar pedido de fornecimento desta proposta?\n\nCliente: ${ped.clienteNome}\nItens: ${count}\nValor: ${brl(ped.proposal.valorTotal || 0)}\n\nOs itens serão copiados para o pedido interno de fornecimento.`)) onGenerateSupplyOrderFromPedido?.(ped);
+  };
   // Cria uma nova proposta a partir da estrutura atual, sem reutilizar número,
   // status, recebimento ou histórico de revisões do documento de origem.
   const handleDuplicate = (ped: Pedido) => {
@@ -760,6 +768,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     const clientLogo = client?.logoPath ? clientLogoUrls[client.logoPath] : undefined;
     const existingOs = pedidosOS.find((os) => os.pedidoId === ped.numeroPedido);
     const existingContract = contracts.find((contract) => contract.sourcePedidoId === ped.id);
+    const existingSupplyOrder = supplyOrders.find((order) => order.sourcePedidoId === ped.id);
     const daysLeft = validityDaysLeft(ped);
     return (
       <div
@@ -819,6 +828,9 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
             <button onClick={() => { if (!existingContract) confirmGenerateContract(ped); }} disabled={!!existingContract} title={existingContract ? `Contrato ${existingContract.id} já foi criado desta proposta` : 'Converter proposta recorrente em contrato'} className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1 ${existingContract ? 'bg-emerald-100 text-emerald-700 cursor-not-allowed' : 'bg-[#1A1A72] hover:bg-[#0B1E38] text-white'}`}>
               <span className="material-symbols-outlined text-sm">handshake</span>{existingContract ? 'Contrato criado' : 'Criar contrato'}
             </button>
+          )}
+          {ped.status === 'aceito' && !ped.proposal.recorrente && onGenerateSupplyOrderFromPedido && (
+            <button onClick={() => { if (!existingSupplyOrder) confirmGenerateSupplyOrder(ped); }} disabled={!!existingSupplyOrder} title={existingSupplyOrder ? `Pedido ${existingSupplyOrder.id} já foi criado desta proposta` : 'Criar pedido de fornecimento'} className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1 ${existingSupplyOrder ? 'bg-emerald-100 text-emerald-700 cursor-not-allowed' : 'bg-sky-700 hover:bg-sky-800 text-white'}`}><span className="material-symbols-outlined text-sm">shopping_cart</span>{existingSupplyOrder ? 'Pedido criado' : 'Gerar pedido'}</button>
           )}
           {ped.proposal.revisoes?.some((revision) => revision.snapshot) && <button onClick={() => setComparisonPedido(ped)} title="Comparar revisão anterior com a proposta atual" className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-violet-700 hover:bg-violet-50"><History className="w-4 h-4" /></button>}
 

@@ -423,6 +423,19 @@ export interface PedidoOS {
   value: number;
 }
 
+/** Pedido interno de fornecimento, rastreável até a proposta aceita. */
+export interface SupplyOrder {
+  id: string;
+  sourcePedidoId: string;
+  clientId?: string;
+  clientName: string;
+  title: string;
+  status: 'ABERTO' | 'EM_COTACAO' | 'COMPRADO' | 'RECEBIDO' | 'CANCELADO';
+  items: PedidoEquipmentItem[];
+  totalValue: number;
+  createdAt: string;
+}
+
 export interface Contract {
   id: string;
   clientName: string;
