@@ -539,6 +539,28 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     [filteredPedidos]
   );
 
+  const commercialInsights = useMemo(() => {
+    const base = pedidos.filter(passesBase);
+    const decided = base.filter((p) => ['aceito', 'concluido', 'recusado', 'expirado'].includes(p.status));
+    const won = base.filter((p) => p.status === 'aceito' || p.status === 'concluido');
+    const lost = base.filter((p) => p.status === 'recusado' || p.status === 'expirado');
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const inSevenDays = new Date(now); inSevenDays.setDate(inSevenDays.getDate() + 7);
+    const expiring = base.filter((p) => {
+      if (['aceito', 'concluido', 'recusado', 'expirado'].includes(p.status)) return false;
+      const date = pedDate(p);
+      const days = Number(p.proposal.validadePropostaDias || 0);
+      if (!date || !days) return false;
+      const deadline = new Date(date); deadline.setDate(deadline.getDate() + days);
+      return deadline >= now && deadline <= inSevenDays;
+    });
+    const reasons = lost.map((p) => p.proposal.motivoRecusa?.trim()).filter(Boolean) as string[];
+    const topReason = reasons.reduce<Record<string, number>>((acc, reason) => ({ ...acc, [reason]: (acc[reason] || 0) + 1 }), {});
+    const topReasonLabel = Object.entries(topReason).sort((a, b) => b[1] - a[1])[0]?.[0];
+    return { won: won.length, lost: lost.length, conversion: decided.length ? Math.round((won.length / decided.length) * 100) : 0, expiring: expiring.length, topReason: topReasonLabel };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedidos, filterClient, filterFrom, filterTo, searchTerm]);
+
   // Agrupamento por data (timeline)
   const groupedByDate = useMemo(() => {
     const groups = new Map<string, { label: string; items: Pedido[] }>();
@@ -1008,6 +1030,13 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
               <p className="text-[10px] font-semibold text-slate-500 uppercase">Volume filtrado</p>
               <p className="font-data-mono text-lg font-bold text-emerald-600">{maskMoney(brl(volumeFiltrado))}</p>
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+            <InsightCard label="Conversão" value={`${commercialInsights.conversion}%`} detail={`${commercialInsights.won} ganha(s) · ${commercialInsights.lost} perdida(s)`} tone="emerald" />
+            <InsightCard label="A vencer em 7 dias" value={String(commercialInsights.expiring)} detail="Propostas abertas" tone={commercialInsights.expiring ? 'amber' : 'slate'} />
+            <InsightCard label="Maior motivo de perda" value={commercialInsights.topReason ? 'Registrado' : '—'} detail={commercialInsights.topReason || 'Sem motivo informado'} tone="red" />
+            <InsightCard label="Volume em análise" value={maskMoney(brl(volumeFiltrado))} detail={`${filteredPedidos.length} proposta(s) no filtro`} tone="navy" />
           </div>
 
           {/* Lista / Timeline */}
@@ -1482,3 +1511,18 @@ const PipelineCard: React.FC<{
     <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mt-1 truncate">{label}</p>
   </button>
 );
+
+const InsightCard: React.FC<{ label: string; value: string; detail: string; tone: 'emerald' | 'amber' | 'red' | 'slate' | 'navy' }> = ({ label, value, detail, tone }) => {
+  const palette = {
+    emerald: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    amber: 'border-amber-200 bg-amber-50 text-amber-800',
+    red: 'border-red-200 bg-red-50 text-red-700',
+    slate: 'border-slate-200 bg-slate-50 text-slate-700',
+    navy: 'border-[#1A1A72]/20 bg-[#1A1A72]/5 text-[#1A1A72]',
+  } as const;
+  return <div className={`rounded-xl border p-3 min-w-0 ${palette[tone]}`}>
+    <p className="text-[10px] font-bold uppercase tracking-wide opacity-75">{label}</p>
+    <p className="mt-1 font-data-mono text-lg font-bold truncate">{value}</p>
+    <p className="mt-0.5 text-[10px] truncate opacity-80" title={detail}>{detail}</p>
+  </div>;
+};
