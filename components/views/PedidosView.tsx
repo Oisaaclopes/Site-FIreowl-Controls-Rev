@@ -59,6 +59,9 @@ interface PedidosViewProps {
   pedidosOS: PedidoOS[];
   pedidos: Pedido[];
   supplyOrders?: SupplyOrder[];
+  /** Abre automaticamente o detalhe deste pedido de fornecimento ao montar/atualizar. */
+  initialDetailOrderId?: string | null;
+  onConsumeInitialDetail?: () => void;
   contracts?: Contract[];
   clients: Client[];
   inventory: InventoryItem[];
@@ -78,6 +81,8 @@ interface PedidosViewProps {
   onGenerateContractFromPedido?: (pedido: Pedido) => void;
   onGenerateSupplyOrderFromPedido?: (pedido: Pedido) => void;
   onUpdateSupplyOrder?: (order: SupplyOrder) => void;
+  /** Cria um item de estoque e retorna o item persistido (para vínculo imediato). */
+  onCreateInventoryItem?: (item: InventoryItem) => Promise<InventoryItem>;
   onReceiveSupplyOrderIntoStock?: (order: SupplyOrder) => void;
   /** Recarrega estoque/pedidos após a entrada segura do recebimento (novo fluxo). */
   onSupplyChanged?: () => void;
@@ -122,6 +127,8 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   pedidosOS,
   pedidos,
   supplyOrders = [],
+  initialDetailOrderId = null,
+  onConsumeInitialDetail,
   contracts = [],
   clients,
   inventory,
@@ -141,6 +148,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   onGenerateContractFromPedido,
   onGenerateSupplyOrderFromPedido,
   onUpdateSupplyOrder,
+  onCreateInventoryItem,
   onReceiveSupplyOrderIntoStock,
   onSupplyChanged,
   onSelectClientForReport,
@@ -163,6 +171,13 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   const [viewTab, setViewTab] = useState<'propostas' | 'ordens_servico' | 'fornecimento'>(
     initialView ?? (isTecnico ? 'ordens_servico' : 'propostas')
   );
+  // Abre o detalhe do fornecimento quando solicitado por outra tela (ex.: Estoque → Origem).
+  useEffect(() => {
+    if (!initialDetailOrderId) return;
+    const ord = supplyOrders.find((o) => o.id === initialDetailOrderId);
+    if (ord) { setDetailOrder(ord); setViewTab('fornecimento'); }
+    onConsumeInitialDetail?.();
+  }, [initialDetailOrderId, supplyOrders]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Modo de exibição das propostas
   const [displayMode, setDisplayMode] = useState<'lista' | 'timeline'>('lista');
@@ -1200,6 +1215,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           userRole={userRole}
           onClose={() => setDetailOrder(null)}
           onUpdateSupplyOrder={onUpdateSupplyOrder}
+          onCreateInventoryItem={onCreateInventoryItem}
           onSupplyChanged={onSupplyChanged}
         />
       )}

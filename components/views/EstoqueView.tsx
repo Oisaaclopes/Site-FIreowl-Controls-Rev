@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { InventoryItem, StockMovement, Supplier } from '@/lib/types';
+import { InventoryItem, StockMovement, Supplier, SupplyOrder } from '@/lib/types';
 import { insertStockMovement, fetchStockMovements, isSupabaseConfigured } from '@/lib/inventory';
 import { PRODUCT_CATALOGS, CatalogoConfig } from '@/lib/catalogosProdutos';
 import { applyTechnicalCatalogPlan, planTechnicalCatalogImport, TechnicalCatalogPlan } from '@/lib/catalogSeed/importer';
@@ -9,11 +9,15 @@ import { applyTechnicalCatalogPlan, planTechnicalCatalogImport, TechnicalCatalog
 interface EstoqueViewProps {
   inventory: InventoryItem[];
   suppliers?: Supplier[];
+  /** Pedidos de fornecimento — usados para resolver a origem das movimentações. */
+  supplyOrders?: SupplyOrder[];
   onAddInventoryItem: (item: InventoryItem) => void | Promise<void>;
   onUpdateInventoryItem?: (item: InventoryItem) => void | Promise<void>;
   onDeleteInventoryItem?: (id: string) => void | Promise<void>;
   /** Cria/atualiza um fornecedor (usado ao importar um catálogo com fornecedor). */
   onAddSupplier?: (s: Supplier) => void | Promise<void>;
+  /** Abre o detalhe do pedido de fornecimento (link a partir da movimentação). */
+  onOpenSupplyOrder?: (id: string) => void;
   loading?: boolean;
 }
 
@@ -789,10 +793,12 @@ const StockItemCard: React.FC<{
 export const EstoqueView: React.FC<EstoqueViewProps> = ({
   inventory,
   suppliers = [],
+  supplyOrders = [],
   onAddInventoryItem,
   onUpdateInventoryItem,
   onDeleteInventoryItem,
   onAddSupplier,
+  onOpenSupplyOrder,
   loading = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -2256,22 +2262,52 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                 </div>
               ) : (
                 <ul className="divide-y divide-slate-100">
-                  {historyRows.map((mv) => (
-                    <li key={mv.id} className="py-3 flex items-center gap-3">
+                  {historyRows.map((mv) => {
+                    const isReversal = mv.originType === 'SUPPLY_REVERSAL';
+                    const pf = mv.supplyOrderId;
+                    const ord = pf ? supplyOrders.find((o) => o.id === pf) : undefined;
+                    return (
+                    <li key={mv.id} className="py-3 flex items-start gap-3">
                       <span
                         className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                          mv.type === 'entrada' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-[#E63946]'
+                          mv.type === 'entrada' ? 'bg-emerald-50 text-emerald-600' : isReversal ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-[#E63946]'
                         }`}
                       >
                         <span className="material-symbols-outlined text-lg">
-                          {mv.type === 'entrada' ? 'arrow_downward' : 'arrow_upward'}
+                          {mv.type === 'entrada' ? 'arrow_downward' : isReversal ? 'undo' : 'arrow_upward'}
                         </span>
                       </span>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-bold text-slate-900 uppercase">
-                          {mv.type === 'entrada' ? 'Entrada' : 'Saída'} de {mv.quantity} un
+                          {isReversal ? 'Estorno de recebimento' : mv.type === 'entrada' ? 'Entrada' : 'Saída'} de {mv.quantity} un
                         </p>
-                        <p className="text-[11px] text-slate-500 truncate">{mv.note || '—'}</p>
+                        {pf ? (
+                          <div className="mt-1 rounded-lg bg-slate-50 border border-slate-100 px-2.5 py-1.5 space-y-0.5">
+                            <p className="text-[11px] text-slate-600">
+                              <span className="font-semibold text-slate-500">Origem:</span>{' '}
+                              {isReversal ? 'Estorno · ' : ''}Pedido de Fornecimento{' '}
+                              <span className="font-data-mono font-bold text-sky-700">{pf}</span>
+                            </p>
+                            {ord?.title && <p className="text-[11px] text-slate-500 truncate">{ord.title}</p>}
+                            {isReversal && mv.reversalReason && (
+                              <p className="text-[11px] text-amber-700"><span className="font-semibold">Motivo:</span> {mv.reversalReason}</p>
+                            )}
+                            {mv.createdBy && (
+                              <p className="text-[10px] text-slate-400">Por {mv.createdBy}</p>
+                            )}
+                            {onOpenSupplyOrder && (
+                              <button
+                                type="button"
+                                onClick={() => { setHistoryItem(null); onOpenSupplyOrder(pf); }}
+                                className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-sky-700 hover:text-sky-900"
+                              >
+                                <span className="material-symbols-outlined text-sm">open_in_new</span> Abrir fornecimento
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-slate-500 truncate">{mv.note || '—'}</p>
+                        )}
                       </div>
                       <div className="text-right shrink-0">
                         <p className="font-data-mono text-xs font-bold text-slate-900">Saldo: {mv.resultingBalance ?? '—'}</p>
@@ -2288,7 +2324,8 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
                         </p>
                       </div>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               )}
             </div>

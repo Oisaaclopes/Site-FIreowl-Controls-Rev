@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { SupplyOrder, InventoryItem, UserRole, SupplyPurchase, SupplyReceipt, SupplyReceiptItem } from '@/lib/types';
-import { fetchReceipts, reverseReceiptItem, resumoItensFornecimento, deriveSupplyStatus, syncSupplyOrderStatus, mensagemErroFornecimento } from '@/lib/supplyReceipts';
+import { fetchReceipts, reverseReceiptItemPartial, disponivelParaEstorno, estornadoDoItem, resumoItensFornecimento, deriveSupplyStatus, syncSupplyOrderStatus, mensagemErroFornecimento } from '@/lib/supplyReceipts';
 import { fetchPurchases } from '@/lib/supplyPurchases';
 import { isSupabaseConfigured } from '@/lib/inventory';
 import { SupplyPurchaseModal } from './SupplyPurchaseModal';
@@ -15,8 +15,13 @@ interface Props {
   userRole: UserRole;
   onClose: () => void;
   onUpdateSupplyOrder?: (o: SupplyOrder) => void;
+  /** Cria um item de estoque e retorna o persistido (para vínculo imediato). */
+  onCreateInventoryItem?: (item: InventoryItem) => Promise<InventoryItem>;
   onSupplyChanged?: () => void;
 }
+
+// Normaliza código para deduplicação: VIP5440 ~ VIP 5440 ~ VIP-5440.
+const normCode = (s?: string) => (s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
 const money = (n?: number) => `R$ ${(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 const fmt = (s?: string) => (s ? new Date(s).toLocaleString('pt-BR') : '—');
@@ -25,7 +30,7 @@ const STATUS_LABEL: Record<string, string> = { ABERTO: 'Aberto', EM_COTACAO: 'Em
 const MOTIVOS_ESTORNO = ['Produto recebido incorretamente', 'Avaria constatada', 'Erro de conferência', 'Devolução ao fornecedor', 'Lançamento incorreto', 'Outro'];
 const podeVerCusto = (role: UserRole) => role === 'ADMINISTRATIVO' || role === 'GESTOR' || role === 'FINANCEIRO';
 
-export const SupplyOrderDetailModal: React.FC<Props> = ({ order: orderProp, inventory, currentUserName, userRole, onClose, onUpdateSupplyOrder, onSupplyChanged }) => {
+export const SupplyOrderDetailModal: React.FC<Props> = ({ order: orderProp, inventory, currentUserName, userRole, onClose, onUpdateSupplyOrder, onCreateInventoryItem, onSupplyChanged }) => {
   const online = isSupabaseConfigured();
   const [order, setOrder] = useState(orderProp);
   const [purchases, setPurchases] = useState<SupplyPurchase[]>([]);
@@ -33,7 +38,8 @@ export const SupplyOrderDetailModal: React.FC<Props> = ({ order: orderProp, inve
   const [loading, setLoading] = useState(true);
   const [sub, setSub] = useState<'comprar' | 'receber' | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [estorno, setEstorno] = useState<{ it: SupplyReceiptItem; rec: SupplyReceipt } | null>(null);
+  const [estorno, setEstorno] = useState<{ it: SupplyReceiptItem; rec: SupplyReceipt; idemKey: string } | null>(null);
+  const [estornoQty, setEstornoQty] = useState(0);
   const [motivo, setMotivo] = useState('');
   const [motivoTxt, setMotivoTxt] = useState('');
   const [busy, setBusy] = useState(false);
@@ -58,13 +64,20 @@ export const SupplyOrderDetailModal: React.FC<Props> = ({ order: orderProp, inve
 
   const refetchTudo = async () => { await carregar(); onSupplyChanged?.(); };
 
+  const openEstorno = (it: SupplyReceiptItem, rec: SupplyReceipt) => {
+    setEstorno({ it, rec, idemKey: (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `idem_${Date.now()}_${Math.random()}`) });
+    setEstornoQty(disponivelParaEstorno(it));
+    setMotivo(''); setMotivoTxt(''); setErro(null);
+  };
   const confirmarEstorno = async () => {
     if (!estorno) return;
+    const disp = disponivelParaEstorno(estorno.it);
     const motivoFinal = [motivo, motivoTxt].filter(Boolean).join(' — ');
     if (!motivoFinal.trim()) { setErro('Informe o motivo do estorno.'); return; }
+    if (estornoQty <= 0 || estornoQty > disp) { setErro(`Quantidade inválida. Disponível para estorno: ${disp}.`); return; }
     setBusy(true); setErro(null);
     try {
-      await reverseReceiptItem(estorno.it.id, motivoFinal, currentUserName);
+      await reverseReceiptItemPartial(estorno.it.id, estornoQty, motivoFinal, currentUserName || 'sistema', estorno.idemKey);
       await syncSupplyOrderStatus(order);
       setEstorno(null); setMotivo(''); setMotivoTxt('');
       await refetchTudo();
@@ -76,7 +89,55 @@ export const SupplyOrderDetailModal: React.FC<Props> = ({ order: orderProp, inve
     const updated = { ...order, items };
     setOrder(updated);
     onUpdateSupplyOrder?.(updated);
-    setVincKey(null); setBusca('');
+    setVincKey(null); setBusca(''); setCriarAberto(false);
+  };
+
+  // ── Criar produto inline (§23–30) — reutiliza o serviço de estoque + dedup + provisório.
+  const itemForKey = (key: string | null) => (key ? order.items.find((it, i) => (it.vinculoEstoqueId || `idx:${i}`) === key) : undefined);
+  const [criarAberto, setCriarAberto] = useState(false);
+  const [criando, setCriando] = useState(false);
+  const [novo, setNovo] = useState({ name: '', brand: '', model: '', unit: 'UN', category: '', code: '' });
+  useEffect(() => {
+    if (!vincKey) { setCriarAberto(false); return; }
+    const it = itemForKey(vincKey);
+    setNovo({ name: it?.descricao || '', brand: '', model: it?.marcaModelo || '', unit: it?.unidade || 'UN', category: '', code: '' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vincKey]);
+  // Deduplicação: sugere itens já cadastrados por código normalizado ou nome.
+  const dupCandidates = useMemo(() => {
+    const code = normCode(novo.code);
+    const q = novo.name.trim().toLowerCase();
+    if (!code && q.length < 3) return [];
+    return inventory.filter((i) => (code && normCode(i.code) === code) || (q && `${i.name} ${i.brand || ''} ${i.model || ''}`.toLowerCase().includes(q))).slice(0, 5);
+  }, [inventory, novo.code, novo.name]);
+  const criarProduto = async () => {
+    if (!onCreateInventoryItem || !vincKey) return;
+    if (!novo.name.trim()) { setErro('Informe a descrição do produto.'); return; }
+    // Se o código já existe (normalizado), vincula ao existente em vez de duplicar.
+    const code = normCode(novo.code);
+    if (code) {
+      const existente = inventory.find((i) => normCode(i.code) === code);
+      if (existente) { vincularProduto(vincKey, existente); return; }
+    }
+    setCriando(true); setErro(null);
+    try {
+      const incompleto = !novo.category.trim() || !novo.brand.trim();
+      const item: InventoryItem = {
+        id: `tmp-${Date.now()}`,
+        code: novo.code.trim() || `PROV-${Date.now().toString(36).toUpperCase()}`,
+        name: novo.name.trim(),
+        category: novo.category.trim() || 'A DEFINIR',
+        quantity: 0, minQuantity: 0, unitPrice: 0, supplier: '', location: '',
+        unit: novo.unit || 'UN',
+        brand: novo.brand.trim() || undefined,
+        model: novo.model.trim() || undefined,
+        stockManaged: true,
+        pendenteValidacao: incompleto || !novo.code.trim(),
+        catalogStatus: incompleto ? 'A_VALIDAR' : 'ATIVO',
+      };
+      const saved = await onCreateInventoryItem(item);
+      vincularProduto(vincKey, saved);
+    } catch (e) { setErro(mensagemErroFornecimento(e)); } finally { setCriando(false); }
   };
 
   // Timeline (§22) — eventos derivados, sem poluir.
@@ -87,8 +148,9 @@ export const SupplyOrderDetailModal: React.FC<Props> = ({ order: orderProp, inve
       ev.push({ at: r.receivedAt, label: `Recebimento${r.supplier ? ` — ${r.supplier}` : ''}`, tone: 'info' });
       (r.items || []).forEach((it) => {
         if (Number(it.quantityRejected || 0) > 0) ev.push({ at: r.receivedAt, label: `Item rejeitado: ${it.descricao} (${it.quantityRejected})`, tone: 'warn' });
-        if (it.stockMovementId && !it.reversedAt) ev.push({ at: it.postedAt, label: `Entrada no estoque: ${it.descricao} (+${it.quantityAccepted})`, tone: 'ok' });
-        if (it.reversedAt) ev.push({ at: it.reversedAt, label: `Estorno: ${it.descricao} (-${it.quantityAccepted})`, tone: 'warn' });
+        if (it.stockMovementId) ev.push({ at: it.postedAt, label: `Entrada no estoque: ${it.descricao} (+${it.quantityAccepted})`, tone: 'ok' });
+        if (it.reversedAt) ev.push({ at: it.reversedAt, label: `Estorno total: ${it.descricao} (-${it.quantityAccepted})`, tone: 'warn' });
+        else if (Number(it.quantityReversed || 0) > 0) ev.push({ at: it.postedAt, label: `Estorno parcial: ${it.descricao} (-${it.quantityReversed})`, tone: 'warn' });
       });
     });
     if (statusDerivado === 'CONCLUIDO') ev.push({ at: undefined, label: 'Fornecimento concluído', tone: 'ok' });
@@ -212,13 +274,15 @@ export const SupplyOrderDetailModal: React.FC<Props> = ({ order: orderProp, inve
                           <div key={it.id} className="flex items-center justify-between gap-2 text-[11px]">
                             <div className="min-w-0"><p className="font-semibold text-slate-800 truncate">{it.descricao}</p><p className="text-[10px] text-slate-500 font-data-mono">Receb. {it.quantityReceived} · Aceito {it.quantityAccepted} · Rejeit. {it.quantityRejected}{it.rejectionReason ? ` (${it.rejectionReason})` : ''}{custoVisivel && it.unitCost ? ` · ${money(it.unitCost)}/un` : ''}</p></div>
                             <div className="shrink-0 text-right">
-                              {it.reversedAt ? <span className="text-[10px] font-bold text-red-500 uppercase">Estornado</span>
-                                : it.stockMovementId ? (
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-[10px] font-bold text-emerald-600">entrada +{it.quantityAccepted}</span>
-                                    <button onClick={() => { setEstorno({ it, rec: r }); setMotivo(''); setMotivoTxt(''); }} className="text-[10px] font-bold uppercase text-slate-400 hover:text-[#E63946]">Estornar</button>
+                              {!it.stockMovementId ? <span className="text-[10px] text-slate-400">não lançado</span> : (() => {
+                                const est = estornadoDoItem(it); const disp = disponivelParaEstorno(it); const liq = Number(it.quantityAccepted || 0) - est;
+                                return (
+                                  <div className="flex items-center gap-2 justify-end">
+                                    <span className={`text-[10px] font-bold ${liq > 0 ? 'text-emerald-600' : 'text-red-500'}`}>{liq > 0 ? `entrada +${liq}` : 'Estornado'}{est > 0 && liq > 0 ? <span className="text-red-500"> (−{est})</span> : null}</span>
+                                    {disp > 0 && <button onClick={() => openEstorno(it, r)} className="text-[10px] font-bold uppercase text-slate-400 hover:text-[#E63946]">Estornar</button>}
                                   </div>
-                                ) : <span className="text-[10px] text-slate-400">não lançado</span>}
+                                );
+                              })()}
                             </div>
                           </div>
                         ))}
@@ -256,12 +320,22 @@ export const SupplyOrderDetailModal: React.FC<Props> = ({ order: orderProp, inve
           <div className="bg-white w-full max-w-md rounded-2xl border border-slate-200 shadow-2xl overflow-hidden">
             <div className="bg-[#0B1E38] text-white p-4 px-5"><h4 className="text-sm font-bold uppercase">Estornar entrada de estoque</h4></div>
             <div className="p-5 space-y-3">
-              <div className="text-xs text-slate-600"><p><b>Produto:</b> {estorno.it.descricao}</p><p><b>Quantidade:</b> {estorno.it.quantityAccepted} un</p><p><b>Movimentação original:</b> +{estorno.it.quantityAccepted}</p></div>
+              <div className="text-xs text-slate-600 grid grid-cols-3 gap-2 bg-slate-50 rounded-lg p-2.5">
+                <div className="col-span-3"><b>{estorno.it.descricao}</b></div>
+                <div><span className="block text-[9px] uppercase text-slate-400">Entrada original</span>{estorno.it.quantityAccepted} un</div>
+                <div><span className="block text-[9px] uppercase text-slate-400">Já estornado</span>{estornadoDoItem(estorno.it)} un</div>
+                <div><span className="block text-[9px] uppercase text-slate-400">Disponível</span><b className="text-slate-800">{disponivelParaEstorno(estorno.it)} un</b></div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Quantidade a estornar</label>
+                <input type="number" min={1} max={disponivelParaEstorno(estorno.it)} value={estornoQty} onChange={(e) => setEstornoQty(Math.max(0, Number(e.target.value) || 0))} className="w-24 border border-slate-300 rounded-lg px-3 py-2 text-sm text-right font-data-mono" />
+              </div>
               <div>
                 <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Motivo (obrigatório)</label>
                 <select value={motivo} onChange={(e) => setMotivo(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-2"><option value="">Selecione…</option>{MOTIVOS_ESTORNO.map((m) => <option key={m} value={m}>{m}</option>)}</select>
                 <input value={motivoTxt} onChange={(e) => setMotivoTxt(e.target.value)} placeholder="Complemento (opcional)" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
               </div>
+              <p className="text-[11px] text-slate-500">Será registrada uma <b>saída de {estornoQty || 0} un</b> no estoque. A entrada original <b>não</b> será apagada.</p>
               {erro && <p className="text-xs text-red-600">{erro}</p>}
             </div>
             <div className="p-4 border-t border-slate-200 bg-slate-50 flex gap-2">
@@ -277,17 +351,62 @@ export const SupplyOrderDetailModal: React.FC<Props> = ({ order: orderProp, inve
       {vincKey && (
         <div className="fixed inset-0 z-[70] bg-slate-900/70 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-2xl border border-slate-200 shadow-2xl overflow-hidden">
-            <div className="bg-[#0B1E38] text-white p-4 px-5 flex items-center justify-between"><h4 className="text-sm font-bold uppercase">Vincular produto ao estoque</h4><button onClick={() => { setVincKey(null); setBusca(''); }} className="text-slate-400 hover:text-white"><span className="material-symbols-outlined">close</span></button></div>
+            <div className="bg-[#0B1E38] text-white p-4 px-5 flex items-center justify-between"><h4 className="text-sm font-bold uppercase">{criarAberto ? 'Criar produto no estoque' : 'Vincular produto ao estoque'}</h4><button onClick={() => { setVincKey(null); setBusca(''); }} className="text-slate-400 hover:text-white"><span className="material-symbols-outlined">close</span></button></div>
+            {!criarAberto ? (
             <div className="p-5">
               <input autoFocus value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome, código, marca ou modelo…" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
-              <div className="mt-2 max-h-64 overflow-y-auto divide-y divide-slate-100">
+              <div className="mt-2 max-h-56 overflow-y-auto divide-y divide-slate-100">
                 {invFiltrado.map((inv) => (
                   <button key={inv.id} onClick={() => vincularProduto(vincKey, inv)} className="w-full text-left py-2 px-1 hover:bg-slate-50 rounded"><p className="text-xs font-bold text-slate-800">{inv.name}</p><p className="text-[10px] text-slate-400 font-data-mono">{inv.code}{inv.brand ? ` · ${inv.brand}` : ''}{inv.model ? ` ${inv.model}` : ''} · saldo {inv.quantity}</p></button>
                 ))}
-                {busca.trim() && invFiltrado.length === 0 && <p className="text-[11px] text-slate-400 py-3 text-center">Nenhum produto encontrado. Cadastre no Estoque e volte para vincular.</p>}
+                {busca.trim() && invFiltrado.length === 0 && <p className="text-[11px] text-slate-400 py-3 text-center">Nenhum produto encontrado.</p>}
               </div>
+              {onCreateInventoryItem && (
+                <button onClick={() => { setCriarAberto(true); setErro(null); }} className="mt-3 w-full inline-flex items-center justify-center gap-1.5 border-2 border-dashed border-sky-300 text-sky-700 hover:bg-sky-50 rounded-lg py-2 text-xs font-bold uppercase tracking-wide">
+                  <span className="material-symbols-outlined text-base">add_box</span> Criar produto
+                </button>
+              )}
               <p className="text-[10px] text-slate-400 mt-2">Vincular não altera a descrição da proposta — cria só o vínculo operacional com o estoque.</p>
+              {erro && <p className="text-[11px] text-red-600 mt-1">{erro}</p>}
             </div>
+            ) : (
+            <div className="p-5 space-y-3">
+              <div className="grid grid-cols-1 gap-2">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Descrição *</label>
+                  <input autoFocus value={novo.name} onChange={(e) => setNovo((n) => ({ ...n, name: e.target.value }))} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div><label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Fabricante</label><input value={novo.brand} onChange={(e) => setNovo((n) => ({ ...n, brand: e.target.value }))} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" /></div>
+                  <div><label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Modelo</label><input value={novo.model} onChange={(e) => setNovo((n) => ({ ...n, model: e.target.value }))} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" /></div>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div><label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Unidade</label><input value={novo.unit} onChange={(e) => setNovo((n) => ({ ...n, unit: e.target.value }))} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" /></div>
+                  <div><label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Categoria</label><input value={novo.category} onChange={(e) => setNovo((n) => ({ ...n, category: e.target.value }))} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" /></div>
+                  <div><label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Código</label><input value={novo.code} onChange={(e) => setNovo((n) => ({ ...n, code: e.target.value }))} placeholder="opcional" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-data-mono" /></div>
+                </div>
+              </div>
+              {dupCandidates.length > 0 && (
+                <div className="rounded-lg bg-amber-50 border border-amber-200 p-2.5">
+                  <p className="text-[10px] font-bold uppercase text-amber-700 mb-1">Possíveis duplicados — vincule em vez de criar</p>
+                  <div className="space-y-1">
+                    {dupCandidates.map((inv) => (
+                      <button key={inv.id} onClick={() => vincularProduto(vincKey, inv)} className="w-full text-left px-1.5 py-1 rounded hover:bg-amber-100"><span className="text-xs font-bold text-slate-800">{inv.name}</span> <span className="text-[10px] text-slate-500 font-data-mono">{inv.code}{inv.brand ? ` · ${inv.brand}` : ''}</span></button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {(!novo.category.trim() || !novo.brand.trim() || !novo.code.trim()) && novo.name.trim() && (
+                <p className="text-[10px] text-amber-600">Sem categoria/fabricante/código o produto será criado como <b>Pendente de validação</b>.</p>
+              )}
+              {erro && <p className="text-[11px] text-red-600">{erro}</p>}
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => { setCriarAberto(false); setErro(null); }} className="flex-1 border border-slate-300 text-slate-600 rounded-lg py-2 text-xs font-bold uppercase">Voltar</button>
+                <button disabled={criando || !novo.name.trim()} onClick={criarProduto} className="flex-1 bg-sky-700 hover:bg-sky-800 disabled:opacity-40 text-white rounded-lg py-2 text-xs font-bold uppercase">{criando ? 'Criando…' : 'Criar e vincular'}</button>
+              </div>
+              <p className="text-[10px] text-slate-400">Não altera a descrição/marca/modelo comercial da proposta.</p>
+            </div>
+            )}
           </div>
         </div>
       )}

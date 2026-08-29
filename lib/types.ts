@@ -508,9 +508,11 @@ export interface SupplyReceiptItem {
   /** Preenchido quando lançado no estoque — impede lançar duas vezes. */
   stockMovementId?: string;
   postedAt?: string;
-  /** Estorno (0054): quando a entrada deste item foi estornada. */
+  /** Estorno (0054): quando a entrada deste item foi estornada por completo. */
   reversedAt?: string;
   reversalMovementId?: string;
+  /** Estorno parcial (0055): total já estornado deste item. */
+  quantityReversed?: number;
 }
 
 /** Recebimento (pode haver vários por pedido de fornecimento — entrega parcial). */
@@ -739,6 +741,10 @@ export interface StockMovement {
   reversesMovementId?: string;
   reversalReason?: string;
   createdBy?: string;
+  /** Semântica do movimento: ex. 'SUPPLY_REVERSAL' (estorno) — distingue de saída operacional. */
+  originType?: string;
+  /** Estorno parcial (0055): entrada original relacionada. */
+  relatedMovementId?: string;
 }
 
 export interface SystemAuditLog {

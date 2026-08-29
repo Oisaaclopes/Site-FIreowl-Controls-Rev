@@ -43,6 +43,7 @@ function itemFromRow(r: any): SupplyReceiptItem {
     postedAt: r.posted_at || undefined,
     reversedAt: r.reversed_at || undefined,
     reversalMovementId: r.reversal_movement_id || undefined,
+    quantityReversed: r.quantity_reversed === null || r.quantity_reversed === undefined ? 0 : Number(r.quantity_reversed),
   };
 }
 
@@ -167,6 +168,28 @@ export async function reverseReceiptItem(receiptItemId: string, reason: string, 
   const { data, error } = await supabase.rpc('reverse_supply_receipt_item', { p_item_id: receiptItemId, p_reason: reason, p_user: user || null });
   if (error) throw error;
   return { alreadyReversed: !!data?.already_reversed, movementId: data?.movement_id || undefined, skipped: !!data?.skipped };
+}
+
+export interface ReversePartialResult { alreadyProcessed: boolean; movementId?: string; disponivelRestante?: number }
+
+/**
+ * §2/§5 (0055) — Estorno PARCIAL idempotente. `idemKey` deve ser estável por
+ * solicitação (gerado ao abrir o modal) para proteger duplo clique/retry.
+ */
+export async function reverseReceiptItemPartial(receiptItemId: string, quantity: number, reason: string, user: string, idemKey: string): Promise<ReversePartialResult> {
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase.rpc('reverse_supply_receipt_item_partial', { p_item_id: receiptItemId, p_qty: quantity, p_reason: reason, p_user: user, p_idem: idemKey });
+  if (error) throw error;
+  return { alreadyProcessed: !!data?.already_processed, movementId: data?.movement_id || undefined, disponivelRestante: data?.disponivel_restante };
+}
+
+/** Total já estornado de um item (parcial + total 0054). */
+export function estornadoDoItem(it: SupplyReceiptItem): number {
+  return Number(it.quantityReversed || 0) + (it.reversedAt ? Number(it.quantityAccepted || 0) : 0);
+}
+/** Disponível para estorno = aceito − já estornado. */
+export function disponivelParaEstorno(it: SupplyReceiptItem): number {
+  return Math.max(0, Number(it.quantityAccepted || 0) - estornadoDoItem(it));
 }
 
 // ---------------------------- derivação pura ----------------------------
@@ -297,12 +320,14 @@ export function resumoItensFornecimento(
     const k = it.orderItemKey || it.inventoryItemId || '';
     if (!k) return;
     const a = (agg[k] = agg[k] || { recebido: 0, aceito: 0, rejeitado: 0, entrada: 0, estornado: 0, naoLancado: 0 });
+    const aceitoIt = Number(it.quantityAccepted || 0);
+    const revIt = Number(it.quantityReversed || 0) + (it.reversedAt ? aceitoIt : 0);
     a.recebido += Number(it.quantityReceived || 0);
-    a.aceito += Number(it.quantityAccepted || 0);
+    a.aceito += aceitoIt;
     a.rejeitado += Number(it.quantityRejected || 0);
-    if (it.stockMovementId && !it.reversedAt) a.entrada += Number(it.quantityAccepted || 0);
-    if (it.reversedAt) a.estornado += Number(it.quantityAccepted || 0);
-    if (!it.stockMovementId && Number(it.quantityAccepted || 0) > 0) a.naoLancado += Number(it.quantityAccepted || 0);
+    if (it.stockMovementId) a.entrada += Math.max(0, aceitoIt - revIt); // entrada líquida de estornos
+    a.estornado += revIt;
+    if (!it.stockMovementId && aceitoIt > 0) a.naoLancado += aceitoIt;
   }));
   return (order.items || []).map((it, i) => ({ it, i })).filter((x) => x.it.tipo !== 'servico').map(({ it, i }) => {
     const key = keyOf(it, i);

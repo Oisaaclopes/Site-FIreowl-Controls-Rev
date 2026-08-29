@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { BottomNav } from '@/components/BottomNav';
 import { Header } from '@/components/Header';
@@ -174,6 +174,11 @@ export function CrmApp({
   const [pedidosOS, setPedidosOS] = useState<PedidoOS[]>(INITIAL_PEDIDOS_OS);
   const [pedidos, setPedidos] = useState<Pedido[]>(isSupabaseConfigured() ? [] : INITIAL_PEDIDOS);
   const [supplyOrders, setSupplyOrders] = useState<SupplyOrder[]>([]);
+  const [pendingSupplyOrderId, setPendingSupplyOrderId] = useState<string | null>(null);
+  const handleOpenSupplyOrder = useCallback((id: string) => {
+    setPendingSupplyOrderId(id);
+    setCurrentTab('pedidos');
+  }, []);
   const [partnerBrands, setPartnerBrands] = useState<PartnerBrand[]>(INITIAL_PARTNER_BRANDS);
   const [empresasAtendidas, setEmpresasAtendidas] = useState<EmpresaAtendida[]>([]);
   const [marcasTecnologias, setMarcasTecnologias] = useState<MarcaTecnologia[]>([]);
@@ -778,6 +783,20 @@ export function CrmApp({
     }
   };
 
+  // Criação inline (ex.: conferência de fornecimento) — retorna o item persistido
+  // para permitir o vínculo imediato. Reutiliza o mesmo serviço insertInventoryItem.
+  const handleCreateInventoryItemReturning = async (newItem: InventoryItem): Promise<InventoryItem> => {
+    if (!isSupabaseConfigured()) {
+      setInventory((prev) => [newItem, ...prev]);
+      logAction('Entrada no Almoxarifado', 'Estoque', `Cadastrado item ${newItem.code} - ${newItem.name} (local)`);
+      return newItem;
+    }
+    const saved = await insertInventoryItem(newItem);
+    setInventory((prev) => [saved, ...prev]);
+    logAction('Entrada no Almoxarifado', 'Estoque', `Cadastrado item ${saved.code} - ${saved.name} (via fornecimento)`);
+    return saved;
+  };
+
   const handleUpdateInventoryItem = async (item: InventoryItem) => {
     if (!isSupabaseConfigured()) {
       setInventory((prev) => prev.map((i) => (i.id === item.id ? item : i)));
@@ -1037,6 +1056,8 @@ export function CrmApp({
               pedidosOS={pedidosOS}
               pedidos={pedidos}
               supplyOrders={supplyOrders}
+              initialDetailOrderId={pendingSupplyOrderId}
+              onConsumeInitialDetail={() => setPendingSupplyOrderId(null)}
               contracts={contracts}
               clients={clients}
               inventory={inventory}
@@ -1056,6 +1077,7 @@ export function CrmApp({
               onGenerateContractFromPedido={handleGenerateContractFromPedido}
               onGenerateSupplyOrderFromPedido={handleGenerateSupplyOrderFromPedido}
               onUpdateSupplyOrder={handleUpdateSupplyOrder}
+              onCreateInventoryItem={handleCreateInventoryItemReturning}
               onReceiveSupplyOrderIntoStock={handleReceiveSupplyOrderIntoStock}
               onSupplyChanged={handleSupplyChanged}
               onSelectClientForReport={handleSelectClientForReport}
@@ -1140,10 +1162,12 @@ export function CrmApp({
             <EstoqueView
               inventory={inventory}
               suppliers={suppliers}
+              supplyOrders={supplyOrders}
               onAddInventoryItem={handleAddInventoryItem}
               onUpdateInventoryItem={handleUpdateInventoryItem}
               onDeleteInventoryItem={handleDeleteInventoryItem}
               onAddSupplier={handleAddSupplier}
+              onOpenSupplyOrder={handleOpenSupplyOrder}
               loading={inventoryLoading}
             />
           )}

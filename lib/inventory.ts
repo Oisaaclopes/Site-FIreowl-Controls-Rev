@@ -173,6 +173,8 @@ function movementRowToObj(r: any): StockMovement {
     reversesMovementId: r.reverses_movement_id ?? undefined,
     reversalReason: r.reversal_reason ?? undefined,
     createdBy: r.created_by ?? undefined,
+    originType: r.origin_type ?? undefined,
+    relatedMovementId: r.related_movement_id ?? undefined,
   };
 }
 
