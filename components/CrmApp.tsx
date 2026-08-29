@@ -40,6 +40,7 @@ import {
 } from '@/lib/types';
 import { createOrdemServico, nextOsNumero } from '@/lib/ordensServico';
 import { fetchPendencias } from '@/lib/pendencias';
+import { deletePedidoTemplate, fetchPedidoTemplates, upsertPedidoTemplate } from '@/lib/pedidoTemplates';
 
 import {
   INITIAL_CLIENTS,
@@ -187,6 +188,29 @@ export function CrmApp({
     if (!templatesReady) return;
     try { window.localStorage.setItem('fireowl_pedido_templates', JSON.stringify(templates)); } catch { /* armazenamento pode estar indisponível */ }
   }, [templates, templatesReady]);
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    let active = true;
+    fetchPedidoTemplates().then((saved) => {
+      if (active && saved.length) setTemplates(saved);
+    }).catch((error) => console.warn('Não foi possível carregar os modelos de proposta:', error));
+    return () => { active = false; };
+  }, []);
+  const handleSavePedidoTemplate = async (template: PedidoTemplate) => {
+    setTemplates((current) => [template, ...current.filter((item) => item.id !== template.id)]);
+    if (!isSupabaseConfigured()) return;
+    try {
+      const stored = await upsertPedidoTemplate(template);
+      setTemplates((current) => [stored, ...current.filter((item) => item.id !== stored.id)]);
+    } catch (error) { console.warn('Não foi possível salvar o modelo na nuvem:', error); }
+  };
+  const handleDeletePedidoTemplate = async (templateId: string) => {
+    const previous = templates;
+    setTemplates((current) => current.filter((item) => item.id !== templateId));
+    if (!isSupabaseConfigured()) return;
+    try { await deletePedidoTemplate(templateId); }
+    catch (error) { setTemplates(previous); console.warn('Não foi possível excluir o modelo na nuvem:', error); }
+  };
   const [contracts, setContracts] = useState<Contract[]>(isSupabaseConfigured() ? [] : INITIAL_CONTRACTS);
   const [equipmentList, setEquipmentList] = useState<ClientEquipment[]>(INITIAL_EQUIPMENT);
   const [punches, setPunches] = useState<TimePunch[]>(
@@ -916,8 +940,8 @@ export function CrmApp({
               inventory={inventory}
               partnerBrands={partnerBrands}
               templates={templates}
-              onSaveTemplate={(template) => setTemplates((current) => [template, ...current.filter((item) => item.id !== template.id)])}
-              onDeleteTemplate={(templateId) => setTemplates((current) => current.filter((item) => item.id !== templateId))}
+              onSaveTemplate={handleSavePedidoTemplate}
+              onDeleteTemplate={handleDeletePedidoTemplate}
               services={services}
               companyProfile={companyProfile}
               empresasAtendidas={empresasAtendidas}
