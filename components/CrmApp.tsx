@@ -544,6 +544,33 @@ export function CrmApp({
       }
     }
   };
+  const handleGenerateContractFromPedido = async (pedido: Pedido) => {
+    if (contracts.some((contract) => contract.sourcePedidoId === pedido.id)) return;
+    const client = clients.find((item) => item.id === pedido.clienteId);
+    const started = new Date();
+    const months = Math.max(1, Number(pedido.proposal.vigenciaMeses || 12));
+    const renewal = new Date(started); renewal.setMonth(renewal.getMonth() + months);
+    const stamp = Date.now().toString(36);
+    await handleAddContract({
+      id: `CTR-FOWL-${stamp}`,
+      clientName: pedido.clienteNome,
+      clientId: pedido.clienteId,
+      unit: client?.address || 'Unidade a definir',
+      contractType: pedido.referencia || pedido.proposal.tipoServico || 'Contrato de prestação de serviços',
+      monthlyValue: Number(pedido.proposal.valorMensal || pedido.proposal.valorTotal || 0),
+      startDate: started.toISOString().slice(0, 10),
+      renewalDate: renewal.toISOString().slice(0, 10),
+      readjustmentIndex: 'IPCA',
+      contractedHours: 0,
+      usedHours: 0,
+      paymentDay: 10,
+      status: 'ATIVO',
+      responsibleTech: pedido.responsavelComercialNome || 'Responsável técnico',
+      artDocumentRef: `ORIG-${pedido.numeroPedido}`,
+      sourcePedidoId: pedido.id,
+    });
+    alert(`Contrato criado a partir da proposta ${pedido.numeroPedido}. Confira vigência, horas e dados técnicos na aba Contratos.`);
+  };
 
   const handleDeleteClient = async (client: Client) => {
     setClients((prev) => prev.filter((c) => c.id !== client.id));
@@ -936,6 +963,7 @@ export function CrmApp({
             <PedidosView
               pedidosOS={pedidosOS}
               pedidos={pedidos}
+              contracts={contracts}
               clients={clients}
               inventory={inventory}
               partnerBrands={partnerBrands}
@@ -951,6 +979,7 @@ export function CrmApp({
               onUpdatePedidoStatus={handleUpdatePedidoStatus}
               onDeletePedido={handleDeletePedido}
               onGenerateOSFromPedido={handleGenerateOSFromPedido}
+              onGenerateContractFromPedido={handleGenerateContractFromPedido}
               onSelectClientForReport={handleSelectClientForReport}
               onAddClient={handleAddClient}
               onAddTransaction={handleAddTransaction}

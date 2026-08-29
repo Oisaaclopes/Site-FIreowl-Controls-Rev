@@ -20,6 +20,7 @@ function rowToContract(r: any): Contract {
     startDate: r.start_date ?? undefined,
     contractType: r.contract_type ?? undefined,
     paymentDay: r.payment_day ?? undefined,
+    sourcePedidoId: r.source_pedido_id ?? undefined,
   };
 }
 
@@ -44,6 +45,7 @@ function contractToRow(c: Contract): Record<string, unknown> {
   if (c.startDate !== undefined) row.start_date = c.startDate;
   if (c.contractType !== undefined) row.contract_type = c.contractType;
   if (c.paymentDay !== undefined) row.payment_day = c.paymentDay;
+  if (c.sourcePedidoId !== undefined) row.source_pedido_id = c.sourcePedidoId;
   return row;
 }
 

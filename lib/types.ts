@@ -440,6 +440,8 @@ export interface Contract {
   startDate?: string; // início da vigência
   contractType?: string; // escopo (Preventiva SDAI, CFTV, Full...)
   paymentDay?: number; // dia de vencimento da mensalidade
+  /** Pedido/proposta que originou este contrato por conversão comercial. */
+  sourcePedidoId?: string;
 }
 
 /** Evento manual do relacionamento com o cliente (nota, contato ou decisão). */

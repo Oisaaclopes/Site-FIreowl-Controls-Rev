@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { PedidoOS, Client, Pedido, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem, DocumentosPadrao, DocumentType, FinancialTransaction, RecebimentoProposta, EmpresaAtendida, MarcaTecnologia } from '@/lib/types';
+import { PedidoOS, Client, Pedido, Contract, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem, DocumentosPadrao, DocumentType, FinancialTransaction, RecebimentoProposta, EmpresaAtendida, MarcaTecnologia } from '@/lib/types';
 import { selecionarEmpresas, selecionarMarcas, experienciaAtiva } from '@/lib/experienciaSelecao';
 import { resolveLogoDataUrls } from '@/lib/institucional';
 import { nomeFantasiaCliente } from '@/lib/utils';
@@ -53,6 +53,7 @@ import {
 interface PedidosViewProps {
   pedidosOS: PedidoOS[];
   pedidos: Pedido[];
+  contracts?: Contract[];
   clients: Client[];
   inventory: InventoryItem[];
   partnerBrands: PartnerBrand[];
@@ -68,6 +69,7 @@ interface PedidosViewProps {
   onUpdatePedidoStatus: (pedidoId: string, newStatus: PedidoStatus) => void;
   onDeletePedido?: (pedidoId: string) => void;
   onGenerateOSFromPedido: (pedido: Pedido) => void;
+  onGenerateContractFromPedido?: (pedido: Pedido) => void;
   onSelectClientForReport?: (clientName: string) => void;
   onAddClient?: (client: Client) => void;
   pdfPrefs: PdfPrefs;
@@ -108,6 +110,7 @@ const razaoSocialCliente = (name: string) => name.replace(/\s*\([^)]*\)\s*$/, ''
 export const PedidosView: React.FC<PedidosViewProps> = ({
   pedidosOS,
   pedidos,
+  contracts = [],
   clients,
   inventory,
   partnerBrands,
@@ -123,6 +126,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   onUpdatePedidoStatus,
   onDeletePedido,
   onGenerateOSFromPedido,
+  onGenerateContractFromPedido,
   onSelectClientForReport,
   onAddClient,
   onAddTransaction,
@@ -650,6 +654,9 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     ].filter(Boolean).join('\n');
     if (window.confirm(`Confirmar geração da Ordem de Serviço?\n\n${details}\n\nA OS entrará na fila de atendimento de campo.`)) onGenerateOSFromPedido(ped);
   };
+  const confirmGenerateContract = (ped: Pedido) => {
+    if (window.confirm(`Criar contrato recorrente a partir desta proposta?\n\nCliente: ${ped.clienteNome}\nEscopo: ${ped.referencia || 'Não informado'}\nValor mensal: ${brl(ped.proposal.valorMensal || ped.proposal.valorTotal || 0)}\nVigência: ${ped.proposal.vigenciaMeses || 12} meses\n\nVocê poderá completar horas, reajuste e dados técnicos na aba Contratos.`)) onGenerateContractFromPedido?.(ped);
+  };
   // Cria uma nova proposta a partir da estrutura atual, sem reutilizar número,
   // status, recebimento ou histórico de revisões do documento de origem.
   const handleDuplicate = (ped: Pedido) => {
@@ -744,6 +751,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     const client = clients.find((item) => item.id === ped.clienteId || item.name === ped.clienteNome);
     const clientLogo = client?.logoPath ? clientLogoUrls[client.logoPath] : undefined;
     const existingOs = pedidosOS.find((os) => os.pedidoId === ped.numeroPedido);
+    const existingContract = contracts.find((contract) => contract.sourcePedidoId === ped.id);
     const daysLeft = validityDaysLeft(ped);
     return (
       <div
@@ -797,6 +805,11 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
               className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1 ${existingOs ? 'bg-emerald-100 text-emerald-700 cursor-not-allowed' : 'bg-[#E63946] hover:bg-[#a51515] text-white'}`}
             >
               <Wrench className="w-3 h-3" /> {existingOs ? 'OS gerada' : 'Gerar OS'}
+            </button>
+          )}
+          {ped.status === 'aceito' && ped.proposal.recorrente && onGenerateContractFromPedido && (
+            <button onClick={() => { if (!existingContract) confirmGenerateContract(ped); }} disabled={!!existingContract} title={existingContract ? `Contrato ${existingContract.id} já foi criado desta proposta` : 'Converter proposta recorrente em contrato'} className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1 ${existingContract ? 'bg-emerald-100 text-emerald-700 cursor-not-allowed' : 'bg-[#1A1A72] hover:bg-[#0B1E38] text-white'}`}>
+              <span className="material-symbols-outlined text-sm">handshake</span>{existingContract ? 'Contrato criado' : 'Criar contrato'}
             </button>
           )}
 
