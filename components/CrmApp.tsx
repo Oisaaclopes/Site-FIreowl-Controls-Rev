@@ -603,6 +603,20 @@ export function CrmApp({
       setSupplyOrders((orders) => orders.map((item) => item.id === stored.id ? stored : item));
     } catch (error) { setSupplyOrders(previous); console.error('Falha ao atualizar pedido de fornecimento:', error); alert('Não foi possível atualizar o pedido de fornecimento.'); }
   };
+  // Novo fluxo (0052/0053): após a entrada segura do recebimento, recarrega
+  // estoque e pedidos de fornecimento do banco (fonte de verdade).
+  const handleSupplyChanged = async () => {
+    if (!isSupabaseConfigured()) return;
+    try {
+      const [inv, orders] = await Promise.all([fetchInventory(), fetchSupplyOrders()]);
+      setInventory(inv);
+      setSupplyOrders(orders);
+    } catch (err) {
+      console.warn('Falha ao recarregar estoque/fornecimento:', err);
+    }
+  };
+
+  /** @deprecated fluxo antigo (0051) — substituído pelo recebimento com RPC idempotente (0052). */
   const handleReceiveSupplyOrderIntoStock = async (order: SupplyOrder) => {
     if (order.stockReceivedAt) return;
     const items = order.items.filter((item) => item.tipo !== 'servico' && item.vinculoEstoqueId);
@@ -1043,6 +1057,7 @@ export function CrmApp({
               onGenerateSupplyOrderFromPedido={handleGenerateSupplyOrderFromPedido}
               onUpdateSupplyOrder={handleUpdateSupplyOrder}
               onReceiveSupplyOrderIntoStock={handleReceiveSupplyOrderIntoStock}
+              onSupplyChanged={handleSupplyChanged}
               onSelectClientForReport={handleSelectClientForReport}
               onAddClient={handleAddClient}
               onAddTransaction={handleAddTransaction}
