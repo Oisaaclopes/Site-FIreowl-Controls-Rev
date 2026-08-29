@@ -22,7 +22,7 @@ import { CatalogSources } from '@/components/reports/FormEngine';
 import { ReportForm } from '@/components/reports/ReportForm';
 import { isSupabaseConfigured } from '@/lib/inventory';
 import { fetchReports, updateReport, deleteReport } from '@/lib/reports';
-import { fetchPendencias } from '@/lib/pendencias';
+import { fetchPendencias, updatePendenciaStatus } from '@/lib/pendencias';
 import { fetchDevices } from '@/lib/devices';
 import { fetchOrdensServico } from '@/lib/ordensServico';
 import { fetchCicloAtivo, quotaPorVisita } from '@/lib/ciclos';
@@ -687,6 +687,13 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     const titulo = `${os.titulo || ''} ${os.descricao || ''}`.toUpperCase();
     const area = titulo.includes('CFTV') ? 'CFTV' : titulo.includes('ACESSO') ? 'CONTROLE_ACESSO' : titulo.includes('BMS') ? 'BMS' : titulo.includes('ALARME') ? 'ALARME' : 'SDAI';
     startForm({ tipo: 'CORRETIVA', area, clienteId: os.clienteId, osId: os.id, contratoId: os.contratoId });
+    // Atualização operacional em segundo plano; uma falha de permissão não
+    // impede o técnico de abrir a corretiva vinculada.
+    if (os.pendenciaIds.length && isSupabaseConfigured()) {
+      Promise.all(os.pendenciaIds.map((id) => updatePendenciaStatus(id, 'em_execucao')))
+        .then(refresh)
+        .catch((error) => console.warn('Não foi possível marcar pendências em execução:', error));
+    }
   };
 
   // Catálogo do formulário: base + pendências aprovadas do cliente escolhido
