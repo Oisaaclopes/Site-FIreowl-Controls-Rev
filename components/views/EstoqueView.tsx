@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { InventoryItem, StockMovement, Supplier, SupplyOrder } from '@/lib/types';
 import { insertStockMovement, fetchStockMovements, isSupabaseConfigured } from '@/lib/inventory';
+import { stockStatus, stockIndicators, STOCK_STATUS_META, isStockControlled, moneyOrNull, textOrNull, normalizeSearch, type StockStatus } from '@/lib/stockStatus';
 import { PRODUCT_CATALOGS, CatalogoConfig } from '@/lib/catalogosProdutos';
 import { applyTechnicalCatalogPlan, planTechnicalCatalogImport, TechnicalCatalogPlan } from '@/lib/catalogSeed/importer';
 
@@ -512,7 +513,9 @@ const StockItemCard: React.FC<{
   const [menuOpen, setMenuOpen] = useState(false);
   const [technicalSheetOpen, setTechnicalSheetOpen] = useState(false);
   const price = item.salePrice ?? item.unitPrice ?? 0;
-  const esgotado = item.quantity <= 0;
+  // Status conceitual de estoque (ETAPA 5): catálogo puro nunca é esgotado/crítico.
+  const st: StockStatus = stockStatus(item);
+  const stMeta = STOCK_STATUS_META[st];
   // Produto criado provisoriamente em campo (relatório): falta finalizar
   // (fornecedor, custo, preço). Marcador persistido no código "PROV-…".
   const provisorio = /^PROV-/i.test(item.code || '') || item.pendenteValidacao === true;
@@ -601,8 +604,9 @@ const StockItemCard: React.FC<{
             {item.brand && <Meta label="Marca" value={item.brand} />}
             {item.productLine && <Meta label="Linha" value={item.productLine} />}
             {item.model && <Meta label="Modelo" value={item.model} />}
-            <Meta label="Qtd." value={`${item.quantity}${item.unit ? ' ' + item.unit.split(' ')[0] : ''}`} />
-            <Meta label="Código" value={<span className="font-data-mono">{item.code}</span>} />
+            {isStockControlled(item) && <Meta label="Saldo" value={`${item.quantity}${item.unit ? ' ' + item.unit.split(' ')[0] : ''}`} />}
+            <Meta label="Código" value={<span className="font-data-mono">{item.code || 'Não cadastrado'}</span>} />
+            <Meta label="Fornecedor" value={<span className={item.supplier ? '' : 'text-slate-400 italic'}>{textOrNull(item.supplier)}</span>} />
           </div>
           {(item.shortDescription || item.technologies?.length) && <p className="mt-1 text-[11px] text-slate-500 line-clamp-2">{item.shortDescription || item.technologies?.join(' · ')}</p>}
           {hasTechnicalSheet && (
@@ -714,13 +718,17 @@ const StockItemCard: React.FC<{
             <span className="material-symbols-outlined text-xs">pending</span>
             Cadastro pendente
           </span>
-        ) : esgotado ? (
-          <span className="shrink-0 px-2.5 py-1 rounded-full border border-[#E63946] text-[#E63946] text-[10px] font-bold uppercase tracking-wide">
-            Esgotado
-          </span>
         ) : (
-          <span className="shrink-0 px-2.5 py-1 rounded-full border border-[#1A1A72]/30 bg-[#1A1A72]/5 text-[#1A1A72] text-[10px] font-bold uppercase tracking-wide">
-            Estoque regular
+          <span
+            title={st === 'SOMENTE_CATALOGO' ? 'Produto de catálogo, sem controle físico de estoque' : undefined}
+            className={`shrink-0 px-2.5 py-1 rounded-full border text-[10px] font-bold uppercase tracking-wide ${
+              stMeta.tone === 'red' ? 'border-[#E63946] text-[#E63946] bg-red-50'
+                : stMeta.tone === 'amber' ? 'border-amber-400 text-amber-700 bg-amber-50'
+                : stMeta.tone === 'emerald' ? 'border-emerald-300 text-emerald-700 bg-emerald-50'
+                : 'border-slate-300 text-slate-500 bg-slate-50'
+            }`}
+          >
+            {stMeta.label}
           </span>
         )}
 
@@ -1124,30 +1132,48 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
     }).length,
   })).filter((c) => c.faltam > 0);
 
+  // Indicadores do catálogo × estoque (ETAPA 5).
+  const indicadores = useMemo(() => stockIndicators(inventory), [inventory]);
+
   const term = searchTerm.toLowerCase();
+  const nTerm = normalizeSearch(searchTerm); // FSP-951 ~ FSP951 ~ fsp 951
+  // Só produtos COM controle físico e abaixo do mínimo aparecem em "compras"/crítico.
+  const abaixoDoMinimo = (item: InventoryItem) => {
+    const st = stockStatus(item);
+    return st === 'ESTOQUE_BAIXO' || st === 'CRITICO' || st === 'SEM_ESTOQUE';
+  };
   const filteredInventory = inventory
-    // Aba "Lista de compras": só itens no nível mínimo ou abaixo
-    .filter((item) => (tab === 'compras' ? item.quantity <= item.minQuantity : true))
-    // Filtro "somente nível crítico" (menu de mais opções)
-    .filter((item) => (criticalOnly ? item.quantity <= item.minQuantity : true))
-    // Filtro por categoria macro, subcategoria e marca
+    // Aba "Lista de compras": itens controlados no nível mínimo/abaixo (catálogo puro não entra)
+    .filter((item) => (tab === 'compras' ? isStockControlled(item) && abaixoDoMinimo(item) : true))
+    // Filtro "somente nível crítico" (exclui somente-catálogo)
+    .filter((item) => (criticalOnly ? stockStatus(item) === 'CRITICO' || stockStatus(item) === 'SEM_ESTOQUE' : true))
+    // Navegação macro: Área (category) → Grupo (subcategory) → Fabricante (brand) → Linha (productLine)
     .filter((item) => (filterCategory ? item.category === filterCategory : true))
     .filter((item) => (filterSubcategory ? item.subcategory === filterSubcategory : true))
     .filter((item) => (filterBrand ? (item.brand || '').toLowerCase() === filterBrand.toLowerCase() : true))
     .filter((item) => (filterLine ? item.productLine === filterLine : true))
     .filter((item) => (filterCatalogStatus ? item.catalogStatus === filterCatalogStatus : true))
-    .filter(
-      (item) =>
+    .filter((item) => {
+      if (!term) return true;
+      // Match textual (nome/marca/linha/subcat/categoria/tecnologias/descrições)…
+      const textual =
         item.name.toLowerCase().includes(term) ||
-        item.code.toLowerCase().includes(term) ||
-        (item.serialBP || '').toLowerCase().includes(term) ||
         (item.brand || '').toLowerCase().includes(term) ||
         (item.model || '').toLowerCase().includes(term) ||
         (item.productLine || '').toLowerCase().includes(term) ||
         (item.technologies || []).some((tag) => tag.toLowerCase().includes(term)) ||
         (item.subcategory || '').toLowerCase().includes(term) ||
-        item.category.toLowerCase().includes(term)
-    );
+        item.category.toLowerCase().includes(term) ||
+        (item.description || '').toLowerCase().includes(term) ||
+        (item.shortDescription || '').toLowerCase().includes(term);
+      if (textual) return true;
+      // …e match normalizado de código/part-number/modelo (FSP-951 ~ FSP951).
+      return (
+        normalizeSearch(item.code).includes(nTerm) ||
+        normalizeSearch(item.serialBP).includes(nTerm) ||
+        normalizeSearch(item.model).includes(nTerm)
+      );
+    });
 
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -1336,10 +1362,10 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
       {/* Título */}
       <div className="border-b border-slate-200 pb-5">
         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-          Gestão de Almoxarifado, Peças &amp; Rastreabilidade BP
+          Catálogo técnico multiárea, disponibilidade física &amp; custos
         </span>
         <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">
-          Estoque de Componentes SDAI &amp; Equipamentos
+          Catálogo de Produtos &amp; Estoque
         </h1>
       </div>
 
@@ -1651,29 +1677,26 @@ export const EstoqueView: React.FC<EstoqueViewProps> = ({
         </div>
       ))}
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <p className="text-[11px] font-semibold text-slate-500 uppercase">Itens Catalogados</p>
-          <p className="font-data-mono text-2xl font-bold text-slate-900 mt-1">{inventory.length}</p>
-        </div>
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <p className="text-[11px] font-semibold text-slate-500 uppercase">Peças em Nível Crítico</p>
-          <p className="font-data-mono text-2xl font-bold text-red-600 mt-1">
-            {inventory.filter((i) => i.quantity <= i.minQuantity).length}
-          </p>
-        </div>
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <p className="text-[11px] font-semibold text-slate-500 uppercase">Total de Unidades</p>
-          <p className="font-data-mono text-2xl font-bold text-emerald-600 mt-1">
-            {inventory.reduce((acc, i) => acc + i.quantity, 0)}
-          </p>
-        </div>
-        <div className="bg-[#1A1A72] text-white p-4 rounded-xl border border-[#1A1A72] shadow-sm">
-          <p className="text-[11px] font-semibold text-white/60 uppercase">Patrimônio de Almoxarifado</p>
-          <p className="font-data-mono text-2xl font-bold text-emerald-400 mt-1">
-            R$ {inventory.reduce((acc, i) => acc + i.quantity * i.unitPrice, 0).toLocaleString('pt-BR')}
-          </p>
+      {/* Indicadores (ETAPA 5) — catálogo × estoque físico, sem contar catálogo
+          como crítico e sem R$0 artificial (só custo conhecido entra no valor). */}
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
+        {[
+          { label: 'Produtos no catálogo', value: indicadores.catalogo, tone: 'text-slate-900' },
+          { label: 'Produtos com saldo', value: indicadores.comSaldo, tone: 'text-slate-900' },
+          { label: 'Unidades em estoque', value: indicadores.unidades, tone: 'text-emerald-600' },
+          { label: 'Estoque baixo', value: indicadores.estoqueBaixo, tone: 'text-amber-600' },
+          { label: 'Estoque crítico', value: indicadores.critico, tone: 'text-red-600' },
+          { label: 'Cadastros pendentes', value: indicadores.pendentes, tone: 'text-[#1A1A72]' },
+        ].map((c) => (
+          <div key={c.label} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+            <p className="text-[10px] font-semibold text-slate-500 uppercase leading-tight">{c.label}</p>
+            <p className={`font-data-mono text-2xl font-bold mt-1 ${c.tone}`}>{c.value}</p>
+          </div>
+        ))}
+        <div className="bg-[#1A1A72] text-white p-3 rounded-xl border border-[#1A1A72] shadow-sm col-span-2 md:col-span-1">
+          <p className="text-[10px] font-semibold text-white/60 uppercase leading-tight">Valor do estoque</p>
+          <p className="font-data-mono text-xl font-bold text-emerald-400 mt-1">R$ {indicadores.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+          <p className="text-[9px] text-white/40 mt-0.5">unidades × custo conhecido</p>
         </div>
       </div>
 
