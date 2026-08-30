@@ -400,6 +400,29 @@ export interface Supplier {
   activeStatus: 'HOMOLOGADO' | 'EM AVALIACAO' | 'SUSPENSO';
   /** Marcas/fabricantes que este fornecedor trabalha (por nome). */
   brands?: string[];
+  tradeName?: string;
+  stateRegistration?: string;
+  logoPath?: string;
+  notes?: string;
+  contacts?: { name: string; role?: string; phone?: string; whatsapp?: string; email?: string; primary?: boolean }[];
+  areas?: string[];
+  address?: { zipCode?: string; street?: string; number?: string; complement?: string; neighborhood?: string; city?: string; state?: string };
+  logistics?: { pickupAvailable?: boolean; carrier?: string; freightMode?: string; notes?: string };
+  commercial?: { paymentTerms?: string; minimumOrderValue?: number; standardDiscount?: number; freightPolicy?: string; quoteValidityDays?: number; notes?: string };
+  homologation?: { homologatedAt?: string; homologatedBy?: string; validUntil?: string; notes?: string };
+}
+
+export interface SupplierProduct {
+  id: string;
+  supplierId: string;
+  inventoryItemId: string;
+  supplierCode?: string;
+  supplierDescription?: string;
+  cost?: number;
+  leadTimeDays?: number;
+  minimumOrderQty?: number;
+  lastQuoteDate?: string;
+  active: boolean;
 }
 
 export interface ServiceCatalogItem {
