@@ -11,6 +11,14 @@ import { fetchHolidays, Holiday } from '@/lib/holidays';
 import { fetchDayEntries, createDayEntry, deleteDayEntry, DayEntry, DayEntryKind } from '@/lib/dayentries';
 import { uploadCertificate, signedDocUrl } from '@/lib/storage';
 import { TimecardPDFView } from '@/components/documentos/TimecardPDFView';
+import type { TimecardBlock } from '@/components/documentos/TimecardDocument';
+import {
+  buildDailyTimeRecords,
+  computePeriodSummary,
+  consolidateDay,
+  dayStatusLabel,
+  fmtHoursShort,
+} from '@/lib/timecard';
 
 interface PontoViewProps {
   punches: TimePunch[];
@@ -185,8 +193,7 @@ export const PontoView: React.FC<PontoViewProps> = ({
   const [feedback, setFeedback] = useState<{ label: string; time: string } | null>(null);
   const [online, setOnline] = useState(true);
   const [lastSync, setLastSync] = useState<Date | null>(null);
-  const [showEspelho, setShowEspelho] = useState(false);
-  const [showTimecardPdf, setShowTimecardPdf] = useState(false);
+  const [timecardCfg, setTimecardCfg] = useState<{ blocks: TimecardBlock[]; periodLabel: string; fileLabel: string } | null>(null);
   const [recordPeriod, setRecordPeriod] = useState('');
   const [recordType, setRecordType] = useState<'TODOS' | PunchType>('TODOS');
   const [recordGps, setRecordGps] = useState<'TODOS' | 'COM_GPS' | 'SEM_GPS'>('TODOS');
@@ -578,35 +585,112 @@ export const PontoView: React.FC<PontoViewProps> = ({
     })
     .sort((a, b) => (a.at || 0) - (b.at || 0));
 
-  // Horas trabalhadas de um conjunto de batidas de um mesmo dia
-  const dayWorkedMs = (dayPunches: TimePunch[]): number => {
-    const e = dayPunches.find((p) => p.type === 'ENTRADA');
-    const a = dayPunches.find((p) => p.type === 'PAUSA');
-    const r = dayPunches.find((p) => p.type === 'RETORNO');
-    const s = [...dayPunches].reverse().find((p) => p.type === 'SAIDA');
-    let ms = 0;
-    if (e?.at) {
-      const aEnd = a?.at ?? s?.at;
-      if (aEnd) ms += Math.max(0, aEnd - e.at);
-    }
-    if (r?.at && s?.at) ms += Math.max(0, s.at - r.at);
-    return ms;
-  };
+  // Horas trabalhadas de um conjunto de batidas de um mesmo dia — via a fonte
+  // de verdade única (lib/timecard). Retorna 0 quando não calculável, apenas
+  // para somatórios; a classificação (incompleta/inconsistente) vem de
+  // consolidateDay().status.
+  const dayWorkedMs = (dayPunches: TimePunch[]): number => consolidateDay(dayPunches, nowMs).workedMs ?? 0;
 
   // ---- Banco de horas real (a partir das batidas + escala + feriados) ----
   // Jornada prevista para uma data: 0 em feriado, folga da escala ou dia
   // justificado por atestado/folga.
-  const expectedMsForDate = (d: Date): number => {
+  const expectedMsForDate = (d: Date, emp: string = currentUser): number => {
     const dk = fmtDateInput(d);
     if (holidays[dk]) return 0;
     const cfg = sched[d.getDay()];
     if (!cfg.works) return 0;
     const justified = dayEntries.some(
-      (e) => e.employeeName === currentUser && e.refDate === dk && (e.kind === 'ATESTADO' || e.kind === 'FOLGA')
+      (e) => e.employeeName === emp && e.refDate === dk && (e.kind === 'ATESTADO' || e.kind === 'FOLGA')
     );
     if (justified) return 0;
     const mins = hmToMinutes(cfg.end) - hmToMinutes(cfg.start) - (cfg.lunchMinutes || 0);
     return Math.max(0, mins) * 60000;
+  };
+
+  // Banco de horas acumulado (all-time, apenas dias efetivamente trabalhados)
+  // de UM funcionário, via a consolidação única.
+  const bankMsFor = (emp: string): number => {
+    const recs = buildDailyTimeRecords(punches.filter((p) => p.employeeName === emp && p.at), { nowMs });
+    let bank = 0;
+    for (const r of recs) {
+      if (r.workedMs != null && r.workedMs > 0) {
+        const [y, m, d] = r.dateKey.split('-').map(Number);
+        bank += r.workedMs - expectedMsForDate(new Date(y, m - 1, d), emp);
+      }
+    }
+    return bank;
+  };
+
+  // Ocorrências (feriado/atestado/folga/obs) de um mês para um funcionário,
+  // como mapa YYYY-MM-DD → texto (usado no Espelho e para incluir dias sem batida).
+  const occurrencesForMonth = (emp: string, month: string): Record<string, string> => {
+    const map: Record<string, string> = {};
+    Object.keys(holidays)
+      .filter((dk) => dk.startsWith(month))
+      .forEach((dk) => (map[dk] = `Feriado: ${holidays[dk].name}`));
+    dayEntries
+      .filter((e) => e.employeeName === emp && e.refDate.startsWith(month))
+      .forEach((e) => {
+        if (e.kind === 'FERIADO') return; // feriado tratado acima
+        map[e.refDate] = `${dayKindLabel(e.kind)}${e.note ? `: ${e.note}` : ''}`;
+      });
+    return map;
+  };
+
+  const monthPeriodLabel = (month: string): string => {
+    const [y, m] = month.split('-').map(Number);
+    const last = new Date(y, m, 0).getDate();
+    return `01/${pad2(m)}/${y} a ${pad2(last)}/${pad2(m)}/${y}`;
+  };
+
+  // Monta os blocos do Espelho de Ponto para o PDF canônico. Um bloco por
+  // funcionário (admin "todos" gera vários; cada um em nova página no PDF).
+  const buildTimecardBlocks = (month: string, employeeFilter?: string): TimecardBlock[] => {
+    const inMonth = (p: TimePunch) =>
+      p.at != null && `${new Date(p.at).getFullYear()}-${pad2(new Date(p.at).getMonth() + 1)}` === month;
+    let emps: string[];
+    if (employeeFilter) {
+      emps = [employeeFilter];
+    } else {
+      const set = new Set<string>();
+      punches.filter(inMonth).forEach((p) => p.employeeName && set.add(p.employeeName));
+      dayEntries.filter((e) => e.refDate.startsWith(month)).forEach((e) => e.employeeName && set.add(e.employeeName));
+      emps = Array.from(set).sort();
+    }
+    return emps.map((emp) => {
+      const occ = occurrencesForMonth(emp, month);
+      const empPunches = punches.filter((p) => p.employeeName === emp && inMonth(p));
+      const records = buildDailyTimeRecords(empPunches, { extraDateKeys: Object.keys(occ), nowMs });
+      const summary = computePeriodSummary(records, (dk) => {
+        const [y, m, d] = dk.split('-').map(Number);
+        return expectedMsForDate(new Date(y, m - 1, d), emp);
+      });
+      return {
+        employee: emp,
+        records,
+        summary,
+        occurrences: occ,
+        scheduleLabel,
+        bank: fmtHoursShort(bankMsFor(emp), true),
+      };
+    });
+  };
+
+  const openMyTimecard = () => {
+    const month = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
+    setTimecardCfg({
+      blocks: buildTimecardBlocks(month, currentUser),
+      periodLabel: monthPeriodLabel(month),
+      fileLabel: currentUser,
+    });
+  };
+
+  const openAdminTimecard = () => {
+    setTimecardCfg({
+      blocks: buildTimecardBlocks(expMonth, expEmployee || undefined),
+      periodLabel: monthPeriodLabel(expMonth),
+      fileLabel: expEmployee || 'todos',
+    });
   };
 
   const hoursStats = useMemo(() => {
@@ -621,14 +705,8 @@ export const PontoView: React.FC<PontoViewProps> = ({
       });
 
     // Banco acumulado: apenas sobre dias efetivamente trabalhados (com batida),
-    // para não penalizar dias anteriores à adoção do sistema.
-    let bankMs = 0;
-    byDay.forEach((list, dk) => {
-      const worked = dayWorkedMs(list);
-      if (worked <= 0) return;
-      const [y, m, d] = dk.split('-').map(Number);
-      bankMs += worked - expectedMsForDate(new Date(y, m - 1, d));
-    });
+    // para não penalizar dias anteriores à adoção do sistema. Fonte única.
+    const bankMs = bankMsFor(currentUser);
 
     // Semana atual (segunda a domingo)
     const base = new Date(nowMs);
@@ -755,7 +833,8 @@ export const PontoView: React.FC<PontoViewProps> = ({
               : dayPunches.find((p) => p.type === type);
           return found?.at ? fmtHM(new Date(found.at)) : '--';
         };
-        const ms = dayPunches.length ? dayWorkedMs(dayPunches) : 0;
+        const cons = dayPunches.length ? consolidateDay(dayPunches, nowMs) : null;
+        const ms = cons?.workedMs ?? 0;
         totalMs += ms;
         rows.push({
           emp,
@@ -767,8 +846,8 @@ export const PontoView: React.FC<PontoViewProps> = ({
             t('PAUSA'),
             t('RETORNO'),
             t('SAIDA'),
-            fmtDuration(ms),
-            occurrenceFor(emp, dk) || '—',
+            cons && cons.workedMs == null ? '—' : fmtDuration(ms),
+            occurrenceFor(emp, dk) || (cons ? dayStatusLabel(cons.status) : '') || '—',
           ],
         });
       });
@@ -797,88 +876,6 @@ export const PontoView: React.FC<PontoViewProps> = ({
     a.download = `folha-ponto_${expEmployee || 'todos'}_${expMonth}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  };
-
-  const exportPDF = () => {
-    const { detail, summary, feriados, atestados } = buildData();
-    const renderTable = (rows: string[][], monoFrom = 99) => {
-      const head = rows[0];
-      const body = rows
-        .slice(1)
-        .map(
-          (r) => {
-            const isTotal = r[0] === '';
-            return `<tr>${r
-              .map(
-                (c, i) =>
-                  `<td style="padding:6px 8px;border:1px solid #ddd;${i >= monoFrom ? 'font-family:monospace;' : ''}${
-                    isTotal && c !== '' ? 'font-weight:bold;text-align:right;' : ''
-                  }">${c}</td>`
-              )
-              .join('')}</tr>`;
-          }
-        )
-        .join('');
-      return `<table style="border-collapse:collapse;width:100%;font-size:12px;margin-bottom:20px">
-        <thead><tr>${head
-          .map((h) => `<th style="padding:6px 8px;border:1px solid #ddd;background:#1A1A72;color:#fff;text-align:left">${h}</th>`)
-          .join('')}</tr></thead>
-        <tbody>${body || `<tr><td colspan="${head.length}" style="padding:16px;text-align:center;color:#888">Sem registros</td></tr>`}</tbody>
-      </table>`;
-    };
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Folha de Ponto</title></head>
-      <body style="font-family:Arial,sans-serif;color:#0f172a;padding:24px">
-        <h2 style="margin:0 0 4px">Folha de Ponto — Fireowl Controls</h2>
-        <p style="margin:0 0 2px;font-size:13px">Funcionário: <strong>${expEmployee || 'Todos'}</strong> · Período: <strong>${expMonth}</strong></p>
-        <p style="margin:0 0 16px;font-size:13px">Registros: ${detail.length - 1} · Feriados no período: <strong>${feriados}</strong> · Atestados: <strong>${atestados}</strong></p>
-        <h3 style="margin:0 0 8px;font-size:14px">Resumo por dia</h3>
-        ${renderTable(summary, 99)}
-        <h3 style="margin:0 0 8px;font-size:14px">Detalhamento das batidas</h3>
-        ${renderTable(detail, 5)}
-      </body></html>`;
-    const w = window.open('', '_blank');
-    if (!w) {
-      alert('Permita pop-ups para gerar o PDF.');
-      return;
-    }
-    w.document.write(html);
-    w.document.close();
-    w.focus();
-    setTimeout(() => w.print(), 300);
-  };
-
-  // Imprime "Meu Espelho de Ponto" numa janela nova (imprimir → salvar como PDF).
-  const printEspelho = () => {
-    const esc = (s: unknown) =>
-      String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
-    const row = (label: string, valor: string) =>
-      `<tr>
-        <td style="padding:8px 10px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:bold;width:40%">${esc(label)}</td>
-        <td style="padding:8px 10px;border:1px solid #e2e8f0;font-family:monospace">${esc(valor)}</td>
-      </tr>`;
-    const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
-      <title>Espelho de Ponto — ${esc(currentUser)}</title></head>
-      <body style="font-family:Arial,sans-serif;color:#0f172a;padding:24px;max-width:760px;margin:0 auto">
-        <div style="border-bottom:3px solid #1A1A72;padding-bottom:10px;margin-bottom:18px">
-          <h2 style="margin:0;text-transform:uppercase;color:#1A1A72">Espelho de Ponto</h2>
-          <p style="margin:2px 0 0;font-size:12px;color:#64748b">Fireowl Controls · Portaria MTP 671/2021 · Emitido em ${new Date().toLocaleDateString('pt-BR')}</p>
-        </div>
-        <table style="border-collapse:collapse;width:100%;font-size:13px">
-          ${row('Nome', currentUser)}
-          ${row('Período', '01 a 31 (mês atual)')}
-          ${row('Jornada', scheduleLabel)}
-          ${row('Banco de horas', week.banco)}
-        </table>
-      </body></html>`;
-    const w = window.open('', '_blank');
-    if (!w) {
-      alert('Permita pop-ups para gerar o PDF.');
-      return;
-    }
-    w.document.write(html);
-    w.document.close();
-    w.focus();
-    setTimeout(() => w.print(), 300);
   };
 
   return (
@@ -936,7 +933,7 @@ export const PontoView: React.FC<PontoViewProps> = ({
           </button>
         ))}
         <button
-          onClick={() => setShowTimecardPdf(true)}
+          onClick={openMyTimecard}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1A1A72] text-white hover:bg-[#12124f] text-xs font-semibold transition-colors ml-auto"
         >
           <span className="material-symbols-outlined text-base">description</span>
@@ -1215,7 +1212,7 @@ export const PontoView: React.FC<PontoViewProps> = ({
               </button>
               <button
                 type="button"
-                onClick={exportPDF}
+                onClick={openAdminTimecard}
                 className="flex items-center gap-1.5 bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors"
               >
                 <span className="material-symbols-outlined text-base">picture_as_pdf</span> PDF
@@ -1387,11 +1384,13 @@ export const PontoView: React.FC<PontoViewProps> = ({
                 title={p.employeeName}
                 meta={
                   <>
-                    <span className="flex items-center gap-1">
+                    <span
+                      className="flex items-center gap-1"
+                      title={hasGps(p) ? `Coordenadas registradas para auditoria${p.accuracy ? ` · precisão ~${p.accuracy}m` : ''}` : undefined}
+                    >
                       <span className="material-symbols-outlined text-sm text-slate-400">location_on</span>
-                      <span className="font-data-mono">{hasGps(p) ? `GPS confirmado${p.accuracy ? ` · ±${p.accuracy}m` : ''}` : 'Sem localização'}</span>
+                      <span>{hasGps(p) ? 'Localização registrada' : 'Sem localização'}</span>
                     </span>
-                    {p.accuracy ? <span className="text-slate-400">Precisão ~{p.accuracy}m</span> : null}
                     {hasGps(p) && (
                       <a
                         href={mapsUrl(p)}
@@ -1399,7 +1398,7 @@ export const PontoView: React.FC<PontoViewProps> = ({
                         rel="noopener noreferrer"
                         className="text-[#1A1A72] font-semibold hover:underline"
                       >
-                        ver no mapa
+                        Ver no mapa
                       </a>
                     )}
                   </>
@@ -1415,8 +1414,8 @@ export const PontoView: React.FC<PontoViewProps> = ({
                     <Badge color={p.type === 'ENTRADA' ? 'emerald' : p.type === 'PAUSA' ? 'amber' : p.type === 'SAIDA' ? 'red' : 'blue'}>
                       {p.type}
                     </Badge>
-                    <Badge color={p.status === 'APROVADO' ? 'emerald' : p.status === 'PENDENTE' ? 'amber' : 'blue'} outline>
-                      MTP 671: {p.status}
+                    <Badge color={p.status === 'AJUSTADO' ? 'blue' : p.status === 'PENDENTE' ? 'amber' : 'emerald'} outline>
+                      {p.status === 'AJUSTADO' ? 'Ajustado' : p.status === 'PENDENTE' ? 'Pendente' : 'Registro original'}
                     </Badge>
                   </>
                 }
@@ -1602,44 +1601,20 @@ export const PontoView: React.FC<PontoViewProps> = ({
         </div>
       )}
 
-      {/* Modal Meu Espelho de Ponto */}
-      {showEspelho && (
-        <div className="fixed inset-0 z-50 bg-[#1A1A72]/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white max-w-xl w-full rounded-xl border border-slate-200 p-6 shadow-2xl relative">
-            <button onClick={() => setShowEspelho(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 font-bold text-xl">
-              ✕
-            </button>
-            <h3 className="font-display text-lg font-bold text-[#1A1A72] uppercase mb-4">Meu Espelho de Ponto</h3>
-            <div className="font-data-mono text-xs space-y-2.5 bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6">
-              <div><strong className="text-slate-900">NOME:</strong> {currentUser}</div>
-              <div><strong className="text-slate-900">PERÍODO:</strong> 01 A 31 (mês atual)</div>
-              <div><strong className="text-slate-900">JORNADA:</strong> {scheduleLabel}</div>
-              <div><strong className="text-slate-900">BANCO DE HORAS:</strong> {week.banco}</div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={printEspelho}
-                className="flex-1 bg-[#E63946] hover:bg-[#a51515] text-white font-semibold py-2.5 rounded-lg text-xs uppercase"
-              >
-                Imprimir / PDF
-              </button>
-              <button
-                onClick={() => setShowEspelho(false)}
-                className="px-4 border border-slate-200 text-slate-700 font-semibold rounded-lg text-xs hover:bg-slate-50 transition-colors"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {nextType && (
         <div className="md:hidden fixed bottom-[4.5rem] left-3 right-3 z-30 rounded-xl bg-white/95 backdrop-blur border border-slate-200 shadow-xl p-2 flex items-center gap-2">
           <div className="min-w-0 flex-1 pl-2"><p className="text-[10px] text-slate-500">Próxima batida</p><p className="text-xs font-bold text-slate-800 truncate">{NEXT_INFO[nextType].label}</p></div>
           <button onClick={handleBaterPonto} disabled={punching || locating} className={`shrink-0 px-4 py-3 rounded-lg text-white text-xs font-bold ${NEXT_INFO[nextType].classes}`}>{locating ? 'GPS…' : 'Registrar'}</button>
         </div>
       )}
-      {showTimecardPdf && <TimecardPDFView employee={currentUser} punches={punches.filter((p) => p.employeeName === currentUser)} scheduleLabel={scheduleLabel} bank={week.banco} onClose={() => setShowTimecardPdf(false)} />}
+      {timecardCfg && (
+        <TimecardPDFView
+          blocks={timecardCfg.blocks}
+          periodLabel={timecardCfg.periodLabel}
+          fileLabel={timecardCfg.fileLabel}
+          onClose={() => setTimecardCfg(null)}
+        />
+      )}
     </div>
   );
 };
