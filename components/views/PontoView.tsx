@@ -254,6 +254,12 @@ export const PontoView: React.FC<PontoViewProps> = ({
     return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
   });
 
+  // Período do "Meu Espelho" do próprio usuário (mês corrente por padrão).
+  const [myMonth, setMyMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+  });
+
   // Relógio em tempo real
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -677,11 +683,10 @@ export const PontoView: React.FC<PontoViewProps> = ({
   };
 
   const openMyTimecard = () => {
-    const month = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
     setTimecardCfg({
-      blocks: buildTimecardBlocks(month, currentUser),
-      periodLabel: monthPeriodLabel(month),
-      fileLabel: currentUser,
+      blocks: buildTimecardBlocks(myMonth, currentUser),
+      periodLabel: monthPeriodLabel(myMonth),
+      fileLabel: `${currentUser}_${myMonth}`,
     });
   };
 
@@ -932,13 +937,24 @@ export const PontoView: React.FC<PontoViewProps> = ({
             {s.label}
           </button>
         ))}
-        <button
-          onClick={openMyTimecard}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1A1A72] text-white hover:bg-[#12124f] text-xs font-semibold transition-colors ml-auto"
-        >
-          <span className="material-symbols-outlined text-base">description</span>
-          Meu Espelho
-        </button>
+        <div className="flex items-center gap-1.5 ml-auto">
+          <label className="sr-only" htmlFor="my-espelho-month">Mês do espelho</label>
+          <input
+            id="my-espelho-month"
+            type="month"
+            value={myMonth}
+            onChange={(e) => setMyMonth(e.target.value || myMonth)}
+            title="Período do espelho de ponto"
+            className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+          />
+          <button
+            onClick={openMyTimecard}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1A1A72] text-white hover:bg-[#12124f] text-xs font-semibold transition-colors"
+          >
+            <span className="material-symbols-outlined text-base">description</span>
+            Meu Espelho
+          </button>
+        </div>
       </div>
 
       {/* ===== Alertas / lembretes ===== */}

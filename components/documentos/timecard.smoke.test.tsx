@@ -44,7 +44,18 @@ describe('TimecardDocument render (Node smoke)', () => {
       p('ENTRADA', 2026, 8, 5, 16, 6), p('PAUSA', 2026, 8, 5, 16, 28), p('RETORNO', 2026, 8, 5, 18, 38), p('SAIDA', 2026, 8, 5, 17, 0),
     ];
     const empB = [p('ENTRADA', 2026, 8, 4, 9, 0)]; // incompleta
-    const doc = <TimecardDocument blocks={[block('Alice', empA), block('Bruno', empB)]} periodLabel="01/08/2026 a 31/08/2026" />;
+    // empC: mês completo (força >1 página → exercita cabeçalho de tabela
+    // repetido e "Página X de Y").
+    const empC: TimePunch[] = [];
+    for (let d = 1; d <= 28; d++) {
+      empC.push(p('ENTRADA', 2026, 8, d, 9, 0), p('PAUSA', 2026, 8, d, 12, 0), p('RETORNO', 2026, 8, d, 13, 0), p('SAIDA', 2026, 8, d, 18, 0));
+    }
+    const doc = (
+      <TimecardDocument
+        blocks={[block('Alice', empA), block('Bruno', empB), block('Carla', empC)]}
+        periodLabel="01/08/2026 a 31/08/2026"
+      />
+    );
     const buf = await renderToBuffer(doc);
     expect(buf.length).toBeGreaterThan(1000);
     expect(buf.slice(0, 5).toString('latin1')).toBe('%PDF-');
