@@ -1,8 +1,9 @@
 import { fetchClients } from './clients';
 import { fetchInventory } from './inventory';
-import { fetchPedidos, upsertPedido } from './pedidos';
+import { fetchPedidos } from './pedidos';
 import { fetchReports } from './reports';
-import { createSurveyOrderLink, fetchSurveyOrderLinks, fetchSurveyRequirements } from './surveyRequirements';
+import { fetchSurveyOrderLinks, fetchSurveyRequirements } from './surveyRequirements';
+import { getSupabaseClient } from './supabaseClient';
 import { CommercialProposalData, Pedido, PedidoEquipmentItem, TechnicalOrigin } from './types';
 
 export type SurveyOrderConversionResult = { pedido: Pedido; alreadyExists: boolean; warnings: string[] };
@@ -35,6 +36,35 @@ function appendGroupedItem(groups: Map<string, PedidoEquipmentItem>, key: string
     return;
   }
   groups.set(key, { ...item, itemNumero: groups.size + 1 });
+}
+
+function pedidoToRpcPayload(pedido: Pedido): Record<string, unknown> {
+  return {
+    id: pedido.id, numero_pedido: pedido.numeroPedido, referencia: pedido.referencia,
+    cliente_id: pedido.clienteId, cliente_nome: pedido.clienteNome, fornecedor: pedido.fornecedor,
+    data_emissao: pedido.dataEmissao, responsavel_comercial_id: pedido.responsavelComercialId,
+    responsavel_comercial_nome: pedido.responsavelComercialNome, status: pedido.status,
+    valor_total: pedido.proposal?.valorTotal ?? 0, proposal: pedido.proposal ?? {},
+    created_at: pedido.createdAt, updated_at: pedido.updatedAt,
+  };
+}
+
+function pedidoFromRpc(row: any): Pedido {
+  return {
+    id: String(row.id), numeroPedido: row.numero_pedido || '', referencia: row.referencia || '',
+    clienteId: row.cliente_id || '', clienteNome: row.cliente_nome || '', fornecedor: row.fornecedor || '',
+    dataEmissao: row.data_emissao || '', responsavelComercialId: row.responsavel_comercial_id || '',
+    responsavelComercialNome: row.responsavel_comercial_nome || '', status: row.status || 'rascunho',
+    proposal: row.proposal || {}, createdAt: row.created_at || '', updatedAt: row.updated_at || '',
+  };
+}
+
+async function getOrCreateInitialSurveyOrder(reportId: string, pedido: Pedido): Promise<{ pedido: Pedido; alreadyExists: boolean }> {
+  const sb = getSupabaseClient() as any;
+  const { data, error } = await sb.rpc('get_or_create_order_from_survey', { p_report_id: reportId, p_pedido: pedidoToRpcPayload(pedido) });
+  if (error) throw error;
+  if (!data?.pedido) throw new Error('A conversão não retornou o Pedido criado.');
+  return { pedido: pedidoFromRpc(data.pedido), alreadyExists: data.already_exists === true };
 }
 
 /**
@@ -136,7 +166,6 @@ export async function createOrderFromSurvey(reportId: string): Promise<SurveyOrd
     clienteId: client.id, clienteNome: client.name, fornecedor: 'Fireowl Controls Ltda.', dataEmissao: now.slice(0, 10),
     responsavelComercialId: '', responsavelComercialNome: report.tecnicoNome || '', status: 'rascunho', proposal, createdAt: now, updatedAt: now,
   };
-  const saved = await upsertPedido(pedido);
-  await createSurveyOrderLink(reportId, saved.id);
-  return { pedido: saved, alreadyExists: false, warnings: [...new Set(warnings)] };
+  const saved = await getOrCreateInitialSurveyOrder(reportId, pedido);
+  return { pedido: saved.pedido, alreadyExists: saved.alreadyExists, warnings: [...new Set(warnings)] };
 }

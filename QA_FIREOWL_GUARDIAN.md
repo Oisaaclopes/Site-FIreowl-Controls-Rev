@@ -55,8 +55,8 @@ Nenhum P0 conhecido na auditoria estática.
 
 ## 6. P1 encontrados
 
-1. **Conversão concorrente de levantamento em pedido não é atômica.** `createOrderFromSurvey` consulta o vínculo, grava o pedido e só então grava `report_order_links`. Dois cliques/sessões concorrentes podem gravar dois pedidos antes do `unique(report_id, pedido_id)` do link atuar. Correção recomendada: RPC transacional que bloqueie o relatório e crie/devolva o pedido único.
-2. **Numeração concorrente de OS.** `generate_os_from_execution` bloqueia a execução, mas gera `OS-AAAA-NNNN` por `max(...) + 1`; duas execuções diferentes podem calcular o mesmo número. Correção recomendada: índice único para número e contador/lock transacional próprio.
+1. **P1-A — Conversão concorrente de levantamento em pedido. Status: FIXED (aguarda E2E).** A migration 0059 adiciona o vínculo `initial_conversion` e a RPC `get_or_create_order_from_survey`, serializada por levantamento. A composição continua no app; o banco cria/devolve somente a conversão inicial. Pedidos adicionais continuam possíveis como vínculos `manual` explícitos.
+2. **P1-B — Numeração concorrente de OS. Status: FIXED (aguarda E2E).** A migration 0059 adiciona lock transacional anual antes de calcular `OS-AAAA-NNNN` e tenta criar índice único parcial de número. Se houver duplicata histórica, ela não altera nem apaga dados: emite aviso e deixa o índice pendente para saneamento manual.
 3. **Dados de demonstração ainda são fallback intencional quando Supabase não está configurado.** `lib/mockData.ts` permanece para modo local/demonstração. Com Supabase configurado, o fallback do estoque para mock foi removido nesta QA. Antes de produção, ambiente sem configuração deve exibir aviso explícito de modo demonstração ou ser bloqueado.
 
 ## 7. P2 encontrados
@@ -76,6 +76,9 @@ Nenhum P0 conhecido na auditoria estática.
 ## 9. Correções realizadas nesta QA
 
 - `components/CrmApp.tsx`: removido o uso de estoque fictício após erro de carregamento quando Supabase está configurado. Falha remota agora preserva um empty state verdadeiro.
+- `0059_qa_conversion_and_os_concurrency.sql`: operação atômica de conversão inicial e serialização da numeração de OS.
+- `lib/surveyOrderConversion.ts`: conversão passou a usar a RPC de banco em vez de criar Pedido e vínculo em chamadas separadas.
+- `scripts/qa-concurrency-integration-test.mjs`: teste real, opcional e com limpeza, dos cenários simultâneos de levantamento e competência.
 
 ## 10. Mocks e dados fictícios
 
@@ -121,8 +124,9 @@ Executar no Supabase autenticado, por Administrador, Gestor, Comercial, Técnico
 
 ## 15. Checklist para produção
 
-- [ ] Confirmar migrations 0033, 0044, 0048, 0056, 0057 e 0058 em `supabase_migrations`.
-- [ ] Aplicar correção transacional dos P1 de conversão de levantamento e numeração de OS antes de carga concorrente.
+- [ ] Confirmar migrations 0033, 0044, 0048, 0056, 0057, 0058 e 0059 em `supabase_migrations`.
+- [ ] Aplicar a migration 0059 antes de executar qualquer fluxo concorrente de conversão/OS.
+- [ ] Rodar `node scripts/qa-concurrency-integration-test.mjs` com service role; registrar PASS, FAIL ou BLOCKED.
 - [ ] Executar E2E desktop/mobile, PDF, offline e RLS deste documento.
 - [ ] Confirmar bucket/policies de `report-media` para logos, relatórios e anexos de contrato.
 - [ ] Validar dados reais após migração e garantir que modo demonstração não seja usado em produção.
