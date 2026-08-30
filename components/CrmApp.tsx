@@ -346,8 +346,10 @@ export function CrmApp({
         if (active) setInventory(items);
       })
       .catch((err) => {
-        console.warn('Estoque: falha ao carregar do Supabase, usando dados locais.', err);
-        if (active) setInventory(INITIAL_INVENTORY);
+        // Com banco configurado, nunca apresente dados de demonstração como se
+        // fossem o estoque real após uma falha de rede/permissão.
+        console.warn('Estoque: falha ao carregar do Supabase.', err);
+        if (active) setInventory([]);
       })
       .finally(() => {
         if (active) setInventoryLoading(false);
