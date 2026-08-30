@@ -81,6 +81,7 @@ Nenhum P0 conhecido na auditoria estática.
 - `scripts/qa-concurrency-integration-test.mjs`: teste real, opcional e com limpeza, dos cenários simultâneos de levantamento e competência.
 - `ContractDetailPanel`: upload, listagem, abertura e remoção de anexos de contrato ligados ao bucket privado existente.
 - `ItensCardEditor`: materiais vinculados exibem Necessário, Disponível e Diferença sem alterar a quantidade do Pedido.
+- `DashboardView`: removidos indicadores percentuais e série semanal fictícia. O painel agora usa somente totais/contagem de lançamentos carregados e apresenta empty state verdadeiro quando não há financeiro.
 
 ## 10. Mocks e dados fictícios
 
@@ -129,6 +130,13 @@ O motor de sync permanece no código; o indicador visual foi removido. Não foi 
 ## 12.3 Atribuição de técnico à OS — auditoria estática
 
 **P2 — OPEN.** `ordens_servico` não possui coluna estruturada de `technician_id`, `executor_id` ou equivalente na migration 0033. O técnico aparece em relatórios (`reports.tecnico_id`/`tecnico_nome`) e valores de responsável podem ser derivados em fluxos de Pedido, mas a Agenda/OS não consegue determinar de modo estruturado quem executará uma OS. Impacto: a OS segue operável, porém não permite filtro, restrição ou escala individual confiável. Próxima etapa recomendada: modelagem aditiva de atribuição de executores, sem inventar equipes ou localização.
+
+## 12.4 QA autenticado — painel administrativo
+
+| Item | Status | Ambiente / evidência |
+|---|---|---|
+| Login administrativo | PASS | Sessão real de usuário `ADMINISTRATIVO` no navegador local, 2026-08-30. |
+| Painel sem dados financeiros | FIXED + PASS | Foram identificadas variações e barras semanais fictícias apesar de totais zero. Após correção, o painel mostra `0 lançamento(s)` e mensagem de nenhum lançamento financeiro; inspeção visual autenticada aprovada. |
 
 ## 13. RLS e permissões
 

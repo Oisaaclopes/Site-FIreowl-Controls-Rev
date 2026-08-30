@@ -33,6 +33,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     .reduce((acc, t) => acc + t.amount, 0);
   const contratosAtivos = contracts.filter((c) => c.status === 'ATIVO').length;
   const osAtrasadas = pedidosOS.filter((p) => p.status === 'ATRASADA').length;
+  const cashMax = Math.max(receitaTotal, despesaTotal, 1);
+  const cashBars = [
+    { label: 'Receitas', value: receitaTotal, color: 'bg-emerald-600' },
+    { label: 'Despesas', value: despesaTotal, color: 'bg-[#E63946]' },
+  ];
 
   const [revenueValue, setRevenueValue] = useState(0);
 
@@ -102,9 +107,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {isPrivacyModeActive ? MASK_DIGITS : revenueValue.toLocaleString('pt-BR')}
             </span>
           </div>
-          <div className="mt-4 flex items-center gap-1 text-xs font-semibold text-emerald-600">
-            <span className="material-symbols-outlined text-sm">arrow_upward</span>
-            <span>+12.4% vs mês anterior</span>
+          <div className="mt-4 flex items-center gap-1 text-xs font-semibold text-slate-500">
+            <span className="material-symbols-outlined text-sm">receipt_long</span>
+            <span>{transactions.filter((t) => t.type === 'RECEITA').length} lançamento(s) de receita</span>
           </div>
         </div>
 
@@ -124,9 +129,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {isPrivacyModeActive ? MASK_DIGITS : despesaTotal.toLocaleString('pt-BR')}
             </span>
           </div>
-          <div className="mt-4 flex items-center gap-1 text-xs font-semibold text-[#E63946]">
-            <span className="material-symbols-outlined text-sm">arrow_downward</span>
-            <span>-2.1% otimização de custo</span>
+          <div className="mt-4 flex items-center gap-1 text-xs font-semibold text-slate-500">
+            <span className="material-symbols-outlined text-sm">receipt_long</span>
+            <span>{transactions.filter((t) => t.type === 'DESPESA').length} lançamento(s) de despesa</span>
           </div>
         </div>
 
@@ -188,7 +193,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 Fluxo de Caixa Mensal
               </h3>
               <p className="text-xs text-slate-500">
-                Comparação semanal de receitas e despesas operacionais (Maio/2024)
+                Comparativo dos lançamentos financeiros carregados no sistema
               </p>
             </div>
             <div className="flex items-center gap-4">
@@ -203,8 +208,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
 
-          {/* SVG Bar Chart */}
-          <div className="relative h-64 w-full flex items-end justify-between gap-6 pt-8">
+          <div className="relative h-64 w-full flex items-end justify-center gap-12 pt-8">
             <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-40">
               <div className="border-t border-slate-200 w-full"></div>
               <div className="border-t border-slate-200 w-full"></div>
@@ -212,27 +216,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="border-t border-dashed border-slate-200 w-full"></div>
             </div>
 
-            {/* Chart Bars (S01 to S05) */}
-            {[
-              { week: 'Semana 1', rec: '70%', desp: '30%' },
-              { week: 'Semana 2', rec: '85%', desp: '40%' },
-              { week: 'Semana 3', rec: '60%', desp: '55%' },
-              { week: 'Semana 4', rec: '95%', desp: '25%' },
-              { week: 'Semana 5', rec: '75%', desp: '45%' },
-            ].map((bar, idx) => (
-              <div key={idx} className="flex-1 flex flex-col justify-end gap-1.5 group relative z-10">
+            {transactions.length === 0 ? <p className="relative z-10 self-center text-xs text-slate-400">Nenhum lançamento financeiro para comparar.</p> : cashBars.map((bar) => (
+              <div key={bar.label} className="w-28 flex flex-col justify-end gap-1.5 group relative z-10">
                 <div
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 transition-all rounded-t-md shadow-sm"
-                  style={{ height: bar.rec }}
-                  title={`Receita ${bar.week}: ${maskMoney(`R$ ${(parseInt(bar.rec) * 1200).toLocaleString()}`)}`}
-                ></div>
-                <div
-                  className="w-full bg-[#E63946] hover:bg-[#a51515] transition-all rounded-t-md shadow-sm"
-                  style={{ height: bar.desp }}
-                  title={`Despesa ${bar.week}: ${maskMoney(`R$ ${(parseInt(bar.desp) * 1000).toLocaleString()}`)}`}
-                ></div>
+                  className={`w-full ${bar.color} transition-all rounded-t-md shadow-sm`}
+                  style={{ height: `${Math.max(4, Math.round((bar.value / cashMax) * 100))}%` }}
+                  title={`${bar.label}: ${maskMoney(`R$ ${bar.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`)}`}
+                />
+                <span className="text-center font-data-mono text-[10px] text-slate-600">{maskMoney(`R$ ${bar.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`)}</span>
                 <span className="text-center font-data-mono text-xs text-slate-500 mt-2 font-medium">
-                  {bar.week}
+                  {bar.label}
                 </span>
               </div>
             ))}
