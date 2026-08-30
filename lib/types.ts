@@ -222,8 +222,6 @@ export interface CommercialProposalData {
    * apagou de propósito (respeitar, não reinjetar). Propostas históricas
    * (textosMaterializados falsy) continuam usando o fallback do renderer.
    * =================================================================== */
-  /** Carta de Apresentação em parágrafos (materializada). */
-  cartaApresentacaoParas?: string[];
   /** Descrição dos Serviços Ofertados (subitens). */
   servicosOfertados?: { titulo: string; itens: string[] }[];
   /** Embalagem, Transporte e Armazenamento. */

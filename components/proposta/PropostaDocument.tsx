@@ -905,7 +905,7 @@ const Paras = ({ paras }: { paras: string[] }) => (
 const Bullets = ({ itens }: { itens: string[] }) => (
   <>
     {itens.filter(nv).map((it, i) => (
-      <View key={i} style={styles.bulletRow}>
+      <View key={i} style={styles.bulletRow} wrap={false}>
         <Text style={styles.bulletDot}>•</Text>
         <Text style={styles.bulletText}>{it}</Text>
       </View>
@@ -922,7 +922,7 @@ const CheckIcon = () => (
 const Checks = ({ itens }: { itens: string[] }) => (
   <>
     {itens.filter(nv).map((it, i) => (
-      <View key={i} style={[styles.bulletRow, { alignItems: 'flex-start' }]}>
+      <View key={i} style={[styles.bulletRow, { alignItems: 'flex-start' }]} wrap={false}>
         <View style={{ marginRight: 5, marginTop: 1.5 }}><CheckIcon /></View>
         <Text style={styles.bulletText}>{it}</Text>
       </View>
@@ -1047,6 +1047,15 @@ export function PropostaDocument({
   const incTermoAceite = p.incluirTermoAceite !== false;
   const temMateriais = materiais.length > 0;
 
+  // ETAPA 2 — o editor é a fonte de verdade. Usa o texto materializado no
+  // registro (mesmo vazio = apagado de propósito); só cai no template quando a
+  // proposta é HISTÓRICA (textosMaterializados falsy) — compatibilidade de leitura.
+  const txtSec = (stored: string[] | undefined, fallback: string[]): string[] =>
+    stored !== undefined ? stored : (p.textosMaterializados ? [] : fallback);
+  const servicosSec = p.servicosOfertados !== undefined
+    ? p.servicosOfertados
+    : (p.textosMaterializados ? [] : SERVICOS_OFERTADOS);
+
   const secoes = ordenarEstrutura(
     montarEstruturaProposta(p, { cartaVisivel: showCarta, historicoVisivel: showHistorico, temMateriais }),
     p.ordemSecoes
@@ -1151,7 +1160,7 @@ export function PropostaDocument({
     ),
     servicos: () => (
       <Sec k="servicos">
-        {SERVICOS_OFERTADOS.map((s, i) => (
+        {servicosSec.map((s, i) => (
           <View key={i} minPresenceAhead={50}>
             <Text style={styles.subTitle}>{`${num('servicos')}.${i + 1}. ${s.titulo}`}</Text>
             <Bullets itens={s.itens} />
@@ -1171,8 +1180,8 @@ export function PropostaDocument({
         )}
       </Sec>
     ),
-    embalagem: () => <Sec k="embalagem"><Paras paras={EMBALAGEM_TRANSPORTE} /></Sec>,
-    seguranca: () => <Sec k="seguranca"><Bullets itens={SEGURANCA_TRABALHO} /></Sec>,
+    embalagem: () => <Sec k="embalagem"><Paras paras={txtSec(p.embalagemTransporteTexto, EMBALAGEM_TRANSPORTE)} /></Sec>,
+    seguranca: () => <Sec k="seguranca"><Bullets itens={txtSec(p.segurancaTrabalhoTexto, SEGURANCA_TRABALHO)} /></Sec>,
     obrigacoes: () => (
       <Sec k="obrigacoes">
         {lnv(p.responsabilidadesContratante) ? (
@@ -1196,7 +1205,7 @@ export function PropostaDocument({
             {vMeses > 0 && <MensalCell label="Valor estimado do contrato" value={brl(vMensal * vMeses)} />}
           </View>
         )}
-        <Paras paras={PRECOS_OBS} />
+        <Paras paras={txtSec(p.precosObsTexto, PRECOS_OBS)} />
       </Sec>
     ),
     infoCompra: () => (
@@ -1212,7 +1221,7 @@ export function PropostaDocument({
     ),
     impostos: () => (
       <Sec k="impostos">
-        <Paras paras={nv(p.impostos) ? [`Regime/observação: ${p.impostos}`, ...IMPOSTOS_OBS] : IMPOSTOS_OBS} />
+        <Paras paras={nv(p.impostos) ? [`Regime/observação: ${p.impostos}`, ...txtSec(p.impostosObsTexto, IMPOSTOS_OBS)] : txtSec(p.impostosObsTexto, IMPOSTOS_OBS)} />
       </Sec>
     ),
     pagamento: () => (
@@ -1237,8 +1246,8 @@ export function PropostaDocument({
         )}
       </Sec>
     ),
-    multas: () => <Sec k="multas"><Paras paras={MULTAS_ATRASO} /></Sec>,
-    limitacao: () => <Sec k="limitacao"><Paras paras={LIMITACAO_RESPONSABILIDADE} /></Sec>,
+    multas: () => <Sec k="multas"><Paras paras={txtSec(p.multasAtrasoTexto, MULTAS_ATRASO)} /></Sec>,
+    limitacao: () => <Sec k="limitacao"><Paras paras={txtSec(p.limitacaoRespTexto, LIMITACAO_RESPONSABILIDADE)} /></Sec>,
     prazo: () => (
       <Sec k="prazo">
         <Text style={styles.para}>{nv(p.prazoExecucao) ? p.prazoExecucao : 'Prazo a ser definido após confirmação do pedido.'}</Text>
@@ -1252,9 +1261,9 @@ export function PropostaDocument({
         </View>
       </Sec>
     ),
-    confidencialidade: () => <Sec k="confidencialidade"><Paras paras={CONFIDENCIALIDADE} /></Sec>,
-    termoAceite: () => <Sec k="termoAceite"><Paras paras={TERMO_ACEITE} /></Sec>,
-    condicoesGerais: () => <Sec k="condicoesGerais"><Paras paras={CONDICOES_GERAIS} /></Sec>,
+    confidencialidade: () => <Sec k="confidencialidade"><Paras paras={txtSec(p.confidencialidadeTexto, CONFIDENCIALIDADE)} /></Sec>,
+    termoAceite: () => <Sec k="termoAceite"><Paras paras={txtSec(p.termoAceiteTexto, TERMO_ACEITE)} /></Sec>,
+    condicoesGerais: () => <Sec k="condicoesGerais"><Paras paras={txtSec(p.condicoesGeraisTexto, CONDICOES_GERAIS)} /></Sec>,
     validade: () => (
       <Sec k="validade">
         <Text style={styles.para}>{`Os preços permanecem fixos dentro do período de validade desta proposta, que é de ${p.validadePropostaDias || 15} ${p.validadePropostaComplemento || 'dias corridos a partir da emissão'}. Após este período, eventuais variações na base de preços dos fabricantes poderão ser repactuadas.`}</Text>

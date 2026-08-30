@@ -10,7 +10,6 @@
  * ===================================================================== */
 import { CommercialProposalData } from './types';
 import {
-  CARTA_APRESENTACAO,
   SERVICOS_OFERTADOS,
   EMBALAGEM_TRANSPORTE,
   SEGURANCA_TRABALHO,
@@ -25,7 +24,6 @@ import {
 
 /** Seção materializável do tipo "lista de parágrafos/itens" (string[]). */
 type CampoLista =
-  | 'cartaApresentacaoParas'
   | 'embalagemTransporteTexto'
   | 'segurancaTrabalhoTexto'
   | 'precosObsTexto'
@@ -54,7 +52,6 @@ export interface SecaoTextoDescriptor {
  * ter estrutura própria (título + itens).
  */
 export const SECOES_TEXTO: SecaoTextoDescriptor[] = [
-  { key: 'carta', titulo: 'Carta de Apresentação', campo: 'cartaApresentacaoParas', padrao: () => [...CARTA_APRESENTACAO] },
   { key: 'embalagem', titulo: 'Embalagem, Transporte e Armazenamento', campo: 'embalagemTransporteTexto', padrao: () => [...EMBALAGEM_TRANSPORTE] },
   { key: 'seguranca', titulo: 'Segurança do Trabalho', campo: 'segurancaTrabalhoTexto', padrao: () => [...SEGURANCA_TRABALHO] },
   { key: 'precos', titulo: 'Preços — Observações', campo: 'precosObsTexto', padrao: () => [...PRECOS_OBS] },

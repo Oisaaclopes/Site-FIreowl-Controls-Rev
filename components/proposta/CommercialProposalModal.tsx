@@ -14,10 +14,13 @@ import {
   PedidoTipo,
   EmpresaAtendida,
   MarcaTecnologia,
+  CommercialProposalData,
 } from '@/lib/types';
 import { PEDIDO_TIPO_LABELS, PEDIDO_TIPO_ORDER } from '@/lib/documentos';
 import { AREAS_PROPOSTA, TIPOS_SERVICO, gerarTituloProposta, conclusaoPorTipo, presetPorTipo } from '@/lib/propostaTitulo';
 import { montarEstruturaProposta, ordenarEstrutura, SECOES_FIXAS_INICIO, SECOES_FIXAS_FIM } from '@/lib/propostaEstrutura';
+import { CARTA_APRESENTACAO } from '@/lib/propostaTextos';
+import { SECOES_TEXTO, servicosOfertadosPadrao, restaurarSecaoLista, fonteDaSecaoLista, fonteServicos } from '@/lib/propostaMaterializacao';
 import { ItensCardEditor } from '@/components/proposta/ItensCardEditor';
 import {
   X,
@@ -68,6 +71,19 @@ const labelCls = 'block text-slate-600 font-bold uppercase text-[11px] mb-1';
 
 // Sanfona: cabeçalho clicável + corpo colapsável. Definida no módulo para os
 // inputs internos não perderem o foco a cada render.
+/** Marcador discreto Padrão Fireowl × Personalizado por seção (ETAPA 2). */
+const FonteBadge: React.FC<{ fonte: 'padrao' | 'personalizado' }> = ({ fonte }) => (
+  <span
+    className={`text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full shrink-0 ${
+      fonte === 'personalizado'
+        ? 'bg-amber-50 text-amber-700 border border-amber-200'
+        : 'bg-slate-100 text-slate-500 border border-slate-200'
+    }`}
+  >
+    {fonte === 'personalizado' ? 'Personalizado' : 'Padrão Fireowl'}
+  </span>
+);
+
 const Accordion: React.FC<{
   title: string;
   icon?: React.ReactNode;
@@ -257,6 +273,14 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   onPreviewPDF,
   nextProposalNumber = 249,
 }) => {
+  // ETAPA 2 — materialização de textos. Uma proposta é NOVA quando não traz um
+  // registro `proposal` anterior; nesse caso os textos-padrão são copiados para
+  // os campos editáveis (visíveis antes do PDF). Propostas históricas mostram o
+  // texto padrão para leitura, mas só o gravam após ação do usuário (textosTouched).
+  const initialProposal = initialPedido?.proposal;
+  const ehNovaProposta = !initialProposal;
+  const jaMaterializada = !!initialProposal?.textosMaterializados;
+
   // Sanfonas abertas (por padrão as principais abertas).
   const [open, setOpen] = useState<Record<string, boolean>>({
     materiais: true,
@@ -300,7 +324,15 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     initialPedido?.proposal?.objetivo ||
       'Prestação de serviços técnicos especializados de engenharia para fornecimento, manutenção e testes de sistemas de segurança e alarme de incêndio (SDAI).'
   );
-  const [cartaApresentacao, setCartaApresentacao] = useState<string>(initialPedido?.proposal?.cartaApresentacao || '');
+  // Carta: proposta NOVA materializa o texto institucional padrão (fica visível
+  // no editor); histórica/já-materializada usa o que estiver gravado.
+  const [cartaApresentacao, setCartaApresentacao] = useState<string>(
+    initialProposal?.cartaApresentacao !== undefined
+      ? initialProposal.cartaApresentacao
+      : ehNovaProposta
+        ? CARTA_APRESENTACAO.join('\n')
+        : ''
+  );
 
   const [diretrizes, setDiretrizes] = useState<string[]>(
     initialPedido?.proposal?.diretrizesNormativas || [
@@ -369,6 +401,67 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   );
   const [faturamento, setFaturamento] = useState<string>(initialPedido?.proposal?.faturamento || '');
   const [impostos, setImpostos] = useState<string>(initialPedido?.proposal?.impostos || 'Inclusos, Simples Nacional (Anexo III)');
+
+  // ETAPA 2 — seções antes injetadas só no PDF (embalagem, segurança, preços/
+  // impostos obs, multas, limitação, confidencialidade, termo de aceite,
+  // condições gerais) + Descrição dos Serviços. Ficam VISÍVEIS aqui; o registro
+  // guarda o snapshot. Ver [[lib/propostaMaterializacao.ts]].
+  const [textosTouched, setTextosTouched] = useState(false);
+  const [secoesTexto, setSecoesTexto] = useState<Record<string, string[]>>(() => {
+    const o: Record<string, string[]> = {};
+    for (const s of SECOES_TEXTO) {
+      const stored = (initialProposal as Record<string, unknown> | undefined)?.[s.campo] as string[] | undefined;
+      o[s.campo] = stored !== undefined ? stored : s.padrao();
+    }
+    return o;
+  });
+  const [servicosOfertados, setServicosOfertados] = useState<{ titulo: string; itens: string[] }[]>(() =>
+    initialProposal?.servicosOfertados !== undefined ? initialProposal.servicosOfertados : servicosOfertadosPadrao()
+  );
+  const [secaoFonte, setSecaoFonte] = useState<Record<string, 'padrao' | 'personalizado'>>(() => ({ ...(initialProposal?.secaoFonte || {}) }));
+
+  const setSecaoTexto = (campo: string, key: string, next: string[]) => {
+    setSecoesTexto((m) => ({ ...m, [campo]: next }));
+    setSecaoFonte((f) => ({ ...f, [key]: 'personalizado' }));
+    setTextosTouched(true);
+  };
+  const restaurarPadraoSecao = (campo: string) => {
+    const r = restaurarSecaoLista(campo as Parameters<typeof restaurarSecaoLista>[0]);
+    if (!r) return;
+    if (!window.confirm('Restaurar o texto padrão ATUAL desta seção? O conteúdo atual dela será substituído (apenas esta seção).')) return;
+    setSecoesTexto((m) => ({ ...m, [campo]: r.valor }));
+    setSecaoFonte((f) => ({ ...f, [r.key]: 'padrao' }));
+    setTextosTouched(true);
+  };
+  const marcarServicosPersonalizado = () => { setSecaoFonte((f) => ({ ...f, servicos: 'personalizado' })); setTextosTouched(true); };
+  const restaurarServicos = () => {
+    if (!window.confirm('Restaurar a Descrição dos Serviços para o padrão ATUAL? O conteúdo atual será substituído.')) return;
+    setServicosOfertados(servicosOfertadosPadrao());
+    setSecaoFonte((f) => ({ ...f, servicos: 'padrao' }));
+    setTextosTouched(true);
+  };
+  // Accordion reutilizável para uma seção-lista materializada (badge + restaurar).
+  const secaoListaBlock = (opts: { openKey: string; fonteKey: string; campo: string; titulo: string; icon: React.ReactNode; addLabel: string; seed: string; numbered?: boolean }) => {
+    const items = secoesTexto[opts.campo] || [];
+    const fonte = fonteDaSecaoLista(opts.campo as Parameters<typeof fonteDaSecaoLista>[0], items);
+    return (
+      <Accordion title={opts.titulo} icon={opts.icon} open={!!open[opts.openKey]} onToggle={() => toggle(opts.openKey)} badge={<FonteBadge fonte={fonte} />}>
+        <div className="flex justify-end mb-2">
+          <button type="button" onClick={() => restaurarPadraoSecao(opts.campo)} className="text-[10px] font-bold uppercase text-slate-400 hover:text-[#1A1A72] inline-flex items-center gap-1">
+            <span className="material-symbols-outlined text-sm">restart_alt</span>Restaurar padrão
+          </button>
+        </div>
+        <ListEditor
+          items={items}
+          numbered={opts.numbered}
+          onAdd={() => setSecaoTexto(opts.campo, opts.fonteKey, [...items, opts.seed])}
+          onUpdate={(i, v) => setSecaoTexto(opts.campo, opts.fonteKey, items.map((x, idx) => (idx === i ? v : x)))}
+          onRemove={(i) => setSecaoTexto(opts.campo, opts.fonteKey, items.filter((_, idx) => idx !== i))}
+          addLabel={opts.addLabel}
+        />
+      </Accordion>
+    );
+  };
 
   // Pagamento por tags pré-formatadas.
   const [formasPagamento, setFormasPagamento] = useState<string[]>(initialPedido?.proposal?.formasPagamento || ['Pix']);
@@ -543,6 +636,46 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     const revisoes = existingRevisions.length
       ? existingRevisions.map((revision, index) => index === existingRevisions.length - 1 ? { ...revision, alteracoes: changes } : revision)
       : undefined;
+
+    // ETAPA 2 — snapshot textual. Grava os textos materializados quando a proposta
+    // é nova, já materializada, ou o usuário tocou nas seções. Em proposta
+    // histórica não tocada, preserva EXATAMENTE o que estava gravado (sem injetar
+    // template e sem marcar textosMaterializados).
+    const cartaParas = cartaApresentacao.split('\n').map((x) => x.trim()).filter(Boolean);
+    const fonteFinal: Record<string, 'padrao' | 'personalizado'> = {};
+    for (const s of SECOES_TEXTO) fonteFinal[s.key] = fonteDaSecaoLista(s.campo, secoesTexto[s.campo]);
+    fonteFinal.servicos = fonteServicos(servicosOfertados);
+    fonteFinal.carta = cartaParas.join('\n') === CARTA_APRESENTACAO.join('\n') ? 'padrao' : 'personalizado';
+    const deveMaterializar = ehNovaProposta || jaMaterializada || textosTouched;
+    const textosPatch: Partial<CommercialProposalData> = deveMaterializar
+      ? {
+          embalagemTransporteTexto: secoesTexto.embalagemTransporteTexto,
+          segurancaTrabalhoTexto: secoesTexto.segurancaTrabalhoTexto,
+          precosObsTexto: secoesTexto.precosObsTexto,
+          impostosObsTexto: secoesTexto.impostosObsTexto,
+          multasAtrasoTexto: secoesTexto.multasAtrasoTexto,
+          limitacaoRespTexto: secoesTexto.limitacaoRespTexto,
+          confidencialidadeTexto: secoesTexto.confidencialidadeTexto,
+          termoAceiteTexto: secoesTexto.termoAceiteTexto,
+          condicoesGeraisTexto: secoesTexto.condicoesGeraisTexto,
+          servicosOfertados,
+          textosMaterializados: true,
+          secaoFonte: fonteFinal,
+        }
+      : {
+          embalagemTransporteTexto: initialProposal?.embalagemTransporteTexto,
+          segurancaTrabalhoTexto: initialProposal?.segurancaTrabalhoTexto,
+          precosObsTexto: initialProposal?.precosObsTexto,
+          impostosObsTexto: initialProposal?.impostosObsTexto,
+          multasAtrasoTexto: initialProposal?.multasAtrasoTexto,
+          limitacaoRespTexto: initialProposal?.limitacaoRespTexto,
+          confidencialidadeTexto: initialProposal?.confidencialidadeTexto,
+          termoAceiteTexto: initialProposal?.termoAceiteTexto,
+          condicoesGeraisTexto: initialProposal?.condicoesGeraisTexto,
+          servicosOfertados: initialProposal?.servicosOfertados,
+          textosMaterializados: initialProposal?.textosMaterializados,
+          secaoFonte: initialProposal?.secaoFonte,
+        };
     return {
       id: initialPedido?.id || `ped_${Date.now()}`,
       numeroPedido,
@@ -611,6 +744,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         incluirCondicoesGerais,
         incluirSeguranca,
         incluirTermoAceite,
+        ...textosPatch,
       },
     };
   };
@@ -1078,12 +1212,27 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             <textarea rows={3} value={objetivo} onChange={(e) => setObjetivo(e.target.value)} placeholder="Objetivo geral da proposta..." className={inputCls} />
           </Accordion>
 
-          <Accordion title="Carta de Apresentação" icon={<FileText className="w-4 h-4 text-[#0B1E38]" />} open={!!open.carta} onToggle={() => toggle('carta')}>
+          <Accordion
+            title="Carta de Apresentação"
+            icon={<FileText className="w-4 h-4 text-[#0B1E38]" />}
+            open={!!open.carta}
+            onToggle={() => toggle('carta')}
+            badge={<FonteBadge fonte={cartaApresentacao.split('\n').map((x) => x.trim()).filter(Boolean).join('\n') === CARTA_APRESENTACAO.join('\n') ? 'padrao' : 'personalizado'} />}
+          >
+            <div className="flex justify-end mb-2">
+              <button
+                type="button"
+                onClick={() => { if (window.confirm('Restaurar o texto padrão da Carta de Apresentação?')) { setCartaApresentacao(CARTA_APRESENTACAO.join('\n')); setTextosTouched(true); } }}
+                className="text-[10px] font-bold uppercase text-slate-400 hover:text-[#1A1A72] inline-flex items-center gap-1"
+              >
+                <span className="material-symbols-outlined text-sm">restart_alt</span>Restaurar padrão
+              </button>
+            </div>
             <textarea
-              rows={4}
+              rows={5}
               value={cartaApresentacao}
-              onChange={(e) => setCartaApresentacao(e.target.value)}
-              placeholder="Deixe em branco para usar o texto institucional padrão da Fireowl. Cada linha vira um parágrafo no PDF."
+              onChange={(e) => { setCartaApresentacao(e.target.value); setTextosTouched(true); }}
+              placeholder="Cada linha vira um parágrafo no PDF. Se ficar em branco, uma proposta histórica ainda usa o texto institucional; numa proposta nova o texto padrão já vem preenchido aqui."
               className={inputCls}
             />
             <p className="text-[10px] text-slate-400 mt-1">Aparece na 2ª página do PDF, assinada pelo responsável comercial.</p>
@@ -1154,6 +1303,58 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           <Accordion title="Obrigações da Contratante" icon={<Building2 className="w-4 h-4 text-blue-600" />} open={!!open.respContratante} onToggle={() => toggle('respContratante')}>
             <ListEditor items={respContratante} onAdd={() => addStr(setRespContratante, 'Liberar autorizações')} onUpdate={(i, v) => updStr(setRespContratante, i, v)} onRemove={(i) => rmStr(setRespContratante, i)} addLabel="Adicionar item" />
           </Accordion>
+
+          {/* ETAPA 2 — Textos padrão materializados (antes injetados só no PDF).
+              Todos ficam VISÍVEIS aqui e são a fonte de verdade do documento. */}
+          <Accordion
+            title="Descrição dos Serviços Ofertados"
+            icon={<Wrench className="w-4 h-4 text-[#E63946]" />}
+            open={!!open.descServicos}
+            onToggle={() => toggle('descServicos')}
+            badge={<FonteBadge fonte={fonteServicos(servicosOfertados)} />}
+          >
+            <div className="flex justify-end mb-2">
+              <button type="button" onClick={restaurarServicos} className="text-[10px] font-bold uppercase text-slate-400 hover:text-[#1A1A72] inline-flex items-center gap-1">
+                <span className="material-symbols-outlined text-sm">restart_alt</span>Restaurar padrão
+              </button>
+            </div>
+            <div className="space-y-3">
+              {servicosOfertados.map((grupo, gi) => (
+                <div key={gi} className="rounded-lg border border-slate-200 p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <input
+                      type="text"
+                      value={grupo.titulo}
+                      onChange={(e) => { setServicosOfertados((prev) => prev.map((g, idx) => (idx === gi ? { ...g, titulo: e.target.value } : g))); marcarServicosPersonalizado(); }}
+                      placeholder="Título do grupo (ex.: Instalação e Montagem)"
+                      className={`flex-1 ${inputCls} font-semibold`}
+                    />
+                    <button type="button" onClick={() => { setServicosOfertados((prev) => prev.filter((_, idx) => idx !== gi)); marcarServicosPersonalizado(); }} className="p-1.5 text-slate-400 hover:text-[#E63946] hover:bg-red-50 rounded-lg shrink-0"><Trash2 className="w-3.5 h-3.5" /></button>
+                  </div>
+                  <ListEditor
+                    items={grupo.itens}
+                    onAdd={() => { setServicosOfertados((prev) => prev.map((g, idx) => (idx === gi ? { ...g, itens: [...g.itens, 'Novo item do serviço'] } : g))); marcarServicosPersonalizado(); }}
+                    onUpdate={(i, v) => { setServicosOfertados((prev) => prev.map((g, idx) => (idx === gi ? { ...g, itens: g.itens.map((x, ii) => (ii === i ? v : x)) } : g))); marcarServicosPersonalizado(); }}
+                    onRemove={(i) => { setServicosOfertados((prev) => prev.map((g, idx) => (idx === gi ? { ...g, itens: g.itens.filter((_, ii) => ii !== i) } : g))); marcarServicosPersonalizado(); }}
+                    addLabel="Adicionar item"
+                  />
+                </div>
+              ))}
+              <button type="button" onClick={() => { setServicosOfertados((prev) => [...prev, { titulo: 'Novo grupo de serviços', itens: [] }]); marcarServicosPersonalizado(); }} className="w-full py-2 rounded-lg border border-dashed border-[#0B1E38]/40 text-[11px] font-semibold text-[#0B1E38] hover:bg-[#0B1E38]/5 flex items-center justify-center gap-1 uppercase">
+                <Plus className="w-3.5 h-3.5" /> Adicionar grupo
+              </button>
+            </div>
+          </Accordion>
+
+          {secaoListaBlock({ openKey: 'secEmbalagem', fonteKey: 'embalagem', campo: 'embalagemTransporteTexto', titulo: 'Embalagem, Transporte e Armazenamento', icon: <FileText className="w-4 h-4 text-[#0B1E38]" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
+          {secaoListaBlock({ openKey: 'secSeguranca', fonteKey: 'seguranca', campo: 'segurancaTrabalhoTexto', titulo: 'Segurança do Trabalho', icon: <ShieldCheck className="w-4 h-4 text-emerald-600" />, addLabel: 'Adicionar item', seed: 'Nova condição de segurança' })}
+          {secaoListaBlock({ openKey: 'secPrecos', fonteKey: 'precos', campo: 'precosObsTexto', titulo: 'Preços — Observações', icon: <DollarSign className="w-4 h-4 text-emerald-600" />, addLabel: 'Adicionar observação', seed: 'Nova observação de preço' })}
+          {secaoListaBlock({ openKey: 'secImpostos', fonteKey: 'impostos', campo: 'impostosObsTexto', titulo: 'Impostos e Taxas — Observações', icon: <Scale className="w-4 h-4 text-blue-600" />, addLabel: 'Adicionar observação', seed: 'Nova observação de imposto' })}
+          {secaoListaBlock({ openKey: 'secMultas', fonteKey: 'multas', campo: 'multasAtrasoTexto', titulo: 'Multas por Atraso de Pagamento', icon: <Scale className="w-4 h-4 text-[#E63946]" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
+          {secaoListaBlock({ openKey: 'secLimitacao', fonteKey: 'limitacao', campo: 'limitacaoRespTexto', titulo: 'Limitação de Responsabilidade', icon: <Scale className="w-4 h-4 text-[#0B1E38]" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
+          {secaoListaBlock({ openKey: 'secConfid', fonteKey: 'confidencialidade', campo: 'confidencialidadeTexto', titulo: 'Confidencialidade', icon: <ShieldCheck className="w-4 h-4 text-[#0B1E38]" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
+          {secaoListaBlock({ openKey: 'secTermo', fonteKey: 'termoAceite', campo: 'termoAceiteTexto', titulo: 'Termo de Aceite da Proposta', icon: <CheckCircle className="w-4 h-4 text-emerald-600" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
+          {secaoListaBlock({ openKey: 'secCondGerais', fonteKey: 'condicoesGerais', campo: 'condicoesGeraisTexto', titulo: 'Condições Gerais', icon: <FileText className="w-4 h-4 text-slate-600" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
 
           <Accordion title="Conclusão" icon={<FileText className="w-4 h-4 text-[#0B1E38]" />} open={!!open.conclusao} onToggle={() => toggle('conclusao')}>
             <div className="flex items-center justify-between mb-1">
