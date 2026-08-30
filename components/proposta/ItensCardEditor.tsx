@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { PedidoEquipmentItem } from '@/lib/types';
+import { normalizeSearch } from '@/lib/stockStatus';
 import { Plus, Minus, Trash2, ChevronUp, ChevronDown, Pencil, Check, X } from 'lucide-react';
 
 const brl = (n: number) => `R$ ${(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -54,7 +55,8 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
     if (!catalogo) return [];
     if (!catalogoFilter.trim()) return catalogo;
     const term = catalogoFilter.toLowerCase().trim();
-    return catalogo.filter((c) => c.label.toLowerCase().includes(term));
+    const nTerm = normalizeSearch(catalogoFilter); // FSP-951 ~ FSP951 ~ fsp 951
+    return catalogo.filter((c) => c.label.toLowerCase().includes(term) || (nTerm.length > 0 && normalizeSearch(c.label).includes(nTerm)));
   }, [catalogo, catalogoFilter]);
 
   const isServico = tipo === 'servico';
