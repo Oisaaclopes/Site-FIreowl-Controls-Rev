@@ -116,6 +116,20 @@ O motor de sync permanece no código; o indicador visual foi removido. Não foi 
 | RLS/RPC/Storage | BLOCKED | Requer sessões reais dos perfis e credenciais de ambiente. |
 | Mobile/PDF/offline | BLOCKED | Requer navegador/dispositivo e dados reais; não foi inferido como PASS. |
 
+## 12.2 Pré-flight E2E — 2026-08-29
+
+| Item | Status | Evidência / próximo passo |
+|---|---|---|
+| URL e chave anônima do Supabase | CONFIGURED localmente | Existem no `.env.local`; valores não foram exibidos. |
+| `SUPABASE_SERVICE_ROLE_KEY` | MISSING localmente | O script `qa-concurrency-integration-test.mjs` não foi executado para não criar registros QA sem credencial/ambiente confirmado. |
+| Ambiente seguro (staging vs. produção) | BLOCKED | Não foi possível confirmar o tipo do projeto somente pela configuração local. Não criar dados artificiais até confirmação humana. |
+| Sessão de usuário para RLS/mobile/PDF/offline | BLOCKED | O navegador integrado alcançou a tela de login, mas não há sessão de funcionário autorizada para teste. |
+| Duplicatas históricas de OS | BLOCKED | Requer consulta autenticada. Não houve leitura/escrita direta no banco. |
+
+## 12.3 Atribuição de técnico à OS — auditoria estática
+
+**P2 — OPEN.** `ordens_servico` não possui coluna estruturada de `technician_id`, `executor_id` ou equivalente na migration 0033. O técnico aparece em relatórios (`reports.tecnico_id`/`tecnico_nome`) e valores de responsável podem ser derivados em fluxos de Pedido, mas a Agenda/OS não consegue determinar de modo estruturado quem executará uma OS. Impacto: a OS segue operável, porém não permite filtro, restrição ou escala individual confiável. Próxima etapa recomendada: modelagem aditiva de atribuição de executores, sem inventar equipes ou localização.
+
 ## 13. RLS e permissões
 
 Executar no Supabase autenticado, por Administrador, Gestor, Comercial, Técnico e Financeiro:
