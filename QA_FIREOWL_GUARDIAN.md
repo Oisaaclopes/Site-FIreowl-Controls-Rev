@@ -55,8 +55,8 @@ Nenhum P0 conhecido na auditoria estática.
 
 ## 6. P1 encontrados
 
-1. **P1-A — Conversão concorrente de levantamento em pedido. Status: FIXED (aguarda E2E).** A migration 0059 adiciona o vínculo `initial_conversion` e a RPC `get_or_create_order_from_survey`, serializada por levantamento. A composição continua no app; o banco cria/devolve somente a conversão inicial. Pedidos adicionais continuam possíveis como vínculos `manual` explícitos.
-2. **P1-B — Numeração concorrente de OS. Status: FIXED (aguarda E2E).** A migration 0059 adiciona lock transacional anual antes de calcular `OS-AAAA-NNNN` e tenta criar índice único parcial de número. Se houver duplicata histórica, ela não altera nem apaga dados: emite aviso e deixa o índice pendente para saneamento manual.
+1. **P1-A — Conversão concorrente de levantamento em pedido. Status: PASS.** Em 2026-08-29, o teste real contra Supabase executou duas chamadas simultâneas e confirmou um único Pedido/vínculo inicial, além da repetição idempotente. A migration 0059 mantém pedidos adicionais deliberados como vínculos `manual` explícitos.
+2. **P1-B — Numeração concorrente de OS. Status: PASS.** Em 2026-08-29, o teste real contra Supabase confirmou que duas chamadas da mesma competência retornam a mesma OS e que duas competências distintas recebem OS/números distintos, preservando `OS-AAAA-NNNN`.
 3. **Dados de demonstração ainda são fallback intencional quando Supabase não está configurado.** `lib/mockData.ts` permanece para modo local/demonstração. Com Supabase configurado, o fallback do estoque para mock foi removido nesta QA. Antes de produção, ambiente sem configuração deve exibir aviso explícito de modo demonstração ou ser bloqueado.
 
 ## 7. P2 encontrados
@@ -110,9 +110,9 @@ O motor de sync permanece no código; o indicador visual foi removido. Não foi 
 
 | Item | Status | Evidência / bloqueio |
 |---|---|---|
-| Migration 0059 | APPLIED (informado pelo operador) | Aplicação confirmada pelo usuário; não há acesso de banco nesta sessão para consultar histórico. |
-| Teste de concorrência | BLOCKED | `SUPABASE_SERVICE_ROLE_KEY` não está presente no ambiente local. Executar o script de QA no PowerShell com a chave somente no ambiente local. |
-| Duplicatas históricas de OS | BLOCKED | Requer consulta autenticada ao Supabase. A migration não altera duplicatas existentes. |
+| Migration 0059 | APPLIED | Aplicação confirmada pelo operador e RPCs/tabelas dependentes responderam no Supabase. |
+| Teste de concorrência | PASS | `qa-concurrency-integration-test.mjs` executado contra Supabase em 2026-08-30: 7 verificações aprovadas, incluindo o Pedido adicional deliberado. Os registros `QA-CONC-*` foram removidos pelo próprio script. |
+| Duplicatas históricas de OS | PASS | Consulta somente de leitura em 2026-08-29: `ordens_servico` sem registros e sem números duplicados. A proteção não precisou de saneamento histórico neste ambiente. |
 | RLS/RPC/Storage | BLOCKED | Requer sessões reais dos perfis e credenciais de ambiente. |
 | Mobile/PDF/offline | BLOCKED | Requer navegador/dispositivo e dados reais; não foi inferido como PASS. |
 
@@ -121,8 +121,8 @@ O motor de sync permanece no código; o indicador visual foi removido. Não foi 
 | Item | Status | Evidência / próximo passo |
 |---|---|---|
 | URL e chave anônima do Supabase | CONFIGURED localmente | Existem no `.env.local`; valores não foram exibidos. |
-| `SUPABASE_SERVICE_ROLE_KEY` | MISSING localmente | O script `qa-concurrency-integration-test.mjs` não foi executado para não criar registros QA sem credencial/ambiente confirmado. |
-| Ambiente seguro (staging vs. produção) | BLOCKED | Não foi possível confirmar o tipo do projeto somente pela configuração local. Não criar dados artificiais até confirmação humana. |
+| `SUPABASE_SERVICE_ROLE_KEY` | CONFIGURED localmente | Utilizada somente no processo local para o script de QA; valor não foi exibido, persistido nem versionado. |
+| Ambiente seguro (staging vs. produção) | BLOCKED | O teste utilizou registros isolados `QA-CONC-*` e cleanup explícito, mas o tipo do projeto não foi confirmado somente pela configuração local. |
 | Sessão de usuário para RLS/mobile/PDF/offline | BLOCKED | O navegador integrado alcançou a tela de login, mas não há sessão de funcionário autorizada para teste. |
 | Duplicatas históricas de OS | BLOCKED | Requer consulta autenticada. Não houve leitura/escrita direta no banco. |
 

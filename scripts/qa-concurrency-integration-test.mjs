@@ -43,6 +43,12 @@ async function main() {
     const later = await sb.rpc('get_or_create_order_from_survey', { p_report_id: reportId, p_pedido: pedidoPayload(`${tag}-PED-C`) });
     if (later.error) throw later.error;
     check('repetição é idempotente', later.data.pedido_id === first.data.pedido_id && later.data.already_exists === true);
+    const manualOrderId = `${tag}-PED-MANUAL`;
+    await sb.from('pedidos').insert(pedidoPayload(manualOrderId)).throwOnError();
+    await sb.from('report_order_links').insert({ report_id: reportId, pedido_id: manualOrderId, operation: 'manual' }).throwOnError();
+    const manualLink = await sb.from('report_order_links').select('pedido_id').eq('report_id', reportId).eq('operation', 'manual').eq('pedido_id', manualOrderId).single();
+    if (manualLink.error) throw manualLink.error;
+    check('pedido adicional deliberado permanece possível', manualLink.data.pedido_id === manualOrderId);
 
     await sb.from('contracts').insert({ id: contractId, client_name: 'QA concorrência', status: 'ATIVO' }).throwOnError();
     await sb.from('contract_routines').insert({ id: routineId, contract_id: contractId, tipo: 'preventiva', frequencia: 'mensal' }).throwOnError();
