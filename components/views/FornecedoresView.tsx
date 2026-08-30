@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Supplier, PartnerBrand } from '@/lib/types';
 import { SidePanel, FormSection, Toggle } from '@/components/SidePanel';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
+import { fetchCnpjData } from '@/lib/cnpj';
 
 const supplierStatusColor = (status: Supplier['activeStatus']) =>
   status === 'HOMOLOGADO' ? 'emerald' : status === 'EM AVALIACAO' ? 'amber' : 'red';
@@ -39,6 +40,13 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
   const [name, setName] = useState('');
   const [cnpj, setCNPJ] = useState('');
   const [category, setCategory] = useState('');
+  const [tradeName, setTradeName] = useState('');
+  const [zipCode, setZipCode] = useState('');
+  const [street, setStreet] = useState('');
+  const [number, setNumber] = useState('');
+  const [neighborhood, setNeighborhood] = useState('');
+  const [stateUf, setStateUf] = useState('');
+  const [consultingCnpj, setConsultingCnpj] = useState(false);
   const [contactName, setContactName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -81,6 +89,7 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
     setName('');
     setCNPJ('');
     setCategory('');
+    setTradeName(''); setZipCode(''); setStreet(''); setNumber(''); setNeighborhood(''); setStateUf('');
     setContactName('');
     setPhone('');
     setEmail('');
@@ -96,6 +105,7 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
     setName(s.name);
     setCNPJ(s.cnpj);
     setCategory(s.category);
+    setTradeName(s.tradeName || ''); setZipCode(s.address?.zipCode || ''); setStreet(s.address?.street || ''); setNumber(s.address?.number || ''); setNeighborhood(s.address?.neighborhood || ''); setStateUf(s.address?.state || '');
     setContactName(s.contactName);
     setPhone(s.phone);
     setEmail(s.email);
@@ -109,6 +119,25 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
     if (!onDeleteSupplier) return;
     if (!window.confirm(`Excluir o fornecedor "${s.name}"?\n\nEsta ação não pode ser desfeita.`)) return;
     onDeleteSupplier(s.id);
+  };
+
+  const consultCnpj = async () => {
+    if (!cnpj.trim()) return;
+    setConsultingCnpj(true);
+    try {
+      const found = await fetchCnpjData(cnpj);
+      const summary = [found.razaoSocial && `Razão social: ${found.razaoSocial}`, found.nomeFantasia && `Fantasia: ${found.nomeFantasia}`, found.cidadeUf && `Cidade/UF: ${found.cidadeUf}`].filter(Boolean).join('\n');
+      if (!window.confirm(`Dados encontrados:\n\n${summary}\n\nDeseja preencher os campos disponíveis? Campos já preenchidos serão atualizados somente com esta confirmação.`)) return;
+      if (found.razaoSocial) setName(found.razaoSocial);
+      if (found.nomeFantasia) setTradeName(found.nomeFantasia);
+      if (found.cep) setZipCode(found.cep);
+      if (found.logradouro) setStreet(found.logradouro);
+      if (found.email) setEmail(found.email);
+      if (found.telefone) setPhone(found.telefone);
+      if (found.cidadeUf) { const [cityValue, ufValue] = found.cidadeUf.split('/'); setCity(cityValue?.trim() || ''); setStateUf(ufValue?.trim() || ''); }
+      if (found.cnaeDescricao && !category) setCategory(found.cnaeDescricao);
+    } catch (error) { alert(error instanceof Error ? error.message : 'Não foi possível consultar o CNPJ.'); }
+    finally { setConsultingCnpj(false); }
   };
 
   const handleCreateSupplier = (e?: React.FormEvent) => {
@@ -126,6 +155,8 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
         city,
         leadTimeDays: Number(leadTimeDays),
         brands,
+        tradeName,
+        address: { zipCode, street, number, neighborhood, city, state: stateUf },
       });
       setShowPanel(false);
       setEditing(null);
@@ -146,6 +177,8 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
       leadTimeDays: Number(leadTimeDays),
       activeStatus: 'HOMOLOGADO',
       brands,
+      tradeName,
+      address: { zipCode, street, number, neighborhood, city, state: stateUf },
     };
     onAddSupplier(created);
     setShowPanel(false);
@@ -189,13 +222,15 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
                   {s.name.slice(0, 2).toUpperCase()}
                 </span>
               }
-              title={<span className="uppercase">{s.name}</span>}
+              title={<span className="uppercase">{s.tradeName || s.name}</span>}
               meta={
                 <>
                   <RowMeta label="Cód" value={<span className="font-data-mono">{s.code}</span>} />
+                  {s.tradeName && <RowMeta label="Razão social" value={s.name} />}
                   <RowMeta label="CNPJ" value={<span className="font-data-mono">{s.cnpj}</span>} />
                   <RowMeta label="Categoria" value={s.category} />
                   <RowMeta label="Cidade" value={s.city} />
+                  {s.address?.state && <RowMeta label="UF" value={s.address.state} />}
                 </>
               }
               center={
@@ -262,13 +297,13 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>{isPJ ? 'CNPJ' : 'CPF'}</label>
-                  <input
+                  <div className="flex gap-1.5"><input
                     type="text"
                     value={cnpj}
                     onChange={(e) => setCNPJ(e.target.value)}
                     placeholder={isPJ ? '00.000.000/0001-00' : '000.000.000-00'}
                     className={`${inputCls} font-data-mono`}
-                  />
+                  /><button type="button" onClick={() => void consultCnpj()} disabled={consultingCnpj || cnpj.replace(/\D/g, '').length !== 14} className="px-2 rounded-lg border border-[#1A1A72] text-[#1A1A72] text-[10px] font-bold disabled:opacity-40">{consultingCnpj ? '...' : 'Consultar'}</button></div>
                 </div>
                 <div>
                   <label className={labelCls}>Categoria</label>
@@ -282,6 +317,16 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
                 </div>
               </div>
             </div>
+          </FormSection>
+
+          <FormSection icon="badge" title="Nome de exibição">
+            <label className={labelCls}>Nome fantasia</label><input value={tradeName} onChange={(e) => setTradeName(e.target.value)} placeholder="Ex.: Fire & Segurança Distribuidora" className={inputCls} />
+          </FormSection>
+
+          <FormSection icon="location_on" title="Endereço">
+            <div className="grid grid-cols-2 gap-3"><div><label className={labelCls}>CEP</label><input value={zipCode} onChange={(e) => setZipCode(e.target.value)} className={inputCls} /></div><div><label className={labelCls}>UF</label><input value={stateUf} onChange={(e) => setStateUf(e.target.value.toUpperCase())} maxLength={2} className={inputCls} /></div></div>
+            <div className="grid grid-cols-[1fr_7rem] gap-3 mt-3"><div><label className={labelCls}>Logradouro</label><input value={street} onChange={(e) => setStreet(e.target.value)} className={inputCls} /></div><div><label className={labelCls}>Número</label><input value={number} onChange={(e) => setNumber(e.target.value)} className={inputCls} /></div></div>
+            <div className="mt-3"><label className={labelCls}>Bairro</label><input value={neighborhood} onChange={(e) => setNeighborhood(e.target.value)} className={inputCls} /></div>
           </FormSection>
 
           {/* Bloco: Contatos */}
