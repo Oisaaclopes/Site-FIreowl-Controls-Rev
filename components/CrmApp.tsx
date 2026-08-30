@@ -970,7 +970,8 @@ export function CrmApp({
       status: 'EM PROGRESSO',
       updatedAt: new Date().toLocaleTimeString('pt-BR', { hour12: false }),
     }));
-    setCurrentTab('servicos');
+    // Relatórios/auditorias vivem no módulo RELATÓRIOS (não mais em Serviço).
+    setCurrentTab('relatorios');
   };
 
   // Sem falsa promessa: em vez de injetar OS fake + alert, leva o usuário para
@@ -1175,12 +1176,8 @@ export function CrmApp({
           {currentTab === 'servicos' && (
             <ServicosView
               services={services}
-              clients={clients}
-              quotes={quotes}
-              onAddQuote={handleAddQuote}
               onUpdateService={handleUpdateService}
               onDeleteService={handleDeleteService}
-              onSelectClientForReport={handleSelectClientForReport}
             />
           )}
 

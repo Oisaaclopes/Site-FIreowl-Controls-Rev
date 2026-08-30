@@ -32,7 +32,6 @@ import { GRUPOS_FALHA, falhasPorArea, AreaFalha } from '@/lib/catalogoFalhas';
 import { fetchTemplates } from '@/lib/reportTemplates';
 import { gerarPdfExecucao } from '@/lib/reportPdf';
 import { ReportTechnicalPDFView } from '@/components/documentos/ReportTechnicalPDFView';
-import { NovaProposta } from '@/components/reports/NovaProposta';
 import { PendenciasBoard } from '@/components/reports/PendenciasBoard';
 import { createOrderFromSurvey } from '@/lib/surveyOrderConversion';
 import { fetchPedidos } from '@/lib/pedidos';
@@ -174,11 +173,10 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const canManage = userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR'; // editar/excluir relatório
 
   const [mode, setMode] = useState<'index' | 'form'>('index');
-  const [board, setBoard] = useState<'atendimentos' | 'relatorios' | 'pendencias'>('atendimentos');
+  const [board, setBoard] = useState<'atendimentos' | 'relatorios' | 'pendencias' | 'auditorias'>('atendimentos');
   // Pré-visualização do PDF técnico (react-pdf). Fallback = método HTML antigo.
   const [reportPreview, setReportPreview] = useState<ReportInstance | null>(null);
   const [creatingOrderFromReport, setCreatingOrderFromReport] = useState<string | null>(null);
-  const [showProposta, setShowProposta] = useState(false);
   const [reports, setReports] = useState<ReportInstance[]>([]);
   const [surveyOrders, setSurveyOrders] = useState<Pedido[]>([]);
   const [pendencias, setPendencias] = useState<Pendencia[]>([]);
@@ -620,6 +618,16 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     setWizardStep(1);
   };
   const closeWizard = () => setWizardStep(0);
+  // Auditoria de conformidade (NBR 17240) = relatório Preventiva SDAI. Reutiliza
+  // o mesmo wizard/engine de relatórios, já com tipo/área/cliente pré-marcados.
+  const openAuditoria = (clienteId: string) => {
+    setWTipo('PREVENTIVA');
+    setWArea('SDAI');
+    setWClienteId(clienteId || clients[0]?.id || '');
+    setWContratoId('');
+    setWOsId('');
+    setWizardStep(1);
+  };
 
   const startForm = (preset?: { tipo: string; area: string; clienteId: string; osId?: string; contratoId?: string }) => {
     const tipo = preset?.tipo || wTipo;
@@ -1071,15 +1079,9 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
           </h1>
         </div>
         <div className="flex items-center gap-2">
-          {/* Proposta: comercial (admin/gestor/financeiro), nunca técnico (§3 RBAC) */}
-          {!isTecnico && (
-            <button
-              onClick={() => setShowProposta(true)}
-              className="border border-[#1A1A72] text-[#1A1A72] hover:bg-[#1A1A72] hover:text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5 uppercase tracking-wide"
-            >
-              <span className="material-symbols-outlined text-base">request_quote</span> Nova proposta
-            </button>
-          )}
+          {/* Propostas comerciais são tratadas no módulo PEDIDOS. A partir de um
+              levantamento, use "Gerar pedido" para levar as necessidades ao
+              comercial — sem um gerador de proposta paralelo aqui. */}
           {canCreate && (
             <button
               onClick={openWizard}
@@ -1117,19 +1119,9 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         </div>
       )}
 
-      <NovaProposta
-        open={showProposta}
-        onClose={() => setShowProposta(false)}
-        clients={clients}
-        inventory={inventory}
-        services={services}
-        pendencias={pendencias}
-        onGenerated={refresh}
-      />
-
       {/* Central de operação: o atendimento é o ponto de entrada principal em campo. */}
       <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 w-fit">
-        {(['atendimentos', 'relatorios', 'pendencias'] as const).map((b) => (
+        {(['atendimentos', 'relatorios', 'pendencias', 'auditorias'] as const).map((b) => (
           <button
             key={b}
             onClick={() => setBoard(b)}
@@ -1137,7 +1129,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
               board === b ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            {b === 'atendimentos' ? 'Meus atendimentos' : b === 'relatorios' ? 'Relatórios' : 'Pendências'}
+            {b === 'atendimentos' ? 'Meus atendimentos' : b === 'relatorios' ? 'Relatórios' : b === 'pendencias' ? 'Pendências' : 'Auditorias'}
           </button>
         ))}
       </div>
@@ -1166,7 +1158,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
               })}
             </div>
           )}
-          <button onClick={openWizard} className="min-h-11 px-4 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold uppercase">Atendimento avulso</button>
+          <button onClick={openWizard} title="Abrir um relatório sem Ordem de Serviço vinculada" className="min-h-11 px-4 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold uppercase inline-flex items-center gap-1.5"><span className="material-symbols-outlined text-base">assignment_late</span>Atendimento sem Ordem de Serviço</button>
         </div>
       )}
 
@@ -1176,8 +1168,42 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
           clients={clients}
           userRole={userRole}
           onChanged={refresh}
-          onCreateProposal={() => setShowProposta(true)}
+          onCreateProposal={onNavigateToPedidos}
         />
+      )}
+
+      {board === 'auditorias' && (
+        <div className="space-y-3">
+          <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-xs text-indigo-900 flex items-start gap-2">
+            <span className="material-symbols-outlined">fact_check</span>
+            <span>
+              <strong>Auditoria de conformidade NBR 17240.</strong> Selecione a unidade para abrir a auditoria (relatório de preventiva SDAI, com ART CREA-PR). As auditorias finalizadas aparecem em{' '}
+              <button onClick={() => { setBoard('relatorios'); setFTipo('PREVENTIVA'); }} className="underline font-bold">Relatórios</button>.
+            </span>
+          </div>
+          {clients.length === 0 ? (
+            <EmptyState variant="relatorio" title="Nenhuma unidade cadastrada" description="Cadastre um cliente para abrir auditorias de conformidade." />
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {clients.map((c) => {
+                const nAud = reports.filter((r) => r.tipo === 'PREVENTIVA' && r.clienteId === c.id).length;
+                return (
+                  <article key={c.id} className="rounded-xl bg-white border border-slate-200 shadow-sm p-4 flex items-center gap-3">
+                    <div className="w-11 h-11 shrink-0 rounded-xl bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center"><span className="material-symbols-outlined">domain</span></div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-slate-900 truncate">{c.name}</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5 truncate">{c.address || 'Endereço não cadastrado'}</p>
+                      {nAud > 0 && <p className="text-[10px] text-slate-400 mt-0.5">{nAud} auditoria(s) registrada(s)</p>}
+                    </div>
+                    {canCreate && (
+                      <button onClick={() => openAuditoria(c.id)} className="shrink-0 min-h-11 px-3 rounded-lg bg-[#E63946] hover:bg-[#a51515] text-white text-[11px] font-bold uppercase tracking-wide inline-flex items-center gap-1.5"><span className="material-symbols-outlined text-base">fact_check</span>Abrir auditoria</button>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
 
       {board === 'relatorios' && (
