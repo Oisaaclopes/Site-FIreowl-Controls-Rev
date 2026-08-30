@@ -667,8 +667,11 @@ export function CrmApp({
   };
 
   const handleAddContract = async (newContract: Contract) => {
-    setContracts((prev) => [newContract, ...prev]);
-    logAction('Novo Contrato', 'Contratos', `Cadastrado contrato ${newContract.id} - ${newContract.clientName}`);
+    // Upsert local por id: editar um contrato não duplica a linha (só substitui).
+    setContracts((prev) => (prev.some((c) => c.id === newContract.id)
+      ? prev.map((c) => (c.id === newContract.id ? newContract : c))
+      : [newContract, ...prev]));
+    logAction('Contrato salvo', 'Contratos', `Contrato ${newContract.id} - ${newContract.clientName}`);
     if (isSupabaseConfigured()) {
       try {
         const saved = await upsertContract(newContract);
