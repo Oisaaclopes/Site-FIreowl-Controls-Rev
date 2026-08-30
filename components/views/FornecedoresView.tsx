@@ -47,20 +47,32 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
   const [brands, setBrands] = useState<string[]>([]);
 
   const [novaMarca, setNovaMarca] = useState('');
+  const [brandHint, setBrandHint] = useState('');
+
+  const normalizeBrand = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/gi, '').toLowerCase();
 
   const toggleBrand = (nome: string) =>
     setBrands((prev) => (prev.includes(nome) ? prev.filter((b) => b !== nome) : [...prev, nome]));
 
-  const adicionarMarca = () => {
+  const adicionarMarcaExistente = () => {
     const nome = novaMarca.trim();
     if (!nome) return;
-    // Cria no registro global de marcas se ainda não existir (por nome).
-    if (!partnerBrands.some((b) => b.name.toLowerCase() === nome.toLowerCase())) {
-      onAddBrand?.(nome);
-    }
-    // Já deixa selecionada neste fornecedor.
-    setBrands((prev) => (prev.some((b) => b.toLowerCase() === nome.toLowerCase()) ? prev : [...prev, nome]));
+    const existing = partnerBrands.find((brand) => normalizeBrand(brand.name) === normalizeBrand(nome));
+    if (!existing) { setBrandHint('Marca não encontrada. Use “Cadastrar novo fabricante” após confirmar os dados.'); return; }
+    setBrands((prev) => (prev.some((brand) => normalizeBrand(brand) === normalizeBrand(existing.name)) ? prev : [...prev, existing.name]));
     setNovaMarca('');
+    setBrandHint('');
+  };
+  const cadastrarNovoFabricante = () => {
+    const nome = novaMarca.trim();
+    if (!nome || !onAddBrand) return;
+    const existing = partnerBrands.find((brand) => normalizeBrand(brand.name) === normalizeBrand(nome));
+    if (existing) { setBrandHint(`A marca já existe como “${existing.name}”. Ela foi selecionada.`); setBrands((prev) => prev.includes(existing.name) ? prev : [...prev, existing.name]); return; }
+    if (!window.confirm(`Cadastrar o fabricante “${nome}” no catálogo global?\n\nConfira a grafia antes de continuar para evitar duplicidade.`)) return;
+    onAddBrand(nome);
+    setBrands((prev) => [...prev, nome]);
+    setNovaMarca('');
+    setBrandHint('Fabricante cadastrado e selecionado.');
   };
 
   const openPanel = () => {
@@ -338,7 +350,7 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
 
           <FormSection icon="sell" title="Marcas que trabalha">
             <p className="text-[11px] text-slate-500 mb-2">
-              Digite uma marca e adicione (ela é criada no catálogo na hora), ou marque as já cadastradas. Responde “quem vende essa marca?” no cadastro de dispositivos.
+              Selecione fabricantes já cadastrados. O cadastro de um novo fabricante é uma ação separada, com confirmação e proteção contra variações de grafia.
             </p>
             {/* Digitar nova marca */}
             <div className="flex gap-1.5 mb-2">
@@ -347,25 +359,27 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
                 value={novaMarca}
                 onChange={(e) => setNovaMarca(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') { e.preventDefault(); adicionarMarca(); }
+                  if (e.key === 'Enter') { e.preventDefault(); adicionarMarcaExistente(); }
                 }}
                 placeholder="Ex.: Bosch, Notifier, Intelbras…"
                 className={inputCls}
               />
               <button
                 type="button"
-                onClick={adicionarMarca}
+                onClick={adicionarMarcaExistente}
                 disabled={!novaMarca.trim()}
                 className="shrink-0 px-3 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] text-white text-[11px] font-bold uppercase disabled:opacity-40"
               >
-                Adicionar
+                Selecionar
               </button>
+              <button type="button" onClick={cadastrarNovoFabricante} disabled={!novaMarca.trim() || !onAddBrand} className="shrink-0 px-3 rounded-lg border border-[#1A1A72] text-[#1A1A72] hover:bg-[#1A1A72]/5 text-[11px] font-bold uppercase disabled:opacity-40">Cadastrar novo fabricante</button>
             </div>
+            {brandHint && <p className="text-[11px] text-amber-700 mb-2">{brandHint}</p>}
             {/* Chips: união das marcas do catálogo + as já selecionadas (mostra a recém-digitada na hora) */}
             {(() => {
               const todas = Array.from(new Set([...partnerBrands.map((b) => b.name), ...brands]));
               if (todas.length === 0) {
-                return <p className="text-[11px] text-slate-400 italic">Nenhuma marca ainda — digite acima para criar a primeira.</p>;
+                return <p className="text-[11px] text-slate-400 italic">Nenhuma marca cadastrada. Use o botão específico acima para cadastrar a primeira.</p>;
               }
               return (
                 <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
