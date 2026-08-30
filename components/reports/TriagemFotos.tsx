@@ -104,7 +104,7 @@ export const TriagemFotos: React.FC<TriagemFotosProps> = ({
                 </span>
               </h3>
               <p className="text-xs text-slate-400">
-                Captura rápida em campo. As fotos não classificadas entrarão no PDF no "Registro Fotográfico Geral".
+                Captura rápida em campo. As fotos não classificadas entrarão no PDF no &quot;Registro Fotográfico Geral&quot;.
               </p>
             </div>
           </div>
