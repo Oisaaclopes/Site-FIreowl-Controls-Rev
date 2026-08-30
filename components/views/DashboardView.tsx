@@ -32,6 +32,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     .filter((t) => t.type === 'DESPESA')
     .reduce((acc, t) => acc + t.amount, 0);
   const contratosAtivos = contracts.filter((c) => c.status === 'ATIVO').length;
+  const receitaContratadaMensal = contracts
+    .filter((c) => c.status === 'ATIVO')
+    .reduce((acc, c) => acc + c.monthlyValue, 0);
   const osAtrasadas = pedidosOS.filter((p) => p.status === 'ATRASADA').length;
   const cashMax = Math.max(receitaTotal, despesaTotal, 1);
   const cashBars = [
@@ -61,28 +64,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }, [receitaTotal]);
 
   return (
-    <div className="flex flex-col w-full p-4 md:p-8 gap-5 md:gap-6">
+    <div className="flex flex-col w-full p-4 md:p-5 gap-4">
       {/* Header Section */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 pb-5">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-200 pb-3">
         <div>
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
             Unidade Londrina/PR — Resumo Executivo
           </span>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight mt-0.5">
             Painel de Controle Operacional
           </h1>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => onNavigateToTab('relatorios')}
-            className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 shadow-sm transition-colors flex items-center gap-1.5"
+            className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-50 shadow-sm transition-colors flex items-center gap-1.5"
           >
             <span className="material-symbols-outlined text-base">fact_check</span>
             Relatórios Técnicos
           </button>
           <button
             onClick={onNewOSClick}
-            className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
+            className="bg-[#E63946] hover:bg-[#a51515] text-white text-[11px] font-semibold px-3 py-1.5 rounded-md transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
           >
             <span className="material-symbols-outlined text-base">add</span> Nova Ordem
           </button>
@@ -90,110 +93,113 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* Indicator Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card: Receita */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-slate-300 transition-all">
+        <div className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-sm relative overflow-hidden group hover:border-slate-300 transition-all">
           <div className="flex justify-between items-start">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Receita Mensal
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+              Receita lançada
             </p>
-            <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <span className="material-symbols-outlined text-[22px]">trending_up</span>
+            <div className="w-8 h-8 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <span className="material-symbols-outlined text-[18px]">trending_up</span>
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-1">
-            <span className="text-sm font-medium text-slate-500">R$</span>
-            <span className="font-data-mono text-3xl font-bold text-slate-900 tabular-nums">
+          <div className="mt-2 flex items-baseline gap-1">
+            <span className="text-xs font-medium text-slate-500">R$</span>
+            <span className="font-data-mono text-2xl font-bold text-slate-900 tabular-nums">
               {isPrivacyModeActive ? MASK_DIGITS : revenueValue.toLocaleString('pt-BR')}
             </span>
           </div>
-          <div className="mt-4 flex items-center gap-1 text-xs font-semibold text-slate-500">
-            <span className="material-symbols-outlined text-sm">receipt_long</span>
-            <span>{transactions.filter((t) => t.type === 'RECEITA').length} lançamento(s) de receita</span>
+          <div className="mt-2.5 flex items-center gap-1 text-[11px] font-semibold text-slate-500">
+            <span className="material-symbols-outlined text-[13px]">receipt_long</span>
+            <span>{transactions.filter((t) => t.type === 'RECEITA').length} lançamento(s) registrado(s)</span>
           </div>
         </div>
 
         {/* Card: Despesas */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-slate-300 transition-all">
+        <div className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-sm relative overflow-hidden group hover:border-slate-300 transition-all">
           <div className="flex justify-between items-start">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Despesas Totais
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+              Despesas lançadas
             </p>
-            <div className="w-10 h-10 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center">
-              <span className="material-symbols-outlined text-[22px]">payments</span>
+            <div className="w-8 h-8 rounded-md bg-slate-100 text-slate-700 flex items-center justify-center">
+              <span className="material-symbols-outlined text-[18px]">payments</span>
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-1">
-            <span className="text-sm font-medium text-slate-500">R$</span>
-            <span className="font-data-mono text-3xl font-bold text-slate-900 tabular-nums">
+          <div className="mt-2 flex items-baseline gap-1">
+            <span className="text-xs font-medium text-slate-500">R$</span>
+            <span className="font-data-mono text-2xl font-bold text-slate-900 tabular-nums">
               {isPrivacyModeActive ? MASK_DIGITS : despesaTotal.toLocaleString('pt-BR')}
             </span>
           </div>
-          <div className="mt-4 flex items-center gap-1 text-xs font-semibold text-slate-500">
-            <span className="material-symbols-outlined text-sm">receipt_long</span>
-            <span>{transactions.filter((t) => t.type === 'DESPESA').length} lançamento(s) de despesa</span>
+          <div className="mt-2.5 flex items-center gap-1 text-[11px] font-semibold text-slate-500">
+            <span className="material-symbols-outlined text-[13px]">receipt_long</span>
+            <span>{transactions.filter((t) => t.type === 'DESPESA').length} lançamento(s) registrado(s)</span>
           </div>
         </div>
 
         {/* Card: Contratos Ativos */}
         <div
           onClick={() => onNavigateToTab('contratos')}
-          className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-slate-300 cursor-pointer transition-all"
+          className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-sm relative overflow-hidden group hover:border-slate-300 cursor-pointer transition-all"
         >
           <div className="flex justify-between items-start">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
               Contratos Ativos
             </p>
-            <div className="w-10 h-10 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center">
-              <span className="material-symbols-outlined text-[22px]">description</span>
+            <div className="w-8 h-8 rounded-md bg-slate-100 text-slate-700 flex items-center justify-center">
+              <span className="material-symbols-outlined text-[18px]">description</span>
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-1">
-            <span className="font-data-mono text-3xl font-bold text-slate-900 tabular-nums">
+          <div className="mt-2 flex items-baseline gap-1">
+            <span className="font-data-mono text-2xl font-bold text-slate-900 tabular-nums">
               {contratosAtivos.toLocaleString('pt-BR')}
             </span>
           </div>
-          <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-slate-500">
-            <span className="material-symbols-outlined text-sm text-[#1A1A72]">verified</span>
-            <span>{contracts.length} contratos no total</span>
+          <div className="mt-2.5 flex items-center gap-1 text-[11px] font-semibold text-slate-500">
+            <span className="material-symbols-outlined text-[13px] text-[#1A1A72]">verified</span>
+            <span>{contracts.length} {contracts.length === 1 ? 'contrato no total' : 'contratos no total'}</span>
+          </div>
+          <div className="mt-1 text-[10px] text-slate-500">
+            {isPrivacyModeActive ? MASK_DIGITS : `R$ ${receitaContratadaMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} / mês contratados
           </div>
         </div>
 
         {/* Card: OS Atrasadas (Critical) */}
         <div
           onClick={() => onNavigateToTab('pedidos')}
-          className="bg-red-50/60 p-5 rounded-xl border border-red-200 shadow-sm relative overflow-hidden group cursor-pointer hover:bg-red-100/50 transition-all"
+          className="bg-red-50/60 p-3.5 rounded-lg border border-red-200 shadow-sm relative overflow-hidden group cursor-pointer hover:bg-red-100/50 transition-all"
         >
           <div className="flex justify-between items-start">
-            <p className="text-xs font-bold text-[#E63946] uppercase tracking-wider flex items-center gap-1">
-              <span className="material-symbols-outlined text-sm">warning</span> OS Atrasadas
+            <p className="text-[10px] font-bold text-[#E63946] uppercase tracking-wider flex items-center gap-1">
+              <span className="material-symbols-outlined text-[13px]">warning</span> OS Atrasadas
             </p>
-            <div className="w-10 h-10 rounded-lg bg-red-100 text-[#E63946] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[22px]">error</span>
+            <div className="w-8 h-8 rounded-md bg-red-100 text-[#E63946] flex items-center justify-center">
+              <span className="material-symbols-outlined text-[18px]">error</span>
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-1">
-            <span className="font-data-mono text-3xl font-bold text-[#E63946] tabular-nums">
+          <div className="mt-2 flex items-baseline gap-1">
+            <span className="font-data-mono text-2xl font-bold text-[#E63946] tabular-nums">
               {osAtrasadas}
             </span>
           </div>
-          <div className="mt-4 flex items-center gap-1 text-xs font-semibold text-[#E63946] group-hover:underline">
+          <div className="mt-2.5 flex items-center gap-1 text-[11px] font-semibold text-[#E63946] group-hover:underline">
             <span>Intervenção técnica pendente →</span>
           </div>
         </div>
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-12 gap-6">
+      <div className="grid grid-cols-12 gap-4">
         {/* Left: Revenue vs Expense Bar Chart */}
-        <div className="col-span-12 lg:col-span-8 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
+        <div className="col-span-12 lg:col-span-8 bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+          <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
             <div>
-              <h3 className="text-base font-bold text-slate-900 uppercase tracking-wide">
-                Fluxo de Caixa Mensal
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                Fluxo de Caixa — Lançamentos
               </h3>
               <p className="text-xs text-slate-500">
-                Comparativo dos lançamentos financeiros carregados no sistema
+                Comparativo de todos os lançamentos financeiros carregados no sistema
               </p>
             </div>
             <div className="flex items-center gap-4">
@@ -208,7 +214,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
 
-          <div className="relative h-64 w-full flex items-end justify-center gap-12 pt-8">
+          <div className="relative h-48 w-full flex items-end justify-center gap-10 pt-6">
             <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-40">
               <div className="border-t border-slate-200 w-full"></div>
               <div className="border-t border-slate-200 w-full"></div>
@@ -233,24 +239,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* Right: Technical Highlight Card & Team Status */}
-        <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
+        <div className="col-span-12 lg:col-span-4 flex flex-col gap-4">
           {/* Anomalias Card */}
-          <div className="bg-white p-6 rounded-xl shadow-sm flex flex-col justify-between relative overflow-hidden">
+          <div className="bg-white p-4 rounded-lg shadow-sm flex flex-col justify-between relative overflow-hidden">
             <div>
               <span className="text-[10px] font-bold text-[#E63946] bg-red-50 px-2.5 py-1 rounded-full uppercase tracking-wider">
                 Módulo de Inteligência Técnica
               </span>
-              <h2 className="text-lg font-bold text-slate-900 mt-3 tracking-tight leading-snug uppercase">
+              <h2 className="text-base font-bold text-slate-900 mt-2 tracking-tight leading-snug uppercase">
                 Identificação de Anomalias no CRM
               </h2>
-              <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+              <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
                 Acompanhe pendências, manutenções atrasadas e anomalias detectadas nos relatórios de campo.
               </p>
             </div>
 
             <button
               onClick={() => onNavigateToTab('relatorios')}
-              className="mt-6 w-full py-2.5 bg-[#E63946] hover:bg-[#a51515] text-white rounded-lg font-semibold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-md"
+              className="mt-4 w-full py-2 bg-[#E63946] hover:bg-[#a51515] text-white rounded-md font-semibold text-[11px] uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-md"
             >
               <span>Ver pendências / anomalias</span>
               <span className="material-symbols-outlined text-base">arrow_forward</span>
@@ -259,13 +265,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           {/* Manutenção de campo — sem dados simulados: estado vazio real até
               existir atribuição de equipe/localização de verdade. */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-3">
+          <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex flex-col gap-2">
             <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
               Manutenção de Campo em Tempo Real
             </h4>
             <button
               onClick={() => onNavigateToTab('agenda')}
-              className="flex-1 min-h-[96px] rounded-lg border border-dashed border-slate-200 text-slate-400 hover:border-[#1A1A72] hover:text-[#1A1A72] transition-colors flex flex-col items-center justify-center gap-1 text-center px-3"
+              className="flex-1 min-h-[76px] rounded-md border border-dashed border-slate-200 text-slate-400 hover:border-[#1A1A72] hover:text-[#1A1A72] transition-colors flex flex-col items-center justify-center gap-1 text-center px-3"
             >
               <span className="material-symbols-outlined text-2xl">groups_off</span>
               <span className="text-[11px] font-semibold uppercase tracking-wide">Nenhuma equipe em atendimento</span>
@@ -276,8 +282,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* Bottom: Recent Transactions Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-[#1A1A72] px-6 py-4 flex justify-between items-center text-white">
+      <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-[#1A1A72] px-4 py-3 flex justify-between items-center text-white">
           <h3 className="text-xs font-bold uppercase tracking-wider">
             Últimos Lançamentos Financeiros &amp; Contratos
           </h3>

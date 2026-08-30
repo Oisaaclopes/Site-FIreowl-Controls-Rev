@@ -1024,7 +1024,7 @@ export function CrmApp({
       />
 
       {/* Main Content Workspace — deslocado pela sidebar apenas no desktop */}
-      <div className={`transition-[padding] duration-300 ease-out ${isSidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'}`}>
+      <div className={`transition-[padding] duration-300 ease-out ${isSidebarCollapsed ? 'lg:pl-20' : 'lg:pl-60'}`}>
         {/* Fixed Header */}
         <Header
           userRole={userRole}
@@ -1038,7 +1038,7 @@ export function CrmApp({
         />
 
         {/* View Switcher — padding inferior no mobile do técnico p/ o BottomNav */}
-        <main className={`pt-16 min-h-[calc(100vh-64px)] ${userRole === 'TECNICO' ? 'pb-20 lg:pb-0' : ''}`}>
+        <main className={`pt-14 min-h-[calc(100vh-56px)] ${userRole === 'TECNICO' ? 'pb-20 lg:pb-0' : ''}`}>
           {currentTab === 'painel' && userRole === 'TECNICO' && (
             <TechDashboard
               currentUser={userName}

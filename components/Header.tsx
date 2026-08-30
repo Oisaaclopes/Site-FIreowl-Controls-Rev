@@ -87,29 +87,29 @@ export const Header: React.FC<HeaderProps> = ({
   }, []);
 
   return (
-    <header className={`fixed top-0 left-0 right-0 h-16 bg-slate-50/70 backdrop-blur-md z-40 flex items-center justify-between px-4 md:px-8 transition-[left] duration-300 ease-out ${sidebarCollapsed ? 'lg:left-20' : 'lg:left-64'}`}>
-      <div className="flex items-center gap-2 md:gap-4 min-w-0">
+    <header className={`fixed top-0 left-0 right-0 h-14 bg-slate-50/70 backdrop-blur-md z-40 flex items-center justify-between px-3 md:px-5 transition-[left] duration-300 ease-out ${sidebarCollapsed ? 'lg:left-20' : 'lg:left-60'}`}>
+      <div className="flex items-center gap-2 md:gap-3 min-w-0">
         {/* Menu hambúrguer — apenas mobile/tablet */}
         <button
           onClick={onOpenMenu}
           aria-label="Abrir menu"
-          className="lg:hidden w-10 h-10 -ml-1 rounded-lg flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors shrink-0"
+          className="lg:hidden w-9 h-9 -ml-1 rounded-md flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors shrink-0"
         >
           <span className="material-symbols-outlined">menu</span>
         </button>
-        <div className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-md border border-slate-200">
-          <span className="material-symbols-outlined text-slate-500 text-base">event</span>
-          <span className="font-data-mono text-slate-700 uppercase text-xs font-semibold whitespace-nowrap">
+        <div className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
+          <span className="material-symbols-outlined text-slate-500 text-[15px]">event</span>
+          <span className="font-data-mono text-slate-700 uppercase text-[11px] font-semibold whitespace-nowrap">
             {currentDateTime}
           </span>
         </div>
-        <div className="hidden md:flex items-center gap-2 text-xs font-medium text-slate-500">
+        <div className="hidden md:flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
           <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
           <span>Unidade Londrina/PR — Operacional</span>
         </div>
       </div>
 
-      <div className="flex items-center gap-3 md:gap-4">
+      <div className="flex items-center gap-2 md:gap-3">
         {/* O status de sincronização (fila offline) continua sendo monitorado e
             é exibido de forma contextual dentro do sino de notificações — o
             motor de sync/offline-first permanece intacto, apenas o badge fixo
@@ -119,7 +119,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="relative">
           <button
             onClick={() => setShowNotifications(!showNotifications)}
-            className="relative p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-600 flex items-center justify-center"
+            className="relative p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-600 flex items-center justify-center"
             title="Notificações do Sistema"
           >
             <span className="material-symbols-outlined">notifications</span>
@@ -173,7 +173,7 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={togglePrivacy}
           aria-pressed={isPrivacyModeActive}
           title={isPrivacyModeActive ? 'Modo Privacidade ativo — mostrar valores' : 'Ocultar valores financeiros'}
-          className={`relative p-2 rounded-full transition-colors flex items-center justify-center ${
+          className={`relative p-1.5 rounded-full transition-colors flex items-center justify-center ${
             isPrivacyModeActive
               ? 'bg-[#1A1A72] text-white hover:bg-[#13135A]'
               : 'text-slate-600 hover:bg-slate-100'
@@ -185,7 +185,7 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
 
         {/* User Profile Info */}
-        <div className="flex items-center gap-3 border-l border-slate-200 pl-4">
+        <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
           <div className="text-right hidden sm:block">
             <p className="font-bold text-slate-800 text-xs truncate max-w-36">{userName}</p>
             <p className="font-label-caps text-slate-500 text-[10px]">{userRole}</p>
@@ -193,14 +193,14 @@ export const Header: React.FC<HeaderProps> = ({
           {canSwitchRole ? (
             <button
               onClick={onOpenAuthModal}
-              className="w-9 h-9 rounded-full bg-[#1A1A72] flex items-center justify-center text-white hover:ring-2 hover:ring-[#E63946] transition-all shadow-sm"
+              className="w-8 h-8 rounded-full bg-[#1A1A72] flex items-center justify-center text-white hover:ring-2 hover:ring-[#E63946] transition-all shadow-sm"
               title="Simular perfil de acesso"
             >
               <span className="material-symbols-outlined text-[20px]">person</span>
             </button>
           ) : (
             <div
-              className="w-9 h-9 rounded-full bg-[#1A1A72] flex items-center justify-center text-white shadow-sm"
+              className="w-8 h-8 rounded-full bg-[#1A1A72] flex items-center justify-center text-white shadow-sm"
               title="Perfil de acesso"
             >
               <span className="material-symbols-outlined text-[20px]">person</span>
