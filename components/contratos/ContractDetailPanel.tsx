@@ -8,7 +8,7 @@ import {
   fetchRoutineExecutions, ensureRoutineExecution, updateExecutionStatus,
   fetchHourLedger, addHourEntry, saldoBolsaHoras,
   fetchContractAttachments,
-  proximaExecucaoRotina,
+  proximaExecucaoRotina, generateOsFromExecution,
 } from '@/lib/contractRoutines';
 
 const inp = 'w-full border border-slate-200 rounded-lg p-2 text-xs text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#E63946]/20';
@@ -75,6 +75,15 @@ export const ContractDetailPanel: React.FC<{ contract: Contract; onClose: () => 
     const next = EXEC_ORDER[idx + 1];
     setBusy(true);
     try { await updateExecutionStatus(e.id, next); await load(); } catch (err) { setErro(err instanceof Error ? err.message : 'Falha.'); } finally { setBusy(false); }
+  };
+  // Gera OS a partir da competência (idempotente). Se já existir, apenas informa.
+  const gerarOS = async (e: ContractRoutineExecution) => {
+    setBusy(true); setErro(null);
+    try {
+      const res = await generateOsFromExecution(e.id);
+      setErro(res.alreadyExisted ? `OS ${res.numero || ''} já existia para ${e.competencia} — nada duplicado.` : `OS ${res.numero || ''} gerada para ${e.competencia}.`);
+      await load();
+    } catch (err) { setErro(err instanceof Error ? err.message : 'Falha ao gerar OS.'); } finally { setBusy(false); }
   };
 
   // ---- Bolsa de horas ----
@@ -155,8 +164,11 @@ export const ContractDetailPanel: React.FC<{ contract: Contract; onClose: () => 
                                 <span className="font-data-mono text-slate-600">{e.competencia}{e.dataProgramada ? ` · ${e.dataProgramada}` : ''}</span>
                                 <div className="flex items-center gap-2">
                                   <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${e.status === 'relatorio_emitido' || e.status === 'executado' ? 'bg-emerald-50 text-emerald-700' : e.status === 'cancelado' ? 'bg-slate-100 text-slate-400' : 'bg-sky-50 text-sky-700'}`}>{EXEC_LABEL[e.status]}</span>
-                                  {e.status !== 'relatorio_emitido' && e.status !== 'cancelado' && (
-                                    <button disabled={busy} onClick={() => avancar(e)} className="text-[10px] font-bold uppercase text-slate-400 hover:text-[#1A1A72]">avançar →</button>
+                                  {(e.status === 'previsto' || e.status === 'agendado') && (
+                                    <button disabled={busy} onClick={() => gerarOS(e)} className="text-[10px] font-bold uppercase text-emerald-700 hover:text-emerald-900 inline-flex items-center gap-0.5"><span className="material-symbols-outlined text-sm">assignment_add</span>Gerar OS</button>
+                                  )}
+                                  {e.status === 'os_gerada' && (
+                                    <button disabled={busy} onClick={() => avancar(e)} className="text-[10px] font-bold uppercase text-slate-400 hover:text-[#1A1A72]">marcar executado →</button>
                                   )}
                                 </div>
                               </div>

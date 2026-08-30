@@ -251,7 +251,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 Identificação de Anomalias no CRM
               </h2>
               <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-                14 clientes apresentaram inconsistências preventivas ou manutenções atrasadas neste trimestre.
+                Acompanhe pendências, manutenções atrasadas e anomalias detectadas nos relatórios de campo.
               </p>
             </div>
 
@@ -264,27 +264,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </button>
           </div>
 
-          {/* Field Maintenance Status */}
+          {/* Manutenção de campo — sem dados simulados: estado vazio real até
+              existir atribuição de equipe/localização de verdade. */}
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-3">
             <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
               Manutenção de Campo em Tempo Real
             </h4>
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between bg-amber-50/70 p-3 rounded-lg border border-amber-200">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500"></div>
-                  <span className="text-xs font-bold text-slate-900">Equipe Alfa (Catuaí)</span>
-                </div>
-                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full uppercase">EM ROTA</span>
-              </div>
-              <div className="flex items-center justify-between bg-emerald-50/70 p-3 rounded-lg border border-emerald-200">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
-                  <span className="text-xs font-bold text-slate-900">Equipe Beta (Norte Shop)</span>
-                </div>
-                <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full uppercase">EM ATENDIMENTO</span>
-              </div>
-            </div>
+            <button
+              onClick={() => onNavigateToTab('agenda')}
+              className="flex-1 min-h-[96px] rounded-lg border border-dashed border-slate-200 text-slate-400 hover:border-[#1A1A72] hover:text-[#1A1A72] transition-colors flex flex-col items-center justify-center gap-1 text-center px-3"
+            >
+              <span className="material-symbols-outlined text-2xl">groups_off</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wide">Nenhuma equipe em atendimento</span>
+              <span className="text-[10px]">Abrir a Agenda de despacho</span>
+            </button>
           </div>
         </div>
       </div>

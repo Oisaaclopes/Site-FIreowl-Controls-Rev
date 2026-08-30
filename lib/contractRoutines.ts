@@ -157,6 +157,33 @@ export async function ensureRoutineExecution(routineId: string, competencia: str
   return { id: data.id, competencia: data.competencia, status: data.status, alreadyExists: !!data.already_exists };
 }
 
+/** Execuções programadas de TODOS os contratos (para a Agenda). */
+export async function fetchScheduledExecutions(statuses?: ContractExecutionStatus[]): Promise<ContractRoutineExecution[]> {
+  const sb = getSupabaseClient() as any;
+  let q = sb.from('contract_routine_executions').select('*').order('data_programada');
+  if (statuses && statuses.length) q = q.in('status', statuses);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data || []).map(execRow);
+}
+
+/**
+ * Gera (idempotente) uma OS a partir de uma execução/competência. Se já existir
+ * OS vinculada, devolve a existente (para abrir, não duplica). Protegido contra
+ * duplo-clique/concorrência no servidor (FOR UPDATE + vínculo único).
+ */
+export async function generateOsFromExecution(executionId: string, opts?: { prioridade?: string; titulo?: string; descricao?: string }): Promise<{ osId: string; numero?: string; alreadyExisted: boolean; status: string }> {
+  const sb = getSupabaseClient() as any;
+  const { data, error } = await sb.rpc('generate_os_from_execution', {
+    p_execution_id: executionId,
+    p_prioridade: opts?.prioridade ?? 'media',
+    p_titulo: opts?.titulo ?? null,
+    p_descricao: opts?.descricao ?? null,
+  });
+  if (error) throw error;
+  return { osId: data.os_id, numero: data.numero ?? undefined, alreadyExisted: !!data.already_existed, status: data.status };
+}
+
 export async function updateExecutionStatus(id: string, status: ContractExecutionStatus, patch?: { ordemServicoId?: string; reportId?: string; observacoes?: string }): Promise<void> {
   const sb = getSupabaseClient() as any;
   const row: Record<string, unknown> = { status };
