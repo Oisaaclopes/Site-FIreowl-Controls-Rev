@@ -99,60 +99,9 @@ export const INITIAL_CLIENTS: Client[] = [
   }
 ];
 
-export const INITIAL_PEDIDOS_OS: PedidoOS[] = [
-  {
-    id: 'OS-2024-0892',
-    pedidoId: 'PED-2024-411',
-    clientId: 'c1',
-    clientName: 'Logística Integrada S.A.',
-    title: 'Inspeção Periódica de Detectores e Laço 02',
-    type: 'Inspeção NBR 17240',
-    technicianName: 'Isaac Lopes',
-    scheduledDate: '24 MAI 2024 | 14:30',
-    status: 'EM ANDAMENTO',
-    priority: 'ALTA',
-    value: 3800
-  },
-  {
-    id: 'OS-2024-0889',
-    pedidoId: 'PED-2024-399',
-    clientId: 'c4',
-    clientName: 'Catuaí Shopping Londrina',
-    title: 'Troca de Botoeira Quebrada Praça de Alimentação',
-    type: 'Corretiva Urgente',
-    technicianName: 'Carlos Silva',
-    scheduledDate: '24 MAI 2024 | 09:00',
-    status: 'CONCLUIDA',
-    priority: 'CRITICA',
-    value: 1450
-  },
-  {
-    id: 'OS-2024-0885',
-    pedidoId: 'PED-2024-380',
-    clientId: 'c2',
-    clientName: 'Condomínio Solar das Águias',
-    title: 'Aferição de Baterias 24V Central de Alarme',
-    type: 'Preventiva SDAI',
-    technicianName: 'Amanda Souza',
-    scheduledDate: '22 MAI 2024 | 15:00',
-    status: 'ATRASADA',
-    priority: 'NORMAL',
-    value: 950
-  },
-  {
-    id: 'OS-2024-0870',
-    pedidoId: 'PED-2024-350',
-    clientId: 'c5',
-    clientName: 'Londrina Norte Shopping',
-    title: 'Manutenção de Sistema de Detecção Contínua',
-    type: 'Preventiva SDAI',
-    technicianName: 'Carlos Silva',
-    scheduledDate: '20 MAI 2024 | 10:00',
-    status: 'CONCLUIDA',
-    priority: 'NORMAL',
-    value: 4200
-  }
-];
+// Demo/seed removido (ETAPA 4): nenhuma OS fictícia. As OS reais vivem em
+// ordens_servico; a Agenda e demais telas mostram estado vazio quando não há dados.
+export const INITIAL_PEDIDOS_OS: PedidoOS[] = [];
 
 export const INITIAL_CONTRACTS: Contract[] = [
   {

@@ -1128,7 +1128,7 @@ export function CrmApp({
             />
           )}
 
-          {currentTab === 'agenda' && <AgendaView pedidosOS={pedidosOS} />}
+          {currentTab === 'agenda' && <AgendaView onOpenOS={() => setCurrentTab('pedidos')} />}
 
           {currentTab === 'clientes' && (
             <CrmView
