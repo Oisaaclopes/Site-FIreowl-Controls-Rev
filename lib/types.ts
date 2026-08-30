@@ -212,6 +212,42 @@ export interface CommercialProposalData {
   incluirCondicoesGerais?: boolean;
   incluirSeguranca?: boolean;
   incluirTermoAceite?: boolean;
+
+  /* ===== ETAPA 2 — Materialização de textos-padrão =====================
+   * Estes campos guardam, NO PRÓPRIO REGISTRO da proposta, os textos que
+   * antes eram injetados apenas na renderização do PDF (propostaTextos.ts).
+   * Ao criar uma proposta NOVA eles são preenchidos ("materializados") a
+   * partir do template atual; o PDF passa a ler daqui. Um campo `undefined`
+   * numa proposta materializada = seção removida; um array vazio = o usuário
+   * apagou de propósito (respeitar, não reinjetar). Propostas históricas
+   * (textosMaterializados falsy) continuam usando o fallback do renderer.
+   * =================================================================== */
+  /** Carta de Apresentação em parágrafos (materializada). */
+  cartaApresentacaoParas?: string[];
+  /** Descrição dos Serviços Ofertados (subitens). */
+  servicosOfertados?: { titulo: string; itens: string[] }[];
+  /** Embalagem, Transporte e Armazenamento. */
+  embalagemTransporteTexto?: string[];
+  /** Segurança do Trabalho. */
+  segurancaTrabalhoTexto?: string[];
+  /** Observações de Preços (reajuste etc.). */
+  precosObsTexto?: string[];
+  /** Observações de Impostos e Taxas. */
+  impostosObsTexto?: string[];
+  /** Multas por Atraso de Pagamento. */
+  multasAtrasoTexto?: string[];
+  /** Limitação de Responsabilidade. */
+  limitacaoRespTexto?: string[];
+  /** Confidencialidade. */
+  confidencialidadeTexto?: string[];
+  /** Termo de Aceite da Proposta. */
+  termoAceiteTexto?: string[];
+  /** Condições Gerais. */
+  condicoesGeraisTexto?: string[];
+  /** Marca que os textos-padrão já foram materializados neste registro. */
+  textosMaterializados?: boolean;
+  /** Origem por seção: 'padrao' (igual ao template) | 'personalizado' (editado). */
+  secaoFonte?: Record<string, 'padrao' | 'personalizado'>;
 }
 
 export interface Pedido {
