@@ -50,14 +50,20 @@ describe('TimecardDocument render (Node smoke)', () => {
     for (let d = 1; d <= 28; d++) {
       empC.push(p('ENTRADA', 2026, 8, d, 9, 0), p('PAUSA', 2026, 8, d, 12, 0), p('RETORNO', 2026, 8, d, 13, 0), p('SAIDA', 2026, 8, d, 18, 0));
     }
-    const doc = (
-      <TimecardDocument
-        blocks={[block('Alice', empA), block('Bruno', empB), block('Carla', empC)]}
-        periodLabel="01/08/2026 a 31/08/2026"
-      />
-    );
-    const buf = await renderToBuffer(doc);
-    expect(buf.length).toBeGreaterThan(1000);
-    expect(buf.slice(0, 5).toString('latin1')).toBe('%PDF-');
-  }, 20000);
+    const blocks = [block('Alice', empA), block('Bruno', empB), block('Carla', empC)];
+
+    // Sem logo → cabeçalho cai no vetor da marca (não pode quebrar).
+    const semLogo = <TimecardDocument blocks={blocks} periodLabel="01/08/2026 a 31/08/2026" />;
+    const bufSem = await renderToBuffer(semLogo);
+    expect(bufSem.slice(0, 5).toString('latin1')).toBe('%PDF-');
+    expect(bufSem.length).toBeGreaterThan(1000);
+
+    // Com logo (PNG opaco 2x2) → exercita o caminho <Image src> do cabeçalho.
+    const pngLogo =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGN4aun21NKNQUqqSEqqCAAiWgQVI7g2/QAAAABJRU5ErkJggg==';
+    const comLogo = <TimecardDocument blocks={blocks} periodLabel="01/08/2026 a 31/08/2026" logoUrl={pngLogo} />;
+    const bufCom = await renderToBuffer(comLogo);
+    expect(bufCom.slice(0, 5).toString('latin1')).toBe('%PDF-');
+    expect(bufCom.length).toBeGreaterThan(1000);
+  }, 30000);
 });

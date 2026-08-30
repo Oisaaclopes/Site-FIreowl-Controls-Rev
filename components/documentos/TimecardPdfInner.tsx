@@ -1,23 +1,29 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { PDFViewer, pdf } from '@react-pdf/renderer';
 import { ArrowLeft, Download } from 'lucide-react';
 import { TimecardDocument, TimecardBlock } from './TimecardDocument';
 
-export default function TimecardPdfInner({
-  blocks,
-  periodLabel,
-  fileLabel,
-  onClose,
-}: {
+interface Props {
   blocks: TimecardBlock[];
   periodLabel: string;
   fileLabel: string;
+  logoUrl?: string;
   onClose: () => void;
-}) {
+}
+
+function TimecardPdfInner({ blocks, periodLabel, fileLabel, logoUrl, onClose }: Props) {
   const [loading, setLoading] = useState(false);
-  const doc = <TimecardDocument blocks={blocks} periodLabel={periodLabel} />;
-  const download = async () => {
+
+  // Snapshot IMUTÁVEL do documento: só é reconstruído quando os dados do
+  // espelho mudam (blocks/período/logo) — nunca por causa do relógio da aba
+  // Ponto ou do estado `loading`. Viewer e download usam o MESMO elemento.
+  const doc = useMemo(
+    () => <TimecardDocument blocks={blocks} periodLabel={periodLabel} logoUrl={logoUrl} />,
+    [blocks, periodLabel, logoUrl]
+  );
+
+  const download = useCallback(async () => {
     setLoading(true);
     try {
       const blob = await pdf(doc).toBlob();
@@ -30,7 +36,8 @@ export default function TimecardPdfInner({
     } finally {
       setLoading(false);
     }
-  };
+  }, [doc, fileLabel]);
+
   return (
     <div className="fixed inset-0 z-[70] bg-slate-900/85 p-3 sm:p-5 flex flex-col">
       <div className="max-w-5xl w-full mx-auto bg-slate-800 text-white rounded-xl p-3 mb-3 flex justify-between items-center">
@@ -55,3 +62,8 @@ export default function TimecardPdfInner({
     </div>
   );
 }
+
+// React.memo: com props estáveis (blocks/periodLabel/fileLabel/logoUrl vindos do
+// snapshot em estado e onClose via useCallback), as re-renderizações de 1s do
+// relógio da aba Ponto NÃO chegam ao viewer — sem flicker.
+export default React.memo(TimecardPdfInner);

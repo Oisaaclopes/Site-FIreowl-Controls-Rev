@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { TimePunch, UserRole } from '@/lib/types';
+import { fetchCompanyProfile } from '@/lib/companyProfile';
+import { resolveLogoDataUrls } from '@/lib/institucional';
 import { DataListRow, Badge } from '@/components/DataListRow';
 import { WorkSchedule, DEFAULT_SCHEDULE, normalizeSchedule, hmToMinutes, WEEKDAY_SHORT } from '@/lib/schedule';
 import { fetchAdjustments, createAdjustment, updateAdjustmentStatus, PunchAdjustment } from '@/lib/adjustments';
@@ -193,7 +195,10 @@ export const PontoView: React.FC<PontoViewProps> = ({
   const [feedback, setFeedback] = useState<{ label: string; time: string } | null>(null);
   const [online, setOnline] = useState(true);
   const [lastSync, setLastSync] = useState<Date | null>(null);
-  const [timecardCfg, setTimecardCfg] = useState<{ blocks: TimecardBlock[]; periodLabel: string; fileLabel: string } | null>(null);
+  const [timecardCfg, setTimecardCfg] = useState<{ blocks: TimecardBlock[]; periodLabel: string; fileLabel: string; logoUrl?: string } | null>(null);
+  // Logo institucional (mesmo mecanismo dos demais PDFs: storage_path →
+  // resolveLogoDataUrls → data URI). Ausente/sem storage → cai no vetor da marca.
+  const [logoUrl, setLogoUrl] = useState<string | undefined>(undefined);
   const [recordPeriod, setRecordPeriod] = useState('');
   const [recordType, setRecordType] = useState<'TODOS' | PunchType>('TODOS');
   const [recordGps, setRecordGps] = useState<'TODOS' | 'COM_GPS' | 'SEM_GPS'>('TODOS');
@@ -246,6 +251,26 @@ export const PontoView: React.FC<PontoViewProps> = ({
     loadAdjustments();
     loadDayData();
   }, []);
+
+  // Resolve o logo institucional uma única vez (não bloqueia o PDF; se falhar,
+  // o cabeçalho usa o vetor da marca — nunca quebra).
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    let active = true;
+    fetchCompanyProfile()
+      .then(async (profile) => {
+        const path = profile?.logoPrincipalPath || profile?.logoEscuroPath || profile?.logoClaroPath;
+        if (!path) return;
+        const map = await resolveLogoDataUrls([path]);
+        if (active && map[path]) setLogoUrl(map[path]);
+      })
+      .catch((err) => console.warn('Logo institucional: não foi possível resolver.', err));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const closeTimecard = useCallback(() => setTimecardCfg(null), []);
 
   // Exportação da folha (admin/gestor)
   const [expEmployee, setExpEmployee] = useState('');
@@ -687,6 +712,7 @@ export const PontoView: React.FC<PontoViewProps> = ({
       blocks: buildTimecardBlocks(myMonth, currentUser),
       periodLabel: monthPeriodLabel(myMonth),
       fileLabel: `${currentUser}_${myMonth}`,
+      logoUrl,
     });
   };
 
@@ -695,6 +721,7 @@ export const PontoView: React.FC<PontoViewProps> = ({
       blocks: buildTimecardBlocks(expMonth, expEmployee || undefined),
       periodLabel: monthPeriodLabel(expMonth),
       fileLabel: expEmployee || 'todos',
+      logoUrl,
     });
   };
 
@@ -1628,7 +1655,8 @@ export const PontoView: React.FC<PontoViewProps> = ({
           blocks={timecardCfg.blocks}
           periodLabel={timecardCfg.periodLabel}
           fileLabel={timecardCfg.fileLabel}
-          onClose={() => setTimecardCfg(null)}
+          logoUrl={timecardCfg.logoUrl}
+          onClose={closeTimecard}
         />
       )}
     </div>
