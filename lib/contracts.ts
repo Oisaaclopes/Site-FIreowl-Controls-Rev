@@ -21,6 +21,26 @@ function rowToContract(r: any): Contract {
     contractType: r.contract_type ?? undefined,
     paymentDay: r.payment_day ?? undefined,
     sourcePedidoId: r.source_pedido_id ?? undefined,
+    // ETAPA 3 (0056)
+    numero: r.numero ?? undefined,
+    responsavelComercial: r.responsavel_comercial ?? undefined,
+    renovacaoAutomatica: r.renovacao_automatica ?? undefined,
+    avisoAntecedenciaDias: r.aviso_antecedencia_dias ?? undefined,
+    reajustePeriodicidadeMeses: r.reajuste_periodicidade_meses ?? undefined,
+    faturamento: r.faturamento ?? undefined,
+    impostosObs: r.impostos_obs ?? undefined,
+    observacoesFinanceiras: r.observacoes_financeiras ?? undefined,
+    areasCobertas: Array.isArray(r.areas_cobertas) ? r.areas_cobertas : undefined,
+    tiposAtendimento: Array.isArray(r.tipos_atendimento) ? r.tipos_atendimento : undefined,
+    incluso: Array.isArray(r.incluso) ? r.incluso : undefined,
+    naoIncluso: Array.isArray(r.nao_incluso) ? r.nao_incluso : undefined,
+    respContratada: Array.isArray(r.resp_contratada) ? r.resp_contratada : undefined,
+    respContratante: Array.isArray(r.resp_contratante) ? r.resp_contratante : undefined,
+    entregaveis: Array.isArray(r.entregaveis) ? r.entregaveis : undefined,
+    materiaisPolitica: r.materiais_politica ?? undefined,
+    materiaisObs: r.materiais_obs ?? undefined,
+    sla: Array.isArray(r.sla) ? r.sla : undefined,
+    observacoesOperacionais: r.observacoes_operacionais ?? undefined,
   };
 }
 
@@ -46,6 +66,26 @@ function contractToRow(c: Contract): Record<string, unknown> {
   if (c.contractType !== undefined) row.contract_type = c.contractType;
   if (c.paymentDay !== undefined) row.payment_day = c.paymentDay;
   if (c.sourcePedidoId !== undefined) row.source_pedido_id = c.sourcePedidoId;
+  // ETAPA 3 (0056) — só envia quando presente (compatível com banco sem 0056).
+  if (c.numero !== undefined) row.numero = c.numero;
+  if (c.responsavelComercial !== undefined) row.responsavel_comercial = c.responsavelComercial;
+  if (c.renovacaoAutomatica !== undefined) row.renovacao_automatica = c.renovacaoAutomatica;
+  if (c.avisoAntecedenciaDias !== undefined) row.aviso_antecedencia_dias = c.avisoAntecedenciaDias;
+  if (c.reajustePeriodicidadeMeses !== undefined) row.reajuste_periodicidade_meses = c.reajustePeriodicidadeMeses;
+  if (c.faturamento !== undefined) row.faturamento = c.faturamento;
+  if (c.impostosObs !== undefined) row.impostos_obs = c.impostosObs;
+  if (c.observacoesFinanceiras !== undefined) row.observacoes_financeiras = c.observacoesFinanceiras;
+  if (c.areasCobertas !== undefined) row.areas_cobertas = c.areasCobertas;
+  if (c.tiposAtendimento !== undefined) row.tipos_atendimento = c.tiposAtendimento;
+  if (c.incluso !== undefined) row.incluso = c.incluso;
+  if (c.naoIncluso !== undefined) row.nao_incluso = c.naoIncluso;
+  if (c.respContratada !== undefined) row.resp_contratada = c.respContratada;
+  if (c.respContratante !== undefined) row.resp_contratante = c.respContratante;
+  if (c.entregaveis !== undefined) row.entregaveis = c.entregaveis;
+  if (c.materiaisPolitica !== undefined) row.materiais_politica = c.materiaisPolitica;
+  if (c.materiaisObs !== undefined) row.materiais_obs = c.materiaisObs;
+  if (c.sla !== undefined) row.sla = c.sla;
+  if (c.observacoesOperacionais !== undefined) row.observacoes_operacionais = c.observacoesOperacionais;
   return row;
 }
 

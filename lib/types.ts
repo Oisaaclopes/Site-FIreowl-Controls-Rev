@@ -585,6 +585,87 @@ export interface Contract {
   paymentDay?: number; // dia de vencimento da mensalidade
   /** Pedido/proposta que originou este contrato por conversão comercial. */
   sourcePedidoId?: string;
+
+  /* ===== ETAPA 3 — campos estruturados (migração 0056) ===== */
+  numero?: string;
+  responsavelComercial?: string;
+  renovacaoAutomatica?: boolean;
+  avisoAntecedenciaDias?: number;
+  reajustePeriodicidadeMeses?: number;
+  faturamento?: string;
+  impostosObs?: string;
+  observacoesFinanceiras?: string;
+  areasCobertas?: string[];
+  tiposAtendimento?: string[];
+  incluso?: string[];
+  naoIncluso?: string[];
+  respContratada?: string[];
+  respContratante?: string[];
+  entregaveis?: string[];
+  /** inclusos | nao_inclusos | limite | so_mao_de_obra | mediante_aprovacao */
+  materiaisPolitica?: string;
+  materiaisObs?: string;
+  /** SLA: linhas situação → prazo (poucas). */
+  sla?: { situacao: string; prazo: string; cobertura?: string }[];
+  observacoesOperacionais?: string;
+}
+
+/** Rotina de atendimento contratual (F). Um contrato tem várias. */
+export interface ContractRoutine {
+  id: string;
+  contractId: string;
+  tipo: string; // preventiva/corretiva/inspecao/operacao/suporte
+  descricao?: string;
+  frequencia?: string; // mensal/trimestral/anual/semanal/sob_demanda...
+  intervaloMeses?: number; // passo p/ próxima competência
+  diaRegra?: string; // primeiro_dia_util / ultimo_dia_util / dia_fixo:N / primeira_segunda
+  diasSemana?: string[];
+  horarioInicio?: string;
+  horarioFim?: string;
+  qtdTecnicos?: number;
+  horasMensais?: number;
+  visitasMes?: number;
+  sla?: string;
+  area?: string;
+  ativo?: boolean;
+  observacoes?: string;
+}
+
+/** Execução de uma competência da rotina (PREVISTO→…→RELATÓRIO). */
+export type ContractExecutionStatus = 'previsto' | 'agendado' | 'os_gerada' | 'executado' | 'relatorio_emitido' | 'cancelado';
+export interface ContractRoutineExecution {
+  id: string;
+  contractId: string;
+  routineId: string;
+  competencia: string; // '2026-09' / '2026-Q3' / '2026'
+  dataProgramada?: string;
+  status: ContractExecutionStatus;
+  ordemServicoId?: string;
+  reportId?: string;
+  observacoes?: string;
+}
+
+/** Lançamento rastreável da bolsa de horas (N). */
+export interface ContractHourEntry {
+  id: string;
+  contractId: string;
+  tipo: 'contratada' | 'consumida' | 'ajuste';
+  horas: number;
+  referencia?: string;
+  ordemServicoId?: string;
+  data: string;
+}
+
+/** Documento/anexo do contrato (O), armazenado no bucket report-media. */
+export interface ContractAttachment {
+  id: string;
+  contractId: string;
+  tipo: string; // proposta/contrato_pdf/art/anexo
+  nome?: string;
+  storagePath: string;
+  mime?: string;
+  tamanho?: number;
+  createdAt?: string;
 }
 
 /** Evento manual do relacionamento com o cliente (nota, contato ou decisão). */
