@@ -167,6 +167,22 @@ O motor de sync permanece no código; o indicador visual foi removido. Não foi 
 | RLS — ADMINISTRATIVO | PASS (leitura) | Navegação e leitura autenticadas foram concluídas para painel, fornecedores, contratos, pedidos, agenda e relatórios. Escritas não foram usadas como teste. |
 | RLS — TÉCNICO, COMERCIAL, GESTOR e FINANCEIRO | BLOCKED | Não há sessão correspondente validada nesta auditoria. |
 
+## 12.7 Fechamento técnico — 2026-08-30
+
+| Item | Status | Evidência / bloqueio |
+|---|---|---|
+| Referência de partida | PASS | Auditoria continuada a partir do commit `0a710a2`. |
+| Build final | PASS | `npm.cmd run build` compilou com sucesso fora do sandbox: Next.js 15.5.23, compilação concluída em 27,6 s. A primeira tentativa dentro do sandbox falhou somente ao buscar Montserrat, Poppins e Roboto pelo `next/font`, com `EACCES`; não foi falha de código nem de cache. |
+| TypeScript | PASS | `npx tsc --noEmit` executado no fechamento sem saída de erro. |
+| Testes | PASS | `npm.cmd test`: 1 arquivo e 5 testes aprovados. |
+| Lint | PASS | `npm.cmd run lint` executado no fechamento sem saída de erro. |
+| Mobile — Painel, Agenda, Pedidos, Contratos, Fornecedores, Estoque e Relatórios | PASS | Sessão `ADMINISTRATIVO` testada em 375×812, 390×812 e 412×812. As 21 combinações carregaram sem erro/404 e sem overflow horizontal. |
+| Mobile — editor de proposta | PASS | Proposta existente aberta em 375×812 sem salvar; editor carregou sem overflow horizontal. |
+| PDF de proposta | BLOCKED | A ação de pré-visualização de uma proposta existente foi iniciada sem alteração de dados, mas a renderização local não concluiu após mais de dois minutos. Não houve arquivo gerado para inspeção A4/paginação. |
+| PDF de relatório multipágina, fotos e assinatura | BLOCKED | A listagem autenticada não continha atendimento/OS ou relatório existente adequado para inspeção, e não foi criado conteúdo fictício. |
+| Anexos/upload, offline e RLS dos demais perfis | BLOCKED | Mantidos por ausência de registro seguro, login TÉCNICO e sessões reais dos demais papéis. |
+| Busca final por mocks operacionais | PASS | Busca em `app`, `components` e `lib` encontrou somente `lib/mockData.ts` e seus fallbacks explícitos para modo sem Supabase, seed de marcas e comentários/fixtures. No navegador autenticado, Painel, Agenda e Relatórios mostraram dados reais ou empty states verdadeiros; nenhum mock operacional adicional foi exibido. |
+
 ## 13. RLS e permissões
 
 Executar no Supabase autenticado, por Administrador, Gestor, Comercial, Técnico e Financeiro:
@@ -197,4 +213,6 @@ Executar no Supabase autenticado, por Administrador, Gestor, Comercial, Técnico
 
 ## 16. Conclusão
 
-Não há P0 conhecido em análise estática. A Etapa 7 **não deve ser encerrada como QA E2E completo** até a confirmação das migrations no Supabase, execução dos testes autenticados e decisão/correção dos dois P1 de concorrência.
+Não há P0 ou P1 aberto conhecido. A concorrência de levantamento→Pedido e de competência→OS foi validada contra o Supabase, o build final, TypeScript, testes e lint passaram, e a navegação mobile essencial foi validada com a sessão administrativa.
+
+A Etapa 7 pode ser encerrada como estabilização técnica, mantendo explicitamente como **BLOCKED** os cenários que dependem de ambiente ou de perfil seguro: upload/anexos de escrita, PDF visual que não concluiu localmente, atendimento offline com TÉCNICO e RLS dos perfis não disponíveis. Esses bloqueios não foram classificados como PASS e devem ser retomados antes de uma homologação operacional completa.
