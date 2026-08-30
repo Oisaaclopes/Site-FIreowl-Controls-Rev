@@ -1168,6 +1168,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                   marcaModelo: [inv.brand, inv.model].filter(Boolean).join(' · ') || inv.supplier || inv.category,
                   precoUnitario: inv.salePrice ?? inv.unitPrice,
                   unidade: inv.unit || 'un',
+                  stockSnapshot: inv.quantity,
                 };
               }}
               onAdd={handleAddEquipmentItem}

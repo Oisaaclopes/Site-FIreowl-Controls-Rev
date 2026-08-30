@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Device, PartnerBrand, Supplier, InventoryItem } from '@/lib/types';
 import { fetchDevices, upsertDevice, deleteDevice } from '@/lib/devices';
 import { isSupabaseConfigured } from '@/lib/inventory';
+import { normalizeSearch } from '@/lib/stockStatus';
 
 interface DevicesManagerProps {
   open: boolean;
@@ -68,12 +69,12 @@ export const DevicesManager: React.FC<DevicesManagerProps> = ({ open, onClose, c
 
   // Interligação marca -> fornecedor -> estoque (pela marca escolhida no form).
   const marca = (form.fabricante || '').trim();
-  const marcaLc = marca.toLowerCase();
+  const marcaLc = normalizeSearch(marca);
   const fornecedoresDaMarca = marca
-    ? suppliers.filter((s) => (s.brands || []).some((b) => b.toLowerCase() === marcaLc))
+    ? suppliers.filter((s) => (s.brands || []).some((b) => normalizeSearch(b) === marcaLc))
     : [];
   const itensEmEstoque = marca
-    ? inventory.filter((i) => (i.brand || '').trim().toLowerCase() === marcaLc)
+    ? inventory.filter((i) => normalizeSearch(i.brand) === marcaLc)
     : [];
   const qtdEstoque = itensEmEstoque.reduce((acc, i) => acc + (Number(i.quantity) || 0), 0);
   const modelosEstoque = Array.from(

@@ -8,6 +8,7 @@ import {
   fetchRoutineExecutions, ensureRoutineExecution, updateExecutionStatus,
   fetchHourLedger, addHourEntry, saldoBolsaHoras,
   fetchContractAttachments,
+  uploadContractAttachment, signedContractAttachmentUrl, removeContractAttachment,
   proximaExecucaoRotina, generateOsFromExecution,
 } from '@/lib/contractRoutines';
 
@@ -94,6 +95,24 @@ export const ContractDetailPanel: React.FC<{ contract: Contract; onClose: () => 
     setBusy(true); setErro(null);
     try { await addHourEntry({ contractId: contract.id, tipo: he.tipo, horas: Number(he.horas), referencia: he.referencia || undefined, data: new Date().toISOString().slice(0, 10) }); setHe({ tipo: 'consumida', horas: 1, referencia: '' }); await load(); }
     catch (err) { setErro(err instanceof Error ? err.message : 'Falha.'); } finally { setBusy(false); }
+  };
+  const enviarAnexo = async (file?: File) => {
+    if (!file) return;
+    setBusy(true); setErro(null);
+    try { await uploadContractAttachment(contract.id, file); await load(); }
+    catch (err) { setErro(err instanceof Error ? err.message : 'Falha ao enviar anexo.'); }
+    finally { setBusy(false); }
+  };
+  const abrirAnexo = async (attachment: ContractAttachment) => {
+    try { window.open(await signedContractAttachmentUrl(attachment.storagePath), '_blank', 'noopener,noreferrer'); }
+    catch (err) { setErro(err instanceof Error ? err.message : 'Falha ao abrir anexo.'); }
+  };
+  const excluirAnexo = async (attachment: ContractAttachment) => {
+    if (!window.confirm(`Remover o anexo “${attachment.nome || attachment.storagePath}”?`)) return;
+    setBusy(true); setErro(null);
+    try { await removeContractAttachment(attachment); await load(); }
+    catch (err) { setErro(err instanceof Error ? err.message : 'Falha ao remover anexo.'); }
+    finally { setBusy(false); }
   };
 
   return (
@@ -213,19 +232,23 @@ export const ContractDetailPanel: React.FC<{ contract: Contract; onClose: () => 
                   {contract.sourcePedidoId && (
                     <div className="rounded-lg bg-indigo-50 border border-indigo-100 px-3 py-2 text-[11px] text-indigo-900">Proposta de origem vinculada: <span className="font-data-mono font-bold">{contract.sourcePedidoId}</span></div>
                   )}
+                  <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-slate-300 p-3 bg-slate-50">
+                    <p className="text-[11px] text-slate-500">Envie proposta, contrato assinado, ART ou outro documento. Os arquivos ficam no bucket privado do contrato.</p>
+                    <label className="shrink-0 cursor-pointer rounded-lg bg-[#0B1E38] px-3 py-2 text-[10px] font-bold uppercase text-white disabled:opacity-40">{busy ? 'Enviando…' : 'Anexar arquivo'}<input disabled={busy} type="file" className="hidden" onChange={(e) => void enviarAnexo(e.target.files?.[0])} /></label>
+                  </div>
                   {atts.length === 0 ? (
                     <p className="text-center text-xs text-slate-400 py-6">Nenhum documento anexado.</p>
                   ) : (
                     <ul className="divide-y divide-slate-100">
                       {atts.map((a) => (
-                        <li key={a.id} className="py-2 flex items-center justify-between text-[11px]">
-                          <span className="text-slate-700"><span className="font-bold uppercase">{a.tipo}</span> · {a.nome || a.storagePath}</span>
-                          <span className="text-slate-400 font-data-mono">{a.createdAt?.slice(0, 10)}</span>
+                        <li key={a.id} className="py-2 flex items-center justify-between gap-2 text-[11px]">
+                          <span className="min-w-0 truncate text-slate-700"><span className="font-bold uppercase">{a.tipo}</span> · {a.nome || a.storagePath}</span>
+                          <span className="shrink-0 flex items-center gap-2"><span className="text-slate-400 font-data-mono">{a.createdAt?.slice(0, 10)}</span><button disabled={busy} onClick={() => void abrirAnexo(a)} className="font-bold text-[#1A1A72]">Abrir</button><button disabled={busy} onClick={() => void excluirAnexo(a)} className="font-bold text-[#E63946]">Remover</button></span>
                         </li>
                       ))}
                     </ul>
                   )}
-                  <p className="text-[10px] text-slate-400">Os anexos reutilizam o bucket privado <b>report-media</b> (caminho <span className="font-data-mono">contracts/{contract.id}/…</span>). O upload de arquivos entra na sequência, reaproveitando o mesmo fluxo de mídia dos relatórios.</p>
+                  <p className="text-[10px] text-slate-400">Os anexos reutilizam o bucket privado <b>report-media</b> (caminho <span className="font-data-mono">contracts/{contract.id}/…</span>).</p>
                 </>
               )}
             </div>

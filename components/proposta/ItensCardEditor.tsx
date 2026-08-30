@@ -18,6 +18,7 @@ type Draft = {
   precoUnitario: number;
   desconto: number;
   vinculoId: string;
+  stockSnapshot?: number;
 };
 
 interface Props {
@@ -79,6 +80,7 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
         marcaModelo: fill.marcaModelo ?? d.marcaModelo,
         precoUnitario: fill.precoUnitario ?? d.precoUnitario,
         unidade: fill.unidade ?? d.unidade,
+        stockSnapshot: fill.stockSnapshot ?? d.stockSnapshot,
       }));
     }
   };
@@ -95,6 +97,7 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
       quantidade: Math.max(1, Math.floor(draft.quantidade || 1)),
       precoUnitario: draft.precoUnitario || 0,
       desconto: draft.desconto ? Math.max(0, draft.desconto) : undefined,
+      stockSnapshot: !isServico && draft.stockSnapshot !== undefined ? draft.stockSnapshot : undefined,
       ...(isServico ? { vinculoServicoId: draft.vinculoId || undefined } : { vinculoEstoqueId: draft.vinculoId || undefined }),
       tipo,
     };
@@ -115,6 +118,7 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
       precoUnitario: it.precoUnitario || 0,
       desconto: it.desconto || 0,
       vinculoId: (isServico ? it.vinculoServicoId : it.vinculoEstoqueId) || '',
+      stockSnapshot: it.stockSnapshot,
     });
   };
 
@@ -146,7 +150,7 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
                         <span key={`${origin.reportId}-${originIndex}`} title={origin.reference || origin.label} className="max-w-full truncate rounded bg-indigo-50 px-1.5 py-0.5 text-[9px] font-semibold text-indigo-700">Origem: {origin.label}</span>
                       ))}
                       {(it.sourceOrigins?.length || 0) > 2 && <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[9px] font-semibold text-indigo-700">+{(it.sourceOrigins?.length || 0) - 2} origem(ns)</span>}
-                      {it.stockSnapshot !== undefined && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">Saldo consultado: {it.stockSnapshot}</span>}
+                      {it.stockSnapshot !== undefined && <span className={`rounded px-1.5 py-0.5 text-[9px] font-semibold ${Math.max(0, it.quantidade - it.stockSnapshot) > 0 ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>Necessário: {it.quantidade} · Disponível: {it.stockSnapshot} · Diferença: {Math.max(0, it.quantidade - it.stockSnapshot)}</span>}
                     </div>
                   ) : null}
                 </div>

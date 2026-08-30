@@ -61,8 +61,8 @@ Nenhum P0 conhecido na auditoria estática.
 
 ## 7. P2 encontrados
 
-1. **DevicesManager:** comparação de marca é apenas minúscula, sem a normalização comum completa; buscar `FSP951`, `FSP-951` e `FSP 951` não é um fluxo de busca desse componente. O Estoque e o seletor de itens de Pedido já usam `normalizeSearch`.
-2. **Anexos contratuais:** schema `contract_attachments` existe em 0056, mas a auditoria não confirmou wiring de upload no editor de contratos. Requer teste autenticado e de Storage antes de concluir.
+1. **DevicesManager. Status: FIXED (aguarda E2E).** Comparação de marcas passou a usar `normalizeSearch`, como Estoque e Pedido. A busca de modelos do levantamento já deriva do catálogo no RelatóriosView.
+2. **Anexos contratuais. Status: FIXED (aguarda E2E).** O painel de contrato agora envia para `report-media/contracts/{contractId}`, registra o metadado, abre por URL assinada e remove metadado+arquivo. Upload/Storage/RLS precisam de validação autenticada.
 3. **Técnico responsável na OS:** a estrutura de `ordens_servico` não mostra vínculo técnico dedicado nesta migration. Classificação P2 enquanto a operação consegue criar/executar OS, porém Agenda não tem atribuição individual estruturada.
 4. **Testes automatizados insuficientes para fluxos críticos:** existe apenas `lib/proposta.leak.test.ts` (5 testes). Não há testes automatizados para conversão levantamento→pedido, RPC de competência→OS, RLS, PDFs ou offline.
 5. **Mobile/PDF/offline/RLS:** não puderam ser validados visualmente ou contra Supabase neste ambiente; seguem como checklist obrigatório abaixo.
@@ -79,6 +79,8 @@ Nenhum P0 conhecido na auditoria estática.
 - `0059_qa_conversion_and_os_concurrency.sql`: operação atômica de conversão inicial e serialização da numeração de OS.
 - `lib/surveyOrderConversion.ts`: conversão passou a usar a RPC de banco em vez de criar Pedido e vínculo em chamadas separadas.
 - `scripts/qa-concurrency-integration-test.mjs`: teste real, opcional e com limpeza, dos cenários simultâneos de levantamento e competência.
+- `ContractDetailPanel`: upload, listagem, abertura e remoção de anexos de contrato ligados ao bucket privado existente.
+- `ItensCardEditor`: materiais vinculados exibem Necessário, Disponível e Diferença sem alterar a quantidade do Pedido.
 
 ## 10. Mocks e dados fictícios
 
@@ -103,6 +105,16 @@ Desktop e 375/390/412 px:
 ## 12. Offline / sync
 
 O motor de sync permanece no código; o indicador visual foi removido. Não foi possível desligar/religar a rede no ambiente de auditoria. Testar criação/edição de atendimento, fotos e pendências offline; depois reconectar e confirmar idempotência, conflitos e ausência de duplicação.
+
+## 12.1 Evidências E2E desta continuação
+
+| Item | Status | Evidência / bloqueio |
+|---|---|---|
+| Migration 0059 | APPLIED (informado pelo operador) | Aplicação confirmada pelo usuário; não há acesso de banco nesta sessão para consultar histórico. |
+| Teste de concorrência | BLOCKED | `SUPABASE_SERVICE_ROLE_KEY` não está presente no ambiente local. Executar o script de QA no PowerShell com a chave somente no ambiente local. |
+| Duplicatas históricas de OS | BLOCKED | Requer consulta autenticada ao Supabase. A migration não altera duplicatas existentes. |
+| RLS/RPC/Storage | BLOCKED | Requer sessões reais dos perfis e credenciais de ambiente. |
+| Mobile/PDF/offline | BLOCKED | Requer navegador/dispositivo e dados reais; não foi inferido como PASS. |
 
 ## 13. RLS e permissões
 

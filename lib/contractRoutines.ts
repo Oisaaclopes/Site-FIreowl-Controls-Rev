@@ -252,3 +252,35 @@ export async function deleteContractAttachment(id: string): Promise<void> {
   const { error } = await sb.from('contract_attachments').delete().eq('id', id);
   if (error) throw error;
 }
+
+const CONTRACT_BUCKET = 'report-media';
+
+/** Envia o arquivo ao bucket privado e só então registra o metadado do contrato. */
+export async function uploadContractAttachment(contractId: string, file: File, tipo = 'anexo'): Promise<ContractAttachment> {
+  const sb = getSupabaseClient() as any;
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(-120) || 'anexo';
+  const path = `contracts/${contractId}/${Date.now()}_${safeName}`;
+  const { error: uploadError } = await sb.storage.from(CONTRACT_BUCKET).upload(path, file, { upsert: false, contentType: file.type || undefined });
+  if (uploadError) throw uploadError;
+  try {
+    return await addContractAttachment({ contractId, tipo, nome: file.name, storagePath: path, mime: file.type || undefined, tamanho: file.size });
+  } catch (error) {
+    await sb.storage.from(CONTRACT_BUCKET).remove([path]);
+    throw error;
+  }
+}
+
+export async function signedContractAttachmentUrl(path: string, expiresSeconds = 120): Promise<string> {
+  const sb = getSupabaseClient() as any;
+  const { data, error } = await sb.storage.from(CONTRACT_BUCKET).createSignedUrl(path, expiresSeconds);
+  if (error) throw error;
+  return data.signedUrl as string;
+}
+
+/** Remove metadado e arquivo do bucket; se o metadado falhar, o arquivo é preservado. */
+export async function removeContractAttachment(attachment: ContractAttachment): Promise<void> {
+  await deleteContractAttachment(attachment.id);
+  const sb = getSupabaseClient() as any;
+  const { error } = await sb.storage.from(CONTRACT_BUCKET).remove([attachment.storagePath]);
+  if (error) throw error;
+}
