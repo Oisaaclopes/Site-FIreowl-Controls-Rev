@@ -31,7 +31,7 @@ alter table public.suppliers
 create table if not exists public.supplier_products (
   id text primary key,
   supplier_id text not null references public.suppliers(id) on delete cascade,
-  inventory_item_id text not null references public.inventory_items(id) on delete cascade,
+  inventory_item_id uuid not null references public.inventory_items(id) on delete cascade,
   supplier_code text,
   supplier_description text,
   cost numeric,
