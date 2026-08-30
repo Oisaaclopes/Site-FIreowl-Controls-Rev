@@ -149,6 +149,24 @@ O motor de sync permanece no código; o indicador visual foi removido. Não foi 
 | `supplier_products` — vincular/desativar e invariantes de custo/saldo | BLOCKED | Não havia vínculo/produto de teste seguro autorizado. Não foi criado nem alterado dado real. |
 | Exclusão/inativação de fornecedor | BLOCKED | Não executada para preservar dados reais. |
 
+## 12.6 QA autenticado — contratos, pedidos, agenda e relatórios
+
+| Item | Status | Ambiente / evidência |
+|---|---|---|
+| Listagem e detalhe de contrato | PASS | Sessão `ADMINISTRATIVO`, 2026-08-30. Contrato ativo exibiu cliente, referência, escopo, responsável, ART, valor, renovação e bolsa de horas. |
+| Rotinas de contrato | PASS | Rotina mensal SDAI existente carregou frequência, janela 08:00–18:00, técnicos, visitas/mês e SLA, sem duplicar competência nem criar OS durante a leitura. |
+| Documentos/anexos de contrato — leitura | PASS | Aba Documentos carregou o empty state verdadeiro “Nenhum documento anexado” e identificou corretamente o bucket privado `report-media/contracts/{contractId}`. |
+| Documentos/anexos de contrato — upload, URL assinada e remoção | BLOCKED | Não há anexo existente nem arquivo/cenário seguro autorizado para escrita em dado real. |
+| Pedidos/propostas — listagem e filtros | PASS | Oito propostas reais exibiram cliente, logo, razão social, número, título, valor, status, busca e filtros por cliente/status/período. |
+| Editor de proposta existente | PASS | Proposta nº 253 aberta sem salvar: materiais e serviços, cliente, valores, textos estruturados, badges Padrão Fireowl/Personalizado, garantia, prazo, impostos, validade e ações de pré-visualização foram renderizados. |
+| Necessário/Disponível/Diferença | BLOCKED | A proposta aberta possuía itens de catálogo, mas não mostrou um caso com saldo físico suficiente para verificar visualmente os três indicadores sem editar/salvar. |
+| PDF de proposta e de relatório | BLOCKED | Nenhum PDF foi gerado nesta sessão para não iniciar download/fluxo comercial sem uma verificação final específica do operador; paginação e conteúdo visual seguem pendentes. |
+| Agenda | PASS | Agosto/2026 exibiu empty state real “Nenhuma OS ou competência programada”, sem técnico, OS ou geolocalização fictícios. |
+| Relatórios | PASS | A tela carregou o empty state real de atendimentos/OS, com entrada explícita para atendimento sem OS e sem relatórios ou pendências inventados. |
+| Offline de atendimento | BLOCKED | O perfil administrativo não é o cenário operacional apropriado; requer login TÉCNICO e um registro seguro. |
+| RLS — ADMINISTRATIVO | PASS (leitura) | Navegação e leitura autenticadas foram concluídas para painel, fornecedores, contratos, pedidos, agenda e relatórios. Escritas não foram usadas como teste. |
+| RLS — TÉCNICO, COMERCIAL, GESTOR e FINANCEIRO | BLOCKED | Não há sessão correspondente validada nesta auditoria. |
+
 ## 13. RLS e permissões
 
 Executar no Supabase autenticado, por Administrador, Gestor, Comercial, Técnico e Financeiro:
