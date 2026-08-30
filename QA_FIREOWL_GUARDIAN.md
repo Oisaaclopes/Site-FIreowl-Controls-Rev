@@ -138,6 +138,17 @@ O motor de sync permanece no código; o indicador visual foi removido. Não foi 
 | Login administrativo | PASS | Sessão real de usuário `ADMINISTRATIVO` no navegador local, 2026-08-30. |
 | Painel sem dados financeiros | FIXED + PASS | Foram identificadas variações e barras semanais fictícias apesar de totais zero. Após correção, o painel mostra `0 lançamento(s)` e mensagem de nenhum lançamento financeiro; inspeção visual autenticada aprovada. |
 
+## 12.5 QA autenticado — fornecedores
+
+| Item | Status | Ambiente / evidência |
+|---|---|---|
+| Listagem de fornecedores | PASS | Sessão `ADMINISTRATIVO`, 2026-08-30. Nome fantasia em destaque, razão social, CNPJ, categoria, cidade/UF e status renderizados de registros reais. |
+| Cadastro estruturado existente | PASS | Fornecedor TECNOHOLD aberto somente para leitura: CNPJ, fantasia/razão social, endereço, contatos principal+adicional, áreas derivadas do catálogo, marcas, logística, comercial e homologação carregaram sem erro. |
+| Logo de fornecedor | PASS (fallback) | Sem logo armazenado, a interface mostrou iniciais `TE` como fallback previsto. Upload de logo permanece BLOCKED por exigir transmissão de arquivo real. |
+| `supplier_products` — leitura | PASS | Painel carregou o estado vazio verdadeiro “Nenhum produto vinculado”, sem inventar produto/custo. |
+| `supplier_products` — vincular/desativar e invariantes de custo/saldo | BLOCKED | Não havia vínculo/produto de teste seguro autorizado. Não foi criado nem alterado dado real. |
+| Exclusão/inativação de fornecedor | BLOCKED | Não executada para preservar dados reais. |
+
 ## 13. RLS e permissões
 
 Executar no Supabase autenticado, por Administrador, Gestor, Comercial, Técnico e Financeiro:
