@@ -1154,6 +1154,7 @@ export function CrmApp({
           {currentTab === 'fornecedores' && (
             <FornecedoresView
               suppliers={suppliers}
+              inventory={inventory}
               partnerBrands={partnerBrands}
               onAddBrand={(name) => handleAddPartnerBrand({ id: `pb_${Date.now()}`, name, category: 'SDAI' })}
               onAddSupplier={handleAddSupplier}
