@@ -1051,7 +1051,7 @@ export function CrmApp({
         />
 
         {/* View Switcher — padding inferior no mobile do técnico p/ o BottomNav */}
-        <main className={`pt-14 min-h-[calc(100vh-56px)] ${userRole === 'TECNICO' ? 'pb-20 lg:pb-0' : ''}`}>
+        <main className={`fireowl-main pt-14 min-h-[calc(100vh-56px)] ${userRole === 'TECNICO' ? 'pb-20 lg:pb-0' : ''}`}>
           {currentTab === 'painel' && userRole === 'TECNICO' && (
             <TechDashboard
               currentUser={userName}

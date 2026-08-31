@@ -87,7 +87,7 @@ export const Header: React.FC<HeaderProps> = ({
   }, []);
 
   return (
-    <header className={`fixed top-0 left-0 right-0 h-14 bg-slate-50/70 backdrop-blur-md z-40 flex items-center justify-between px-3 md:px-5 transition-[left] duration-300 ease-out ${sidebarCollapsed ? 'lg:left-20' : 'lg:left-60'}`}>
+    <header className={`fireowl-header fixed top-0 left-0 right-0 h-14 bg-slate-50/70 backdrop-blur-md z-40 flex items-center justify-between px-3 md:px-5 transition-[left] duration-300 ease-out ${sidebarCollapsed ? 'lg:left-20' : 'lg:left-60'}`}>
       <div className="flex items-center gap-2 md:gap-3 min-w-0">
         {/* Menu hambúrguer — apenas mobile/tablet */}
         <button

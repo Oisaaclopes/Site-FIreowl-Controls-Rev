@@ -27,6 +27,12 @@ body {
   background-color: var(--bg-white);
 }
 
+/* Só acrescenta área útil em aparelhos com recorte; desktop permanece inalterado. */
+@media (max-width: 767px) {
+  .fireowl-header { height: calc(3.5rem + env(safe-area-inset-top)) !important; padding-top: env(safe-area-inset-top); }
+  .fireowl-main { padding-top: calc(3.5rem + env(safe-area-inset-top)) !important; }
+}
+
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-poppins), sans-serif;
 }
@@ -132,4 +138,3 @@ h1, h2, h3, h4, h5, h6 {
 .scrollbar-hide::-webkit-scrollbar {
   display: none; /* Chrome, Safari, Edge e Opera */
 }
-
