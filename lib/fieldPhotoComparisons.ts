@@ -100,6 +100,20 @@ export function sortComparisons<T extends { createdAt?: string }>(list: T[]): T[
   return [...list].sort((x, y) => (y.createdAt || '').localeCompare(x.createdAt || ''));
 }
 
+/** Comparação já resolvida contra as fotos carregadas (antes/depois presentes). */
+export interface ResolvedComparison { comparison: FieldPhotoComparison; before: GalleryPhoto; after: GalleryPhoto }
+
+/** Junta as comparações às fotos já carregadas; descarta as que não têm as duas acessíveis. */
+export function resolveComparisons(list: FieldPhotoComparison[], photoById: Map<string, GalleryPhoto>): ResolvedComparison[] {
+  const out: ResolvedComparison[] = [];
+  for (const c of list) {
+    const before = photoById.get(c.beforePhotoId);
+    const after = photoById.get(c.afterPhotoId);
+    if (before && after) out.push({ comparison: c, before, after });
+  }
+  return out;
+}
+
 /* --------------------------------- data layer --------------------------------- */
 
 function rowToComparison(r: any): FieldPhotoComparison {

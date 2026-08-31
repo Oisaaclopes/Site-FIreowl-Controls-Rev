@@ -21,7 +21,7 @@ import { signedFieldPhotoUrl, signedFieldPhotoUrls } from '@/lib/fieldPhotoStora
 import { PhotoSheetConfigModal } from '@/components/field-photos/PhotoSheetConfigModal';
 import { ComparisonsPanel } from '@/components/field-photos/ComparisonsPanel';
 import { ComparisonCreateModal } from '@/components/field-photos/ComparisonCreateModal';
-import { FieldPhotoComparison, listComparisons, PAIR_INVALID_MESSAGE, validateComparisonPair } from '@/lib/fieldPhotoComparisons';
+import { FieldPhotoComparison, listComparisons, PAIR_INVALID_MESSAGE, ResolvedComparison, validateComparisonPair } from '@/lib/fieldPhotoComparisons';
 import { flushOutbox, isOnline } from '@/lib/offline/reportSync';
 import { fetchReports } from '@/lib/reports';
 import { fetchOrdensServico } from '@/lib/ordensServico';
@@ -59,6 +59,7 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole }) => {
   const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
   const [comparisons, setComparisons] = useState<FieldPhotoComparison[]>([]);
   const [comparePair, setComparePair] = useState<{ a: GalleryPhoto; b: GalleryPhoto } | null>(null);
+  const [sheetComparisons, setSheetComparisons] = useState<ResolvedComparison[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const [filters, setFilters] = useState<FieldPhotoFilters>({});
@@ -224,7 +225,7 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole }) => {
 
       {/* Conteúdo */}
       {tab === 'comparacoes' ? (
-        <ComparisonsPanel comparisons={comparisons} photoById={photoById} thumbs={thumbs} onReload={reloadComparisons} />
+        <ComparisonsPanel comparisons={comparisons} photoById={photoById} thumbs={thumbs} onReload={reloadComparisons} onGenerateSheet={(items) => setSheetComparisons(items)} />
       ) : loading ? (
         <div className="py-20 text-center text-sm text-slate-400">Carregando fotos…</div>
       ) : visible.length === 0 ? (
@@ -288,6 +289,10 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole }) => {
 
       {sheetPhotos && (
         <PhotoSheetConfigModal photos={sheetPhotos} onClose={() => setSheetPhotos(null)} />
+      )}
+
+      {sheetComparisons && (
+        <PhotoSheetConfigModal comparisons={sheetComparisons} onClose={() => setSheetComparisons(null)} />
       )}
 
       {comparePair && (

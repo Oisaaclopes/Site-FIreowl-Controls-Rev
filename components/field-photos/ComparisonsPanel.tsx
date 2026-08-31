@@ -5,17 +5,18 @@ import { useConfirm, useToast } from '@/components/ui/Feedback';
 import { GalleryPhoto, normalizeText } from '@/lib/fieldPhotosGallery';
 import { signedFieldPhotoUrl } from '@/lib/fieldPhotoStorage';
 import {
-  ComparisonResult, deleteComparison, FieldPhotoComparison, RESULT_LABEL, updateComparison,
+  ComparisonResult, deleteComparison, FieldPhotoComparison, RESULT_LABEL,
+  ResolvedComparison, resolveComparisons, updateComparison,
 } from '@/lib/fieldPhotoComparisons';
+import { comparisonSheetClient } from '@/lib/comparisonSheet';
 
 interface Props {
   comparisons: FieldPhotoComparison[];
   photoById: Map<string, GalleryPhoto>;
   thumbs: Record<string, string>;
   onReload: () => Promise<void> | void;
+  onGenerateSheet: (items: ResolvedComparison[]) => void;
 }
-
-interface Resolved { c: FieldPhotoComparison; before: GalleryPhoto; after: GalleryPhoto }
 
 const RESULT_TONE: Record<ComparisonResult, string> = {
   corrigido: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -25,27 +26,29 @@ const RESULT_TONE: Record<ComparisonResult, string> = {
 const fmtDate = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
 const fmtTime = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '');
 
-export const ComparisonsPanel: React.FC<Props> = ({ comparisons, photoById, thumbs, onReload }) => {
+export const ComparisonsPanel: React.FC<Props> = ({ comparisons, photoById, thumbs, onReload, onGenerateSheet }) => {
   const toast = useToast();
   const confirm = useConfirm();
   const [search, setSearch] = useState('');
-  const [detail, setDetail] = useState<Resolved | null>(null);
+  const [detail, setDetail] = useState<ResolvedComparison | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const resolved = useMemo<Resolved[]>(() => {
-    const out: Resolved[] = [];
-    for (const c of comparisons) {
-      const before = photoById.get(c.beforePhotoId);
-      const after = photoById.get(c.afterPhotoId);
-      if (before && after) out.push({ c, before, after }); // sem acesso às duas → não exibe
-    }
-    return out;
-  }, [comparisons, photoById]);
+  const resolved = useMemo(() => resolveComparisons(comparisons, photoById), [comparisons, photoById]);
 
   const visible = useMemo(() => {
     const q = normalizeText(search);
     if (!q) return resolved;
-    return resolved.filter((r) => normalizeText([r.before.clientName, r.before.localSetor, r.after.localSetor, r.c.titulo, r.c.descricao].filter(Boolean).join(' ')).includes(q));
+    return resolved.filter((r) => normalizeText([r.before.clientName, r.before.localSetor, r.after.localSetor, r.comparison.titulo, r.comparison.descricao].filter(Boolean).join(' ')).includes(q));
   }, [resolved, search]);
+
+  const toggle = (id: string) => setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const selectedItems = useMemo(() => visible.filter((r) => selected.has(r.comparison.id)), [visible, selected]);
+
+  const gerar = () => {
+    if (selectedItems.length === 0) return;
+    if (!comparisonSheetClient(selectedItems).ok) { toast.error('A Folha de Fotos deve conter comparações do mesmo cliente.'); return; }
+    onGenerateSheet(selectedItems);
+  };
 
   return (
     <div>
@@ -53,6 +56,18 @@ export const ComparisonsPanel: React.FC<Props> = ({ comparisons, photoById, thum
         <span className="material-symbols-outlined pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-lg text-slate-400">search</span>
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por cliente, local, título ou descrição" className="min-h-11 w-full rounded-xl border border-slate-300 bg-white pl-9 pr-3 text-sm" />
       </div>
+
+      {selected.size > 0 && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#1A1A72]/20 bg-[#1A1A72]/5 p-2.5">
+          <span className="text-xs font-bold text-[#1A1A72]">{selected.size} comparação(ões) selecionada(s)</span>
+          <div className="flex gap-2">
+            <button onClick={gerar} className="min-h-9 rounded-lg bg-[#E63946] px-3 text-xs font-bold uppercase text-white">
+              <span className="material-symbols-outlined align-middle text-sm">picture_as_pdf</span> Gerar Folha de Fotos
+            </button>
+            <button onClick={() => setSelected(new Set())} className="min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold uppercase text-slate-600">Limpar</button>
+          </div>
+        </div>
+      )}
 
       {visible.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center text-slate-400">
@@ -62,7 +77,9 @@ export const ComparisonsPanel: React.FC<Props> = ({ comparisons, photoById, thum
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          {visible.map((r) => <ComparisonCard key={r.c.id} r={r} thumbs={thumbs} onOpen={() => setDetail(r)} />)}
+          {visible.map((r) => (
+            <ComparisonCard key={r.comparison.id} r={r} thumbs={thumbs} selected={selected.has(r.comparison.id)} onToggle={() => toggle(r.comparison.id)} onOpen={() => setDetail(r)} />
+          ))}
         </div>
       )}
 
@@ -80,35 +97,43 @@ export const ComparisonsPanel: React.FC<Props> = ({ comparisons, photoById, thum
   );
 };
 
-const ComparisonCard: React.FC<{ r: Resolved; thumbs: Record<string, string>; onOpen: () => void }> = ({ r, thumbs, onOpen }) => {
-  const { c, before, after } = r;
+const CardThumb = ({ photo, thumbs }: { photo: GalleryPhoto; thumbs: Record<string, string> }) => (
+  <div className="aspect-[4/3] overflow-hidden rounded-lg bg-slate-900">
+    {thumbs[photo.clientUuid]
+      ? <img src={thumbs[photo.clientUuid]} alt="Evidência" className="h-full w-full object-contain" loading="lazy" />
+      : <div className="flex h-full items-center justify-center text-slate-500"><span className="material-symbols-outlined">image</span></div>}
+  </div>
+);
+
+const ComparisonCard: React.FC<{ r: ResolvedComparison; thumbs: Record<string, string>; selected: boolean; onToggle: () => void; onOpen: () => void }> = ({ r, thumbs, selected, onToggle, onOpen }) => {
+  const { comparison: c, before, after } = r;
   const localDiff = (before.localSetor || '') !== (after.localSetor || '');
   return (
-    <button onClick={onOpen} className="flex flex-col rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition-colors hover:border-slate-300">
-      {/* Antes | Depois (empilha no mobile, lado a lado ≥sm) */}
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <div className="flex-1">
-          <p className="mb-1 text-[10px] font-bold uppercase text-sky-700">Antes · {fmtDate(before.capturadoEm)}</p>
-          <div className="aspect-[4/3] overflow-hidden rounded-lg bg-slate-900">
-            {thumbs[before.clientUuid] ? <img src={thumbs[before.clientUuid]} alt="Antes" className="h-full w-full object-contain" loading="lazy" /> : <div className="flex h-full items-center justify-center text-slate-500"><span className="material-symbols-outlined">image</span></div>}
+    <div className={`relative flex flex-col rounded-xl border bg-white p-3 shadow-sm transition-colors ${selected ? 'border-[#1A1A72] ring-2 ring-[#1A1A72]/20' : 'border-slate-200 hover:border-slate-300'}`}>
+      <button onClick={onToggle} className={`absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-lg shadow ${selected ? 'bg-[#1A1A72] text-white' : 'bg-white/90 text-slate-500 hover:bg-white'}`} aria-label="Selecionar">
+        <span className="material-symbols-outlined text-base">{selected ? 'check' : 'check_box_outline_blank'}</span>
+      </button>
+      <button onClick={onOpen} className="text-left">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex-1">
+            <p className="mb-1 text-[10px] font-bold uppercase text-sky-700">Antes · {fmtDate(before.capturadoEm)}</p>
+            <CardThumb photo={before} thumbs={thumbs} />
+          </div>
+          <div className="flex-1">
+            <p className="mb-1 text-[10px] font-bold uppercase text-emerald-700">Depois · {fmtDate(after.capturadoEm)}</p>
+            <CardThumb photo={after} thumbs={thumbs} />
           </div>
         </div>
-        <div className="flex-1">
-          <p className="mb-1 text-[10px] font-bold uppercase text-emerald-700">Depois · {fmtDate(after.capturadoEm)}</p>
-          <div className="aspect-[4/3] overflow-hidden rounded-lg bg-slate-900">
-            {thumbs[after.clientUuid] ? <img src={thumbs[after.clientUuid]} alt="Depois" className="h-full w-full object-contain" loading="lazy" /> : <div className="flex h-full items-center justify-center text-slate-500"><span className="material-symbols-outlined">image</span></div>}
+        <div className="mt-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="truncate text-sm font-bold text-slate-900">{c.titulo || 'Comparação'}</p>
+            {c.resultado && <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${RESULT_TONE[c.resultado]}`}>{RESULT_LABEL[c.resultado]}</span>}
           </div>
+          <p className="truncate text-[11px] text-slate-500">{before.clientName || before.clientId}{localDiff ? ' · locais distintos' : before.localSetor ? ` · ${before.localSetor}` : ''}</p>
+          {c.descricao && <p className="mt-0.5 line-clamp-2 text-[11px] text-slate-600">{c.descricao}</p>}
         </div>
-      </div>
-      <div className="mt-2.5">
-        <div className="flex items-center justify-between gap-2">
-          <p className="truncate text-sm font-bold text-slate-900">{c.titulo || 'Comparação'}</p>
-          {c.resultado && <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${RESULT_TONE[c.resultado]}`}>{RESULT_LABEL[c.resultado]}</span>}
-        </div>
-        <p className="truncate text-[11px] text-slate-500">{before.clientName || before.clientId}{localDiff ? ' · locais distintos' : before.localSetor ? ` · ${before.localSetor}` : ''}</p>
-        {c.descricao && <p className="mt-0.5 line-clamp-2 text-[11px] text-slate-600">{c.descricao}</p>}
-      </div>
-    </button>
+      </button>
+    </div>
   );
 };
 
@@ -136,12 +161,12 @@ const BigPhoto = ({ photo, label, tone, thumbs }: { photo: GalleryPhoto; label: 
 };
 
 const ComparisonDetail: React.FC<{
-  r: Resolved; thumbs: Record<string, string>;
+  r: ResolvedComparison; thumbs: Record<string, string>;
   toast: { success: (m: string) => void; error: (m: string) => void; info: (m: string) => void };
   confirm: (o: { title: string; message?: string; confirmLabel?: string; danger?: boolean }) => Promise<boolean>;
   onClose: () => void; onChanged: () => Promise<void> | void;
 }> = ({ r, thumbs, toast, confirm, onClose, onChanged }) => {
-  const { c, before, after } = r;
+  const { comparison: c, before, after } = r;
   const [edit, setEdit] = useState(false);
   const [titulo, setTitulo] = useState(c.titulo || '');
   const [descricao, setDescricao] = useState(c.descricao || '');

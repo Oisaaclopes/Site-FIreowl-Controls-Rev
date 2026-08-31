@@ -1,21 +1,18 @@
 'use client';
-import React, { useCallback, useMemo, useState } from 'react';
-import { PDFViewer, pdf } from '@react-pdf/renderer';
+import React, { useCallback, useState } from 'react';
+import { pdf, PDFViewer, type DocumentProps } from '@react-pdf/renderer';
 import { ArrowLeft, Download } from 'lucide-react';
-import { PhotoSheetDocument } from './PhotoSheetDocument';
-import { photoSheetFilename, PhotoSheetConfig, PhotoSheetItem } from '@/lib/photoSheet';
 
 interface Props {
-  config: PhotoSheetConfig;
-  items: PhotoSheetItem[];
+  /** Documento React-PDF já montado (Folha individual ou Antes × Depois). */
+  doc: React.ReactElement<DocumentProps>;
+  filename: string;
   onClose: () => void;
 }
 
-function PhotoSheetPdfInner({ config, items, onClose }: Props) {
+// Viewer/download genérico reutilizado pelos dois modos da Folha de Fotos.
+function PhotoSheetPdfInner({ doc, filename, onClose }: Props) {
   const [loading, setLoading] = useState(false);
-
-  // Snapshot imutável: o mesmo elemento alimenta viewer e download.
-  const doc = useMemo(() => <PhotoSheetDocument config={config} items={items} />, [config, items]);
 
   const download = useCallback(async () => {
     setLoading(true);
@@ -24,13 +21,13 @@ function PhotoSheetPdfInner({ config, items, onClose }: Props) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = photoSheetFilename(config.clienteNome, config.dataEmissao);
+      a.download = filename;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 3000);
     } finally {
       setLoading(false);
     }
-  }, [doc, config.clienteNome, config.dataEmissao]);
+  }, [doc, filename]);
 
   return (
     <div className="fixed inset-0 z-[80] bg-slate-900/85 p-3 sm:p-5 flex flex-col">
