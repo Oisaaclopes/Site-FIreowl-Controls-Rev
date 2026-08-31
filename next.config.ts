@@ -2,6 +2,11 @@ import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // ID de build seguro para FTP/Hostinger: por padrão o Next pode gerar um ID
+  // começando com "-" (ex.: "-HBsP..."), e nomes iniciados por hífen quebram o
+  // path handling de vários servidores FTP → 550 ao enviar _next/static/<id>/*.
+  // Aqui garantimos um ID alfanumérico que sempre começa com letra.
+  generateBuildId: async () => `b${Date.now().toString(36)}`,
   eslint: {
     ignoreDuringBuilds: true,
   },

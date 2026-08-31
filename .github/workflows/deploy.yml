@@ -6,6 +6,12 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Impede dois deploys FTP simultâneos de mexerem na mesma árvore do Hostinger
+# (rajadas de push corrompiam o estado de sync → uploads completos concorrentes).
+concurrency:
+  group: deploy-hostinger
+  cancel-in-progress: true
+
 jobs:
   build-deploy:
     runs-on: ubuntu-latest
@@ -16,11 +22,23 @@ jobs:
       - name: Instalar Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Instalar dependências
         run: npm ci
+
+      # Fail-fast: aborta ANTES do build se as chaves do Supabase estiverem
+      # vazias/ausentes (senão o site seria publicado sem conexão ao Supabase).
+      # NUNCA imprime o valor do secret.
+      - name: Validar secrets do Supabase
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        run: |
+          test -n "$NEXT_PUBLIC_SUPABASE_URL" || { echo "::error::Secret NEXT_PUBLIC_SUPABASE_URL vazio ou ausente. Cadastre em Settings → Secrets and variables → Actions."; exit 1; }
+          test -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY" || { echo "::error::Secret NEXT_PUBLIC_SUPABASE_ANON_KEY vazio ou ausente. Cadastre em Settings → Secrets and variables → Actions."; exit 1; }
+          echo "Secrets do Supabase presentes (valores não exibidos)."
 
       - name: Gerar o build estático (pasta out/)
         run: npm run build
