@@ -17,6 +17,7 @@ const TABS: TabPath[] = [
   'estoque',
   'servicos',
   'relatorios',
+  'fotos-de-campo',
   'ponto',
   'conta',
 ];

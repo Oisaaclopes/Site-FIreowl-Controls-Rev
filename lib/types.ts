@@ -11,6 +11,7 @@ export type TabPath =
   | 'estoque'
   | 'servicos'
   | 'relatorios'
+  | 'fotos-de-campo'
   | 'ponto'
   | 'conta';
 

@@ -43,3 +43,17 @@ export async function signedFieldPhotoUrl(path: string, seconds = 900): Promise<
   if (error) throw error;
   return data.signedUrl as string;
 }
+
+/** Assina vários caminhos numa única requisição (grid da galeria). Falhas isoladas viram null. */
+export async function signedFieldPhotoUrls(paths: string[], seconds = 900): Promise<Record<string, string>> {
+  const unique = Array.from(new Set(paths.filter(Boolean)));
+  if (unique.length === 0) return {};
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase.storage.from(FIELD_PHOTO_BUCKET).createSignedUrls(unique, seconds);
+  if (error) throw error;
+  const map: Record<string, string> = {};
+  for (const row of data || []) {
+    if (row?.path && row?.signedUrl && !row.error) map[row.path as string] = row.signedUrl as string;
+  }
+  return map;
+}

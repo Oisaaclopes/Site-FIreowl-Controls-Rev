@@ -77,6 +77,7 @@ import { FornecedoresView } from '@/components/views/FornecedoresView';
 import { EstoqueView } from '@/components/views/EstoqueView';
 import { ServicosView } from '@/components/views/ServicosView';
 import { RelatoriosView } from '@/components/views/RelatoriosView';
+import { FotosDeCampoView } from '@/components/field-photos/FotosDeCampoView';
 import { PontoView } from '@/components/views/PontoView';
 import { ContaView } from '@/components/views/ContaView';
 import { allowedTabs, isTabAllowed } from '@/lib/rbac';
@@ -1224,6 +1225,13 @@ export function CrmApp({
               onDeletePartnerBrand={handleDeletePartnerBrand}
               onConsumeMaterials={handleConsumeReportMaterials}
               onNavigateToPedidos={() => setCurrentTab('pedidos')}
+            />
+          )}
+
+          {currentTab === 'fotos-de-campo' && (
+            <FotosDeCampoView
+              clients={clients}
+              userRole={userRole}
             />
           )}
 
