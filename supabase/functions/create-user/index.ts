@@ -16,25 +16,35 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
-
 const VALID_ROLES = ['ADMINISTRATIVO', 'TECNICO', 'GESTOR', 'FINANCEIRO'];
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-function json(status: number, body: unknown): Response {
+// CORS NÃO é autenticação (a segurança é o JWT). Por padrão reflete "*"; para
+// endurecer, defina o segredo ALLOWED_ORIGINS (lista separada por vírgula) na
+// função — aí só as origens listadas recebem o header, sem quebrar o restante.
+function corsFor(req: Request): Record<string, string> {
+  const allow = (Deno.env.get('ALLOWED_ORIGINS') || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const origin = req.headers.get('Origin') || '';
+  const allowOrigin = allow.length === 0 ? '*' : (allow.includes(origin) ? origin : allow[0]);
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin',
+  };
+}
+
+function json(status: number, body: unknown, cors: Record<string, string>): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...cors, 'Content-Type': 'application/json' },
   });
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-  if (req.method !== 'POST') return json(405, { error: 'method_not_allowed' });
+  const cors = corsFor(req);
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+  if (req.method !== 'POST') return json(405, { error: 'method_not_allowed' }, cors);
 
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
   const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -42,7 +52,7 @@ Deno.serve(async (req: Request) => {
 
   // 1) Identidade do solicitante a partir do JWT (nunca do corpo).
   const authHeader = req.headers.get('Authorization') || '';
-  if (!authHeader.startsWith('Bearer ')) return json(401, { error: 'unauthorized' });
+  if (!authHeader.startsWith('Bearer ')) return json(401, { error: 'unauthorized' }, cors);
 
   const userClient = createClient(SUPABASE_URL, ANON_KEY, {
     global: { headers: { Authorization: authHeader } },
@@ -50,7 +60,7 @@ Deno.serve(async (req: Request) => {
   });
   const { data: userData, error: userErr } = await userClient.auth.getUser();
   const caller = userData?.user;
-  if (userErr || !caller) return json(401, { error: 'unauthorized' });
+  if (userErr || !caller) return json(401, { error: 'unauthorized' }, cors);
 
   // 2) Cliente admin (service_role) — só no servidor.
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
@@ -61,24 +71,24 @@ Deno.serve(async (req: Request) => {
     .select('role, name')
     .eq('id', caller.id)
     .single();
-  if (!prof || prof.role !== 'ADMINISTRATIVO') return json(403, { error: 'forbidden' });
+  if (!prof || prof.role !== 'ADMINISTRATIVO') return json(403, { error: 'forbidden' }, cors);
 
   // 4) Entrada validada server-side.
   let body: Record<string, unknown>;
   try {
     body = await req.json();
   } catch {
-    return json(400, { error: 'invalid_json' });
+    return json(400, { error: 'invalid_json' }, cors);
   }
   const email = String(body.email ?? '').trim().toLowerCase();
   const password = String(body.password ?? '');
   const role = String(body.role ?? '');
   const name = String(body.name ?? '').trim();
 
-  if (!EMAIL_RE.test(email)) return json(422, { error: 'invalid_email' });
-  if (password.length < 6) return json(422, { error: 'weak_password' });
-  if (!VALID_ROLES.includes(role)) return json(422, { error: 'invalid_role' });
-  if (!name) return json(422, { error: 'invalid_name' });
+  if (!EMAIL_RE.test(email)) return json(422, { error: 'invalid_email' }, cors);
+  if (password.length < 6) return json(422, { error: 'weak_password' }, cors);
+  if (!VALID_ROLES.includes(role)) return json(422, { error: 'invalid_role' }, cors);
+  if (!name) return json(422, { error: 'invalid_name' }, cors);
 
   // 5) Cria o auth user já confirmado (senha definida pelo admin é usável de
   //    imediato). O role vai nos metadados → trigger cria o profile já correto.
@@ -91,10 +101,10 @@ Deno.serve(async (req: Request) => {
   if (createErr || !created?.user) {
     const m = (createErr?.message ?? '').toLowerCase();
     if (m.includes('already') || m.includes('registered') || m.includes('exists')) {
-      return json(409, { error: 'email_exists' });
+      return json(409, { error: 'email_exists' }, cors);
     }
-    if (m.includes('password')) return json(422, { error: 'weak_password' });
-    return json(400, { error: 'create_failed' });
+    if (m.includes('password')) return json(422, { error: 'weak_password' }, cors);
+    return json(400, { error: 'create_failed' }, cors);
   }
   const newId = created.user.id;
 
@@ -115,7 +125,7 @@ Deno.serve(async (req: Request) => {
     .eq('id', newId);
   if (updErr) {
     await admin.auth.admin.deleteUser(newId).catch(() => {});
-    return json(500, { error: 'profile_update_failed' });
+    return json(500, { error: 'profile_update_failed' }, cors);
   }
 
   // 7) Trilha de auditoria (best-effort; nunca bloqueia; sem senha).
@@ -131,5 +141,5 @@ Deno.serve(async (req: Request) => {
     })
     .catch(() => {});
 
-  return json(200, { ok: true, id: newId });
+  return json(200, { ok: true, id: newId }, cors);
 });

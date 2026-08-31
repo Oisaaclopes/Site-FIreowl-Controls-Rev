@@ -28,7 +28,19 @@ supabase functions deploy create-user --no-verify-jwt
 ## 2) Testar a criação controlada (na app, logado como ADMINISTRATIVO)
 Conta → Usuários → Novo usuário. Esperado: "OK: usuário criado. Já pode fazer login".
 
-## 3) Fechar o signup público (só depois do passo 1–2 OK)
+## ⚠️ P0 CRÍTICO — trigger confia em metadata.role
+O `handle_new_user` (migration 0006) faz `coalesce(raw_user_meta_data->>'role','TECNICO')`.
+Com o signup público **ABERTO**, qualquer pessoa (a anon key é pública no site
+estático) pode `auth.signUp({ options:{ data:{ role:'ADMINISTRATIVO' } } })` e nascer
+**ADMINISTRATIVO** já confirmado (autoconfirm) → **takeover total**. Severidade: crítica.
+
+Correções (fazer AMBAS):
+- **Primária:** fechar o signup (passo 3 abaixo).
+- **Defesa em profundidade:** aplicar `lib/db/migrations/0060_harden_new_user_role.sql`
+  no SQL Editor (trigger passa a criar sempre `TECNICO`; o role autorizado é
+  definido só server-side por esta função). Não quebra o fluxo admin.
+
+## 3) Fechar o signup público (FAZER JÁ — não esperar o deploy da função)
 No Dashboard: **Authentication → Sign In / Providers → Email → desmarcar
 "Allow new users to sign up"** (fica `disable_signup: true`).
 
