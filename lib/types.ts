@@ -1076,6 +1076,9 @@ export interface OrdemServico {
   dataPrevista?: string;
   dataConclusao?: string;
   criadoPor?: string;
+  /** Técnico responsável (profiles.id). Null = "Não atribuído". Fonte da verdade
+   *  é o UUID; o nome é resolvido pelo profile (não duplicamos texto). */
+  tecnicoResponsavelId?: string;
 }
 
 /** Custos de logística versionados por vigência. */

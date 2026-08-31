@@ -85,6 +85,22 @@ export async function logUserAudit(action: string, details: string): Promise<voi
   }
 }
 
+// Diretório de técnicos ATRIBUÍVEIS a uma OS (status ATIVO + perfis operacionais).
+// OBS: hoje a RLS de `profiles` só deixa ADMINISTRATIVO ler todos os perfis, então
+// para GESTOR/TECNICO isto retorna [] (o diretório completo depende de uma policy
+// de leitura mínima, prevista para a passada de RLS). Falha de acesso → [].
+export async function fetchAssignableTechnicians(): Promise<ManagedUser[]> {
+  try {
+    const all = await listUsers();
+    const OPERACIONAIS: UserRole[] = ['TECNICO', 'GESTOR', 'ADMINISTRATIVO'];
+    return all
+      .filter((u) => u.status === 'ATIVO' && OPERACIONAIS.includes(u.role))
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  } catch {
+    return [];
+  }
+}
+
 // Ativar / Inativar / Desligar — NUNCA deleta (preserva histórico).
 export async function setUserStatus(id: string, status: UserStatus): Promise<void> {
   const supabase = getSupabaseClient() as any;

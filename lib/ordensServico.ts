@@ -20,6 +20,7 @@ function rowToOS(r: any): OrdemServico {
     dataPrevista: r.data_prevista ?? undefined,
     dataConclusao: r.data_conclusao ?? undefined,
     criadoPor: r.criado_por ?? undefined,
+    tecnicoResponsavelId: r.tecnico_responsavel_id ?? undefined,
   };
 }
 
@@ -37,6 +38,7 @@ function osToRow(o: OrdemServico): Record<string, unknown> {
     report_id: o.reportId ?? null,
     data_prevista: o.dataPrevista ?? null,
     data_conclusao: o.dataConclusao ?? null,
+    tecnico_responsavel_id: o.tecnicoResponsavelId ?? null,
   };
   if (o.dataAbertura) row.data_abertura = o.dataAbertura;
   if (o.id) row.id = o.id;

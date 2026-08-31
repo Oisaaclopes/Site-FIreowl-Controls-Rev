@@ -8,6 +8,8 @@ import { fetchOrdensServico } from '@/lib/ordensServico';
 import { fetchContracts } from '@/lib/contracts';
 import { fetchClients } from '@/lib/clients';
 import { fetchScheduledExecutions, generateOsFromExecution } from '@/lib/contractRoutines';
+import { fetchAssignableTechnicians, ManagedUser } from '@/lib/users';
+import { useConfirm } from '@/components/ui/Feedback';
 
 interface AgendaViewProps {
   /** Abre a OS no módulo de Pedidos/OS quando o usuário clica num evento real. */
@@ -35,6 +37,7 @@ type AgendaStatus = 'previsto' | 'agendado' | 'os_aberta' | 'em_atendimento' | '
 interface AgendaEvent {
   id: string; kind: 'os' | 'competencia'; date: string; // yyyy-mm-dd
   cliente: string; sub: string; status: AgendaStatus; osId?: string; executionId?: string;
+  tecnicoId?: string; // responsável técnico (só em OS)
 }
 
 const STATUS_META: Record<AgendaStatus, { label: string; dot: string; chip: string }> = {
@@ -60,7 +63,11 @@ const KANBAN: { key: string; label: string; match: (e: AgendaEvent) => boolean }
 
 export const AgendaView: React.FC<AgendaViewProps> = ({ onOpenOS }) => {
   const online = isSupabaseConfigured();
+  const confirm = useConfirm();
   const [viewMode, setViewMode] = useState<'calendar' | 'kanban' | 'map'>('calendar');
+  const [technicians, setTechnicians] = useState<ManagedUser[]>([]);
+  // Filtro por responsável: 'TODOS' | 'NAO' (não atribuídas) | <profileId>.
+  const [tecnicoFilter, setTecnicoFilter] = useState<string>('TODOS');
   const today = new Date();
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [holidays, setHolidays] = useState<Record<string, { name: string; type: string }>>({});
@@ -86,6 +93,9 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ onOpenOS }) => {
         fetchClients(),
       ]);
       setOrdens(os); setExecs(ex); setContracts(ct); setClients(cl);
+      // Diretório de técnicos (para nome/filtro). Vazio se a RLS não permitir ler
+      // profiles (GESTOR/TECNICO hoje) — degrada para "Atribuído/Não atribuído".
+      setTechnicians(await fetchAssignableTechnicians());
     } catch (e) { setAviso(e instanceof Error ? e.message : 'Falha ao carregar a agenda.'); } finally { setLoading(false); }
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
@@ -99,13 +109,23 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ onOpenOS }) => {
   const clientName = (id?: string) => clients.find((c) => c.id === id)?.name;
   const contractById = (id: string) => contracts.find((c) => c.id === id);
 
+  // Resolve o responsável técnico pelo profile (sem texto duplicado). Se o
+  // diretório não estiver acessível (RLS), mostra rótulo neutro.
+  const tecMap = useMemo(() => new Map(technicians.map((t) => [t.id, t])), [technicians]);
+  const tecnicoLabel = (id?: string): string => {
+    if (!id) return 'Não atribuído';
+    const t = tecMap.get(id);
+    if (!t) return 'Atribuído';
+    return t.cargo ? `${t.name} · ${t.cargo}` : t.name;
+  };
+
   // Fonte única: OS reais + competências ainda sem OS (dedup — se a execução já
   // tem OS, ela é representada pela OS, não pela competência).
   const events = useMemo<AgendaEvent[]>(() => {
     const evs: AgendaEvent[] = [];
     ordens.forEach((os) => {
       if (!os.dataPrevista) return;
-      evs.push({ id: `os_${os.id}`, kind: 'os', date: os.dataPrevista, cliente: clientName(os.clienteId) || os.titulo || 'OS', sub: os.numero || os.id.slice(0, 8), status: osStatusToAgenda(os.status), osId: os.id });
+      evs.push({ id: `os_${os.id}`, kind: 'os', date: os.dataPrevista, cliente: clientName(os.clienteId) || os.titulo || 'OS', sub: os.numero || os.id.slice(0, 8), status: osStatusToAgenda(os.status), osId: os.id, tecnicoId: os.tecnicoResponsavelId });
     });
     execs.forEach((e) => {
       if (e.ordemServicoId) return; // já virou OS → dedup
@@ -117,15 +137,21 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ onOpenOS }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ordens, execs, contracts, clients]);
 
+  const filteredEvents = useMemo(() => {
+    if (tecnicoFilter === 'TODOS') return events;
+    if (tecnicoFilter === 'NAO') return events.filter((e) => !e.tecnicoId);
+    return events.filter((e) => e.tecnicoId === tecnicoFilter);
+  }, [events, tecnicoFilter]);
+
   const eventsByDay = useMemo(() => {
     const map: Record<number, AgendaEvent[]> = {};
-    events.forEach((e) => {
+    filteredEvents.forEach((e) => {
       const [y, m, d] = e.date.split('-').map(Number);
       if (y !== year || m - 1 !== month) return;
       (map[d] = map[d] || []).push(e);
     });
     return map;
-  }, [events, year, month]);
+  }, [filteredEvents, year, month]);
 
   const grid = useMemo(() => {
     const firstWeekday = new Date(year, month, 1).getDay();
@@ -142,7 +168,12 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ onOpenOS }) => {
   const clickEvent = async (e: AgendaEvent) => {
     if (e.kind === 'os' && e.osId) { onOpenOS?.(e.osId); return; }
     if (e.kind === 'competencia' && e.executionId) {
-      if (!window.confirm(`Gerar Ordem de Serviço para ${e.cliente} — ${e.sub}?`)) return;
+      const ok = await confirm({
+        title: 'Gerar Ordem de Serviço?',
+        message: `Será aberta uma OS para ${e.cliente} — ${e.sub}.`,
+        confirmLabel: 'Gerar OS',
+      });
+      if (!ok) return;
       setBusy(true); setAviso(null);
       try {
         const res = await generateOsFromExecution(e.executionId);
@@ -170,12 +201,27 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ onOpenOS }) => {
           <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Despacho Técnico &amp; Escala de Campo</span>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">Agenda de Atendimentos &amp; Manutenções</h1>
         </div>
-        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
-          {(['calendar', 'kanban', 'map'] as const).map((m) => (
-            <button key={m} onClick={() => setViewMode(m)} className={`px-3 py-1.5 rounded-md text-xs font-semibold uppercase transition-colors ${viewMode === m ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>
-              {m === 'calendar' ? 'Calendário' : m === 'kanban' ? 'Kanban' : 'Mapa de Rota'}
-            </button>
-          ))}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Filtro por responsável técnico (UX; a restrição real virá na RLS) */}
+          <select
+            aria-label="Filtrar por responsável técnico"
+            value={tecnicoFilter}
+            onChange={(e) => setTecnicoFilter(e.target.value)}
+            className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+          >
+            <option value="TODOS">Todos os técnicos</option>
+            <option value="NAO">Não atribuídas</option>
+            {technicians.map((t) => (
+              <option key={t.id} value={t.id}>{t.name}{t.cargo ? ` · ${t.cargo}` : ''}</option>
+            ))}
+          </select>
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+            {(['calendar', 'kanban', 'map'] as const).map((m) => (
+              <button key={m} onClick={() => setViewMode(m)} className={`px-3 py-1.5 rounded-md text-xs font-semibold uppercase transition-colors ${viewMode === m ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>
+                {m === 'calendar' ? 'Calendário' : m === 'kanban' ? 'Kanban' : 'Mapa de Rota'}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -219,7 +265,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ onOpenOS }) => {
                   </div>
                   {holiday && <div className="bg-[#E63946] text-white px-1.5 py-0.5 rounded text-[9px] font-bold leading-tight truncate">{holiday.name}</div>}
                   {dayEvents.slice(0, 3).map((e) => (
-                    <button key={e.id} onClick={() => clickEvent(e)} disabled={busy} title={`${e.cliente} · ${e.sub} · ${STATUS_META[e.status].label}${e.kind === 'competencia' ? ' (clique p/ gerar OS)' : ''}`} className={`text-left px-1.5 py-0.5 rounded text-[9px] truncate font-medium border ${e.kind === 'competencia' ? 'border-dashed' : ''} ${STATUS_META[e.status].chip}`}>
+                    <button key={e.id} onClick={() => clickEvent(e)} disabled={busy} title={`${e.cliente} · ${e.sub} · ${STATUS_META[e.status].label}${e.kind === 'os' ? ` · ${tecnicoLabel(e.tecnicoId)}` : ''}${e.kind === 'competencia' ? ' (clique p/ gerar OS)' : ''}`} className={`text-left px-1.5 py-0.5 rounded text-[9px] truncate font-medium border ${e.kind === 'competencia' ? 'border-dashed' : ''} ${STATUS_META[e.status].chip}`}>
                       <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${STATUS_META[e.status].dot}`} />{e.cliente}
                     </button>
                   ))}
@@ -233,10 +279,10 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ onOpenOS }) => {
       )}
 
       {online && viewMode === 'kanban' && (
-        events.length === 0 && !loading ? emptyBox('view_kanban', 'Nenhuma OS programada') : (
+        filteredEvents.length === 0 && !loading ? emptyBox('view_kanban', 'Nenhuma OS programada') : (
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             {KANBAN.map((col) => {
-              const items = events.filter(col.match);
+              const items = filteredEvents.filter(col.match);
               return (
                 <div key={col.key} className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-col gap-3">
                   <div className="flex justify-between items-center border-b border-slate-200 pb-2">
@@ -252,6 +298,12 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ onOpenOS }) => {
                           <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full border ${STATUS_META[e.status].chip}`}>{STATUS_META[e.status].label}</span>
                           <span className="text-[9px] text-slate-400 font-data-mono">{e.date}</span>
                         </div>
+                        {e.kind === 'os' && (
+                          <p className="text-[9px] text-slate-500 mt-1.5 flex items-center gap-1 truncate">
+                            <span className="material-symbols-outlined text-[12px] text-slate-400">engineering</span>
+                            <span className="truncate">{tecnicoLabel(e.tecnicoId)}</span>
+                          </p>
+                        )}
                         {e.kind === 'competencia' && <p className="text-[9px] text-emerald-700 font-bold uppercase mt-1">clique p/ gerar OS</p>}
                       </button>
                     ))}
