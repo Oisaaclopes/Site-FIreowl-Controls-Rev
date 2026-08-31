@@ -7,6 +7,7 @@ import { Header } from '@/components/Header';
 import { MobileQuickMenu } from '@/components/mobile/MobileQuickMenu';
 import { useIsMobile } from '@/lib/useIsMobile';
 import { isHomeEligibleEntry } from '@/lib/modules';
+import { setOutboxOwner } from '@/lib/offline/outbox';
 import { AuthModal } from '@/components/AuthModal';
 import { PrivacyProvider } from '@/lib/privacy';
 import { FeedbackProvider } from '@/components/ui/Feedback';
@@ -145,6 +146,13 @@ export function CrmApp({
     setMobileHome(false);
   }, [currentTab]);
   const handleSelectTab = useCallback((t: TabPath) => { setMobileHome(false); setCurrentTab(t); }, []);
+
+  // Dono da outbox = usuário desta sessão. Impede que o flush sincronize jobs
+  // offline de outro usuário num aparelho compartilhado. Limpa no logout (unmount).
+  useEffect(() => {
+    setOutboxOwner(userId);
+    return () => setOutboxOwner(undefined);
+  }, [userId]);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // menu off-canvas (mobile)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // mini-sidebar (desktop)

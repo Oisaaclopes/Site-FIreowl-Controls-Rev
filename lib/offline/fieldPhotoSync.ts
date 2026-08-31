@@ -1,7 +1,7 @@
 import { createFieldPhotoSession, FieldPhoto, FieldPhotoSession, insertFieldPhoto, updateFieldPhotoSessionStatus } from '../fieldPhotos';
 import { buildFieldPhotoPath, uploadFieldPhotoAsset } from '../fieldPhotoStorage';
 import { createFireowlEvidence } from '../fieldPhotoEvidence';
-import { enqueueOfflineJob, listOfflineJobs, OfflineJob, registerOfflineHandler } from './outbox';
+import { canProcessJob, enqueueOfflineJob, getOutboxOwner, listOfflineJobs, OfflineJob, registerOfflineHandler } from './outbox';
 
 export interface FieldPhotoSessionPayload {
   session: FieldPhotoSession;
@@ -20,19 +20,22 @@ export interface FieldPhotoPayload {
 
 export async function enqueueFieldPhotoSession(session: FieldPhotoSession): Promise<void> {
   await enqueueOfflineJob<FieldPhotoSessionPayload>({
-    domain: 'FIELD_PHOTO_SESSION', entityClientUuid: session.clientUuid, payload: { session },
+    // O dono é o técnico da sessão (autoritativo, mesmo se o owner global ainda não foi definido).
+    domain: 'FIELD_PHOTO_SESSION', entityClientUuid: session.clientUuid, payload: { session }, ownerUserId: session.tecnicoId,
   });
 }
 
 export async function enqueueFieldPhoto(payload: FieldPhotoPayload): Promise<void> {
   await enqueueOfflineJob<FieldPhotoPayload>({
-    domain: 'FIELD_PHOTO', entityClientUuid: payload.photo.clientUuid, payload,
+    domain: 'FIELD_PHOTO', entityClientUuid: payload.photo.clientUuid, payload, ownerUserId: payload.session.tecnicoId,
   });
 }
 
 export async function pendingFieldPhotoJobs(): Promise<number> {
-  const jobs = await listOfflineJobs();
-  return jobs.filter((job) => job.domain === 'FIELD_PHOTO' || job.domain === 'FIELD_PHOTO_SESSION').length;
+  const owner = getOutboxOwner();
+  return (await listOfflineJobs()).filter(
+    (job) => (job.domain === 'FIELD_PHOTO' || job.domain === 'FIELD_PHOTO_SESSION') && canProcessJob(job, owner)
+  ).length;
 }
 
 async function syncSession(job: OfflineJob<FieldPhotoSessionPayload>): Promise<void> {

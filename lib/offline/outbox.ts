@@ -17,12 +17,35 @@ export interface OfflineJob<T = unknown> {
   /** Lease curto: evita duas abas executarem o mesmo job simultaneamente. */
   leaseUntil?: string;
   leaseOwner?: string;
+  /**
+   * Dono do job (auth.users.id de quem o criou). Impede que a sessão de outro
+   * usuário, num aparelho compartilhado, sincronize trabalho alheio. Jobs
+   * antigos (criados antes deste campo) ficam `undefined` = legado, processados
+   * por compatibilidade — nunca apagados.
+   */
+  ownerUserId?: string;
 }
 
 export type OfflineHandler<T = unknown> = (job: OfflineJob<T>) => Promise<void>;
 const handlers = new Map<OfflineDomain, OfflineHandler>();
 let flushing = false;
 const LEASE_MS = 30_000;
+
+// Dono corrente da fila = usuário autenticado nesta sessão. Definido pela shell
+// autenticada (CrmApp) e limpo no logout. Estado em memória (não persistido).
+let currentOwner: string | undefined;
+export function setOutboxOwner(userId: string | undefined): void { currentOwner = userId || undefined; }
+export function getOutboxOwner(): string | undefined { return currentOwner; }
+
+/**
+ * Regra pura (testável): a sessão atual pode processar este job?
+ * - job sem dono (legado) → sim (compatibilidade segura);
+ * - job com dono → só se for o mesmo usuário corrente.
+ * Um job de OUTRO dono é ignorado (permanece pendente), nunca apagado.
+ */
+export function canProcessJob(job: Pick<OfflineJob, 'ownerUserId'>, owner: string | undefined): boolean {
+  return job.ownerUserId == null || job.ownerUserId === owner;
+}
 
 const newId = () => {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
@@ -46,6 +69,9 @@ export async function enqueueOfflineJob<T>(input: Omit<OfflineJob<T>, 'id' | 'st
     attempts: current?.attempts || 0,
     createdAt: current?.createdAt || now,
     updatedAt: now,
+    // Dono definido na criação: explícito (ex.: dono da sessão de fotos) →
+    // dono já registrado no job → usuário corrente. Reenfileirar preserva o dono.
+    ownerUserId: input.ownerUserId ?? current?.ownerUserId ?? getOutboxOwner(),
   }));
   return id;
 }
@@ -92,6 +118,8 @@ export async function flushOfflineJobs(isOnline: () => boolean): Promise<{ synce
   let failed = 0;
   try {
     for (const job of await listOfflineJobs()) {
+      // Aparelho compartilhado: não sincroniza trabalho de outro usuário.
+      if (!canProcessJob(job, currentOwner)) continue;
       const claimed = await claimJob(job);
       if (!claimed) continue;
       const handler = handlers.get(claimed.domain);

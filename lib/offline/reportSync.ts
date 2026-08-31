@@ -9,7 +9,7 @@ import { PendenciaStatus } from '../types';
 import { fetchCicloAtivo, registrarTestesNoCiclo } from '../ciclos';
 import { replaceSurveyRequirements } from '../surveyRequirements';
 import { idbGetAll, idbDelete, idbAvailable, STORE_OUTBOX } from './idb';
-import { enqueueOfflineJob, flushOfflineJobs, listOfflineJobs, registerOfflineHandler, removeOfflineJob } from './outbox';
+import { canProcessJob, enqueueOfflineJob, flushOfflineJobs, getOutboxOwner, listOfflineJobs, registerOfflineHandler, removeOfflineJob } from './outbox';
 // Registra o handler de Fotos de Campo no mesmo núcleo; não cria uma segunda fila.
 import './fieldPhotoSync';
 
@@ -271,7 +271,8 @@ export async function removeBundle(clientUuid: string): Promise<void> {
 
 export async function pendingCount(): Promise<number> {
   await migrateLegacyReportBundles();
-  return (await listOfflineJobs('REPORT')).length;
+  const owner = getOutboxOwner();
+  return (await listOfflineJobs('REPORT')).filter((job) => canProcessJob(job, owner)).length;
 }
 
 /** Migra silenciosamente bundles antigos sem serializar Blobs em JSON. */
