@@ -180,7 +180,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const canManage = userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR'; // editar/excluir relatório
 
   const [mode, setMode] = useState<'index' | 'form'>('index');
-  const [board, setBoard] = useState<'atendimentos' | 'relatorios' | 'pendencias' | 'auditorias'>('atendimentos');
+  const [board, setBoard] = useState<'atendimentos' | 'relatorios' | 'pendencias'>('atendimentos');
   // Pré-visualização do PDF técnico (react-pdf). Fallback = método HTML antigo.
   const [reportPreview, setReportPreview] = useState<ReportInstance | null>(null);
   const [creatingOrderFromReport, setCreatingOrderFromReport] = useState<string | null>(null);
@@ -247,10 +247,12 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     }
   };
 
-  // Wizard "+ Novo relatório"
+  // Wizard "+ Novo Atendimento". Auditoria continua usando PREVENTIVA/SDAI
+  // internamente, mas conserva o contexto operacional apenas nesta sessão.
   const [wizardStep, setWizardStep] = useState<0 | 1 | 2 | 3>(0);
   const [wTipo, setWTipo] = useState<string>(''); // LEVANTAMENTO | CORRETIVA | PREVENTIVA
   const [wArea, setWArea] = useState<string>(''); // disciplina (SDAI, CFTV, ...)
+  const [attendanceMode, setAttendanceMode] = useState<'NORMAL' | 'AUDITORIA'>('NORMAL');
   const [wClienteId, setWClienteId] = useState<string>('');
   const [wContratoId, setWContratoId] = useState<string>('');
   const [wOsId, setWOsId] = useState<string>('');
@@ -649,6 +651,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const openWizard = () => {
     setWTipo('');
     setWArea('');
+    setAttendanceMode('NORMAL');
     setWClienteId(clients[0]?.id || '');
     setWContratoId('');
     setWOsId('');
@@ -663,17 +666,6 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialAction]);
-  // Auditoria de conformidade (NBR 17240) = relatório Preventiva SDAI. Reutiliza
-  // o mesmo wizard/engine de relatórios, já com tipo/área/cliente pré-marcados.
-  const openAuditoria = (clienteId: string) => {
-    setWTipo('PREVENTIVA');
-    setWArea('SDAI');
-    setWClienteId(clienteId || clients[0]?.id || '');
-    setWContratoId('');
-    setWOsId('');
-    setWizardStep(1);
-  };
-
   const startForm = (preset?: { tipo: string; area: string; clienteId: string; osId?: string; contratoId?: string }) => {
     const tipo = preset?.tipo || wTipo;
     const area = preset?.area || wArea;
@@ -1072,6 +1064,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         pendenciasAprovadas={formPendAprovadas}
         ciclo={formCiclo}
         fieldMode={formTemplate.tipo === 'PREVENTIVA' || formTemplate.tipo === 'LEVANTAMENTO' || (formContext.osId && formTemplate.tipo === 'CORRETIVA') ? 'rapido' : 'completo'}
+        attendanceTitle={attendanceMode === 'AUDITORIA' ? 'Auditoria Técnica — SDAI' : undefined}
         onCreateCatalogo={(origem, name) => {
           // Marca nova → abre a janela de cadastro de marca (não cria nada solto).
           if (origem === 'marcas') {
@@ -1118,9 +1111,9 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       {/* Header */}
       <div className="flex flex-row items-center justify-between gap-3 border-b border-slate-200 pb-3">
         <div className="min-w-0">
-          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Relatórios de Campo — SDAI</span>
+          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Atendimentos de Campo — SDAI</span>
           <h1 className="text-lg md:text-2xl font-bold text-slate-900 tracking-tight truncate">
-            {isTecnico ? 'Meu trabalho pendente' : 'Acompanhamento de Relatórios'}
+            {isTecnico ? 'Meu trabalho' : 'Acompanhamento de Atendimentos'}
           </h1>
         </div>
         <div className="flex items-center gap-2">
@@ -1132,7 +1125,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
               onClick={openWizard}
               className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
             >
-              <span className="material-symbols-outlined text-base">add</span> Novo relatório
+              <span className="material-symbols-outlined text-base">add</span> Novo atendimento
             </button>
           )}
         </div>
@@ -1166,7 +1159,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 
       {/* Central de operação: o atendimento é o ponto de entrada principal em campo. */}
       <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 w-fit">
-        {(['atendimentos', 'relatorios', 'pendencias', 'auditorias'] as const).map((b) => (
+        {(['atendimentos', 'relatorios', 'pendencias'] as const).map((b) => (
           <button
             key={b}
             onClick={() => setBoard(b)}
@@ -1174,7 +1167,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
               board === b ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            {b === 'atendimentos' ? 'Meus atendimentos' : b === 'relatorios' ? 'Relatórios' : b === 'pendencias' ? 'Pendências' : 'Auditorias'}
+            {b === 'atendimentos' ? 'Meus atendimentos' : b === 'relatorios' ? 'Relatórios' : 'Pendências'}
           </button>
         ))}
       </div>
@@ -1226,7 +1219,6 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
               })}
             </div>
           )}
-          <button onClick={openWizard} title="Abrir um relatório sem Ordem de Serviço vinculada" className="min-h-11 px-4 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold uppercase inline-flex items-center gap-1.5"><span className="material-symbols-outlined text-base">assignment_late</span>Atendimento sem Ordem de Serviço</button>
         </div>
       )}
 
@@ -1238,40 +1230,6 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
           onChanged={refresh}
           onCreateProposal={onNavigateToPedidos}
         />
-      )}
-
-      {board === 'auditorias' && (
-        <div className="space-y-3">
-          <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-xs text-indigo-900 flex items-start gap-2">
-            <span className="material-symbols-outlined">fact_check</span>
-            <span>
-              <strong>Auditoria de conformidade NBR 17240.</strong> Selecione a unidade para abrir a auditoria (relatório de preventiva SDAI, com ART CREA-PR). As auditorias finalizadas aparecem em{' '}
-              <button onClick={() => { setBoard('relatorios'); setFTipo('PREVENTIVA'); }} className="underline font-bold">Relatórios</button>.
-            </span>
-          </div>
-          {clients.length === 0 ? (
-            <EmptyState variant="relatorio" title="Nenhuma unidade cadastrada" description="Cadastre um cliente para abrir auditorias de conformidade." />
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              {clients.map((c) => {
-                const nAud = reports.filter((r) => r.tipo === 'PREVENTIVA' && r.clienteId === c.id).length;
-                return (
-                  <article key={c.id} className="rounded-xl bg-white border border-slate-200 shadow-sm p-4 flex items-center gap-3">
-                    <div className="w-11 h-11 shrink-0 rounded-xl bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center"><span className="material-symbols-outlined">domain</span></div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-bold text-slate-900 truncate">{c.name}</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5 truncate">{c.address || 'Endereço não cadastrado'}</p>
-                      {nAud > 0 && <p className="text-[10px] text-slate-400 mt-0.5">{nAud} auditoria(s) registrada(s)</p>}
-                    </div>
-                    {canCreate && (
-                      <button onClick={() => openAuditoria(c.id)} className="shrink-0 min-h-11 px-3 rounded-lg bg-[#E63946] hover:bg-[#a51515] text-white text-[11px] font-bold uppercase tracking-wide inline-flex items-center gap-1.5"><span className="material-symbols-outlined text-base">fact_check</span>Abrir auditoria</button>
-                    )}
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </div>
       )}
 
       {board === 'relatorios' && (
@@ -1346,7 +1304,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
           variant="relatorio"
           title="Nenhum relatório"
           description={canCreate ? 'Abra um novo relatório de campo para começar.' : 'Sem relatórios para exibir com os filtros atuais.'}
-          actionLabel={canCreate ? 'Novo relatório' : undefined}
+          actionLabel={canCreate ? 'Novo atendimento' : undefined}
           onAction={canCreate ? openWizard : undefined}
         />
       ) : (
@@ -1504,13 +1462,13 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       </>
       )}
 
-      {/* ===== Wizard "+ Novo relatório" (3 passos) ===== */}
+      {/* ===== Wizard "+ Novo Atendimento" (3 passos) ===== */}
       {wizardStep > 0 && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-lg rounded-xl shadow-2xl border border-slate-200 max-h-[92vh] flex flex-col">
             <div className="flex items-center justify-between p-5 border-b border-slate-100">
               <div>
-                <h3 className="text-base font-bold text-slate-900 uppercase">Novo relatório</h3>
+                <h3 className="text-base font-bold text-slate-900 uppercase">Novo atendimento</h3>
                 <p className="text-[11px] text-slate-500">Passo {wizardStep} de 3</p>
               </div>
               <button onClick={closeWizard} className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none">✕</button>
@@ -1521,19 +1479,29 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
               {wizardStep === 1 && (
                 <div className="space-y-5">
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">1. Tipo de relatório</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">1. Tipo de atendimento</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                       {[
                         { id: 'CORRETIVA', label: 'Manutenção Corretiva', icon: 'build' },
-                        { id: 'LEVANTAMENTO', label: 'Levantamento (Orçamento)', icon: 'search' },
+                        { id: 'LEVANTAMENTO', label: 'Levantamento Técnico', icon: 'search' },
                         { id: 'PREVENTIVA', label: 'Manutenção Preventiva', icon: 'fact_check' },
+                        { id: 'AUDITORIA', label: 'Auditoria Técnica', icon: 'policy' },
                       ].map((t) => {
-                        const on = wTipo === t.id;
+                        const on = t.id === 'AUDITORIA' ? attendanceMode === 'AUDITORIA' : attendanceMode === 'NORMAL' && wTipo === t.id;
                         return (
                           <button
                             key={t.id}
                             type="button"
-                            onClick={() => setWTipo(t.id)}
+                            onClick={() => {
+                              if (t.id === 'AUDITORIA') {
+                                setAttendanceMode('AUDITORIA');
+                                setWTipo('PREVENTIVA');
+                                setWArea('SDAI');
+                              } else {
+                                setAttendanceMode('NORMAL');
+                                setWTipo(t.id);
+                              }
+                            }}
                             aria-pressed={on}
                             className={`border-2 rounded-xl p-4 text-left transition-colors ${
                               on ? 'border-[#1A1A72] bg-[#1A1A72]/5' : 'border-slate-200 hover:border-[#1A1A72]/50'
@@ -1557,14 +1525,17 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                         { id: 'CONTROLE_ACESSO', label: 'Controle de Acesso' },
                         { id: 'BMS', label: 'BMS (Automação)' },
                       ].map((a) => {
+                        const auditoriaIncompativel = attendanceMode === 'AUDITORIA' && a.id !== 'SDAI';
                         const on = wArea === a.id;
                         return (
                           <button
                             key={a.id}
                             type="button"
-                            onClick={() => setWArea(a.id)}
+                            onClick={() => !auditoriaIncompativel && setWArea(a.id)}
                             aria-pressed={on}
-                            className={`px-4 py-2 rounded-full text-xs font-semibold border transition-colors ${
+                            disabled={auditoriaIncompativel}
+                            title={auditoriaIncompativel ? 'Checklist de auditoria ainda não disponível.' : undefined}
+                            className={`px-4 py-2 rounded-full text-xs font-semibold border transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
                               on ? 'bg-[#E63946] text-white border-[#E63946] shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-[#E63946]'
                             }`}
                           >
@@ -1575,9 +1546,10 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                     </div>
                     {wTipo && wArea && (
                       <p className="text-[10px] text-slate-400 mt-2">
-                        Selecionado: <b className="text-slate-600">{TIPO_LABEL[wTipo]} · {wArea === 'CONTROLE_ACESSO' ? 'Controle de Acesso' : wArea === 'BMS' ? 'BMS' : wArea === 'ALARME' ? 'Alarme' : wArea}</b>
+                        Selecionado: <b className="text-slate-600">{attendanceMode === 'AUDITORIA' ? 'Auditoria Técnica' : TIPO_LABEL[wTipo]} · {wArea === 'CONTROLE_ACESSO' ? 'Controle de Acesso' : wArea === 'BMS' ? 'BMS' : wArea === 'ALARME' ? 'Alarme' : wArea}</b>
                       </p>
                     )}
+                    {attendanceMode === 'AUDITORIA' && <p className="text-[10px] text-indigo-700 mt-1">Auditoria de conformidade — ABNT NBR 17240</p>}
                   </div>
                 </div>
               )}
@@ -1735,7 +1707,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                   onClick={() => startForm()}
                   className="px-5 py-2 rounded-lg bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold uppercase tracking-wide"
                 >
-                  Iniciar relatório
+                  Iniciar atendimento
                 </button>
               )}
             </div>

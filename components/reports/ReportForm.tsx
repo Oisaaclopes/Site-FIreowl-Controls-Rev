@@ -42,6 +42,8 @@ interface ReportFormProps {
   contexto?: { osId?: string; contratoId?: string };
   /** Experiência de campo: simplifica a orientação sem alterar regras/dados. */
   fieldMode?: 'rapido' | 'completo';
+  /** Rótulo operacional local; não altera o tipo persistido do relatório. */
+  attendanceTitle?: string;
   /** Inventário do cliente — semeia o checklist_dispositivos (Preventiva). */
   devices?: Device[];
   /** Pendências aprovadas do cliente — semeiam o checklist_pendencias (Corretiva). */
@@ -177,6 +179,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   currentUserName = '',
   contexto,
   fieldMode = 'completo',
+  attendanceTitle,
   devices,
   pendenciasAprovadas,
   ciclo,
@@ -748,7 +751,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         </button>
         <div className="min-w-0 flex-1">
           <p className="text-[10px] text-slate-500 uppercase tracking-wider truncate">{cliente?.name || ''} {contexto?.osId ? '· OS vinculada' : ''}</p>
-          <p className="text-sm font-bold text-slate-900 truncate">{tituloOperacional}</p>
+          <p className="text-sm font-bold text-slate-900 truncate">{attendanceTitle || tituloOperacional}</p>
         </div>
         {modoCampo === 'rapido' && <span className="font-data-mono text-xs font-bold text-[#1A1A72] shrink-0">{cronometro}</span>}
         {modoCampo === 'rapido' && (
