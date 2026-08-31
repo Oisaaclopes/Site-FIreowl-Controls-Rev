@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { evidenceLines, isUnclassifiedFieldPhoto, newFieldPhoto, newFieldPhotoSession } from './fieldPhotos';
+import { evidenceLayout } from './fieldPhotoEvidence';
 
 describe('field photos', () => {
   it('preserva o instante real informado na captura e cria IDs estáveis', () => {
@@ -18,5 +19,9 @@ describe('field photos', () => {
     expect(lines.clientName).toBe('Cliente A');
     expect(lines.localSetor).toBeUndefined();
     expect(lines.note).toBeUndefined();
+  });
+  it('calcula carimbo proporcional para portrait e landscape', () => {
+    expect(evidenceLayout(1080, 1920, 2).overlayHeight).toBeLessThan(1920 * .35);
+    expect(evidenceLayout(1920, 1080, 3).font).toBeGreaterThan(0);
   });
 });
