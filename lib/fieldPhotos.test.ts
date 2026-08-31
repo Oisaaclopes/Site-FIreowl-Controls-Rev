@@ -24,4 +24,15 @@ describe('field photos', () => {
     expect(evidenceLayout(1080, 1920, 2).overlayHeight).toBeLessThan(1920 * .35);
     expect(evidenceLayout(1920, 1080, 3).font).toBeGreaterThan(0);
   });
+  it('mantém 20 capturas locais independentes sem alterar o instante capturado', () => {
+    const session = newFieldPhotoSession({ clientId: 'cliente-1', tecnicoId: '00000000-0000-4000-8000-000000000001' }, '2026-08-31T16:42:13.000Z');
+    const photos = Array.from({ length: 20 }, (_, index) => newFieldPhoto({
+      sessionId: session.id,
+      clientId: 'cliente-1',
+      storagePathOriginal: `local/${index}.jpg`,
+      marcador: 'falha',
+    }, '2026-08-31T16:42:13.000Z'));
+    expect(new Set(photos.map((photo) => photo.clientUuid)).size).toBe(20);
+    expect(photos.every((photo) => photo.capturadoEm === '2026-08-31T16:42:13.000Z')).toBe(true);
+  });
 });

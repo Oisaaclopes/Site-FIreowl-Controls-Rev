@@ -59,7 +59,11 @@ export async function createFieldPhotoSession(session: FieldPhotoSession) {
   if (error.code !== '23505') throw error;
   const { data: existing, error: lookupError } = await table.select('*').eq('client_uuid', session.clientUuid).single();
   if (lookupError) throw lookupError;
-  return fromSession(existing);
+  const { data: updated, error: updateError } = await table
+    .update({ local_setor: session.localSetor ?? null, finalizado_em: session.finalizadoEm ?? null, sync_status: session.syncStatus })
+    .eq('id', existing.id).select().single();
+  if (updateError) throw updateError;
+  return fromSession(updated);
 }
 export async function insertFieldPhoto(photo: FieldPhoto) {
   const table = (getSupabaseClient() as any).from('field_photos');
@@ -72,6 +76,12 @@ export async function insertFieldPhoto(photo: FieldPhoto) {
 }
 export async function listUnclassifiedFieldPhotos() {
   const { data, error } = await (getSupabaseClient() as any).from('field_photos').select('*').is('report_id', null).is('os_id', null).is('pendencia_id', null).order('capturado_em', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(fromPhoto);
+}
+
+export async function listFieldPhotosBySession(sessionId: string): Promise<FieldPhoto[]> {
+  const { data, error } = await (getSupabaseClient() as any).from('field_photos').select('*').eq('session_id', sessionId).order('capturado_em', { ascending: true });
   if (error) throw error;
   return (data || []).map(fromPhoto);
 }

@@ -2,10 +2,12 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { TabPath, TimePunch, Client, OrdemServico } from '@/lib/types';
-import { pendingCount, isOnline } from '@/lib/offline/reportSync';
+import { flushOutbox, pendingCount, isOnline } from '@/lib/offline/reportSync';
+import { pendingFieldPhotoJobs } from '@/lib/offline/fieldPhotoSync';
 import { fetchOrdensServico } from '@/lib/ordensServico';
 import { nextPunchType, buildPunch, capturePunchPosition, PUNCH_LABEL, PUNCH_DONE } from '@/lib/pontoActions';
 import { useToast } from '@/components/ui/Feedback';
+import { QuickFieldPhotoModal } from '@/components/field-photos/QuickFieldPhotoModal';
 
 interface TechDashboardProps {
   currentUser: string;
@@ -52,11 +54,16 @@ export const TechDashboard: React.FC<TechDashboardProps> = ({
   const [pend, setPend] = useState(0);
   const [punching, setPunching] = useState(false);
   const [ordens, setOrdens] = useState<OrdemServico[]>([]);
+  const [quickPhotoOpen, setQuickPhotoOpen] = useState(false);
+
+  const refreshPending = React.useCallback(() => {
+    void Promise.all([pendingCount(), pendingFieldPhotoJobs()]).then(([reports, photos]) => setPend(reports + photos)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     setOnline(isOnline());
-    pendingCount().then(setPend).catch(() => {});
-    const on = () => { setOnline(true); pendingCount().then(setPend).catch(() => {}); };
+    refreshPending();
+    const on = () => { setOnline(true); void flushOutbox().finally(refreshPending); };
     const off = () => setOnline(false);
     window.addEventListener('online', on);
     window.addEventListener('offline', off);
@@ -64,7 +71,7 @@ export const TechDashboard: React.FC<TechDashboardProps> = ({
       window.removeEventListener('online', on);
       window.removeEventListener('offline', off);
     };
-  }, []);
+  }, [refreshPending]);
 
   useEffect(() => {
     // A RLS já restringe o TÉCNICO às OS dele; filtramos por UUID como reforço.
@@ -172,6 +179,13 @@ export const TechDashboard: React.FC<TechDashboardProps> = ({
           <span className="material-symbols-outlined text-3xl">add_task</span>
           <span className="text-xs font-bold uppercase tracking-wide text-slate-700">Nova OS</span>
         </button>
+        <button
+          onClick={() => setQuickPhotoOpen(true)}
+          className="min-h-[80px] rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col items-center justify-center gap-1 text-[#1A1A72] hover:border-[#1A1A72] transition-colors"
+        >
+          <span className="material-symbols-outlined text-3xl">photo_camera</span>
+          <span className="text-xs font-bold uppercase tracking-wide text-slate-700">Registro Rápido</span>
+        </button>
       </div>
 
       {/* Mini-agenda — minhas próximas OS (por UUID, RLS já restringe) */}
@@ -209,6 +223,13 @@ export const TechDashboard: React.FC<TechDashboardProps> = ({
           </div>
         )}
       </div>
+      <QuickFieldPhotoModal
+        isOpen={quickPhotoOpen}
+        onClose={() => setQuickPhotoOpen(false)}
+        clients={clients}
+        technicianId={currentUserId}
+        technicianName={currentUser}
+      />
     </div>
   );
 };
