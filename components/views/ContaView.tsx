@@ -423,7 +423,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
           .map((s) => s.trim())
           .filter(Boolean),
       });
-      setCreateMsg('OK: usuário criado. Já pode fazer login (se a confirmação de e-mail estiver desativada).');
+      setCreateMsg('OK: usuário criado. Já pode fazer login com a senha definida.');
       setNuName('');
       setNuEmail('');
       setNuPassword('');
@@ -436,14 +436,8 @@ export const ContaView: React.FC<ContaViewProps> = ({
       setNuSchedule(DEFAULT_SCHEDULE.map((d) => ({ ...d })));
       setTimeout(refreshUsers, 600);
     } catch (err: any) {
-      const msg = String(err?.message || '');
-      if (/already registered|already exists/i.test(msg)) {
-        setCreateMsg('Já existe um usuário com esse e-mail.');
-      } else if (/signups? not allowed|disabled/i.test(msg)) {
-        setCreateMsg('Cadastro desativado no Supabase (Auth → Providers → Email → habilite os cadastros).');
-      } else {
-        setCreateMsg('Não foi possível criar o usuário: ' + msg);
-      }
+      // createUser já devolve mensagem amigável (PT) por código da Edge Function.
+      setCreateMsg(String(err?.message || 'Não foi possível criar o usuário.'));
     } finally {
       setCreating(false);
     }

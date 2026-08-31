@@ -1,4 +1,3 @@
-import { createClient } from '@supabase/supabase-js';
 import { getSupabaseClient } from './supabaseClient';
 import { UserRole } from './types';
 import { WorkSchedule, normalizeSchedule } from './schedule';
@@ -64,24 +63,55 @@ const profileFields = (u: Partial<NewUserInput>) => ({
   courses: u.courses ?? null,
 });
 
-// Cria o login (Auth, cliente temporário) + completa os dados do perfil.
-export async function createUser(input: NewUserInput): Promise<void> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-  const tmp = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { data, error } = await tmp.auth.signUp({
-    email: input.email,
-    password: input.password,
-    options: { data: { name: input.name, role: input.role } },
-  });
-  if (error) throw error;
+// Mensagens amigáveis (PT) por código de erro da Edge Function. Nunca expõe
+// erro bruto do Supabase.
+const CREATE_ERROR_MSG: Record<string, string> = {
+  email_exists: 'Já existe um usuário com esse e-mail.',
+  invalid_email: 'E-mail inválido.',
+  weak_password: 'Senha inválida (mínimo de 6 caracteres).',
+  invalid_role: 'Perfil de acesso inválido.',
+  invalid_name: 'Informe o nome do usuário.',
+  forbidden: 'Sem permissão: apenas o Administrativo pode criar usuários.',
+  unauthorized: 'Sessão inválida. Faça login novamente.',
+  profile_update_failed: 'Falha ao gravar os dados do usuário. Nenhuma conta foi criada.',
+  create_failed: 'Não foi possível criar o usuário.',
+  not_deployed: 'Serviço de criação de usuários indisponível. Verifique se a Edge Function "create-user" foi implantada.',
+};
 
-  // Completa os dados cadastrais do perfil (o admin logado tem update via RLS).
-  const newId = data.user?.id;
-  if (newId) {
-    const supabase = getSupabaseClient() as any;
-    await supabase.from('profiles').update({ name: input.name, ...profileFields(input) }).eq('id', newId);
+// Criação de usuário SERVER-SIDE via Edge Function (create-user). O browser
+// NÃO chama mais auth.signUp — a service_role fica só na função. A sessão do
+// admin (JWT) é enviada automaticamente pelo functions.invoke e validada lá.
+export async function createUser(input: NewUserInput): Promise<void> {
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase.functions.invoke('create-user', {
+    body: {
+      email: input.email,
+      password: input.password,
+      name: input.name,
+      role: input.role,
+      fullName: input.fullName ?? null,
+      cpf: input.cpf ?? null,
+      birthDate: input.birthDate ?? null,
+      phone: input.phone ?? null,
+      schedule: input.schedule ?? null,
+      courses: input.courses ?? null,
+    },
+  });
+
+  if (error) {
+    // FunctionsHttpError expõe a Response em error.context; extrai o código.
+    let code = '';
+    try {
+      const payload = await error.context?.json?.();
+      code = payload?.error || '';
+    } catch {
+      /* corpo indisponível */
+    }
+    // Função ainda não implantada / rede: fecha o fluxo (não cai em signUp).
+    if (!code && /not found|failed to (send|fetch)|404/i.test(error.message || '')) code = 'not_deployed';
+    throw new Error(CREATE_ERROR_MSG[code] || CREATE_ERROR_MSG.create_failed);
   }
+  if (data?.error) throw new Error(CREATE_ERROR_MSG[data.error] || CREATE_ERROR_MSG.create_failed);
 }
 
 export async function updateUserRole(id: string, role: UserRole): Promise<void> {

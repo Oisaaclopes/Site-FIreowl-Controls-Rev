@@ -1,0 +1,7 @@
+# Config mínima do Supabase CLI (apenas para as Edge Functions deste projeto).
+# A função create-user faz sua própria validação de JWT + role ADMINISTRATIVO,
+# e precisa responder ao preflight OPTIONS do navegador, então verify_jwt=false
+# (a autorização real acontece dentro da função, não no gateway).
+
+[functions.create-user]
+verify_jwt = false
