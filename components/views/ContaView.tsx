@@ -36,6 +36,8 @@ import { maskCpf } from '@/lib/utils';
 import { listEmployeeDocs, uploadEmployeeDoc, signedDocUrl, deleteEmployeeDoc, EmployeeDoc } from '@/lib/storage';
 import { uploadPropostaCapa, removePropostaCapa } from '@/lib/propostaCapa';
 import { uploadInstitucionalLogo, removeInstitucionalLogo, resolveLogoDataUrls } from '@/lib/institucional';
+import { canResetUserPassword } from '@/lib/rbac';
+import { ResetPasswordModal } from '@/components/users/ResetPasswordModal';
 
 interface ContaViewProps {
   logs: SystemAuditLog[];
@@ -275,6 +277,8 @@ export const ContaView: React.FC<ContaViewProps> = ({
 
   // Edição de funcionário existente
   const [editUser, setEditUser] = useState<ManagedUser | null>(null);
+  const [resetUser, setResetUser] = useState<ManagedUser | null>(null);
+  const canReset = canResetUserPassword(userRole);
   const [savingEdit, setSavingEdit] = useState(false);
   const [revealCpf, setRevealCpf] = useState(false); // LGPD: CPF oculto por padrão
   const [euForm, setEuForm] = useState({
@@ -1577,6 +1581,9 @@ export const ContaView: React.FC<ContaViewProps> = ({
                             <option value="DESLIGADO">Desligado</option>
                           </select>
                           <RowAction icon="edit" label="Editar dados" onClick={() => openEditUser(u)} />
+                          {canReset && !isSelf && (
+                            <RowAction icon="lock_reset" label="Redefinir senha" onClick={() => setResetUser(u)} />
+                          )}
                           {!isSelf && (
                             <RowAction icon="delete" label="Excluir definitivamente (excepcional)" danger onClick={() => handleDeleteUser(u)} />
                           )}
@@ -1593,6 +1600,10 @@ export const ContaView: React.FC<ContaViewProps> = ({
             </p>
           </div>
         </div>
+      )}
+
+      {resetUser && canReset && (
+        <ResetPasswordModal user={resetUser} onClose={() => setResetUser(null)} />
       )}
 
       {/* Drawer: Editar dados do funcionário */}

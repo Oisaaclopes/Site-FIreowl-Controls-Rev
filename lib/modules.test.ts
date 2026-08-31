@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { greeting, isHomeEligibleEntry, MODULE_META, quickMenuTabs, shouldRenderMobileHome } from './modules';
-import { allowedTabs } from './rbac';
+import { allowedTabs, canResetUserPassword } from './rbac';
 import { UserRole } from './types';
 
 const ROLES: UserRole[] = ['ADMINISTRATIVO', 'GESTOR', 'FINANCEIRO', 'TECNICO'];
@@ -35,6 +35,13 @@ describe('menu rápido / RBAC (Fase 4.1)', () => {
     expect(quickMenuTabs('TECNICO')[0]).toBe('relatorios');
     expect(quickMenuTabs('ADMINISTRATIVO')[0]).toBe('painel');
     expect(quickMenuTabs('GESTOR')[0]).toBe('painel');
+  });
+
+  it('redefinir senha é exclusivo do ADMINISTRATIVO (§B19)', () => {
+    expect(canResetUserPassword('ADMINISTRATIVO')).toBe(true);
+    expect(canResetUserPassword('GESTOR')).toBe(false);
+    expect(canResetUserPassword('FINANCEIRO')).toBe(false);
+    expect(canResetUserPassword('TECNICO')).toBe(false);
   });
 
   it('saudação por horário', () => {

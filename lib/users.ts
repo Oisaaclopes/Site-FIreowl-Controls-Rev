@@ -168,6 +168,35 @@ export async function createUser(input: NewUserInput): Promise<void> {
   if (data?.error) throw new Error(CREATE_ERROR_MSG[data.error] || CREATE_ERROR_MSG.create_failed);
 }
 
+// Mensagens (PT) por código da Edge Function reset-user-password. A senha NUNCA
+// é registrada em log/toast/URL — só trafega no corpo da requisição para a função.
+const RESET_ERROR_MSG: Record<string, string> = {
+  weak_password: 'Senha fraca: use ao menos 10 caracteres com maiúscula, minúscula, número e símbolo.',
+  forbidden: 'Sem permissão: apenas o Administrativo (ativo) pode redefinir senhas.',
+  unauthorized: 'Sessão inválida. Faça login novamente.',
+  self_reset_blocked: 'Use "Alterar minha senha" para a sua própria conta.',
+  target_not_found: 'Usuário não encontrado.',
+  invalid_target: 'Usuário inválido.',
+  reset_failed: 'Não foi possível redefinir a senha.',
+  not_deployed: 'Serviço de redefinição indisponível. Verifique se a Edge Function "reset-user-password" foi implantada.',
+};
+
+// Redefinição de senha SERVER-SIDE (Edge Function). O browser não usa
+// service_role; a sessão do admin (JWT) é validada dentro da função.
+export async function resetUserPassword(targetUserId: string, password: string): Promise<void> {
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase.functions.invoke('reset-user-password', {
+    body: { targetUserId, password },
+  });
+  if (error) {
+    let code = '';
+    try { const payload = await error.context?.json?.(); code = payload?.error || ''; } catch { /* corpo indisponível */ }
+    if (!code && /not found|failed to (send|fetch)|404/i.test(error.message || '')) code = 'not_deployed';
+    throw new Error(RESET_ERROR_MSG[code] || RESET_ERROR_MSG.reset_failed);
+  }
+  if (data?.error) throw new Error(RESET_ERROR_MSG[data.error] || RESET_ERROR_MSG.reset_failed);
+}
+
 export async function updateUserRole(id: string, role: UserRole): Promise<void> {
   const supabase = getSupabaseClient() as any;
   const { error } = await supabase.from('profiles').update({ role }).eq('id', id);

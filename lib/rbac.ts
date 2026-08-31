@@ -26,4 +26,7 @@ export const ROLE_TABS: Record<UserRole, TabPath[]> = {
 
 export const allowedTabs = (role: UserRole): TabPath[] => ROLE_TABS[role] || ROLE_TABS.ADMINISTRATIVO;
 
+/** Redefinir a senha de outro usuário é exclusivo do ADMINISTRATIVO (Fase B). */
+export const canResetUserPassword = (role: UserRole): boolean => role === 'ADMINISTRATIVO';
+
 export const isTabAllowed = (role: UserRole, tab: TabPath): boolean => allowedTabs(role).includes(tab);
