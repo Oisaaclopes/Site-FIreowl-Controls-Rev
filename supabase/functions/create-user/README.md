@@ -17,6 +17,11 @@ se a gravação dos dados cadastrais falhar, o auth user é revertido (sem conta
   supabase link --project-ref kalfwikvgxogzbsemgbk
   ```
 
+## 0) Pré-requisito de schema
+Aplique **`lib/db/migrations/0061_profile_status_cargo.sql`** ANTES de implantar esta
+função (ela grava `status`/`cargo` no profile) e antes do deploy do frontend desta
+passada (a edição de usuário passa a gravar essas colunas).
+
 ## 1) Implantar a função (ANTES de fechar o signup)
 ```bash
 supabase functions deploy create-user --no-verify-jwt

@@ -1,5 +1,5 @@
 import { getSupabaseClient } from './supabaseClient';
-import { UserRole } from './types';
+import { UserRole, UserStatus } from './types';
 import { WorkSchedule, normalizeSchedule } from './schedule';
 
 export interface AuthUser {
@@ -7,8 +7,15 @@ export interface AuthUser {
   email: string;
   name: string;
   role: UserRole;
+  status: UserStatus;
+  cargo?: string;
   schedule?: WorkSchedule;
 }
+
+const VALID_STATUS: UserStatus[] = ['ATIVO', 'INATIVO', 'DESLIGADO'];
+// Tolerante à migration 0061 ainda não aplicada: sem coluna → ATIVO.
+const normalizeStatus = (s: unknown): UserStatus =>
+  VALID_STATUS.includes(s as UserStatus) ? (s as UserStatus) : 'ATIVO';
 
 const VALID_ROLES: UserRole[] = ['ADMINISTRATIVO', 'TECNICO', 'GESTOR', 'FINANCEIRO'];
 const normalizeRole = (r: unknown): UserRole =>
@@ -16,9 +23,10 @@ const normalizeRole = (r: unknown): UserRole =>
 
 // Monta o AuthUser a partir do perfil no banco. Sem perfil => sem acesso.
 async function toAuthUser(supabase: any, user: any): Promise<AuthUser | null> {
+  // select('*') é tolerante a colunas ainda ausentes (status/cargo antes da 0061).
   const { data: profile } = await supabase
     .from('profiles')
-    .select('name, role, schedule')
+    .select('*')
     .eq('id', user.id)
     .maybeSingle();
 
@@ -30,6 +38,8 @@ async function toAuthUser(supabase: any, user: any): Promise<AuthUser | null> {
     email: user.email || '',
     name,
     role: normalizeRole(profile.role),
+    status: normalizeStatus(profile.status),
+    cargo: profile.cargo ?? undefined,
     schedule: profile.schedule ? normalizeSchedule(profile.schedule) : undefined,
   };
 }
@@ -43,6 +53,11 @@ export async function signIn(email: string, password: string): Promise<AuthUser>
   if (!authUser) {
     await supabase.auth.signOut();
     throw new Error('PROFILE_NOT_AUTHORIZED');
+  }
+  // Bloqueio de ciclo de vida: apenas ATIVO entra.
+  if (authUser.status !== 'ATIVO') {
+    await supabase.auth.signOut();
+    throw new Error(authUser.status === 'DESLIGADO' ? 'PROFILE_DESLIGADO' : 'PROFILE_INATIVO');
   }
   return authUser;
 }
@@ -59,7 +74,8 @@ export async function getSessionUser(): Promise<AuthUser | null> {
   const user = data?.session?.user;
   if (!user) return null;
   const authUser = await toAuthUser(supabase, user);
-  if (!authUser) {
+  if (!authUser || authUser.status !== 'ATIVO') {
+    // Perfil revogado OU inativo/desligado: derruba a sessão restaurada.
     await supabase.auth.signOut();
     return null;
   }

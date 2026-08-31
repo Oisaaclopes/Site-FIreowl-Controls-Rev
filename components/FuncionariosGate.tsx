@@ -69,6 +69,10 @@ export function FuncionariosGate({ initialTab }: { initialTab?: TabPath }) {
         setErro('E-mail ou senha inválidos.');
       } else if (/email not confirmed/i.test(msg)) {
         setErro('E-mail ainda não confirmado. Confirme o cadastro ou peça ao administrador.');
+      } else if (/PROFILE_INATIVO/.test(msg)) {
+        setErro('Seu acesso está temporariamente inativo. Entre em contato com o administrador.');
+      } else if (/PROFILE_DESLIGADO/.test(msg)) {
+        setErro('Este usuário não possui mais acesso ao sistema.');
       } else if (/PROFILE_NOT_AUTHORIZED/.test(msg)) {
         setErro('Acesso não autorizado. Fale com o administrador do sistema.');
       } else {

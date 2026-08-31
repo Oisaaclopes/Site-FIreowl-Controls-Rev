@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { SystemAuditLog, UserRole, CompanyProfile, PartnerBrand, PdfPrefs, Client, CatalogoProvisorio, DocumentosPadrao, PedidoTipo, DocumentType, EmpresaAtendida, MarcaTecnologia } from '@/lib/types';
+import { SystemAuditLog, UserRole, UserStatus, CompanyProfile, PartnerBrand, PdfPrefs, Client, CatalogoProvisorio, DocumentosPadrao, PedidoTipo, DocumentType, EmpresaAtendida, MarcaTecnologia } from '@/lib/types';
 import { ExperienciaAdmin } from '@/components/views/ExperienciaAdmin';
 import {
   PEDIDO_TIPO_LABELS,
@@ -26,6 +26,8 @@ import {
   updateUserRole,
   updateUserProfile,
   deleteUserProfile,
+  setUserStatus,
+  logUserAudit,
   ManagedUser,
 } from '@/lib/users';
 import { WorkSchedule, DEFAULT_SCHEDULE, WEEKDAY_SHORT } from '@/lib/schedule';
@@ -259,6 +261,8 @@ export const ContaView: React.FC<ContaViewProps> = ({
   const [nuEmail, setNuEmail] = useState('');
   const [nuPassword, setNuPassword] = useState('');
   const [nuRole, setNuRole] = useState<UserRole>('TECNICO');
+  const [nuCargo, setNuCargo] = useState('');
+  const [nuStatus, setNuStatus] = useState<UserStatus>('ATIVO');
   const [nuFullName, setNuFullName] = useState('');
   const [nuCpf, setNuCpf] = useState('');
   const [nuBirth, setNuBirth] = useState('');
@@ -277,6 +281,8 @@ export const ContaView: React.FC<ContaViewProps> = ({
     birthDate: '',
     phone: '',
     role: 'TECNICO' as UserRole,
+    cargo: '',
+    status: 'ATIVO' as UserStatus,
     courses: '',
     schedule: DEFAULT_SCHEDULE.map((d) => ({ ...d })) as WorkSchedule,
   });
@@ -346,6 +352,8 @@ export const ContaView: React.FC<ContaViewProps> = ({
       birthDate: u.birthDate || '',
       phone: u.phone || '',
       role: u.role,
+      cargo: u.cargo || '',
+      status: u.status || 'ATIVO',
       courses: (u.courses || []).join('\n'),
       schedule: u.schedule ? u.schedule.map((d) => ({ ...d })) : DEFAULT_SCHEDULE.map((d) => ({ ...d })),
     });
@@ -355,10 +363,13 @@ export const ContaView: React.FC<ContaViewProps> = ({
   const handleSaveUserEdit = async () => {
     if (!editUser || savingEdit) return;
     setSavingEdit(true);
+    const prev = editUser;
     try {
       await updateUserProfile(editUser.id, {
         name: euForm.name.trim() || undefined,
         role: euForm.role,
+        cargo: euForm.cargo.trim() || undefined,
+        status: euForm.status,
         fullName: euForm.fullName.trim() || undefined,
         cpf: euForm.cpf.trim() || undefined,
         birthDate: euForm.birthDate || undefined,
@@ -369,6 +380,10 @@ export const ContaView: React.FC<ContaViewProps> = ({
           .map((s) => s.trim())
           .filter(Boolean),
       });
+      // Auditoria das mudanças sensíveis (perfil/cargo/status).
+      if (prev.role !== euForm.role) logUserAudit('USER_ROLE_CHANGED', `target=${prev.id} ${prev.role}→${euForm.role}`);
+      if ((prev.cargo || '') !== euForm.cargo.trim()) logUserAudit('USER_CARGO_CHANGED', `target=${prev.id} "${prev.cargo || ''}"→"${euForm.cargo.trim()}"`);
+      if (prev.status !== euForm.status) logUserAudit('USER_STATUS_CHANGED', `target=${prev.id} ${prev.status}→${euForm.status}`);
       setEditUser(null);
       setTimeout(refreshUsers, 300);
     } catch (err) {
@@ -413,6 +428,8 @@ export const ContaView: React.FC<ContaViewProps> = ({
         password: nuPassword,
         name: (nuName || nuFullName || nuEmail.split('@')[0]).trim(),
         role: nuRole,
+        status: nuStatus,
+        cargo: nuCargo.trim() || undefined,
         fullName: nuFullName.trim() || undefined,
         cpf: nuCpf.trim() || undefined,
         birthDate: nuBirth || undefined,
@@ -423,11 +440,14 @@ export const ContaView: React.FC<ContaViewProps> = ({
           .map((s) => s.trim())
           .filter(Boolean),
       });
+      // (a Edge Function já registra USER_CREATED no audit_logs server-side)
       setCreateMsg('OK: usuário criado. Já pode fazer login com a senha definida.');
       setNuName('');
       setNuEmail('');
       setNuPassword('');
       setNuRole('TECNICO');
+      setNuCargo('');
+      setNuStatus('ATIVO');
       setNuFullName('');
       setNuCpf('');
       setNuBirth('');
@@ -444,12 +464,37 @@ export const ContaView: React.FC<ContaViewProps> = ({
   };
 
   const handleRoleChange = async (u: ManagedUser, role: UserRole) => {
+    if (role === u.role) return;
     try {
       await updateUserRole(u.id, role);
+      logUserAudit('USER_ROLE_CHANGED', `target=${u.id} ${u.role}→${role}`);
       setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, role } : x)));
     } catch (err) {
       console.error('Falha ao alterar papel:', err);
       alert('Não foi possível alterar o nível de acesso.');
+    }
+  };
+
+  // Ativar / Inativar / Desligar — sem DELETE (preserva histórico).
+  const [statusBusy, setStatusBusy] = useState<string | null>(null);
+  const handleStatusChange = async (u: ManagedUser, status: UserStatus) => {
+    if (status === u.status) return;
+    if (u.email && currentEmail && u.email.toLowerCase() === currentEmail.toLowerCase()) {
+      alert('Você não pode alterar o próprio status de acesso.');
+      return;
+    }
+    const verbo = status === 'ATIVO' ? 'reativar' : status === 'INATIVO' ? 'inativar' : 'marcar como desligado';
+    if (!window.confirm(`Deseja ${verbo} "${u.name || u.email}"?\n\nO histórico é preservado; nada é excluído.`)) return;
+    setStatusBusy(u.id);
+    try {
+      await setUserStatus(u.id, status);
+      logUserAudit('USER_STATUS_CHANGED', `target=${u.id} ${u.status}→${status}`);
+      setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, status } : x)));
+    } catch (err) {
+      console.error('Falha ao alterar status:', err);
+      alert('Não foi possível alterar o status.');
+    } finally {
+      setStatusBusy(null);
     }
   };
 
@@ -458,7 +503,14 @@ export const ContaView: React.FC<ContaViewProps> = ({
       alert('Você não pode remover o seu próprio acesso.');
       return;
     }
-    if (!window.confirm(`Remover o acesso de "${u.name || u.email}"?\n\nO usuário perde o acesso ao sistema.`)) return;
+    if (
+      !window.confirm(
+        `EXCLUSÃO DEFINITIVA de "${u.name || u.email}".\n\n` +
+          'Para desativar no dia a dia use INATIVO/DESLIGADO (preserva o histórico).\n' +
+          'A exclusão remove o perfil. Prosseguir apenas em caso excepcional?'
+      )
+    )
+      return;
     try {
       await deleteUserProfile(u.id);
       setUsers((prev) => prev.filter((x) => x.id !== u.id));
@@ -1332,12 +1384,25 @@ export const ContaView: React.FC<ContaViewProps> = ({
                   <input type="text" value={nuName} onChange={(e) => setNuName(e.target.value)} className={inputCls} placeholder="Ex.: Isaac L." />
                 </div>
                 <div>
-                  <label className={labelCls}>Nível de acesso</label>
+                  <label className={labelCls}>Perfil de acesso</label>
                   <select value={nuRole} onChange={(e) => setNuRole(e.target.value as UserRole)} className={`${inputCls} font-semibold`}>
                     <option value="ADMINISTRATIVO">Administrativo — acesso total</option>
                     <option value="GESTOR">Gestor — operação e contratos</option>
                     <option value="FINANCEIRO">Financeiro — receitas e despesas</option>
                     <option value="TECNICO">Técnico — campo e ponto</option>
+                  </select>
+                  <p className="text-[10px] text-slate-400 mt-1">Controla o acesso ao sistema (RLS). Não é o cargo.</p>
+                </div>
+                <div>
+                  <label className={labelCls}>Cargo (função profissional)</label>
+                  <input type="text" value={nuCargo} onChange={(e) => setNuCargo(e.target.value)} className={inputCls} placeholder="Ex.: Técnico de Campo, Analista Administrativo" />
+                  <p className="text-[10px] text-slate-400 mt-1">Descritivo; não altera permissões.</p>
+                </div>
+                <div>
+                  <label className={labelCls}>Status inicial</label>
+                  <select value={nuStatus} onChange={(e) => setNuStatus(e.target.value as UserStatus)} className={inputCls}>
+                    <option value="ATIVO">Ativo</option>
+                    <option value="INATIVO">Inativo</option>
                   </select>
                 </div>
                 <div>
@@ -1442,10 +1507,20 @@ export const ContaView: React.FC<ContaViewProps> = ({
                           {isSelf && <span className="ml-2 text-[10px] text-slate-400 uppercase">(você)</span>}
                         </span>
                       }
-                      meta={<span className="font-data-mono text-slate-500">{u.email}</span>}
+                      meta={
+                        <>
+                          <span className="font-data-mono text-slate-500">{u.email}</span>
+                          {u.cargo && <span className="text-slate-500">{u.cargo}</span>}
+                          <Badge color={u.status === 'ATIVO' ? 'emerald' : u.status === 'INATIVO' ? 'amber' : 'slate'}>
+                            {u.status === 'ATIVO' ? 'Ativo' : u.status === 'INATIVO' ? 'Inativo' : 'Desligado'}
+                          </Badge>
+                        </>
+                      }
                       right={
                         <>
                           <select
+                            aria-label="Perfil de acesso"
+                            title="Perfil de acesso (permissões)"
                             value={u.role}
                             onChange={(e) => handleRoleChange(u, e.target.value as UserRole)}
                             className="border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
@@ -1455,9 +1530,21 @@ export const ContaView: React.FC<ContaViewProps> = ({
                             <option value="FINANCEIRO">Financeiro</option>
                             <option value="TECNICO">Técnico</option>
                           </select>
+                          <select
+                            aria-label="Status do funcionário"
+                            title="Status (ciclo de vida)"
+                            value={u.status}
+                            disabled={isSelf || statusBusy === u.id}
+                            onChange={(e) => handleStatusChange(u, e.target.value as UserStatus)}
+                            className="border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20 disabled:opacity-50"
+                          >
+                            <option value="ATIVO">Ativo</option>
+                            <option value="INATIVO">Inativo</option>
+                            <option value="DESLIGADO">Desligado</option>
+                          </select>
                           <RowAction icon="edit" label="Editar dados" onClick={() => openEditUser(u)} />
                           {!isSelf && (
-                            <RowAction icon="delete" label="Remover acesso" danger onClick={() => handleDeleteUser(u)} />
+                            <RowAction icon="delete" label="Excluir definitivamente (excepcional)" danger onClick={() => handleDeleteUser(u)} />
                           )}
                         </>
                       }
@@ -1468,7 +1555,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
             )}
             <p className="text-[10px] text-slate-400 mt-3 flex items-center gap-1">
               <span className="material-symbols-outlined text-sm">info</span>
-              &quot;Remover&quot; revoga o acesso ao sistema. A exclusão total da conta de login é feita no painel do Supabase.
+              Use o status (Ativo/Inativo/Desligado) para o ciclo de vida — nada é excluído. &quot;Excluir&quot; é excepcional; a conta de login é removida no painel do Supabase.
             </p>
           </div>
         </div>
@@ -1490,7 +1577,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
               <input value={euForm.name} onChange={(e) => setEuForm({ ...euForm, name: e.target.value })} className={inputCls} />
             </div>
             <div>
-              <label className={labelCls}>Nível de acesso</label>
+              <label className={labelCls}>Perfil de acesso</label>
               <select
                 value={euForm.role}
                 onChange={(e) => setEuForm({ ...euForm, role: e.target.value as UserRole })}
@@ -1501,6 +1588,24 @@ export const ContaView: React.FC<ContaViewProps> = ({
                 <option value="FINANCEIRO">Financeiro</option>
                 <option value="TECNICO">Técnico</option>
               </select>
+              <p className="text-[10px] text-slate-400 mt-1">Permissões (RLS). Distinto do cargo.</p>
+            </div>
+            <div>
+              <label className={labelCls}>Cargo (função profissional)</label>
+              <input value={euForm.cargo} onChange={(e) => setEuForm({ ...euForm, cargo: e.target.value })} className={inputCls} placeholder="Ex.: Coordenador Técnico" />
+            </div>
+            <div>
+              <label className={labelCls}>Status</label>
+              <select
+                value={euForm.status}
+                onChange={(e) => setEuForm({ ...euForm, status: e.target.value as UserStatus })}
+                className={inputCls}
+              >
+                <option value="ATIVO">Ativo</option>
+                <option value="INATIVO">Inativo</option>
+                <option value="DESLIGADO">Desligado</option>
+              </select>
+              <p className="text-[10px] text-slate-400 mt-1">Só ATIVO acessa o sistema. Não exclui histórico.</p>
             </div>
             <div>
               <label className={labelCls}>Nome completo</label>

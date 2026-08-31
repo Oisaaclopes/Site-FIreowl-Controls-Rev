@@ -16,6 +16,9 @@ export type TabPath =
 
 export type UserRole = 'ADMINISTRATIVO' | 'TECNICO' | 'GESTOR' | 'FINANCEIRO';
 
+// Ciclo de vida do funcionário (separado do perfil de acesso). Só ATIVO opera.
+export type UserStatus = 'ATIVO' | 'INATIVO' | 'DESLIGADO';
+
 export type PedidoStatus =
   | 'rascunho'
   | 'em_revisao'

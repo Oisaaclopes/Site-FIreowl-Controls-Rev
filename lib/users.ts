@@ -1,5 +1,5 @@
 import { getSupabaseClient } from './supabaseClient';
-import { UserRole } from './types';
+import { UserRole, UserStatus } from './types';
 import { WorkSchedule, normalizeSchedule } from './schedule';
 
 export interface ManagedUser {
@@ -7,6 +7,8 @@ export interface ManagedUser {
   email: string;
   name: string;
   role: UserRole;
+  status: UserStatus;
+  cargo?: string;
   fullName?: string;
   cpf?: string;
   birthDate?: string;
@@ -20,6 +22,8 @@ export interface NewUserInput {
   password: string;
   name: string;
   role: UserRole;
+  status?: UserStatus;
+  cargo?: string;
   fullName?: string;
   cpf?: string;
   birthDate?: string;
@@ -28,12 +32,17 @@ export interface NewUserInput {
   courses?: string[];
 }
 
+const VALID_STATUS: UserStatus[] = ['ATIVO', 'INATIVO', 'DESLIGADO'];
+const normStatus = (s: unknown): UserStatus => (VALID_STATUS.includes(s as UserStatus) ? (s as UserStatus) : 'ATIVO');
+
 function rowToUser(r: any): ManagedUser {
   return {
     id: String(r.id),
     email: r.email || '',
     name: r.name || (r.email || '').split('@')[0],
     role: r.role as UserRole,
+    status: normStatus(r.status),
+    cargo: r.cargo ?? undefined,
     fullName: r.full_name ?? undefined,
     cpf: r.cpf ?? undefined,
     birthDate: r.birth_date ?? undefined,
@@ -43,12 +52,13 @@ function rowToUser(r: any): ManagedUser {
   };
 }
 
-// Só ADMINISTRATIVO enxerga (RLS). Traz os dados cadastrais dos funcionários.
+// Só ADMINISTRATIVO enxerga (RLS). select('*') tolera colunas ainda ausentes
+// (status/cargo antes da migration 0061).
 export async function listUsers(): Promise<ManagedUser[]> {
   const supabase = getSupabaseClient() as any;
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, email, name, role, full_name, cpf, birth_date, phone, schedule, courses')
+    .select('*')
     .order('created_at', { ascending: true });
   if (error) throw error;
   return (data || []).map(rowToUser);
@@ -59,9 +69,28 @@ const profileFields = (u: Partial<NewUserInput>) => ({
   cpf: u.cpf || null,
   birth_date: u.birthDate || null,
   phone: u.phone || null,
+  cargo: u.cargo || null,
   schedule: u.schedule ?? null,
   courses: u.courses ?? null,
 });
+
+// Trilha de auditoria (best-effort; nunca bloqueia; sem senha). user_id (actor)
+// é preenchido pelo default auth.uid() no banco.
+export async function logUserAudit(action: string, details: string): Promise<void> {
+  try {
+    const supabase = getSupabaseClient() as any;
+    await supabase.from('audit_logs').insert({ action, module: 'usuarios', details });
+  } catch {
+    /* auditoria não deve quebrar a operação */
+  }
+}
+
+// Ativar / Inativar / Desligar — NUNCA deleta (preserva histórico).
+export async function setUserStatus(id: string, status: UserStatus): Promise<void> {
+  const supabase = getSupabaseClient() as any;
+  const { error } = await supabase.from('profiles').update({ status }).eq('id', id);
+  if (error) throw error;
+}
 
 // Mensagens amigáveis (PT) por código de erro da Edge Function. Nunca expõe
 // erro bruto do Supabase.
@@ -89,6 +118,8 @@ export async function createUser(input: NewUserInput): Promise<void> {
       password: input.password,
       name: input.name,
       role: input.role,
+      status: input.status ?? 'ATIVO',
+      cargo: input.cargo ?? null,
       fullName: input.fullName ?? null,
       cpf: input.cpf ?? null,
       birthDate: input.birthDate ?? null,
@@ -126,6 +157,7 @@ export async function updateUserProfile(id: string, u: Partial<NewUserInput>): P
   const payload: Record<string, unknown> = profileFields(u);
   if (u.name) payload.name = u.name;
   if (u.role) payload.role = u.role;
+  if (u.status) payload.status = u.status;
   const { error } = await supabase.from('profiles').update(payload).eq('id', id);
   if (error) throw error;
 }

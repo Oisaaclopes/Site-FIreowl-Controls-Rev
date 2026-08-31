@@ -84,6 +84,10 @@ Deno.serve(async (req: Request) => {
   const password = String(body.password ?? '');
   const role = String(body.role ?? '');
   const name = String(body.name ?? '').trim();
+  // status é ciclo de vida (não privilégio); default seguro ATIVO.
+  const statusIn = String(body.status ?? 'ATIVO');
+  const status = ['ATIVO', 'INATIVO', 'DESLIGADO'].includes(statusIn) ? statusIn : 'ATIVO';
+  const cargo = body.cargo != null ? String(body.cargo) : null;
 
   if (!EMAIL_RE.test(email)) return json(422, { error: 'invalid_email' }, cors);
   if (password.length < 6) return json(422, { error: 'weak_password' }, cors);
@@ -114,6 +118,8 @@ Deno.serve(async (req: Request) => {
     .update({
       name,
       role,
+      status,
+      cargo,
       email,
       full_name: (body.fullName as string) ?? null,
       cpf: (body.cpf as string) ?? null,
