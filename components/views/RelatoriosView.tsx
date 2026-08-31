@@ -24,7 +24,9 @@ import { isSupabaseConfigured } from '@/lib/inventory';
 import { fetchReports, updateReport, deleteReport } from '@/lib/reports';
 import { fetchPendencias, updatePendenciaStatus } from '@/lib/pendencias';
 import { fetchDevices } from '@/lib/devices';
-import { fetchOrdensServico } from '@/lib/ordensServico';
+import { fetchOrdensServico, updateOrdemServico } from '@/lib/ordensServico';
+import { fetchAssignableTechnicians, ManagedUser } from '@/lib/users';
+import { useToast, useConfirm } from '@/components/ui/Feedback';
 import { fetchCicloAtivo, quotaPorVisita } from '@/lib/ciclos';
 import { flushOutbox, pendingCount, isOnline } from '@/lib/offline/reportSync';
 import { EmptyState } from '@/components/EmptyState';
@@ -181,6 +183,36 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const [surveyOrders, setSurveyOrders] = useState<Pedido[]>([]);
   const [pendencias, setPendencias] = useState<Pendencia[]>([]);
   const [ordens, setOrdens] = useState<OrdemServico[]>([]);
+  const toast = useToast();
+  const confirm = useConfirm();
+  const podeAtribuir = userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR';
+  const [technicians, setTechnicians] = useState<ManagedUser[]>([]);
+  useEffect(() => {
+    // O RPC já restringe (FINANCEIRO/inativo → []); carregamos para resolver nomes.
+    fetchAssignableTechnicians().then(setTechnicians).catch(() => setTechnicians([]));
+  }, []);
+  const tecById = (id?: string) => (id ? technicians.find((t) => t.id === id) : undefined);
+  const responsavelLabel = (os: OrdemServico): string => {
+    if (!os.tecnicoResponsavelId) return 'Não atribuído';
+    const t = tecById(os.tecnicoResponsavelId);
+    if (!t) return 'Responsável definido';
+    return t.cargo ? `${t.name} · ${t.cargo}` : t.name;
+  };
+  const setOsResponsavel = async (os: OrdemServico, id: string) => {
+    if ((os.tecnicoResponsavelId || '') === id) return;
+    if (!id) {
+      const ok = await confirm({ title: 'Remover responsável técnico desta OS?', confirmLabel: 'Remover', danger: true });
+      if (!ok) return;
+    }
+    try {
+      const saved = await updateOrdemServico({ ...os, tecnicoResponsavelId: id || undefined });
+      setOrdens((prev) => prev.map((x) => (x.id === os.id ? saved : x)));
+      toast.success('Responsável técnico atualizado.');
+    } catch (err) {
+      console.error('Falha ao atribuir responsável:', err);
+      toast.error('Não foi possível atualizar o responsável.');
+    }
+  };
   const [loading, setLoading] = useState(false);
   // Templates: "template é dado, não código" — carregados do banco, com
   // fallback aos empacotados e seed automático (admin) na primeira vez.
@@ -1151,6 +1183,29 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                     <div className="flex items-start gap-3">
                       <div className="w-11 h-11 shrink-0 rounded-xl bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center"><span className="material-symbols-outlined">business</span></div>
                       <div className="min-w-0 flex-1"><p className="font-bold text-slate-900 truncate">{cliente?.name || 'Cliente não identificado'}</p><p className="text-[11px] text-slate-500 mt-0.5">{os.numero || os.id.slice(0, 8)} · Corretiva · {os.status.replace('_', ' ')}</p><p className="text-xs text-slate-600 mt-1 line-clamp-2">{os.titulo || `${os.pendenciaIds.length} pendência(s) vinculada(s)`}</p></div>
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px] border-t border-slate-100 pt-2">
+                      <span className="material-symbols-outlined text-[16px] text-slate-400">engineering</span>
+                      <span className="text-slate-500 shrink-0">Responsável:</span>
+                      {podeAtribuir ? (
+                        <select
+                          aria-label="Responsável técnico da OS"
+                          value={os.tecnicoResponsavelId || ''}
+                          onChange={(e) => setOsResponsavel(os, e.target.value)}
+                          className="flex-1 min-w-0 border border-slate-200 rounded-lg px-2 py-1 text-[11px] font-semibold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                        >
+                          <option value="">Não atribuído</option>
+                          {/* Mantém o responsável atual visível mesmo se já não estiver na lista de ativos */}
+                          {os.tecnicoResponsavelId && !tecById(os.tecnicoResponsavelId) && (
+                            <option value={os.tecnicoResponsavelId}>Responsável atual (inativo)</option>
+                          )}
+                          {technicians.map((t) => (
+                            <option key={t.id} value={t.id}>{t.name}{t.cargo ? ` · ${t.cargo}` : ''}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="font-semibold text-slate-700 truncate">{responsavelLabel(os)}</span>
+                      )}
                     </div>
                     <button onClick={() => iniciarAtendimentoDaOs(os)} className="min-h-12 rounded-lg bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-bold uppercase tracking-wide flex items-center justify-center gap-2"><span className="material-symbols-outlined text-base">play_arrow</span>Iniciar atendimento</button>
                   </article>
