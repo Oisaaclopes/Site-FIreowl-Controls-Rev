@@ -53,6 +53,9 @@ interface RelatoriosViewProps {
   userRole: UserRole;
   companyProfile?: CompanyProfile;
   currentUserName?: string;
+  /** Atalho vindo do Dashboard: 'wizard' abre o Novo Atendimento direto. */
+  initialAction?: 'wizard' | null;
+  onInitialActionConsumed?: () => void;
   onAddClient?: (newClient: Client) => void;
   /** Cadastra uma nova marca (usado pelo "Cadastrar nova marca" dos comboboxes). */
   onAddBrand?: (name: string, category?: string) => void;
@@ -160,6 +163,8 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   userRole,
   companyProfile,
   currentUserName = '',
+  initialAction,
+  onInitialActionConsumed,
   onAddClient,
   onAddBrand,
   onAddInventoryItem,
@@ -650,6 +655,14 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     setWizardStep(1);
   };
   const closeWizard = () => setWizardStep(0);
+  // Atalho do Dashboard: abre o wizard direto (uma ação → dentro do Novo Atendimento).
+  useEffect(() => {
+    if (initialAction === 'wizard') {
+      openWizard();
+      onInitialActionConsumed?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialAction]);
   // Auditoria de conformidade (NBR 17240) = relatório Preventiva SDAI. Reutiliza
   // o mesmo wizard/engine de relatórios, já com tipo/área/cliente pré-marcados.
   const openAuditoria = (clienteId: string) => {

@@ -13,6 +13,7 @@ import { fetchHolidays, Holiday } from '@/lib/holidays';
 import { fetchDayEntries, createDayEntry, deleteDayEntry, DayEntry, DayEntryKind } from '@/lib/dayentries';
 import { uploadCertificate, signedDocUrl } from '@/lib/storage';
 import { TimecardPDFView } from '@/components/documentos/TimecardPDFView';
+import { nextPunchType, buildPunch } from '@/lib/pontoActions';
 import type { TimecardBlock } from '@/components/documentos/TimecardDocument';
 import {
   buildDailyTimeRecords,
@@ -320,16 +321,8 @@ export const PontoView: React.FC<PontoViewProps> = ({
   const retorno = byType('RETORNO');
   const saida = byType('SAIDA');
 
-  // Próxima batida da sequência
-  const nextType: PunchType | null = !entrada
-    ? 'ENTRADA'
-    : !almoco
-    ? 'PAUSA'
-    : !retorno
-    ? 'RETORNO'
-    : !saida
-    ? 'SAIDA'
-    : null;
+  // Próxima batida da sequência (regra compartilhada em lib/pontoActions).
+  const nextType: PunchType | null = nextPunchType(punches, currentUser, nowMs);
 
   // Horas trabalhadas (manhã + tarde)
   let workedMs = 0;
@@ -421,18 +414,7 @@ export const PontoView: React.FC<PontoViewProps> = ({
     }
     const hasGps = typeof lat === 'number' && typeof lng === 'number';
     const d = new Date();
-    const newPunch: TimePunch = {
-      id: `p_${Date.now()}`,
-      employeeName: currentUser,
-      timestamp: `${d.getDate()} ${d.toLocaleDateString('pt-BR', { month: 'short' }).toUpperCase()} ${d.getFullYear()} | ${fmtClock(d)}`,
-      type: nextType,
-      locationStr: hasGps ? `${lat!.toFixed(6)}, ${lng!.toFixed(6)}` : 'Sem localização (GPS indisponível)',
-      lat: hasGps ? lat! : 0,
-      lng: hasGps ? lng! : 0,
-      status: 'APROVADO',
-      at: d.getTime(),
-      accuracy: hasGps && accuracy ? Math.round(accuracy) : undefined,
-    };
+    const newPunch = buildPunch(nextType, currentUser, hasGps ? { lat: lat!, lng: lng!, accuracy } : undefined);
     onAddPunch(newPunch);
     setLastSync(d);
     setFeedback({ label: FEEDBACK_LABEL[nextType], time: fmtClock(d) });

@@ -128,6 +128,7 @@ export function CrmApp({
   const [sidebarOpen, setSidebarOpen] = useState(false); // menu off-canvas (mobile)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // mini-sidebar (desktop)
   const [pedidosInitialView, setPedidosInitialView] = useState<'propostas' | 'ordens_servico' | null>(null); // atalho "Nova OS"
+  const [relatoriosInitialAction, setRelatoriosInitialAction] = useState<'wizard' | null>(null); // atalho "Novo Atendimento"
 
   // RBAC: se a aba atual não é permitida ao perfil, volta para a primeira permitida
   useEffect(() => {
@@ -990,6 +991,13 @@ export function CrmApp({
     setCurrentTab('pedidos');
   };
 
+  // "Novo Atendimento" do Dashboard → abre o wizard existente em uma ação
+  // (leva o técnico direto ao wizard, sem parar na lista de Relatórios).
+  const handleNewAtendimento = () => {
+    setRelatoriosInitialAction('wizard');
+    setCurrentTab('relatorios');
+  };
+
   const logAction = (action: string, module: string, details: string) => {
     const nowStr = new Date().toLocaleTimeString('pt-BR', { hour12: false });
     const newLog = {
@@ -1047,9 +1055,13 @@ export function CrmApp({
           {currentTab === 'painel' && userRole === 'TECNICO' && (
             <TechDashboard
               currentUser={userName}
-              pedidosOS={pedidosOS}
+              currentUserId={userId}
+              punches={punches}
+              onAddPunch={handleAddPunch}
+              clients={clients}
               onNavigateToTab={setCurrentTab}
               onNewOSClick={handleNewOSQuick}
+              onNewAtendimento={handleNewAtendimento}
             />
           )}
           {currentTab === 'painel' && userRole !== 'TECNICO' && (
@@ -1194,6 +1206,8 @@ export function CrmApp({
 
           {currentTab === 'relatorios' && (
             <RelatoriosView
+              initialAction={relatoriosInitialAction}
+              onInitialActionConsumed={() => setRelatoriosInitialAction(null)}
               clients={clients}
               inventory={inventory}
               services={services}
