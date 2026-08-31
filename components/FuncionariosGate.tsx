@@ -102,6 +102,7 @@ export function FuncionariosGate({ initialTab }: { initialTab?: TabPath }) {
     return (
       <CrmApp
         initialRole={authUser.role}
+        userId={authUser.id}
         userName={authUser.name}
         userEmail={authUser.email}
         userSchedule={authUser.schedule}

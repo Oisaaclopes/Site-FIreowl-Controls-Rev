@@ -4,6 +4,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Client, OrdemServico, OrdemServicoStatus, Pendencia, PendenciaStatus, UserRole } from '@/lib/types';
 import { updatePendenciaStatus } from '@/lib/pendencias';
 import { createOrdemServico, fetchOrdensServico, nextOsNumero } from '@/lib/ordensServico';
+import { fetchAssignableTechnicians, ManagedUser } from '@/lib/users';
+import { useToast } from '@/components/ui/Feedback';
 
 interface PendenciasBoardProps {
   pendencias: Pendencia[];
@@ -43,6 +45,12 @@ const OS_STATUS_LABEL: Record<OrdemServicoStatus, string> = {
 
 export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, clients, userRole, onChanged, onCreateProposal }) => {
   const podeEditar = userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR';
+  const toast = useToast();
+  const [technicians, setTechnicians] = useState<ManagedUser[]>([]);
+  const [tecnicoSel, setTecnicoSel] = useState<string>(''); // '' = Não atribuído
+  useEffect(() => {
+    if (podeEditar) fetchAssignableTechnicians().then(setTechnicians).catch(() => setTechnicians([]));
+  }, [podeEditar]);
   const [fStatus, setFStatus] = useState<string>('TODOS');
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -137,18 +145,20 @@ export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, cl
         status: 'aberta',
         prioridade: 'media',
         pendenciaIds: selecionadas.map((p) => p.id),
+        tecnicoResponsavelId: tecnicoSel || undefined,
       });
       // As pendências entram em execução (vinculadas à OS aberta).
       for (const p of selecionadas) {
         await updatePendenciaStatus(p.id, 'em_execucao');
       }
       setSelected(new Set());
+      setTecnicoSel('');
       await carregarOrdens();
       onChanged();
-      alert(`Ordem de Serviço ${numero} gerada com ${selecionadas.length} pendência(s).`);
+      toast.success(`OS ${numero} gerada com ${selecionadas.length} pendência(s).`);
     } catch (err) {
       console.error('Falha ao gerar OS:', err);
-      alert('Não foi possível gerar a Ordem de Serviço.');
+      toast.error('Não foi possível gerar a Ordem de Serviço.');
     } finally {
       setGerandoOs(false);
     }
@@ -175,6 +185,18 @@ export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, cl
             >
               Limpar
             </button>
+            <select
+              aria-label="Responsável técnico"
+              title="Responsável técnico da OS"
+              value={tecnicoSel}
+              onChange={(e) => setTecnicoSel(e.target.value)}
+              className="px-2 py-1.5 rounded-lg text-[11px] font-semibold text-slate-700 bg-white border border-white/30 focus:outline-none max-w-[180px]"
+            >
+              <option value="">Não atribuído</option>
+              {technicians.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}{t.cargo ? ` · ${t.cargo}` : ''}</option>
+              ))}
+            </select>
             <button
               onClick={gerarOs}
               disabled={!podeGerarOs || gerandoOs}

@@ -101,6 +101,8 @@ function getNextSeq() {
 
 interface CrmAppProps {
   initialRole?: UserRole;
+  /** UUID do usuário autenticado (auth.users.id) — para "Minhas OS" etc. */
+  userId?: string;
   userName?: string;
   userEmail?: string;
   userSchedule?: WorkSchedule;
@@ -111,6 +113,7 @@ interface CrmAppProps {
 
 export function CrmApp({
   initialRole = 'ADMINISTRATIVO',
+  userId,
   userName = 'Operador Fireowl',
   userEmail = '',
   userSchedule,
@@ -1132,7 +1135,7 @@ export function CrmApp({
             />
           )}
 
-          {currentTab === 'agenda' && <AgendaView onOpenOS={() => setCurrentTab('pedidos')} />}
+          {currentTab === 'agenda' && <AgendaView onOpenOS={() => setCurrentTab('pedidos')} userRole={userRole} currentUserId={userId} />}
 
           {currentTab === 'clientes' && (
             <CrmView

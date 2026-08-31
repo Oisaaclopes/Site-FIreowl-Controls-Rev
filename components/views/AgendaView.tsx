@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { OrdemServico, Contract, Client, ContractRoutineExecution } from '@/lib/types';
+import { OrdemServico, Contract, Client, ContractRoutineExecution, UserRole } from '@/lib/types';
 import { fetchHolidays, Holiday } from '@/lib/holidays';
 import { isSupabaseConfigured } from '@/lib/inventory';
 import { fetchOrdensServico } from '@/lib/ordensServico';
@@ -14,6 +14,9 @@ import { useConfirm } from '@/components/ui/Feedback';
 interface AgendaViewProps {
   /** Abre a OS no módulo de Pedidos/OS quando o usuário clica num evento real. */
   onOpenOS?: (osId: string) => void;
+  userRole?: UserRole;
+  /** UUID do usuário logado — para o TÉCNICO abrir em "Minhas OS". */
+  currentUserId?: string;
 }
 
 const WEEKDAYS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
@@ -61,13 +64,16 @@ const KANBAN: { key: string; label: string; match: (e: AgendaEvent) => boolean }
   { key: 'concluido', label: 'Concluído', match: (e) => e.status === 'concluido' },
 ];
 
-export const AgendaView: React.FC<AgendaViewProps> = ({ onOpenOS }) => {
+export const AgendaView: React.FC<AgendaViewProps> = ({ onOpenOS, userRole, currentUserId }) => {
   const online = isSupabaseConfigured();
   const confirm = useConfirm();
+  const isTecnico = userRole === 'TECNICO';
   const [viewMode, setViewMode] = useState<'calendar' | 'kanban' | 'map'>('calendar');
   const [technicians, setTechnicians] = useState<ManagedUser[]>([]);
   // Filtro por responsável: 'TODOS' | 'NAO' (não atribuídas) | <profileId>.
-  const [tecnicoFilter, setTecnicoFilter] = useState<string>('TODOS');
+  // TÉCNICO abre em "Minhas OS" (seu próprio id) por padrão — UX sobre dados que
+  // a RLS já restringe às OS dele.
+  const [tecnicoFilter, setTecnicoFilter] = useState<string>(isTecnico && currentUserId ? currentUserId : 'TODOS');
   const today = new Date();
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [holidays, setHolidays] = useState<Record<string, { name: string; type: string }>>({});
@@ -209,11 +215,20 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ onOpenOS }) => {
             onChange={(e) => setTecnicoFilter(e.target.value)}
             className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
           >
-            <option value="TODOS">Todos os técnicos</option>
-            <option value="NAO">Não atribuídas</option>
-            {technicians.map((t) => (
-              <option key={t.id} value={t.id}>{t.name}{t.cargo ? ` · ${t.cargo}` : ''}</option>
-            ))}
+            {isTecnico && currentUserId ? (
+              <>
+                <option value={currentUserId}>Minhas OS</option>
+                <option value="TODOS">Todas as minhas OS</option>
+              </>
+            ) : (
+              <>
+                <option value="TODOS">Todos os técnicos</option>
+                <option value="NAO">Não atribuídas</option>
+                {technicians.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}{t.cargo ? ` · ${t.cargo}` : ''}</option>
+                ))}
+              </>
+            )}
           </select>
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
             {(['calendar', 'kanban', 'map'] as const).map((m) => (

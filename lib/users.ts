@@ -85,17 +85,24 @@ export async function logUserAudit(action: string, details: string): Promise<voi
   }
 }
 
-// Diretório de técnicos ATRIBUÍVEIS a uma OS (status ATIVO + perfis operacionais).
-// OBS: hoje a RLS de `profiles` só deixa ADMINISTRATIVO ler todos os perfis, então
-// para GESTOR/TECNICO isto retorna [] (o diretório completo depende de uma policy
-// de leitura mínima, prevista para a passada de RLS). Falha de acesso → [].
+// Diretório de técnicos ATRIBUÍVEIS a uma OS. Consome o RPC mínimo
+// get_assignable_technicians() (0063) — que devolve APENAS id/name/cargo/role/
+// status de perfis ATIVOS operacionais, sem PII, e sem abrir a tabela profiles.
+// Funciona para ADMINISTRATIVO/GESTOR/TECNICO; falha/acesso negado → [].
 export async function fetchAssignableTechnicians(): Promise<ManagedUser[]> {
   try {
-    const all = await listUsers();
-    const OPERACIONAIS: UserRole[] = ['TECNICO', 'GESTOR', 'ADMINISTRATIVO'];
-    return all
-      .filter((u) => u.status === 'ATIVO' && OPERACIONAIS.includes(u.role))
-      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    const supabase = getSupabaseClient() as any;
+    const { data, error } = await supabase.rpc('get_assignable_technicians');
+    if (error) throw error;
+    return (data || []).map((r: any) => ({
+      id: String(r.id),
+      email: '',
+      name: r.name || r.full_name || '',
+      role: r.role as UserRole,
+      status: normStatus(r.status),
+      cargo: r.cargo ?? undefined,
+      fullName: r.full_name ?? undefined,
+    }));
   } catch {
     return [];
   }
