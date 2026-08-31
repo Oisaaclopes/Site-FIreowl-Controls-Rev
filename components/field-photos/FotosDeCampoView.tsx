@@ -19,6 +19,9 @@ import {
 } from '@/lib/fieldPhotosGallery';
 import { signedFieldPhotoUrl, signedFieldPhotoUrls } from '@/lib/fieldPhotoStorage';
 import { PhotoSheetConfigModal } from '@/components/field-photos/PhotoSheetConfigModal';
+import { ComparisonsPanel } from '@/components/field-photos/ComparisonsPanel';
+import { ComparisonCreateModal } from '@/components/field-photos/ComparisonCreateModal';
+import { FieldPhotoComparison, listComparisons, PAIR_INVALID_MESSAGE, validateComparisonPair } from '@/lib/fieldPhotoComparisons';
 import { flushOutbox, isOnline } from '@/lib/offline/reportSync';
 import { fetchReports } from '@/lib/reports';
 import { fetchOrdensServico } from '@/lib/ordensServico';
@@ -52,8 +55,10 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole }) => {
   const confirm = useConfirm();
   const isManager = userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR';
 
-  const [tab, setTab] = useState<'todas' | 'nao_classificadas'>('todas');
+  const [tab, setTab] = useState<'todas' | 'nao_classificadas' | 'comparacoes'>('todas');
   const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
+  const [comparisons, setComparisons] = useState<FieldPhotoComparison[]>([]);
+  const [comparePair, setComparePair] = useState<{ a: GalleryPhoto; b: GalleryPhoto } | null>(null);
   const [loading, setLoading] = useState(true);
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const [filters, setFilters] = useState<FieldPhotoFilters>({});
@@ -68,11 +73,13 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole }) => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [remote, local] = await Promise.all([
+      const [remote, local, comps] = await Promise.all([
         listRemoteFieldPhotos().catch((e) => { toast.error('Não foi possível carregar as fotos remotas.'); void e; return [] as GalleryPhoto[]; }),
         listLocalFieldPhotos().catch(() => [] as GalleryPhoto[]),
+        listComparisons().catch(() => [] as FieldPhotoComparison[]),
       ]);
       setPhotos(attachClientNames(mergeFieldPhotos(remote, local), clients));
+      setComparisons(comps);
     } finally {
       setLoading(false);
     }
@@ -141,6 +148,14 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole }) => {
   }, [visible, groupByDay]);
 
   const selectedPhotos = useMemo(() => visible.filter((p) => selection.has(p.clientUuid)), [visible, selection]);
+  const photoById = useMemo(() => new Map(photos.map((p) => [p.id, p] as const)), [photos]);
+  const reloadComparisons = useCallback(async () => { try { setComparisons(await listComparisons()); } catch { /* mantém a lista atual */ } }, []);
+
+  const startCompare = () => {
+    const v = validateComparisonPair(selectedPhotos);
+    if (!v.ok) { toast.error(PAIR_INVALID_MESSAGE[v.reason!]); return; }
+    setComparePair({ a: selectedPhotos[0], b: selectedPhotos[1] });
+  };
 
   return (
     <div className="mx-auto max-w-7xl px-3 py-4 sm:px-5 sm:py-6">
@@ -156,12 +171,16 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole }) => {
         <div className="flex items-center gap-1 rounded-xl bg-slate-100 p-1 text-xs font-bold">
           <button onClick={() => setTab('todas')} className={`min-h-9 flex-1 rounded-lg px-3 uppercase tracking-wide transition-colors ${tab === 'todas' ? 'bg-white text-[#1A1A72] shadow-sm' : 'text-slate-500'}`}>Todas</button>
           <button onClick={() => setTab('nao_classificadas')} className={`min-h-9 flex-1 rounded-lg px-3 uppercase tracking-wide transition-colors ${tab === 'nao_classificadas' ? 'bg-white text-[#1A1A72] shadow-sm' : 'text-slate-500'}`}>
-            Não classificadas{unclassifiedCount > 0 ? ` · ${unclassifiedCount}` : ''}
+            Não classif.{unclassifiedCount > 0 ? ` · ${unclassifiedCount}` : ''}
+          </button>
+          <button onClick={() => setTab('comparacoes')} className={`min-h-9 flex-1 rounded-lg px-3 uppercase tracking-wide transition-colors ${tab === 'comparacoes' ? 'bg-white text-[#1A1A72] shadow-sm' : 'text-slate-500'}`}>
+            Antes × Depois{comparisons.length > 0 ? ` · ${comparisons.length}` : ''}
           </button>
         </div>
       </div>
 
-      {/* Busca + ações */}
+      {/* Busca + ações (fotos) — ocultas na aba de comparações */}
+      {tab !== 'comparacoes' && (
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="relative min-w-0 flex-1">
           <span className="material-symbols-outlined pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-lg text-slate-400">search</span>
@@ -184,14 +203,18 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole }) => {
           <span className="material-symbols-outlined align-middle text-base">sync</span>
         </button>
       </div>
+      )}
 
       {/* Barra de seleção em lote */}
-      {selection.size > 0 && (
+      {tab !== 'comparacoes' && selection.size > 0 && (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#1A1A72]/20 bg-[#1A1A72]/5 p-2.5">
           <span className="text-xs font-bold text-[#1A1A72]">{selection.size} selecionada(s)</span>
           <div className="flex flex-wrap gap-2">
             <button onClick={() => setSheetPhotos(selectedPhotos)} className="min-h-9 rounded-lg bg-[#E63946] px-3 text-xs font-bold uppercase text-white">
               <span className="material-symbols-outlined align-middle text-sm">picture_as_pdf</span> Folha de Fotos
+            </button>
+            <button onClick={startCompare} className="min-h-9 rounded-lg border border-[#1A1A72] bg-white px-3 text-xs font-bold uppercase text-[#1A1A72]">
+              <span className="material-symbols-outlined align-middle text-sm">compare</span> Antes × Depois
             </button>
             <button onClick={() => setLinkTarget({ photos: selectedPhotos })} className="min-h-9 rounded-lg bg-[#1A1A72] px-3 text-xs font-bold uppercase text-white">Vincular</button>
             <button onClick={clearSelection} className="min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold uppercase text-slate-600">Limpar</button>
@@ -200,7 +223,9 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole }) => {
       )}
 
       {/* Conteúdo */}
-      {loading ? (
+      {tab === 'comparacoes' ? (
+        <ComparisonsPanel comparisons={comparisons} photoById={photoById} thumbs={thumbs} onReload={reloadComparisons} />
+      ) : loading ? (
         <div className="py-20 text-center text-sm text-slate-400">Carregando fotos…</div>
       ) : visible.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center text-slate-400">
@@ -263,6 +288,17 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole }) => {
 
       {sheetPhotos && (
         <PhotoSheetConfigModal photos={sheetPhotos} onClose={() => setSheetPhotos(null)} />
+      )}
+
+      {comparePair && (
+        <ComparisonCreateModal
+          a={comparePair.a}
+          b={comparePair.b}
+          thumbs={thumbs}
+          existing={comparisons}
+          onClose={() => setComparePair(null)}
+          onDone={async () => { setComparePair(null); clearSelection(); await reloadComparisons(); }}
+        />
       )}
     </div>
   );
