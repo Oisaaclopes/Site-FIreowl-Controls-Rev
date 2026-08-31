@@ -8,7 +8,10 @@ import { insertPendencia, updatePendenciaStatus } from '../pendencias';
 import { PendenciaStatus } from '../types';
 import { fetchCicloAtivo, registrarTestesNoCiclo } from '../ciclos';
 import { replaceSurveyRequirements } from '../surveyRequirements';
-import { idbPut, idbGetAll, idbDelete, idbCount, idbAvailable, STORE_OUTBOX } from './idb';
+import { idbGetAll, idbDelete, idbAvailable, STORE_OUTBOX } from './idb';
+import { enqueueOfflineJob, flushOfflineJobs, listOfflineJobs, registerOfflineHandler, removeOfflineJob } from './outbox';
+// Registra o handler de Fotos de Campo no mesmo núcleo; não cria uma segunda fila.
+import './fieldPhotoSync';
 
 /* ---------------------------------------------------------------------------
  * Offline-first do relatório de campo (Parte 4.1). A finalização vira um
@@ -252,45 +255,42 @@ export async function persistReportBundle(b: ReportBundle): Promise<{ reportId?:
 /* -------------------------------- Outbox ---------------------------------- */
 
 export async function enqueueBundle(b: ReportBundle): Promise<void> {
-  await idbPut(STORE_OUTBOX, b, b.clientUuid);
+  await enqueueOfflineJob({ domain: 'REPORT', entityClientUuid: b.clientUuid, payload: b });
 }
 
 export async function listBundles(): Promise<ReportBundle[]> {
-  return idbGetAll<ReportBundle>(STORE_OUTBOX);
+  await migrateLegacyReportBundles();
+  return (await listOfflineJobs('REPORT')).map((job) => job.payload as ReportBundle);
 }
 
 export async function removeBundle(clientUuid: string): Promise<void> {
+  await removeOfflineJob(`REPORT:${clientUuid}`);
+  // Compatibilidade com a fila criada antes da versão 2 do IndexedDB.
   await idbDelete(STORE_OUTBOX, clientUuid);
 }
 
 export async function pendingCount(): Promise<number> {
-  return idbCount(STORE_OUTBOX);
+  await migrateLegacyReportBundles();
+  return (await listOfflineJobs('REPORT')).length;
 }
 
-let flushing = false;
+/** Migra silenciosamente bundles antigos sem serializar Blobs em JSON. */
+async function migrateLegacyReportBundles(): Promise<void> {
+  const legacy = await idbGetAll<ReportBundle>(STORE_OUTBOX);
+  for (const bundle of legacy) {
+    await enqueueOfflineJob({ domain: 'REPORT', entityClientUuid: bundle.clientUuid, payload: bundle });
+    await idbDelete(STORE_OUTBOX, bundle.clientUuid);
+  }
+}
+
+registerOfflineHandler<ReportBundle>('REPORT', async (job) => {
+  await persistReportBundle(job.payload);
+});
 
 /** Replica todos os bundles pendentes. Remove os sincronizados/duplicados. */
 export async function flushOutbox(): Promise<{ synced: number; failed: number; pending: number }> {
-  if (flushing || !isOnline() || !offlineAvailable()) {
-    return { synced: 0, failed: 0, pending: await pendingCount().catch(() => 0) };
-  }
-  flushing = true;
-  let synced = 0;
-  let failed = 0;
-  try {
-    const bundles = await listBundles();
-    for (const b of bundles) {
-      try {
-        await persistReportBundle(b);
-        await removeBundle(b.clientUuid);
-        synced++;
-      } catch (e) {
-        console.warn('Sincronização de relatório falhou (mantido na fila):', e);
-        failed++;
-      }
-    }
-  } finally {
-    flushing = false;
-  }
-  return { synced, failed, pending: await pendingCount() };
+  if (!offlineAvailable()) return { synced: 0, failed: 0, pending: 0 };
+  await migrateLegacyReportBundles();
+  const result = await flushOfflineJobs(isOnline);
+  return { ...result, pending: await pendingCount() };
 }

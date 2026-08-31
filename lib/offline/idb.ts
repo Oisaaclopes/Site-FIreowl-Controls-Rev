@@ -6,9 +6,11 @@
  * ------------------------------------------------------------------------- */
 
 const DB_NAME = 'fireowl-offline';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 export const STORE_OUTBOX = 'report_outbox';
-const STORES = [STORE_OUTBOX];
+/** Fila de jobs por domínio. Blobs são suportados pelo structured clone do IDB. */
+export const STORE_OFFLINE_JOBS = 'offline_jobs';
+const STORES = [STORE_OUTBOX, STORE_OFFLINE_JOBS];
 
 function hasIDB(): boolean {
   return typeof indexedDB !== 'undefined';
@@ -52,6 +54,46 @@ export async function idbGetAll<T = unknown>(store: string): Promise<T[]> {
     const req = tx.objectStore(store).getAll();
     req.onsuccess = () => resolve((req.result || []) as T[]);
     req.onerror = () => reject(req.error);
+  });
+  db.close();
+  return out;
+}
+
+export async function idbGet<T = unknown>(store: string, key: IDBValidKey): Promise<T | undefined> {
+  if (!hasIDB()) return undefined;
+  const db = await openDB();
+  const out = await new Promise<T | undefined>((resolve, reject) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).get(key);
+    req.onsuccess = () => resolve(req.result as T | undefined);
+    req.onerror = () => reject(req.error);
+  });
+  db.close();
+  return out;
+}
+
+/** Atualização atômica por chave; usada para reclamar um job sem corrida óbvia entre abas. */
+export async function idbUpdate<T>(store: string, key: IDBValidKey, update: (current: T | undefined) => T | undefined): Promise<T | undefined> {
+  const db = await openDB();
+  const out = await new Promise<T | undefined>((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    const objectStore = tx.objectStore(store);
+    const req = objectStore.get(key);
+    let next: T | undefined;
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      try {
+        next = update(req.result as T | undefined);
+        if (next === undefined) objectStore.delete(key);
+        else objectStore.put(next, key);
+      } catch (error) {
+        tx.abort();
+        reject(error);
+      }
+    };
+    tx.oncomplete = () => resolve(next);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error('Transação IndexedDB cancelada'));
   });
   db.close();
   return out;
