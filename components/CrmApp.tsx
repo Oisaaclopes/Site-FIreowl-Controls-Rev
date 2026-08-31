@@ -4,6 +4,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { BottomNav } from '@/components/BottomNav';
 import { Header } from '@/components/Header';
+import { MobileQuickMenu } from '@/components/mobile/MobileQuickMenu';
+import { useIsMobile } from '@/lib/useIsMobile';
+import { isHomeEligibleEntry } from '@/lib/modules';
 import { AuthModal } from '@/components/AuthModal';
 import { PrivacyProvider } from '@/lib/privacy';
 import { FeedbackProvider } from '@/components/ui/Feedback';
@@ -106,6 +109,8 @@ interface CrmAppProps {
   userId?: string;
   userName?: string;
   userEmail?: string;
+  /** Cargo do perfil (exibido na Home Mobile). */
+  userCargo?: string;
   userSchedule?: WorkSchedule;
   /** Aba inicial (vem da URL /funcionarios/<aba>). */
   initialTab?: TabPath;
@@ -117,6 +122,7 @@ export function CrmApp({
   userId,
   userName = 'Operador Fireowl',
   userEmail = '',
+  userCargo,
   userSchedule,
   initialTab,
   onLogout,
@@ -125,6 +131,20 @@ export function CrmApp({
     initialTab && isTabAllowed(initialRole, initialTab) ? initialTab : allowedTabs(initialRole)[0]
   );
   const [userRole, setUserRole] = useState<UserRole>(initialRole);
+
+  // Home Mobile (Fase 4.1): no mobile, entrada por raiz/pouso abre o Menu Rápido;
+  // deep link para um módulo específico vai direto ao destino (§32/§33).
+  const isMobile = useIsMobile();
+  const [mobileHome, setMobileHome] = useState<boolean>(() =>
+    isHomeEligibleEntry(initialTab, allowedTabs(initialRole)[0])
+  );
+  // Qualquer navegação para um módulo sai da Home; tocar "Início" volta a ela.
+  const firstTabRun = React.useRef(true);
+  useEffect(() => {
+    if (firstTabRun.current) { firstTabRun.current = false; return; }
+    setMobileHome(false);
+  }, [currentTab]);
+  const handleSelectTab = useCallback((t: TabPath) => { setMobileHome(false); setCurrentTab(t); }, []);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // menu off-canvas (mobile)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // mini-sidebar (desktop)
@@ -1024,7 +1044,7 @@ export function CrmApp({
       {/* Sidebar Navigation (off-canvas no mobile, fixa no desktop) */}
       <Sidebar
         currentTab={currentTab}
-        onSelectTab={setCurrentTab}
+        onSelectTab={handleSelectTab}
         userRole={userRole}
         userName={userName}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
@@ -1051,8 +1071,19 @@ export function CrmApp({
           onOpenPedidos={() => setCurrentTab('pedidos')}
         />
 
-        {/* View Switcher — padding inferior no mobile do técnico p/ o BottomNav */}
-        <main className={`fireowl-main pt-14 min-h-[calc(100vh-56px)] ${userRole === 'TECNICO' ? 'pb-20 lg:pb-0' : ''}`}>
+        {/* View Switcher — padding inferior no mobile p/ o BottomNav (todos os perfis) */}
+        <main className="fireowl-main pt-14 min-h-[calc(100vh-56px)] pb-20 lg:pb-0">
+          {isMobile && mobileHome ? (
+            <MobileQuickMenu
+              userName={userName}
+              cargo={userCargo}
+              userRole={userRole}
+              userId={userId}
+              clients={clients}
+              onSelectTab={handleSelectTab}
+            />
+          ) : (
+          <>
           {currentTab === 'painel' && userRole === 'TECNICO' && (
             <TechDashboard
               currentUser={userName}
@@ -1270,11 +1301,19 @@ export function CrmApp({
               currentEmail={userEmail}
             />
           )}
+          </>
+          )}
         </main>
       </div>
 
-      {/* Bottom nav — técnico no mobile */}
-      <BottomNav currentTab={currentTab} onSelectTab={setCurrentTab} userRole={userRole} />
+      {/* Bottom nav — mobile, todos os perfis (Início volta ao Menu Rápido) */}
+      <BottomNav
+        currentTab={currentTab}
+        onSelectTab={handleSelectTab}
+        userRole={userRole}
+        homeActive={isMobile && mobileHome}
+        onGoHome={() => setMobileHome(true)}
+      />
 
       {/* Auth & Operator Modal */}
       <AuthModal

@@ -2,33 +2,23 @@
 
 import React from 'react';
 import { TabPath, UserRole } from '@/lib/types';
-import { allowedTabs } from '@/lib/rbac';
+import { MODULE_META, quickMenuTabs } from '@/lib/modules';
 
-/* Barra de navegação inferior — apenas TÉCNICO, apenas mobile (lg:hidden).
-   Substitui a sidebar como navegação primária no celular do técnico de campo. */
-
-const META: Record<string, { label: string; icon: string }> = {
-  painel: { label: 'Início', icon: 'home' },
-  agenda: { label: 'Agenda', icon: 'calendar_today' },
-  relatorios: { label: 'Relatórios', icon: 'assignment' },
-  ponto: { label: 'Ponto', icon: 'schedule' },
-  pedidos: { label: 'Pedidos', icon: 'receipt_long' },
-};
-
-// Ordem no bottom bar (Início, e Relatórios em destaque — foco do técnico).
-const TECH_ORDER: TabPath[] = ['painel', 'agenda', 'relatorios', 'pedidos', 'ponto'];
+/* Barra de navegação inferior — mobile (lg:hidden), TODOS os perfis (Fase 4.1).
+   Slot 1 = Início (volta ao Menu Rápido); demais = módulos permitidos pelo RBAC. */
 
 interface BottomNavProps {
   currentTab: TabPath;
   onSelectTab: (t: TabPath) => void;
   userRole: UserRole;
+  /** Home Mobile ativa (Menu Rápido em foco). */
+  homeActive: boolean;
+  onGoHome: () => void;
 }
 
-export const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onSelectTab, userRole }) => {
-  if (userRole !== 'TECNICO') return null;
-  const permitted = allowedTabs(userRole);
-  const items = TECH_ORDER.filter((t) => permitted.includes(t) && META[t]);
-  if (items.length === 0) return null;
+export const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onSelectTab, userRole, homeActive, onGoHome }) => {
+  // Até 4 módulos permitidos (a fonte é o RBAC via quickMenuTabs) + o Início.
+  const tabs = quickMenuTabs(userRole).slice(0, 4);
 
   return (
     <nav
@@ -37,21 +27,25 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onSelectTab, u
       aria-label="Navegação principal"
     >
       <div className="flex items-stretch justify-around">
-        {items.map((t) => {
-          const active = currentTab === t;
+        <button
+          onClick={onGoHome}
+          aria-current={homeActive ? 'page' : undefined}
+          className={`flex-1 min-h-[56px] flex flex-col items-center justify-center gap-0.5 transition-colors ${homeActive ? 'text-white' : 'text-white/60 hover:text-white/90'}`}
+        >
+          <span className={`material-symbols-outlined text-[22px] ${homeActive ? 'text-[#E63946]' : ''}`}>home</span>
+          <span className="text-[10px] font-semibold uppercase tracking-wide">Início</span>
+        </button>
+        {tabs.map((t) => {
+          const active = !homeActive && currentTab === t;
           return (
             <button
               key={t}
               onClick={() => onSelectTab(t)}
               aria-current={active ? 'page' : undefined}
-              className={`flex-1 min-h-[56px] flex flex-col items-center justify-center gap-0.5 transition-colors ${
-                active ? 'text-white' : 'text-white/60 hover:text-white/90'
-              }`}
+              className={`flex-1 min-h-[56px] flex flex-col items-center justify-center gap-0.5 transition-colors ${active ? 'text-white' : 'text-white/60 hover:text-white/90'}`}
             >
-              <span className={`material-symbols-outlined text-[22px] ${active ? 'text-[#E63946]' : ''}`}>
-                {META[t].icon}
-              </span>
-              <span className="text-[10px] font-semibold uppercase tracking-wide">{META[t].label}</span>
+              <span className={`material-symbols-outlined text-[22px] ${active ? 'text-[#E63946]' : ''}`}>{MODULE_META[t].icon}</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide truncate max-w-[68px]">{MODULE_META[t].short || MODULE_META[t].label}</span>
             </button>
           );
         })}

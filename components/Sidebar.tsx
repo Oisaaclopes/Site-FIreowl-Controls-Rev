@@ -5,6 +5,7 @@ import { PanelLeft } from 'lucide-react';
 import { TabPath, UserRole } from '@/lib/types';
 import { OfficialLogo } from '@/components/OfficialLogo';
 import { allowedTabs } from '@/lib/rbac';
+import { MODULE_META } from '@/lib/modules';
 
 interface SidebarProps {
   currentTab: TabPath;
@@ -37,30 +38,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   onExpand,
 }) => {
-  const allNavItems: { path: TabPath; label: string; icon: string }[] = [
-    { path: 'painel', label: 'Painel', icon: 'dashboard' },
-    { path: 'pedidos', label: 'Pedidos', icon: 'receipt_long' },
-    { path: 'contratos', label: 'Contratos', icon: 'description' },
-    { path: 'receitas', label: 'Receitas', icon: 'trending_up' },
-    { path: 'despesas', label: 'Despesas', icon: 'trending_down' },
-    { path: 'financas', label: 'Finanças', icon: 'payments' },
-    { path: 'agenda', label: 'Agenda', icon: 'calendar_today' },
-    { path: 'clientes', label: 'Clientes', icon: 'group' },
-    { path: 'fornecedores', label: 'Fornecedores', icon: 'local_shipping' },
-    { path: 'estoque', label: 'Estoque', icon: 'inventory_2' },
-    { path: 'servicos', label: 'Serviço', icon: 'construction' },
-    { path: 'relatorios', label: 'Atendimentos', icon: 'assignment' },
-    { path: 'fotos-de-campo', label: 'Fotos de Campo', icon: 'photo_library' },
-    { path: 'ponto', label: 'Ponto', icon: 'schedule' },
-    { path: 'conta', label: 'Conta & Log', icon: 'settings' },
-  ];
-
-  // RBAC: mostra apenas as abas permitidas ao perfil logado
+  // RBAC: mostra apenas as abas permitidas ao perfil logado. Metadados (rótulo/
+  // ícone) vêm da fonte única MODULE_META, compartilhada com o Menu Rápido (§25).
   const permitted = allowedTabs(userRole);
-  const META = Object.fromEntries(allNavItems.map((i) => [i.path, i])) as Record<
-    TabPath,
-    { path: TabPath; label: string; icon: string }
-  >;
+  const META = Object.fromEntries(
+    (Object.keys(MODULE_META) as TabPath[]).map((path) => [path, { path, label: MODULE_META[path].label, icon: MODULE_META[path].icon }])
+  ) as Record<TabPath, { path: TabPath; label: string; icon: string }>;
 
   // Agrupamento por domínio (Painel fica solto no topo, sem cabeçalho).
   const GROUPS: { title?: string; items: TabPath[] }[] = [
