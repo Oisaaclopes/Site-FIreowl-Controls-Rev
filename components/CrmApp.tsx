@@ -6,6 +6,7 @@ import { BottomNav } from '@/components/BottomNav';
 import { Header } from '@/components/Header';
 import { AuthModal } from '@/components/AuthModal';
 import { PrivacyProvider } from '@/lib/privacy';
+import { FeedbackProvider } from '@/components/ui/Feedback';
 import {
   fetchInventory,
   insertInventoryItem,
@@ -1006,6 +1007,7 @@ export function CrmApp({
 
   return (
     <PrivacyProvider>
+    <FeedbackProvider>
     <div className="min-h-screen bg-slate-50 font-body-md text-[#131c28]">
       {/* Sidebar Navigation (off-canvas no mobile, fixa no desktop) */}
       <Sidebar
@@ -1257,6 +1259,7 @@ export function CrmApp({
         onSelectRole={setUserRole}
       />
     </div>
+    </FeedbackProvider>
     </PrivacyProvider>
   );
 }

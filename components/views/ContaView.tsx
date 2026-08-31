@@ -20,6 +20,7 @@ import {
 } from '@/lib/homologacao';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
 import { Toggle, SidePanel } from '@/components/SidePanel';
+import { useToast, useConfirm } from '@/components/ui/Feedback';
 import {
   listUsers,
   createUser,
@@ -254,6 +255,8 @@ export const ContaView: React.FC<ContaViewProps> = ({
 
 
   // Gestão de usuários (apenas admin)
+  const toast = useToast();
+  const confirm = useConfirm();
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState('');
@@ -314,7 +317,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
       await loadDocs(editUser.id);
     } catch (err) {
       console.error('Falha ao enviar documento:', err);
-      alert('Não foi possível enviar o documento.');
+      toast.error('Não foi possível enviar o documento.');
     } finally {
       setUploading(false);
       if (docFileRef.current) docFileRef.current.value = '';
@@ -326,18 +329,25 @@ export const ContaView: React.FC<ContaViewProps> = ({
       window.open(await signedDocUrl(path), '_blank');
     } catch (err) {
       console.error('Falha ao abrir documento:', err);
-      alert('Não foi possível abrir o documento.');
+      toast.error('Não foi possível abrir o documento.');
     }
   };
 
   const handleDeleteDoc = async (d: EmployeeDoc) => {
-    if (!window.confirm(`Excluir o documento "${d.name.replace(/^\d+_/, '')}"?`)) return;
+    const ok = await confirm({
+      title: 'Excluir documento?',
+      message: `"${d.name.replace(/^\d+_/, '')}" será removido do armazenamento.`,
+      confirmLabel: 'Excluir',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await deleteEmployeeDoc(d.path);
       setDocs((prev) => prev.filter((x) => x.path !== d.path));
+      toast.success('Documento excluído.');
     } catch (err) {
       console.error('Falha ao excluir documento:', err);
-      alert('Não foi possível excluir o documento.');
+      toast.error('Não foi possível excluir o documento.');
     }
   };
 
@@ -386,9 +396,10 @@ export const ContaView: React.FC<ContaViewProps> = ({
       if (prev.status !== euForm.status) logUserAudit('USER_STATUS_CHANGED', `target=${prev.id} ${prev.status}→${euForm.status}`);
       setEditUser(null);
       setTimeout(refreshUsers, 300);
+      toast.success('Dados do funcionário atualizados.');
     } catch (err) {
       console.error('Falha ao salvar edição do funcionário:', err);
-      alert('Não foi possível salvar as alterações.');
+      toast.error('Não foi possível salvar as alterações.');
     } finally {
       setSavingEdit(false);
     }
@@ -469,9 +480,10 @@ export const ContaView: React.FC<ContaViewProps> = ({
       await updateUserRole(u.id, role);
       logUserAudit('USER_ROLE_CHANGED', `target=${u.id} ${u.role}→${role}`);
       setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, role } : x)));
+      toast.success(`Perfil de acesso de ${u.name || u.email} atualizado.`);
     } catch (err) {
       console.error('Falha ao alterar papel:', err);
-      alert('Não foi possível alterar o nível de acesso.');
+      toast.error('Não foi possível alterar o nível de acesso.');
     }
   };
 
@@ -480,19 +492,41 @@ export const ContaView: React.FC<ContaViewProps> = ({
   const handleStatusChange = async (u: ManagedUser, status: UserStatus) => {
     if (status === u.status) return;
     if (u.email && currentEmail && u.email.toLowerCase() === currentEmail.toLowerCase()) {
-      alert('Você não pode alterar o próprio status de acesso.');
+      toast.error('Você não pode alterar o próprio status de acesso.');
       return;
     }
-    const verbo = status === 'ATIVO' ? 'reativar' : status === 'INATIVO' ? 'inativar' : 'marcar como desligado';
-    if (!window.confirm(`Deseja ${verbo} "${u.name || u.email}"?\n\nO histórico é preservado; nada é excluído.`)) return;
+    const nome = u.name || u.email;
+    const dialog =
+      status === 'DESLIGADO'
+        ? {
+            title: 'Marcar usuário como desligado?',
+            message: `O acesso de "${nome}" será bloqueado. O histórico e os registros anteriores permanecem arquivados.`,
+            confirmLabel: 'Marcar como desligado',
+            danger: true,
+          }
+        : status === 'INATIVO'
+        ? {
+            title: 'Inativar usuário?',
+            message: `"${nome}" perderá temporariamente o acesso ao sistema. O histórico é mantido e o acesso pode ser reativado quando necessário.`,
+            confirmLabel: 'Inativar',
+          }
+        : {
+            title: 'Reativar usuário?',
+            message: `"${nome}" voltará a ter acesso conforme o seu perfil de permissão.`,
+            confirmLabel: 'Reativar',
+          };
+    if (!(await confirm(dialog))) return;
     setStatusBusy(u.id);
     try {
       await setUserStatus(u.id, status);
       logUserAudit('USER_STATUS_CHANGED', `target=${u.id} ${u.status}→${status}`);
       setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, status } : x)));
+      toast.success(
+        status === 'ATIVO' ? `${nome} reativado.` : status === 'INATIVO' ? `${nome} inativado.` : `${nome} marcado como desligado.`
+      );
     } catch (err) {
       console.error('Falha ao alterar status:', err);
-      alert('Não foi possível alterar o status.');
+      toast.error('Não foi possível alterar o status.');
     } finally {
       setStatusBusy(null);
     }
@@ -500,23 +534,23 @@ export const ContaView: React.FC<ContaViewProps> = ({
 
   const handleDeleteUser = async (u: ManagedUser) => {
     if (u.email && currentEmail && u.email.toLowerCase() === currentEmail.toLowerCase()) {
-      alert('Você não pode remover o seu próprio acesso.');
+      toast.error('Você não pode remover o seu próprio acesso.');
       return;
     }
-    if (
-      !window.confirm(
-        `EXCLUSÃO DEFINITIVA de "${u.name || u.email}".\n\n` +
-          'Para desativar no dia a dia use INATIVO/DESLIGADO (preserva o histórico).\n' +
-          'A exclusão remove o perfil. Prosseguir apenas em caso excepcional?'
-      )
-    )
-      return;
+    const ok = await confirm({
+      title: 'Excluir definitivamente?',
+      message: `Para o dia a dia, prefira Inativar/Desligar "${u.name || u.email}" (preserva o histórico). A exclusão remove o perfil e é irreversível — use apenas em caso excepcional.`,
+      confirmLabel: 'Excluir definitivamente',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await deleteUserProfile(u.id);
       setUsers((prev) => prev.filter((x) => x.id !== u.id));
+      toast.success('Perfil excluído.');
     } catch (err) {
       console.error('Falha ao remover usuário:', err);
-      alert('Não foi possível remover o usuário.');
+      toast.error('Não foi possível remover o usuário.');
     }
   };
 
