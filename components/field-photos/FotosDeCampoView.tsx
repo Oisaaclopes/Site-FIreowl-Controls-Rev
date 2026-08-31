@@ -18,6 +18,7 @@ import {
   updateFieldPhotoLinks,
 } from '@/lib/fieldPhotosGallery';
 import { signedFieldPhotoUrl, signedFieldPhotoUrls } from '@/lib/fieldPhotoStorage';
+import { PhotoSheetConfigModal } from '@/components/field-photos/PhotoSheetConfigModal';
 import { flushOutbox, isOnline } from '@/lib/offline/reportSync';
 import { fetchReports } from '@/lib/reports';
 import { fetchOrdensServico } from '@/lib/ordensServico';
@@ -62,6 +63,7 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole }) => {
   const [selection, setSelection] = useState<Set<string>>(new Set());
   const [detail, setDetail] = useState<GalleryPhoto | null>(null);
   const [linkTarget, setLinkTarget] = useState<{ photos: GalleryPhoto[] } | null>(null);
+  const [sheetPhotos, setSheetPhotos] = useState<GalleryPhoto[] | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -187,7 +189,10 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole }) => {
       {selection.size > 0 && (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#1A1A72]/20 bg-[#1A1A72]/5 p-2.5">
           <span className="text-xs font-bold text-[#1A1A72]">{selection.size} selecionada(s)</span>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => setSheetPhotos(selectedPhotos)} className="min-h-9 rounded-lg bg-[#E63946] px-3 text-xs font-bold uppercase text-white">
+              <span className="material-symbols-outlined align-middle text-sm">picture_as_pdf</span> Folha de Fotos
+            </button>
             <button onClick={() => setLinkTarget({ photos: selectedPhotos })} className="min-h-9 rounded-lg bg-[#1A1A72] px-3 text-xs font-bold uppercase text-white">Vincular</button>
             <button onClick={clearSelection} className="min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold uppercase text-slate-600">Limpar</button>
           </div>
@@ -254,6 +259,10 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole }) => {
           toast={toast}
           onDone={async () => { setLinkTarget(null); clearSelection(); setDetail(null); await load(); }}
         />
+      )}
+
+      {sheetPhotos && (
+        <PhotoSheetConfigModal photos={sheetPhotos} onClose={() => setSheetPhotos(null)} />
       )}
     </div>
   );
