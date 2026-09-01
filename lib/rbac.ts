@@ -13,7 +13,6 @@ export const ROLE_TABS: Record<UserRole, TabPath[]> = {
     'clientes',
     'fornecedores',
     'estoque',
-    'catalogo',
     'servicos',
     'relatorios',
     'fotos-de-campo',
@@ -21,7 +20,7 @@ export const ROLE_TABS: Record<UserRole, TabPath[]> = {
     'conta',
   ],
   TECNICO: ['painel', 'agenda', 'pedidos', 'relatorios', 'fotos-de-campo', 'ponto'],
-  GESTOR: ['painel', 'pedidos', 'contratos', 'agenda', 'clientes', 'servicos', 'estoque', 'catalogo', 'relatorios', 'fotos-de-campo', 'ponto'],
+  GESTOR: ['painel', 'pedidos', 'contratos', 'agenda', 'clientes', 'servicos', 'estoque', 'relatorios', 'fotos-de-campo', 'ponto'],
   FINANCEIRO: ['painel', 'pedidos', 'contratos', 'receitas', 'despesas', 'financas', 'clientes', 'fornecedores'],
 };
 

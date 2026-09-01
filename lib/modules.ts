@@ -21,7 +21,6 @@ export const MODULE_META: Record<TabPath, ModuleMeta> = {
   clientes: { label: 'Clientes', icon: 'group' },
   fornecedores: { label: 'Fornecedores', icon: 'local_shipping' },
   estoque: { label: 'Estoque', icon: 'inventory_2' },
-  catalogo: { label: 'Catálogo', icon: 'account_tree' },
   servicos: { label: 'Serviço', icon: 'construction' },
   relatorios: { label: 'Atendimentos', icon: 'assignment', short: 'Atend.' },
   'fotos-de-campo': { label: 'Fotos de Campo', icon: 'photo_library', short: 'Fotos' },

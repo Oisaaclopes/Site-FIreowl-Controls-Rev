@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { InventoryItem, UserRole } from '@/lib/types';
 import { isSupabaseConfigured } from '@/lib/inventory';
+import { stockStatus } from '@/lib/stockStatus';
 import { EmptyState } from '@/components/EmptyState';
 import { TaxonomyBreadcrumb, CrumbItem } from '@/components/catalog/TaxonomyBreadcrumb';
 import { CatalogSearch } from '@/components/catalog/CatalogSearch';
@@ -15,9 +16,35 @@ import {
 } from '@/lib/catalogTree';
 
 type StatusFilter = 'all' | ClassificationStatus;
+type StockMode = 'all' | 'in_stock' | 'low' | 'out' | 'catalog_only';
 
 const AREA_ICON: Record<string, string> = { SDAI: 'local_fire_department', CFTV: 'videocam', ALARME: 'sensors', BMS: 'thermostat' };
 
+const STOCK_OPTIONS: { value: StockMode; label: string }[] = [
+  { value: 'all', label: 'Estoque: todos' },
+  { value: 'in_stock', label: 'Em estoque' },
+  { value: 'low', label: 'Estoque baixo' },
+  { value: 'out', label: 'Sem estoque' },
+  { value: 'catalog_only', label: 'Somente catálogo' },
+];
+
+// Reutiliza as regras de estoque existentes (lib/stockStatus). Não muda a regra.
+function passesStock(item: InventoryItem, mode: StockMode): boolean {
+  if (mode === 'all') return true;
+  const st = stockStatus(item);
+  if (mode === 'catalog_only') return st === 'SOMENTE_CATALOGO';
+  if (mode === 'in_stock') return st === 'EM_ESTOQUE';
+  if (mode === 'low') return st === 'ESTOQUE_BAIXO' || st === 'CRITICO';
+  if (mode === 'out') return st === 'SEM_ESTOQUE';
+  return true;
+}
+
+/**
+ * Estoque unificado (Passada 3.1): a navegação técnica por taxonomia canônica é
+ * a experiência principal, com o estoque como dimensão adicional (filtros de
+ * saldo). Reaproveita TaxonomyNavigator/Breadcrumb/CatalogSearch/
+ * ProductCatalogList/catalogTree e as regras de lib/stockStatus.
+ */
 export function CatalogoView({ inventory, inventoryLoading = false, userRole }: {
   inventory: InventoryItem[];
   inventoryLoading?: boolean;
@@ -34,6 +61,7 @@ export function CatalogoView({ inventory, inventoryLoading = false, userRole }: 
   const [nodeId, setNodeId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [stockMode, setStockMode] = useState<StockMode>('all');
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
 
   useEffect(() => {
@@ -58,43 +86,50 @@ export function CatalogoView({ inventory, inventoryLoading = false, userRole }: 
     [tree, inventory, aliases, query],
   );
 
-  const resetTo = (a: string | null, n: string | null) => { setArea(a); setNodeId(n); setStatusFilter('all'); setQuery(''); };
+  // Aplica as dimensões de filtro (status de classificação + saldo).
+  const applyFilters = (list: InventoryItem[]): InventoryItem[] =>
+    list.filter((p) =>
+      (statusFilter === 'all' || (p.classificationStatus ?? 'NAO_CLASSIFICADO') === statusFilter)
+      && passesStock(p, stockMode));
+
+  const resetTo = (a: string | null, n: string | null) => { setArea(a); setNodeId(n); setStatusFilter('all'); setStockMode('all'); setQuery(''); };
 
   const loading = inventoryLoading || loadingTax;
 
-  // ---- Breadcrumb ----
   const crumbs: CrumbItem[] = useMemo(() => {
-    const list: CrumbItem[] = [{ key: 'root', label: 'Catálogo', onClick: () => resetTo(null, null) }];
+    const list: CrumbItem[] = [{ key: 'root', label: 'Estoque', onClick: () => resetTo(null, null) }];
     if (area) list.push({ key: `area-${area}`, label: area, onClick: () => resetTo(area, null) });
     if (tree && nodeId) for (const n of nodePath(tree, nodeId)) list.push({ key: n.id, label: n.name, onClick: () => setNodeId(n.id) });
     return list;
   }, [area, nodeId, tree]);
 
-  // ---- Corpo ----
+  const hasFilter = statusFilter !== 'all' || stockMode !== 'all';
+
   let body: React.ReactNode = null;
 
   if (loading) {
     body = (
       <div className="flex flex-col items-center justify-center py-24 text-slate-400">
         <span className="material-symbols-outlined animate-spin text-3xl">progress_activity</span>
-        <p className="text-sm mt-2 font-semibold">Carregando catálogo…</p>
+        <p className="text-sm mt-2 font-semibold">Carregando estoque…</p>
       </div>
     );
   } else if (loadError || !tree) {
-    body = <EmptyState variant="estoque" title="Catálogo indisponível" description="Não foi possível carregar a taxonomia do catálogo. Verifique sua conexão e tente novamente." />;
+    body = <EmptyState variant="estoque" title="Estoque indisponível" description="Não foi possível carregar o catálogo/taxonomia. Verifique sua conexão e tente novamente." />;
   } else if (searchResult) {
-    // ---- Busca global ----
-    body = searchResult.products.length === 0 ? (
+    const list = applyFilters(searchResult.products);
+    body = list.length === 0 ? (
       <EmptyState variant="generico" title="Nenhum resultado" description={`Nada encontrado para "${query}". Tente outro modelo, fabricante ou sinônimo técnico.`} />
     ) : (
       <div className="flex flex-col gap-3">
-        <p className="text-xs font-semibold text-slate-500">{searchResult.products.length} resultado(s) para “{query}”.</p>
-        <ProductCatalogList products={searchResult.products} tree={tree} viewMode={viewMode} canSeePrice={canSeePrice} />
+        <p className="text-xs font-semibold text-slate-500">{list.length} resultado(s) para “{query}”.</p>
+        <ProductCatalogList products={list} tree={tree} viewMode={viewMode} canSeePrice={canSeePrice} />
       </div>
     );
-  } else if (statusFilter !== 'all') {
-    // ---- Filtro por status (Revisar / Não classificados) ----
-    const list = inventory.filter((p) => (p.classificationStatus ?? 'NAO_CLASSIFICADO') === statusFilter);
+  } else if (hasFilter) {
+    // Modo de filtro (status/saldo) — lista plana, opcionalmente restrita à área.
+    const base = area ? inventory.filter((p) => (p.category || '').toUpperCase() === area) : inventory;
+    const list = applyFilters(base);
     body = (
       <div className="flex flex-col gap-3">
         {statusFilter === 'REVISAR' && (
@@ -109,12 +144,16 @@ export function CatalogoView({ inventory, inventoryLoading = false, userRole }: 
           </div>
         )}
         {list.length === 0
-          ? <EmptyState variant="generico" title="Nada aqui" description="Nenhum produto neste estado." />
-          : <ProductCatalogList products={list} tree={tree} viewMode={viewMode} canSeePrice={canSeePrice} />}
+          ? <EmptyState variant="generico" title="Nada aqui" description="Nenhum produto para este filtro." />
+          : (
+            <>
+              <p className="text-xs font-semibold text-slate-500">{list.length} produto(s).</p>
+              <ProductCatalogList products={list} tree={tree} viewMode={viewMode} canSeePrice={canSeePrice} />
+            </>
+          )}
       </div>
     );
   } else if (area === null) {
-    // ---- Seleção de área ----
     const areas = [...new Set([...CANONICAL_AREAS, ...[...areaCounts.keys()]])].filter((a) => (areaCounts.get(a) ?? 0) > 0);
     body = (
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -138,7 +177,6 @@ export function CatalogoView({ inventory, inventoryLoading = false, userRole }: 
       </div>
     );
   } else if (!(CANONICAL_AREAS as readonly string[]).includes(area)) {
-    // ---- Área ainda sem árvore canônica: lista os produtos, sem inventar árvore ----
     const list = inventory.filter((p) => (p.category || '').toUpperCase() === area);
     body = (
       <div className="flex flex-col gap-3">
@@ -150,7 +188,6 @@ export function CatalogoView({ inventory, inventoryLoading = false, userRole }: 
       </div>
     );
   } else {
-    // ---- Navegação canônica (SDAI/CFTV) ----
     const children = nodeId ? nodeChildren(tree, nodeId) : areaFamilies(tree, area);
     const nodeProducts = nodeId ? productsUnderNode(tree, inventory, nodeId) : [];
     body = (
@@ -176,14 +213,13 @@ export function CatalogoView({ inventory, inventoryLoading = false, userRole }: 
 
   return (
     <div className="px-3 sm:px-6 py-4 max-w-6xl mx-auto w-full">
-      {/* Cabeçalho */}
       <div className="flex flex-col gap-3 mb-4">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h1 className="text-lg sm:text-xl font-bold text-[#1A1A72] flex items-center gap-2">
-              <span className="material-symbols-outlined text-[#E63946]">account_tree</span> Catálogo Técnico
+              <span className="material-symbols-outlined text-[#E63946]">inventory_2</span> Estoque
             </h1>
-            <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide">Navegação por taxonomia canônica</p>
+            <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide">Catálogo técnico por taxonomia · saldo como dimensão</p>
           </div>
           <div className="hidden sm:flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
             {(['cards', 'list'] as const).map((m) => (
@@ -198,18 +234,25 @@ export function CatalogoView({ inventory, inventoryLoading = false, userRole }: 
 
         <CatalogSearch value={query} onChange={setQuery} />
 
-        {/* Filtros rápidos + breadcrumb */}
         <div className="flex items-center gap-2 flex-wrap">
           <button type="button" className={chip(statusFilter === 'all' && !query)} onClick={() => { setStatusFilter('all'); setQuery(''); }}>Navegar</button>
-          <button type="button" className={chip(statusFilter === 'REVISAR')} onClick={() => { setStatusFilter('REVISAR'); setQuery(''); }}>
+          <button type="button" className={chip(statusFilter === 'REVISAR')} onClick={() => { setStatusFilter(statusFilter === 'REVISAR' ? 'all' : 'REVISAR'); setQuery(''); }}>
             Revisar classificação{revisarCount ? ` · ${revisarCount}` : ''}
           </button>
-          <button type="button" className={chip(statusFilter === 'NAO_CLASSIFICADO')} onClick={() => { setStatusFilter('NAO_CLASSIFICADO'); setQuery(''); }}>
+          <button type="button" className={chip(statusFilter === 'NAO_CLASSIFICADO')} onClick={() => { setStatusFilter(statusFilter === 'NAO_CLASSIFICADO' ? 'all' : 'NAO_CLASSIFICADO'); setQuery(''); }}>
             Não classificados{naoClassCount ? ` · ${naoClassCount}` : ''}
           </button>
+          <select
+            aria-label="Filtro de estoque"
+            value={stockMode}
+            onChange={(e) => { setStockMode(e.target.value as StockMode); setQuery(''); }}
+            className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors ${stockMode !== 'all' ? 'bg-[#1A1A72] text-white border-[#1A1A72]' : 'bg-white text-slate-600 border-slate-200'}`}
+          >
+            {STOCK_OPTIONS.map((o) => <option key={o.value} value={o.value} className="text-slate-800">{o.label}</option>)}
+          </select>
         </div>
 
-        {!query && statusFilter === 'all' && <TaxonomyBreadcrumb items={crumbs} />}
+        {!query && !hasFilter && <TaxonomyBreadcrumb items={crumbs} />}
       </div>
 
       {body}

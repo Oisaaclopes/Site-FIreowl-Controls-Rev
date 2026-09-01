@@ -78,7 +78,6 @@ import { FinancasView } from '@/components/views/FinancasView';
 import { AgendaView } from '@/components/views/AgendaView';
 import { CrmView } from '@/components/views/CrmView';
 import { FornecedoresView } from '@/components/views/FornecedoresView';
-import { EstoqueView } from '@/components/views/EstoqueView';
 import { CatalogoView } from '@/components/views/CatalogoView';
 import { ServicosView } from '@/components/views/ServicosView';
 import { RelatoriosView } from '@/components/views/RelatoriosView';
@@ -1224,20 +1223,6 @@ export function CrmApp({
           )}
 
           {currentTab === 'estoque' && (
-            <EstoqueView
-              inventory={inventory}
-              suppliers={suppliers}
-              supplyOrders={supplyOrders}
-              onAddInventoryItem={handleAddInventoryItem}
-              onUpdateInventoryItem={handleUpdateInventoryItem}
-              onDeleteInventoryItem={handleDeleteInventoryItem}
-              onAddSupplier={handleAddSupplier}
-              onOpenSupplyOrder={handleOpenSupplyOrder}
-              loading={inventoryLoading}
-            />
-          )}
-
-          {currentTab === 'catalogo' && (
             <CatalogoView
               inventory={inventory}
               inventoryLoading={inventoryLoading}
