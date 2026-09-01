@@ -15,11 +15,12 @@ export interface ManagedUser {
   phone?: string;
   schedule?: WorkSchedule;
   courses?: string[];
+  firstAccessCompleted: boolean;
+  invitationSentAt?: string;
 }
 
 export interface NewUserInput {
   email: string;
-  password: string;
   name: string;
   role: UserRole;
   status?: UserStatus;
@@ -49,6 +50,8 @@ function rowToUser(r: any): ManagedUser {
     phone: r.phone ?? undefined,
     schedule: r.schedule ? normalizeSchedule(r.schedule) : undefined,
     courses: Array.isArray(r.courses) ? r.courses : undefined,
+    firstAccessCompleted: r.first_access_completed !== false,
+    invitationSentAt: r.invitation_sent_at ?? undefined,
   };
 }
 
@@ -120,13 +123,17 @@ export async function setUserStatus(id: string, status: UserStatus): Promise<voi
 const CREATE_ERROR_MSG: Record<string, string> = {
   email_exists: 'Já existe um usuário com esse e-mail.',
   invalid_email: 'E-mail inválido.',
-  weak_password: 'Senha inválida (mínimo de 6 caracteres).',
   invalid_role: 'Perfil de acesso inválido.',
   invalid_name: 'Informe o nome do usuário.',
   forbidden: 'Sem permissão: apenas o Administrativo pode criar usuários.',
   unauthorized: 'Sessão inválida. Faça login novamente.',
   profile_update_failed: 'Falha ao gravar os dados do usuário. Nenhuma conta foi criada.',
-  create_failed: 'Não foi possível criar o usuário.',
+  create_failed: 'Não foi possível convidar o usuário.',
+  invite_failed: 'Não foi possível enviar o convite.',
+  target_not_found: 'Usuário não encontrado.',
+  already_activated: 'Este usuário já concluiu o primeiro acesso.',
+  target_inactive: 'Reative o usuário antes de reenviar o convite.',
+  redirect_not_configured: 'A URL pública do primeiro acesso não está configurada no serviço.',
   not_deployed: 'Serviço de criação de usuários indisponível. Verifique se a Edge Function "create-user" foi implantada.',
 };
 
@@ -137,8 +144,8 @@ export async function createUser(input: NewUserInput): Promise<void> {
   const supabase = getSupabaseClient() as any;
   const { data, error } = await supabase.functions.invoke('create-user', {
     body: {
+      action: 'invite',
       email: input.email,
-      password: input.password,
       name: input.name,
       role: input.role,
       status: input.status ?? 'ATIVO',
@@ -166,6 +173,19 @@ export async function createUser(input: NewUserInput): Promise<void> {
     throw new Error(CREATE_ERROR_MSG[code] || CREATE_ERROR_MSG.create_failed);
   }
   if (data?.error) throw new Error(CREATE_ERROR_MSG[data.error] || CREATE_ERROR_MSG.create_failed);
+}
+
+export async function resendUserInvite(targetUserId: string): Promise<void> {
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase.functions.invoke('create-user', {
+    body: { action: 'resend', targetUserId },
+  });
+  if (error) {
+    let code = '';
+    try { code = (await error.context?.json?.())?.error || ''; } catch { /* corpo indisponível */ }
+    throw new Error(CREATE_ERROR_MSG[code] || CREATE_ERROR_MSG.invite_failed);
+  }
+  if (data?.error) throw new Error(CREATE_ERROR_MSG[data.error] || CREATE_ERROR_MSG.invite_failed);
 }
 
 // Mensagens (PT) por código da Edge Function reset-user-password. A senha NUNCA

@@ -53,6 +53,21 @@ describe('auth — gate de acesso (Fase 4.1)', () => {
     expect(h.signOut).toHaveBeenCalledTimes(1);
   });
 
+  it('usuário com primeiro acesso pendente não entra no app', async () => {
+    h.state.profileResponse = profile({ first_access_completed: false });
+    await expect(signIn('a@fireowl.com', 'x')).rejects.toThrow(/FIRST_ACCESS_PENDING/);
+    expect(h.signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('primeiro acesso concluído libera o login', async () => {
+    h.state.profileResponse = profile({ first_access_completed: true });
+    await expect(signIn('a@fireowl.com', 'x')).resolves.toMatchObject({ firstAccessCompleted: true });
+  });
+
+  it('usuário histórico sem a coluna explícita continua liberado', async () => {
+    await expect(signIn('a@fireowl.com', 'x')).resolves.toMatchObject({ firstAccessCompleted: true });
+  });
+
   it('login sem perfil (revogado) não autoriza', async () => {
     h.state.profileResponse = { data: null, error: null };
     await expect(signIn('a@fireowl.com', 'x')).rejects.toThrow(/PROFILE_NOT_AUTHORIZED/);

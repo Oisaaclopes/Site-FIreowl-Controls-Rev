@@ -10,6 +10,7 @@ export interface AuthUser {
   status: UserStatus;
   cargo?: string;
   schedule?: WorkSchedule;
+  firstAccessCompleted: boolean;
 }
 
 const VALID_STATUS: UserStatus[] = ['ATIVO', 'INATIVO', 'DESLIGADO'];
@@ -57,6 +58,7 @@ async function readProfileState(supabase: any, user: any): Promise<{ state: 'ok'
       status: normalizeStatus(profile.status),
       cargo: profile.cargo ?? undefined,
       schedule: profile.schedule ? normalizeSchedule(profile.schedule) : undefined,
+      firstAccessCompleted: profile.first_access_completed !== false,
     },
   };
 }
@@ -78,6 +80,11 @@ export async function signIn(email: string, password: string): Promise<AuthUser>
     await supabase.auth.signOut();
     clearAuthSnapshot();
     throw new Error(res.user.status === 'DESLIGADO' ? 'PROFILE_DESLIGADO' : 'PROFILE_INATIVO');
+  }
+  if (!res.user.firstAccessCompleted) {
+    await supabase.auth.signOut();
+    clearAuthSnapshot();
+    throw new Error('FIRST_ACCESS_PENDING');
   }
   saveSnapshot(res.user);
   return res.user;
@@ -115,6 +122,7 @@ export function authErrorMessage(err: unknown): string {
   if (/PROFILE_INATIVO/.test(msg)) return 'Seu acesso está temporariamente inativo. Entre em contato com o administrador.';
   if (/PROFILE_DESLIGADO/.test(msg)) return 'Este usuário não possui mais acesso ao sistema.';
   if (/PROFILE_NOT_AUTHORIZED/.test(msg)) return 'Acesso não autorizado. Fale com o administrador do sistema.';
+  if (/FIRST_ACCESS_PENDING/.test(msg)) return 'Conclua seu cadastro pelo link enviado por e-mail antes de entrar.';
   if (/network|fetch|Failed to fetch/i.test(msg)) return 'Sem conexão com o servidor. Verifique sua internet e tente novamente.';
   return 'Não foi possível entrar. Tente novamente.';
 }
@@ -132,7 +140,7 @@ export async function getSessionUser(): Promise<AuthUser | null> {
   if (!user) return null;
   const res = await readProfileState(supabase, user);
   if (res.state === 'ok') {
-    if (res.user.status !== 'ATIVO') {
+    if (res.user.status !== 'ATIVO' || !res.user.firstAccessCompleted) {
       await supabase.auth.signOut();
       clearAuthSnapshot();
       return null;

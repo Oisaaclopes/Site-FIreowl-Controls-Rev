@@ -29,6 +29,7 @@ import {
   deleteUserProfile,
   setUserStatus,
   logUserAudit,
+  resendUserInvite,
   ManagedUser,
 } from '@/lib/users';
 import { WorkSchedule, DEFAULT_SCHEDULE, WEEKDAY_SHORT } from '@/lib/schedule';
@@ -264,7 +265,6 @@ export const ContaView: React.FC<ContaViewProps> = ({
   const [usersError, setUsersError] = useState('');
   const [nuName, setNuName] = useState('');
   const [nuEmail, setNuEmail] = useState('');
-  const [nuPassword, setNuPassword] = useState('');
   const [nuRole, setNuRole] = useState<UserRole>('TECNICO');
   const [nuCargo, setNuCargo] = useState('');
   const [nuStatus, setNuStatus] = useState<UserStatus>('ATIVO');
@@ -432,15 +432,14 @@ export const ContaView: React.FC<ContaViewProps> = ({
     e.preventDefault();
     if (creating) return;
     setCreateMsg('');
-    if (!nuEmail.trim() || nuPassword.length < 6) {
-      setCreateMsg('Informe um e-mail válido e uma senha de pelo menos 6 caracteres.');
+    if (!nuEmail.trim()) {
+      setCreateMsg('Informe um e-mail válido.');
       return;
     }
     setCreating(true);
     try {
       await createUser({
         email: nuEmail.trim(),
-        password: nuPassword,
         name: (nuName || nuFullName || nuEmail.split('@')[0]).trim(),
         role: nuRole,
         status: nuStatus,
@@ -455,11 +454,10 @@ export const ContaView: React.FC<ContaViewProps> = ({
           .map((s) => s.trim())
           .filter(Boolean),
       });
-      // (a Edge Function já registra USER_CREATED no audit_logs server-side)
-      setCreateMsg('OK: usuário criado. Já pode fazer login com a senha definida.');
+      // A Edge Function registra USER_INVITED sem senha/token.
+      setCreateMsg(`OK: convite enviado para ${nuEmail.trim()}`);
       setNuName('');
       setNuEmail('');
-      setNuPassword('');
       setNuRole('TECNICO');
       setNuCargo('');
       setNuStatus('ATIVO');
@@ -476,6 +474,13 @@ export const ContaView: React.FC<ContaViewProps> = ({
     } finally {
       setCreating(false);
     }
+  };
+
+  const handleResendInvite = async (u: ManagedUser) => {
+    const ok = await confirm({ title: 'Reenviar convite?', message: `Um novo link seguro será enviado para ${u.email}.`, confirmLabel: 'Reenviar convite' });
+    if (!ok) return;
+    try { await resendUserInvite(u.id); toast.success(`Convite reenviado para ${u.email}.`); setTimeout(refreshUsers, 400); }
+    catch (err: any) { toast.error(err?.message || 'Não foi possível reenviar o convite.'); }
   };
 
   const handleRoleChange = async (u: ManagedUser, role: UserRole) => {
@@ -1411,7 +1416,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
                 <h3 className="font-display text-sm font-bold uppercase tracking-wide text-[#1A1A72]">
                   Novo usuário
                 </h3>
-                <p className="text-[11px] text-slate-400">Cria o login e já define o nível de acesso.</p>
+                <p className="text-[11px] text-slate-400">Um convite será enviado. O funcionário criará a própria senha no primeiro acesso.</p>
               </div>
             </div>
 
@@ -1446,10 +1451,6 @@ export const ContaView: React.FC<ContaViewProps> = ({
                 <div>
                   <label className={labelCls}>E-mail (login)</label>
                   <input type="email" value={nuEmail} onChange={(e) => setNuEmail(e.target.value)} className={`${inputCls} font-data-mono`} placeholder="nome@fireowlcontrols.com.br" />
-                </div>
-                <div>
-                  <label className={labelCls}>Senha inicial</label>
-                  <input type="text" value={nuPassword} onChange={(e) => setNuPassword(e.target.value)} className={`${inputCls} font-data-mono`} placeholder="mín. 6 caracteres" />
                 </div>
               </div>
 
@@ -1508,7 +1509,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
                 <span className={`material-symbols-outlined text-base ${creating ? 'animate-spin' : ''}`}>
                   {creating ? 'progress_activity' : 'person_add'}
                 </span>
-                {creating ? 'Criando...' : 'Criar usuário'}
+                {creating ? 'Enviando...' : 'Enviar convite'}
               </button>
             </form>
           </div>
@@ -1549,8 +1550,8 @@ export const ContaView: React.FC<ContaViewProps> = ({
                         <>
                           <span className="font-data-mono text-slate-500">{u.email}</span>
                           {u.cargo && <span className="text-slate-500">{u.cargo}</span>}
-                          <Badge color={u.status === 'ATIVO' ? 'emerald' : u.status === 'INATIVO' ? 'amber' : 'slate'}>
-                            {u.status === 'ATIVO' ? 'Ativo' : u.status === 'INATIVO' ? 'Inativo' : 'Desligado'}
+                          <Badge color={u.status === 'ATIVO' && u.firstAccessCompleted ? 'emerald' : u.status === 'ATIVO' ? 'amber' : u.status === 'INATIVO' ? 'amber' : 'slate'}>
+                            {u.status === 'ATIVO' && !u.firstAccessCompleted ? 'Convite pendente' : u.status === 'ATIVO' ? 'Ativo' : u.status === 'INATIVO' ? 'Inativo' : 'Desligado'}
                           </Badge>
                         </>
                       }
@@ -1581,6 +1582,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
                             <option value="DESLIGADO">Desligado</option>
                           </select>
                           <RowAction icon="edit" label="Editar dados" onClick={() => openEditUser(u)} />
+                          {!u.firstAccessCompleted && u.status === 'ATIVO' && <RowAction icon="forward_to_inbox" label="Reenviar convite" onClick={() => handleResendInvite(u)} />}
                           {canReset && !isSelf && (
                             <RowAction icon="lock_reset" label="Redefinir senha" onClick={() => setResetUser(u)} />
                           )}
