@@ -41,7 +41,7 @@ describe('taxonomia canônica — árvore', () => {
 
   it('getTaxonomyChildren respeita sort_order', () => {
     expect(getTaxonomyChildren('SDAI.MODULOS').map((n) => n.code)).toEqual([
-      'SDAI.MODULOS.ENTRADA', 'SDAI.MODULOS.SAIDA', 'SDAI.MODULOS.IO', 'SDAI.MODULOS.RELE', 'SDAI.MODULOS.ISOLADOR',
+      'SDAI.MODULOS.ENTRADA', 'SDAI.MODULOS.SAIDA', 'SDAI.MODULOS.IO', 'SDAI.MODULOS.RELE', 'SDAI.MODULOS.ISOLADOR', 'SDAI.MODULOS.ZONA',
     ]);
   });
 });
@@ -80,16 +80,14 @@ describe('taxonomia canônica — classificação determinística', () => {
     expect(classifyCatalogItem(find('NFS2-3030'))).toEqual({ code: 'SDAI.CENTRAIS.EQUIP.END', status: 'CLASSIFICADO' });
   });
 
-  it('módulos Edwards SIGA genéricos permanecem REVISAR na família', () => {
-    for (const m of ['SIGA-IM', 'SIGA-MM1', 'SIGA-CC1', 'SIGA-CT1']) {
-      expect(classifyCatalogItem(find(m))).toEqual({ code: 'SDAI.MODULOS', status: 'REVISAR' });
-    }
+  it('módulos SIGA sem revisão comprovada permanecem REVISAR (ex.: SIGA-CR)', () => {
+    // Após a 0072, os módulos revisados foram promovidos; SIGA-CR não teve
+    // evidência nesta passada e segue REVISAR na família.
+    expect(classifyCatalogItem(find('SIGA-CR'))).toEqual({ code: 'SDAI.MODULOS', status: 'REVISAR' });
   });
 
-  it('detectores Edwards/Bosch genéricos permanecem REVISAR na família', () => {
-    for (const m of ['SIGA-OSD', 'FAP-425-O']) {
-      expect(classifyCatalogItem(find(m))).toEqual({ code: 'SDAI.DETECTORES', status: 'REVISAR' });
-    }
+  it('Bosch FAP-520 permanece REVISAR por ambiguidade de variante', () => {
+    expect(classifyCatalogItem(find('FAP-520'))).toEqual({ code: 'SDAI.DETECTORES', status: 'REVISAR' });
   });
 
   it('FCM-1-REL vai para Relé; FCM-1 para Saída / Controle', () => {
@@ -147,8 +145,9 @@ describe('taxonomia canônica — totais do backfill (espelho do 0070)', () => {
     return { total: items.length, ...by };
   };
 
-  it('SDAI: 80 total = 60 CLASSIFICADO + 20 REVISAR + 0 não classificado', () => {
-    expect(count('SDAI')).toEqual({ total: 80, CLASSIFICADO: 60, REVISAR: 20, NAO_CLASSIFICADO: 0 });
+  it('SDAI seed pós-0072: 80 = 78 CLASSIFICADO + 2 REVISAR (SIGA-CR, FAP-520)', () => {
+    // 0070 deixava 20 REVISAR; a revisão 0072 promoveu 18, restando SIGA-CR e FAP-520.
+    expect(count('SDAI')).toEqual({ total: 80, CLASSIFICADO: 78, REVISAR: 2, NAO_CLASSIFICADO: 0 });
   });
 
   it('CFTV: 77 total = 77 CLASSIFICADO + 0 REVISAR + 0 não classificado', () => {

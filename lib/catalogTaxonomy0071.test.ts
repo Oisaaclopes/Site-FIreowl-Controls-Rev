@@ -92,8 +92,10 @@ describe('0071 — novos nós e árvore', () => {
     }
   });
 
-  it('Multicritério NÃO foi criado (sem produto real que justifique)', () => {
+  it('Multicritério passou a existir na 0072 (com END), Bullet-free MULTI antigo nunca existiu', () => {
     expect(CATALOG_TAXONOMY_NODES.find((n) => n.code === 'SDAI.DETECTORES.MULTI')).toBeUndefined();
+    expect(CATALOG_TAXONOMY_NODES.find((n) => n.code === 'SDAI.DETECTORES.MULTICRITERIO')).toBeDefined();
+    expect(CATALOG_TAXONOMY_NODES.find((n) => n.code === 'SDAI.DETECTORES.MULTICRITERIO.END')?.parentCode).toBe('SDAI.DETECTORES.MULTICRITERIO');
   });
 
   it('nenhum alias normalizado aponta para nós diferentes (invariante real)', () => {
@@ -118,10 +120,12 @@ describe('0071 — novos nós e árvore', () => {
 describe('0071 — classificação determinística dos 51', () => {
   const results = PROD_51.map(([brand, model, sub]) => ({ brand, model, sub, r: classifyCatalogItem(item({ brand, model, subcategory: sub })) }));
 
-  it('totais: 45 CLASSIFICADO / 5 REVISAR / 1 NAO_CLASSIFICADO', () => {
+  it('totais pós-0072: 49 CLASSIFICADO / 1 REVISAR / 1 NAO_CLASSIFICADO', () => {
+    // 0071 deixava 45/5/1; a revisão 0072 promoveu por modelo AME 566, AMET12 IP-67,
+    // MDZ 521 V2 e MCB485TH, restando só "Placa Fonte CIE" em REVISAR (e PLA0014 NC).
     const t = { CLASSIFICADO: 0, REVISAR: 0, NAO_CLASSIFICADO: 0 } as Record<string, number>;
     for (const x of results) t[x.r.status]++;
-    expect(t).toEqual({ CLASSIFICADO: 45, REVISAR: 5, NAO_CLASSIFICADO: 1 });
+    expect(t).toEqual({ CLASSIFICADO: 49, REVISAR: 1, NAO_CLASSIFICADO: 1 });
   });
 
   it('exemplos de caminhos ALTA confiança', () => {
@@ -137,9 +141,9 @@ describe('0071 — classificação determinística dos 51', () => {
     expect(path('RP 520')).toBe('Repetidoras / Anunciadores'); // repetidor = anunciador, não componente
   });
 
-  it('itens de baixa/média confiança ficam REVISAR', () => {
+  it('após 0072, só "Placa Fonte CIE" segue REVISAR entre os 51', () => {
     const rev = results.filter((x) => x.r.status === 'REVISAR').map((x) => x.model).sort();
-    expect(rev).toEqual(['AME 566', 'AMET12 IP-67', 'MCB485TH', 'MDZ 521 V2', 'Placa Fonte CIE'].sort());
+    expect(rev).toEqual(['Placa Fonte CIE']);
   });
 
   it('PLA0014 (sem subcategoria) permanece NAO_CLASSIFICADO', () => {
@@ -157,11 +161,10 @@ describe('0071 — proteções', () => {
     expect(classifyCatalogItem(item({ category: 'BMS', subcategory: 'Controlador', model: 'SNC' }))).toEqual({ code: null, status: 'NAO_CLASSIFICADO' });
   });
 
-  it('os 20 REVISAR históricos (Edwards/Bosch) continuam REVISAR na família', () => {
-    // subcategoria genérica "Detector"/"Módulo" do seed original
-    expect(classifyCatalogItem(item({ category: 'SDAI', brand: 'Edwards', subcategory: 'Detector', model: 'SIGA-OSD' }))).toEqual({ code: 'SDAI.DETECTORES', status: 'REVISAR' });
-    expect(classifyCatalogItem(item({ category: 'SDAI', brand: 'Bosch', subcategory: 'Detector', model: 'FAP-425-OT' }))).toEqual({ code: 'SDAI.DETECTORES', status: 'REVISAR' });
-    expect(classifyCatalogItem(item({ category: 'SDAI', brand: 'Edwards', subcategory: 'Módulo', model: 'SIGA-IM' }))).toEqual({ code: 'SDAI.MODULOS', status: 'REVISAR' });
+  it('modelo genérico não revisado ainda cai em REVISAR na família (subcategoria genérica)', () => {
+    // Um SIGA hipotético fora do mapa de revisão continua REVISAR pela regra de subcategoria.
+    expect(classifyCatalogItem(item({ category: 'SDAI', brand: 'Edwards', subcategory: 'Detector', model: 'SIGA-ZZZ' }))).toEqual({ code: 'SDAI.DETECTORES', status: 'REVISAR' });
+    expect(classifyCatalogItem(item({ category: 'SDAI', brand: 'Edwards', subcategory: 'Módulo', model: 'SIGA-CR' }))).toEqual({ code: 'SDAI.MODULOS', status: 'REVISAR' });
   });
 
   it('classificação não muta o produto', () => {

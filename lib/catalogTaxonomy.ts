@@ -59,12 +59,17 @@ export const CATALOG_TAXONOMY_NODES: CatalogTaxonomyNode[] = [
   // 0071 — novos tipos de detector com produto real (Gás, Linear/Feixe)
   n('SDAI', 'SDAI.DETECTORES', 'TYPE', 'SDAI.DETECTORES.GAS', 'Gás', 40),
   n('SDAI', 'SDAI.DETECTORES', 'TYPE', 'SDAI.DETECTORES.LINEAR', 'Linear / Feixe', 50),
+  // 0072 — multicritério (multissensor: óptico+térmico etc.); só endereçável real
+  n('SDAI', 'SDAI.DETECTORES', 'TYPE', 'SDAI.DETECTORES.MULTICRITERIO', 'Multicritério', 25),
+  n('SDAI', 'SDAI.DETECTORES.MULTICRITERIO', 'TECHNOLOGY', 'SDAI.DETECTORES.MULTICRITERIO.END', 'Endereçável', 10),
   // SDAI — Módulos
   n('SDAI', 'SDAI.MODULOS', 'FUNCTION', 'SDAI.MODULOS.ENTRADA', 'Entrada / Monitor', 10),
   n('SDAI', 'SDAI.MODULOS', 'FUNCTION', 'SDAI.MODULOS.SAIDA', 'Saída / Controle', 20),
   n('SDAI', 'SDAI.MODULOS', 'FUNCTION', 'SDAI.MODULOS.IO', 'Entrada e Saída (I/O)', 30),
   n('SDAI', 'SDAI.MODULOS', 'FUNCTION', 'SDAI.MODULOS.RELE', 'Relé', 40),
   n('SDAI', 'SDAI.MODULOS', 'FUNCTION', 'SDAI.MODULOS.ISOLADOR', 'Isolador', 50),
+  // 0072 — módulo de zona (interface de laço/zona convencional no endereçável)
+  n('SDAI', 'SDAI.MODULOS', 'FUNCTION', 'SDAI.MODULOS.ZONA', 'Módulo de Zona', 60),
   // SDAI — Acionadores
   n('SDAI', 'SDAI.ACIONADORES', 'TECHNOLOGY', 'SDAI.ACIONADORES.END', 'Endereçável', 10),
   n('SDAI', 'SDAI.ACIONADORES', 'TECHNOLOGY', 'SDAI.ACIONADORES.CONV', 'Convencional', 20),
@@ -127,6 +132,9 @@ export const CATALOG_TAXONOMY_ALIASES: CatalogTaxonomyAlias[] = [
   ...aliasList('SDAI.CENTRAIS.COMPONENTES.PROGRAMACAO', ['Programador de Endereços', 'Programador de Endereço']),
   ...aliasList('SDAI.CENTRAIS.COMPONENTES', ['Componente de Central', 'Peça de Central']),
   ...aliasList('SDAI.EMERGENCIA.LUMINARIAS', ['Luminária de Emergência', 'Iluminação de Emergência', 'Bloco Autônomo']),
+  // 0072 — Módulo de Zona e Multicritério
+  ...aliasList('SDAI.MODULOS.ZONA', ['Módulo de Zona', 'Módulo Endereçador de Zona', 'Endereçador de Zona', 'Zone Module', 'Módulo para Laço Convencional']),
+  ...aliasList('SDAI.DETECTORES.MULTICRITERIO', ['Multicritério', 'Multisensor', 'Multi-criteria']),
 ];
 
 function aliasList(code: string, aliases: string[]): CatalogTaxonomyAlias[] {
@@ -204,11 +212,54 @@ const CLASSIFICADO = (code: string): ClassificationResult => ({ code, status: 'C
 const REVISAR = (code: string): ClassificationResult => ({ code, status: 'REVISAR' });
 const NAO_CLASSIFICADO: ClassificationResult = { code: null, status: 'NAO_CLASSIFICADO' };
 
+// ---------------------------------------------------------------------
+// Revisão técnica por MODELO (Passada 2.3 / migration 0072). Decisões
+// comprovadas em datasheet/documentação do fabricante, espelhadas no
+// backfill da 0072. Chave = modelo normalizado (normalizedCatalogKey).
+// FAP-520 permanece REVISAR (variante FAP-O 520 vs FAP-OC 520 ambígua).
+// ---------------------------------------------------------------------
+const REVIEWED_BY_MODEL: Record<string, ClassificationResult> = {
+  // Bosch AVENAR 4000
+  fap425o: CLASSIFICADO('SDAI.DETECTORES.FUMACA.END'),
+  fap425do: CLASSIFICADO('SDAI.DETECTORES.FUMACA.END'),
+  fap425ot: CLASSIFICADO('SDAI.DETECTORES.MULTICRITERIO.END'),
+  fap425dot: CLASSIFICADO('SDAI.DETECTORES.MULTICRITERIO.END'),
+  fah425tr: CLASSIFICADO('SDAI.DETECTORES.TEMP.END'),
+  fap520: REVISAR('SDAI.DETECTORES'),
+  // Edwards Signature — detectores
+  sigaosd: CLASSIFICADO('SDAI.DETECTORES.FUMACA.END'),
+  sigapd: CLASSIFICADO('SDAI.DETECTORES.FUMACA.END'),
+  sigaps: CLASSIFICADO('SDAI.DETECTORES.FUMACA.END'),
+  sigahrd: CLASSIFICADO('SDAI.DETECTORES.TEMP.END'),
+  sigahfs: CLASSIFICADO('SDAI.DETECTORES.TEMP.END'),
+  sigaiphs: CLASSIFICADO('SDAI.DETECTORES.MULTICRITERIO.END'),
+  // Edwards Signature — módulos de entrada/monitor
+  sigact1: CLASSIFICADO('SDAI.MODULOS.ENTRADA'),
+  sigact2: CLASSIFICADO('SDAI.MODULOS.ENTRADA'),
+  sigamm1: CLASSIFICADO('SDAI.MODULOS.ENTRADA'),
+  // Edwards Signature — módulos de saída/controle (função operacional)
+  sigacc1: CLASSIFICADO('SDAI.MODULOS.SAIDA'),
+  sigacc2: CLASSIFICADO('SDAI.MODULOS.SAIDA'),
+  // Edwards Signature — isoladores
+  sigaim: CLASSIFICADO('SDAI.MODULOS.ISOLADOR'),
+  sigaim2: CLASSIFICADO('SDAI.MODULOS.ISOLADOR'),
+  // Módulo de zona (Intelbras / Tecnohold)
+  mdz521v2: CLASSIFICADO('SDAI.MODULOS.ZONA'),
+  mcb485th: CLASSIFICADO('SDAI.MODULOS.ZONA'),
+  // Acionadores manuais endereçáveis (IP é atributo, não nó)
+  ame566: CLASSIFICADO('SDAI.ACIONADORES.END'),
+  amet12ip67: CLASSIFICADO('SDAI.ACIONADORES.END'),
+};
+
 export function classifyCatalogItem(item: ClassifiableItem): ClassificationResult {
   const area = normalizedCatalogKey(item.category);
   const sub = normalizedCatalogKey(item.subcategory);
   const brand = normalizedCatalogKey(item.brand);
   const model = item.model || item.code || '';
+
+  // Revisão técnica por modelo tem precedência (decisão comprovada, 0072).
+  const reviewed = REVIEWED_BY_MODEL[normalizedCatalogKey(model)];
+  if (reviewed) return reviewed;
   const tok = normalizedCatalogKey(`${item.name || ''} ${item.description || ''} ${item.productLine || ''}`);
   const conv = tok.includes('convencional');
   const housing = typeof item.technicalSpecs?.housing === 'string' ? item.technicalSpecs.housing : '';
