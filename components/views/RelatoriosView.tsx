@@ -38,6 +38,7 @@ import { ReportTechnicalPDFView } from '@/components/documentos/ReportTechnicalP
 import { PendenciasBoard } from '@/components/reports/PendenciasBoard';
 import { createOrderFromSurvey } from '@/lib/surveyOrderConversion';
 import { fetchPedidos } from '@/lib/pedidos';
+import { centralModelsForBrand, centralType, manufacturersForArea } from '@/lib/technicalCatalogSelection';
 
 /** Template disponível ao motor: o schema + o id no banco (quando veio do DB). */
 interface LoadedTemplate {
@@ -783,6 +784,10 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   })();
   const formCatalog: CatalogSources = {
     ...catalog,
+    marcas: manufacturersForArea(inventory, areaCategory),
+    modelosPorMarca: Object.fromEntries(manufacturersForArea(inventory, areaCategory).map(brand=>[brand,centralModelsForBrand(inventory,areaCategory,brand).map(i=>i.model||i.name)])),
+    modelosPorGrupo: {...catalog.modelosPorGrupo,centrais_sdai:inventory.filter(i=>i.category==='SDAI'&&/central/i.test(`${i.subcategory||''} ${i.name}`)).map(i=>i.model||i.name)},
+    detalhesModelo: Object.fromEntries(inventory.map(i=>[i.model||i.name,{marca:i.brand,linha:i.productLine,resumo:i.shortDescription||i.technicalDescription,tecnologias:i.technologies,indicacao:i.recommendedUse,tipoCentral:centralType(i)}])),
     categorias: uniq([...gruposDaArea, ...inventory.map((i) => i.category), ...services.map((s) => s.category)]),
     dispositivosPadrao,
     // Dispositivos da área escolhida (Corretiva) — alimenta "dispositivos afetados".

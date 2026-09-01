@@ -45,7 +45,7 @@ export interface CatalogSources {
   modelosPorMarca?: Record<string, string[]>;
   /** Modelos já filtrados por família técnica para campos de identificação. */
   modelosPorGrupo?: Record<string, string[]>;
-  detalhesModelo?: Record<string, { marca?: string; linha?: string; resumo?: string; tecnologias?: string[]; indicacao?: string }>;
+  detalhesModelo?: Record<string, { marca?: string; linha?: string; resumo?: string; tecnologias?: string[]; indicacao?: string; tipoCentral?: string }>;
   devices: { id: string; label: string }[];
   contratos: { id: string; label: string }[];
   pendenciasAprovadas: { id: string; label: string }[];
@@ -680,7 +680,11 @@ const Section: React.FC<{
                   <FieldControl
                     field={field}
                     value={values[field.key]}
-                    onValue={(v) => onChange(field.key, v)}
+                    onValue={(v) => {
+                      onChange(field.key, v);
+                      if(field.key==='central_fabricante') { onChange('central_modelo',''); onChange('tipo_central',''); }
+                      if(field.key==='central_modelo') onChange('tipo_central', catalog.detalhesModelo?.[String(v)]?.tipoCentral || 'Não identificado');
+                    }}
                     catalog={catalog}
                     onCreateCatalogo={onCreateCatalogo}
                     filtroValor={field.filtro_por ? String(values[field.filtro_por] ?? '') : undefined}
