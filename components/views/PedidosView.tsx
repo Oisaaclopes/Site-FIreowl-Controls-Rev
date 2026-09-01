@@ -2,7 +2,7 @@
 import { showToast, requestConfirm, requestText } from '@/components/ui/Feedback';
 
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { PedidoOS, SupplyOrder, Client, Pedido, Contract, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem, DocumentosPadrao, DocumentType, FinancialTransaction, RecebimentoProposta, EmpresaAtendida, MarcaTecnologia } from '@/lib/types';
+import { PedidoOS, SupplyOrder, Client, Pedido, Contract, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem, DocumentosPadrao, DocumentType, FinancialTransaction, RecebimentoProposta, EmpresaAtendida, MarcaTecnologia, OrdemServico } from '@/lib/types';
 import { selecionarEmpresas, selecionarMarcas, experienciaAtiva } from '@/lib/experienciaSelecao';
 import { resolveLogoDataUrls } from '@/lib/institucional';
 import { nomeFantasiaCliente } from '@/lib/utils';
@@ -79,6 +79,9 @@ interface PedidosViewProps {
   onUpdatePedidoStatus: (pedidoId: string, newStatus: PedidoStatus) => void;
   onDeletePedido?: (pedidoId: string) => void;
   onGenerateOSFromPedido: (pedido: Pedido) => void;
+  /** OS ATIVA de cada Pedido, indexada por pedidos.id (vínculo estrutural real,
+   *  source_pedido_id). Fonte da verdade do card — sobrevive a refresh. */
+  activeOsByPedido?: Record<string, OrdemServico>;
   onGenerateContractFromPedido?: (pedido: Pedido) => void;
   onGenerateSupplyOrderFromPedido?: (pedido: Pedido) => void;
   onUpdateSupplyOrder?: (order: SupplyOrder) => void;
@@ -146,6 +149,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   onUpdatePedidoStatus,
   onDeletePedido,
   onGenerateOSFromPedido,
+  activeOsByPedido = {},
   onGenerateContractFromPedido,
   onGenerateSupplyOrderFromPedido,
   onUpdateSupplyOrder,
@@ -166,6 +170,8 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   const [receivingOrder, setReceivingOrder] = useState<SupplyOrder | null>(null);
   const [purchasingOrder, setPurchasingOrder] = useState<SupplyOrder | null>(null);
   const [detailOrder, setDetailOrder] = useState<SupplyOrder | null>(null);
+  // OS ativa exibida em modal read-only ("Ver Ordem de Serviço" do card).
+  const [osDetail, setOsDetail] = useState<OrdemServico | null>(null);
   const isTecnico = userRole === 'TECNICO';
 
   // Aba inicial: atalho "Nova OS" força OS; técnico começa em OS; demais em propostas
@@ -797,7 +803,9 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     const { num, ano } = numeroAno(ped);
     const client = clients.find((item) => item.id === ped.clienteId || item.name === ped.clienteNome);
     const clientLogo = client?.logoPath ? clientLogoUrls[client.logoPath] : undefined;
-    const existingOs = pedidosOS.find((os) => os.pedidoId === ped.numeroPedido);
+    // OS ATIVA pelo vínculo ESTRUTURAL (source_pedido_id === pedidos.id), nunca
+    // por numero_pedido (que não é único). Coerente com contrato/fornecimento abaixo.
+    const existingOs = activeOsByPedido[ped.id];
     const existingContract = contracts.find((contract) => contract.sourcePedidoId === ped.id);
     const existingSupplyOrder = supplyOrders.find((order) => order.sourcePedidoId === ped.id);
     const daysLeft = validityDaysLeft(ped);
@@ -846,14 +854,23 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           </select>
 
           {ped.status === 'aceito' && (
-            <button
-              onClick={() => { if (!existingOs) confirmGenerateOS(ped); }}
-              title={existingOs ? `OS ${existingOs.id} já foi gerada desta proposta` : 'Gerar Ordem de Serviço'}
-              disabled={!!existingOs}
-              className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1 ${existingOs ? 'bg-emerald-100 text-emerald-700 cursor-not-allowed' : 'bg-[#E63946] hover:bg-[#a51515] text-white'}`}
-            >
-              <Wrench className="w-3 h-3" /> {existingOs ? 'OS gerada' : 'Gerar OS'}
-            </button>
+            existingOs ? (
+              <button
+                onClick={() => setOsDetail(existingOs)}
+                title={`Abrir a Ordem de Serviço ${existingOs.numero || existingOs.id}`}
+                className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                <Wrench className="w-3 h-3" /> Ver OS {existingOs.numero || ''}
+              </button>
+            ) : (
+              <button
+                onClick={() => confirmGenerateOS(ped)}
+                title="Gerar Ordem de Serviço"
+                className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1 bg-[#E63946] hover:bg-[#a51515] text-white"
+              >
+                <Wrench className="w-3 h-3" /> Gerar OS
+              </button>
+            )
           )}
           {ped.status === 'aceito' && ped.proposal.recorrente && onGenerateContractFromPedido && (
             <button onClick={() => { if (!existingContract) confirmGenerateContract(ped); }} disabled={!!existingContract} title={existingContract ? `Contrato ${existingContract.id} já foi criado desta proposta` : 'Converter proposta recorrente em contrato'} className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1 ${existingContract ? 'bg-emerald-100 text-emerald-700 cursor-not-allowed' : 'bg-[#1A1A72] hover:bg-[#0B1E38] text-white'}`}>
@@ -1218,6 +1235,15 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           onUpdateSupplyOrder={onUpdateSupplyOrder}
           onCreateInventoryItem={onCreateInventoryItem}
           onSupplyChanged={onSupplyChanged}
+        />
+      )}
+
+      {osDetail && (
+        <OrdemServicoDetailModal
+          os={osDetail}
+          clients={clients}
+          contracts={contracts}
+          onClose={() => setOsDetail(null)}
         />
       )}
 
@@ -1703,4 +1729,58 @@ const RevisionComparisonModal: React.FC<{ pedido: Pedido; onClose: () => void }>
       <div className="p-4 border-t border-slate-200 flex justify-end"><button onClick={onClose} className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-bold">Fechar</button></div>
     </div>
   </div>;
+};
+
+// Detalhe read-only da OS ativa vinculada a um Pedido ("Ver Ordem de Serviço").
+// Não edita nem gera nada — abrir/editar a OS operacional é escopo de 2B.
+const OS_STATUS_LABEL: Record<OrdemServico['status'], { label: string; color: 'emerald' | 'amber' | 'slate' | 'red' | 'blue' }> = {
+  aberta: { label: 'Aberta', color: 'amber' },
+  agendada: { label: 'Agendada', color: 'blue' },
+  em_execucao: { label: 'Em execução', color: 'amber' },
+  concluida: { label: 'Concluída', color: 'emerald' },
+  cancelada: { label: 'Cancelada', color: 'red' },
+};
+const OrdemServicoDetailModal: React.FC<{
+  os: OrdemServico;
+  clients: Client[];
+  contracts: Contract[];
+  onClose: () => void;
+}> = ({ os, clients, contracts, onClose }) => {
+  const clienteNome = clients.find((c) => c.id === os.clienteId)?.name || os.clienteId || '—';
+  const contrato = contracts.find((c) => c.id === os.contratoId);
+  const st = OS_STATUS_LABEL[os.status] || { label: os.status, color: 'slate' as const };
+  const linha = (label: string, value: React.ReactNode) => (
+    <div className="flex gap-3 py-1.5 border-b border-slate-100 last:border-0">
+      <span className="w-32 shrink-0 text-[11px] font-bold text-slate-500 uppercase">{label}</span>
+      <span className="text-sm text-slate-800 break-words min-w-0">{value}</span>
+    </div>
+  );
+  return (
+    <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white w-full max-w-lg max-h-[90vh] overflow-hidden rounded-xl shadow-2xl flex flex-col">
+        <div className="p-5 border-b border-slate-200 flex items-start justify-between">
+          <div>
+            <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide">Ordem de Serviço</p>
+            <h3 className="font-bold text-slate-900 mt-1 font-data-mono">{os.numero || os.id}</h3>
+            <div className="mt-1"><Badge color={st.color}>{st.label}</Badge></div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-xl">×</button>
+        </div>
+        <div className="overflow-y-auto p-5">
+          {linha('Cliente', clienteNome)}
+          {linha('Título', os.titulo || '—')}
+          {linha('Tipo', os.tipo)}
+          {linha('Prioridade', os.prioridade)}
+          {os.descricao ? linha('Descrição', <span className="whitespace-pre-wrap">{os.descricao}</span>) : null}
+          {linha('Pendências', String(os.pendenciaIds?.length || 0))}
+          {contrato ? linha('Contrato', <span className="font-data-mono">{contrato.id}</span>) : null}
+          {linha('Abertura', os.dataAbertura || '—')}
+          {os.dataPrevista ? linha('Prevista', os.dataPrevista) : null}
+        </div>
+        <div className="p-4 border-t border-slate-200 flex justify-end">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-bold">Fechar</button>
+        </div>
+      </div>
+    </div>
+  );
 };

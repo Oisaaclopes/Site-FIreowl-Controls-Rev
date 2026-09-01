@@ -470,9 +470,16 @@ export interface Client {
   logoPath?: string;
 }
 
+/**
+ * LEGADO/mock da vitrine comercial (CrmView/Dashboard). NÃO é a Ordem de Serviço
+ * operacional persistida (ver OrdemServico + tabela ordens_servico). Vive apenas
+ * em memória de sessão. O campo `pedidoId` aqui guarda o numero_pedido humano
+ * (não a identidade estrutural) e por isso NÃO serve para vínculo — o vínculo
+ * real é OrdemServico.sourcePedidoId → pedidos.id. Ver 0073.
+ */
 export interface PedidoOS {
   id: string; // OS-2024-001
-  pedidoId: string; // PED-8812
+  pedidoId: string; // numero_pedido humano (LEGADO) — não é pedidos.id
   clientId: string;
   clientName: string;
   title: string;
@@ -1083,6 +1090,10 @@ export interface OrdemServico {
   /** Técnico responsável (profiles.id). Null = "Não atribuído". Fonte da verdade
    *  é o UUID; o nome é resolvido pelo profile (não duplicamos texto). */
   tecnicoResponsavelId?: string;
+  /** Pedido comercial de origem (pedidos.id — IDENTIDADE ESTRUTURAL, TEXT).
+   *  NUNCA usar numero_pedido para vincular: ele NÃO é único (0073). Null = OS
+   *  legada/avulsa sem origem conhecida em Pedido. */
+  sourcePedidoId?: string;
 }
 
 /** Custos de logística versionados por vigência. */

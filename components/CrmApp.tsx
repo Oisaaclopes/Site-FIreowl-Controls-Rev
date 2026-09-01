@@ -1,7 +1,7 @@
 'use client';
 import { showToast } from '@/components/ui/Feedback';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { BottomNav } from '@/components/BottomNav';
 import { Header } from '@/components/Header';
@@ -43,8 +43,9 @@ import {
   PdfPrefs,
   DocumentosPadrao
   ,SupplyOrder
+  ,OrdemServico
 } from '@/lib/types';
-import { createOrdemServico, nextOsNumero } from '@/lib/ordensServico';
+import { fetchOrdensServico, getOrCreateOsFromPedido, findActiveOsForPedido } from '@/lib/ordensServico';
 import { fetchPendencias } from '@/lib/pendencias';
 import { deletePedidoTemplate, fetchPedidoTemplates, upsertPedidoTemplate } from '@/lib/pedidoTemplates';
 
@@ -206,6 +207,10 @@ export function CrmApp({
   // System State Data
   const [clients, setClients] = useState<Client[]>(isSupabaseConfigured() ? [] : INITIAL_CLIENTS);
   const [pedidosOS, setPedidosOS] = useState<PedidoOS[]>(INITIAL_PEDIDOS_OS);
+  // OS operacionais REAIS (tabela ordens_servico). Fonte da verdade do vínculo
+  // Pedido → OS (source_pedido_id). O card da proposta lê daqui, não do mock
+  // pedidosOS — por isso o estado "Ver OS" sobrevive a refresh (0073).
+  const [ordensServico, setOrdensServico] = useState<OrdemServico[]>([]);
   const [pedidos, setPedidos] = useState<Pedido[]>(isSupabaseConfigured() ? [] : INITIAL_PEDIDOS);
   const [supplyOrders, setSupplyOrders] = useState<SupplyOrder[]>([]);
   const [pendingSupplyOrderId, setPendingSupplyOrderId] = useState<string | null>(null);
@@ -309,6 +314,9 @@ export function CrmApp({
     fetchPedidos()
       .then((rows) => setPedidos(rows))
       .catch((err) => console.warn('Propostas: falha ao carregar do Supabase.', err));
+    fetchOrdensServico()
+      .then((rows) => setOrdensServico(rows))
+      .catch((err) => console.warn('Ordens de serviço: falha ao carregar do Supabase.', err));
     fetchQuotes()
       .then((rows) => setQuotes(rows))
       .catch((err) => console.warn('Orçamentos: falha ao carregar do Supabase.', err));
@@ -351,6 +359,17 @@ export function CrmApp({
       .then((rows) => setMarcasTecnologias(rows))
       .catch((err) => console.warn('Marcas/tecnologias: falha ao carregar do Supabase.', err));
   }, []);
+
+  // Mapa pedidos.id → OS ATIVA (vínculo estrutural real). O card da proposta usa
+  // este mapa para decidir entre "Gerar OS" e "Ver OS" — nunca por numero_pedido.
+  const activeOsByPedido = useMemo(() => {
+    const map: Record<string, OrdemServico> = {};
+    for (const ped of pedidos) {
+      const os = findActiveOsForPedido(ordensServico, ped.id);
+      if (os) map[ped.id] = os;
+    }
+    return map;
+  }, [pedidos, ordensServico]);
 
   const handleUpdatePdfPrefs = (p: PdfPrefs) => {
     setPdfPrefs(p);
@@ -469,50 +488,66 @@ export function CrmApp({
     logAction('Exclusão de Proposta', 'Pedidos CRM', `Removida proposta ${ped?.numeroPedido || pedidoId}`);
   };
 
+  // Pedido → OS: canônico, estrutural e IDEMPOTENTE. Usa pedidos.id (nunca
+  // numero_pedido) e delega à RPC get_or_create_os_from_pedido (0073), que
+  // garante NO MÁXIMO UMA OS ativa por Pedido e numeração concorrente-segura.
   const handleGenerateOSFromPedido = async (pedido: Pedido) => {
-    const seq = getNextSeq();
     const area = pedido.proposal.areaPrincipal?.[0] || '';
     const serviceType = pedido.proposal.tipoServico || '';
-    const type: PedidoOS['type'] = /cftv/i.test(area) ? 'Instalação CFTV'
-      : /preventiva|manutencao/i.test(serviceType) ? 'Preventiva SDAI'
-      : /inspecao/i.test(serviceType) ? 'Inspeção NBR 17240'
-      : 'Corretiva Urgente';
-    const newOS: PedidoOS = {
-      id: `OS-2026-${seq}`,
-      pedidoId: pedido.numeroPedido,
-      clientId: pedido.clienteId,
-      clientName: pedido.clienteNome,
-      title: `${pedido.referencia || 'Execução de proposta aceita'}${pedido.proposal.surveyOrigin?.reportNumber ? ` · origem ${pedido.proposal.surveyOrigin.reportNumber}` : ''}`,
-      type,
-      technicianName: pedido.responsavelComercialNome || 'Isaac Lopes',
-      scheduledDate: `${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).toUpperCase()} | 08:30`,
-      status: 'ABERTA',
-      priority: 'ALTA',
-      value: pedido.proposal.valorTotal || 0,
-    };
-    handleAddOS(newOS);
-    // Também persiste no módulo operacional usado pela fila de atendimentos de campo.
-    if (isSupabaseConfigured()) {
+    const tipo: OrdemServico['tipo'] = /cftv/i.test(area) ? 'instalacao'
+      : /preventiva|manutencao/i.test(serviceType) ? 'preventiva'
+      : 'corretiva';
+    const titulo = `${pedido.referencia || 'Execução de proposta aceita'}${pedido.proposal.surveyOrigin?.reportNumber ? ` · origem ${pedido.proposal.surveyOrigin.reportNumber}` : ''}`;
+
+    // Demo/local (sem Supabase): mantém o mock efêmero da vitrine comercial.
+    if (!isSupabaseConfigured()) {
+      const legacy: PedidoOS = {
+        id: `OS-${new Date().getFullYear()}-${getNextSeq()}`, pedidoId: pedido.numeroPedido,
+        clientId: pedido.clienteId, clientName: pedido.clienteNome, title: titulo,
+        type: tipo === 'instalacao' ? 'Instalação CFTV' : tipo === 'preventiva' ? 'Preventiva SDAI' : 'Corretiva Urgente',
+        technicianName: pedido.responsavelComercialNome || 'Isaac Lopes',
+        scheduledDate: `${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).toUpperCase()} | 08:30`,
+        status: 'ABERTA', priority: 'ALTA', value: pedido.proposal.valorTotal || 0,
+      };
+      handleAddOS(legacy);
+      showToast(`Ordem de Serviço (${legacy.id}) gerada a partir da Proposta ${pedido.numeroPedido}.`);
+      setCurrentTab('pedidos');
+      return;
+    }
+
+    try {
+      // Preserva o vínculo útil de pendências abertas da proposta/origem (item 14).
+      let pendenciaIds: string[] = [];
       try {
-        const numero = await nextOsNumero();
         const pendencias = await fetchPendencias(userRole, { clienteId: pedido.clienteId });
         const originId = pedido.proposal.surveyOrigin?.reportId;
-        const pendenciaIds = pendencias
+        pendenciaIds = pendencias
           .filter((p) => ['aberta', 'orcada', 'aprovada'].includes(p.status))
           .filter((p) => p.propostaId === pedido.numeroPedido || (originId && p.reportOrigemId === originId))
           .map((p) => p.id);
-        await createOrdemServico({
-          id: '', numero, clienteId: pedido.clienteId, tipo: type === 'Instalação CFTV' ? 'instalacao' : type === 'Preventiva SDAI' ? 'preventiva' : 'corretiva',
-          titulo: newOS.title, descricao: `Gerada do Pedido ${pedido.numeroPedido}.`, status: 'aberta', prioridade: 'alta', pendenciaIds,
-          dataAbertura: new Date().toISOString().slice(0, 10), dataPrevista: undefined, criadoPor: pedido.responsavelComercialNome,
-        });
-      } catch (error) {
-        console.error('Falha ao persistir OS operacional:', error);
-        showToast('A OS foi criada na sessão comercial, mas não pôde ser enviada para a fila de campo.');
+      } catch (e) {
+        console.warn('OS: falha ao coletar pendências da proposta (segue sem elas).', e);
       }
+
+      const { os, created } = await getOrCreateOsFromPedido(pedido.id, {
+        tipo, prioridade: 'alta', titulo, pendenciaIds,
+      });
+
+      // Atualiza a fonte da verdade real (dedupe por id): o card passa a mostrar
+      // "Ver OS" imediatamente E após refresh (a relação está persistida).
+      setOrdensServico((prev) => [os, ...prev.filter((o) => o.id !== os.id)]);
+
+      if (created) {
+        logAction('Geração de OS', 'Pedidos CRM', `OS ${os.numero} gerada do Pedido ${pedido.numeroPedido} (${pedido.id}).`);
+        showToast(`Ordem de Serviço ${os.numero || ''} gerada a partir da Proposta ${pedido.numeroPedido}.`);
+      } else {
+        showToast(`Este Pedido já possui a OS ${os.numero || ''} ativa — abrindo a existente.`);
+      }
+      setCurrentTab('pedidos');
+    } catch (error) {
+      console.error('Falha ao gerar OS do pedido:', error);
+      showToast('Não foi possível gerar a Ordem de Serviço. Tente novamente.');
     }
-    showToast(`Ordem de Serviço (${newOS.id}) gerada com sucesso a partir da Proposta ${pedido.numeroPedido}!`);
-    setCurrentTab('pedidos');
   };
 
   const handleUpdateCompanyProfile = (cp: CompanyProfile) => {
@@ -1136,6 +1171,7 @@ export function CrmApp({
               onUpdatePedidoStatus={handleUpdatePedidoStatus}
               onDeletePedido={handleDeletePedido}
               onGenerateOSFromPedido={handleGenerateOSFromPedido}
+              activeOsByPedido={activeOsByPedido}
               onGenerateContractFromPedido={handleGenerateContractFromPedido}
               onGenerateSupplyOrderFromPedido={handleGenerateSupplyOrderFromPedido}
               onUpdateSupplyOrder={handleUpdateSupplyOrder}
