@@ -31,6 +31,7 @@ export interface NewUserInput {
   phone?: string;
   schedule?: WorkSchedule;
   courses?: string[];
+  temporaryPassword: string;
 }
 
 const VALID_STATUS: UserStatus[] = ['ATIVO', 'INATIVO', 'DESLIGADO'];
@@ -128,12 +129,8 @@ const CREATE_ERROR_MSG: Record<string, string> = {
   forbidden: 'Sem permissão: apenas o Administrativo pode criar usuários.',
   unauthorized: 'Sessão inválida. Faça login novamente.',
   profile_update_failed: 'Falha ao gravar os dados do usuário. Nenhuma conta foi criada.',
-  create_failed: 'Não foi possível convidar o usuário.',
-  invite_failed: 'Não foi possível enviar o convite.',
-  target_not_found: 'Usuário não encontrado.',
-  already_activated: 'Este usuário já concluiu o primeiro acesso.',
-  target_inactive: 'Reative o usuário antes de reenviar o convite.',
-  redirect_not_configured: 'A URL pública do primeiro acesso não está configurada no serviço.',
+  create_failed: 'Não foi possível criar o usuário.',
+  weak_password: 'Senha temporária fraca: use ao menos 10 caracteres com maiúscula, minúscula, número e símbolo.',
   not_deployed: 'Serviço de criação de usuários indisponível. Verifique se a Edge Function "create-user" foi implantada.',
 };
 
@@ -144,7 +141,6 @@ export async function createUser(input: NewUserInput): Promise<void> {
   const supabase = getSupabaseClient() as any;
   const { data, error } = await supabase.functions.invoke('create-user', {
     body: {
-      action: 'invite',
       email: input.email,
       name: input.name,
       role: input.role,
@@ -156,6 +152,7 @@ export async function createUser(input: NewUserInput): Promise<void> {
       phone: input.phone ?? null,
       schedule: input.schedule ?? null,
       courses: input.courses ?? null,
+      temporaryPassword: input.temporaryPassword,
     },
   });
 
@@ -173,19 +170,6 @@ export async function createUser(input: NewUserInput): Promise<void> {
     throw new Error(CREATE_ERROR_MSG[code] || CREATE_ERROR_MSG.create_failed);
   }
   if (data?.error) throw new Error(CREATE_ERROR_MSG[data.error] || CREATE_ERROR_MSG.create_failed);
-}
-
-export async function resendUserInvite(targetUserId: string): Promise<void> {
-  const supabase = getSupabaseClient() as any;
-  const { data, error } = await supabase.functions.invoke('create-user', {
-    body: { action: 'resend', targetUserId },
-  });
-  if (error) {
-    let code = '';
-    try { code = (await error.context?.json?.())?.error || ''; } catch { /* corpo indisponível */ }
-    throw new Error(CREATE_ERROR_MSG[code] || CREATE_ERROR_MSG.invite_failed);
-  }
-  if (data?.error) throw new Error(CREATE_ERROR_MSG[data.error] || CREATE_ERROR_MSG.invite_failed);
 }
 
 // Mensagens (PT) por código da Edge Function reset-user-password. A senha NUNCA

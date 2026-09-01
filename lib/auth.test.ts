@@ -53,10 +53,10 @@ describe('auth — gate de acesso (Fase 4.1)', () => {
     expect(h.signOut).toHaveBeenCalledTimes(1);
   });
 
-  it('usuário com primeiro acesso pendente não entra no app', async () => {
+  it('login com senha temporária mantém sessão e sinaliza primeiro acesso pendente ao gate', async () => {
     h.state.profileResponse = profile({ first_access_completed: false });
-    await expect(signIn('a@fireowl.com', 'x')).rejects.toThrow(/FIRST_ACCESS_PENDING/);
-    expect(h.signOut).toHaveBeenCalledTimes(1);
+    await expect(signIn('a@fireowl.com', 'x')).resolves.toMatchObject({ firstAccessCompleted: false });
+    expect(h.signOut).not.toHaveBeenCalled();
   });
 
   it('primeiro acesso concluído libera o login', async () => {
@@ -92,6 +92,13 @@ describe('auth — gate de acesso (Fase 4.1)', () => {
     h.state.profileResponse = profile({ status: 'INATIVO' });
     expect(await getSessionUser()).toBeNull();
     expect(h.signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('deep link com sessão pendente permanece no estado obrigatório sem deslogar', async () => {
+    h.state.session = { user: { id: 'u1', email: 'a@fireowl.com' } };
+    h.state.profileResponse = profile({ first_access_completed: false });
+    await expect(getSessionUser()).resolves.toMatchObject({ firstAccessCompleted: false });
+    expect(h.signOut).not.toHaveBeenCalled();
   });
 
   it('perfil removido (confirmado online) → derruba sessão', async () => {

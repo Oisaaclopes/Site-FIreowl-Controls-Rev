@@ -29,7 +29,6 @@ import {
   deleteUserProfile,
   setUserStatus,
   logUserAudit,
-  resendUserInvite,
   ManagedUser,
 } from '@/lib/users';
 import { WorkSchedule, DEFAULT_SCHEDULE, WEEKDAY_SHORT } from '@/lib/schedule';
@@ -39,6 +38,7 @@ import { uploadPropostaCapa, removePropostaCapa } from '@/lib/propostaCapa';
 import { uploadInstitucionalLogo, removeInstitucionalLogo, resolveLogoDataUrls } from '@/lib/institucional';
 import { canResetUserPassword } from '@/lib/rbac';
 import { ResetPasswordModal } from '@/components/users/ResetPasswordModal';
+import { checkPassword, generateStrongPassword, PASSWORD_MIN } from '@/lib/password';
 
 interface ContaViewProps {
   logs: SystemAuditLog[];
@@ -273,6 +273,10 @@ export const ContaView: React.FC<ContaViewProps> = ({
   const [nuBirth, setNuBirth] = useState('');
   const [nuPhone, setNuPhone] = useState('');
   const [nuCourses, setNuCourses] = useState('');
+  const [nuTemporaryPassword, setNuTemporaryPassword] = useState('');
+  const [nuTemporaryPasswordConfirm, setNuTemporaryPasswordConfirm] = useState('');
+  const [showNuPassword, setShowNuPassword] = useState(false);
+  const [createdTemporaryPassword, setCreatedTemporaryPassword] = useState<string | null>(null);
   const [nuSchedule, setNuSchedule] = useState<WorkSchedule>(() => DEFAULT_SCHEDULE.map((d) => ({ ...d })));
 
   // Edição de funcionário existente
@@ -436,6 +440,8 @@ export const ContaView: React.FC<ContaViewProps> = ({
       setCreateMsg('Informe um e-mail válido.');
       return;
     }
+    if (!checkPassword(nuTemporaryPassword).ok) { setCreateMsg(`A senha deve ter ${PASSWORD_MIN}+ caracteres, maiúscula, minúscula, número e símbolo.`); return; }
+    if (nuTemporaryPassword !== nuTemporaryPasswordConfirm) { setCreateMsg('As senhas temporárias não coincidem.'); return; }
     setCreating(true);
     try {
       await createUser({
@@ -453,9 +459,10 @@ export const ContaView: React.FC<ContaViewProps> = ({
           .split('\n')
           .map((s) => s.trim())
           .filter(Boolean),
+        temporaryPassword: nuTemporaryPassword,
       });
-      // A Edge Function registra USER_INVITED sem senha/token.
-      setCreateMsg(`OK: convite enviado para ${nuEmail.trim()}`);
+      setCreatedTemporaryPassword(nuTemporaryPassword);
+      setCreateMsg('');
       setNuName('');
       setNuEmail('');
       setNuRole('TECNICO');
@@ -474,13 +481,6 @@ export const ContaView: React.FC<ContaViewProps> = ({
     } finally {
       setCreating(false);
     }
-  };
-
-  const handleResendInvite = async (u: ManagedUser) => {
-    const ok = await confirm({ title: 'Reenviar convite?', message: `Um novo link seguro será enviado para ${u.email}.`, confirmLabel: 'Reenviar convite' });
-    if (!ok) return;
-    try { await resendUserInvite(u.id); toast.success(`Convite reenviado para ${u.email}.`); setTimeout(refreshUsers, 400); }
-    catch (err: any) { toast.error(err?.message || 'Não foi possível reenviar o convite.'); }
   };
 
   const handleRoleChange = async (u: ManagedUser, role: UserRole) => {
@@ -1416,7 +1416,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
                 <h3 className="font-display text-sm font-bold uppercase tracking-wide text-[#1A1A72]">
                   Novo usuário
                 </h3>
-                <p className="text-[11px] text-slate-400">Um convite será enviado. O funcionário criará a própria senha no primeiro acesso.</p>
+                <p className="text-[11px] text-slate-400">Crie o acesso com uma senha temporária para entregar diretamente ao funcionário.</p>
               </div>
             </div>
 
@@ -1451,6 +1451,14 @@ export const ContaView: React.FC<ContaViewProps> = ({
                 <div>
                   <label className={labelCls}>E-mail (login)</label>
                   <input type="email" value={nuEmail} onChange={(e) => setNuEmail(e.target.value)} className={`${inputCls} font-data-mono`} placeholder="nome@fireowlcontrols.com.br" />
+                </div>
+                <div className="md:col-span-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                  <p className="mb-3 text-[11px] text-amber-900">Esta é uma senha temporária. O funcionário será obrigado a criar uma nova senha no primeiro acesso.</p>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div><label className={labelCls}>Senha temporária</label><div className="relative"><input type={showNuPassword ? 'text' : 'password'} value={nuTemporaryPassword} onChange={(e) => setNuTemporaryPassword(e.target.value)} className={`${inputCls} pr-11 font-data-mono`} autoComplete="new-password"/><button type="button" onClick={() => setShowNuPassword((v) => !v)} className="absolute right-1 top-1 min-h-9 min-w-9" aria-label={showNuPassword ? 'Ocultar senha' : 'Mostrar senha'}><span className="material-symbols-outlined text-lg">{showNuPassword ? 'visibility_off' : 'visibility'}</span></button></div></div>
+                    <div><label className={labelCls}>Confirmar senha temporária</label><input type={showNuPassword ? 'text' : 'password'} value={nuTemporaryPasswordConfirm} onChange={(e) => setNuTemporaryPasswordConfirm(e.target.value)} className={`${inputCls} font-data-mono`} autoComplete="new-password"/></div>
+                  </div>
+                  <button type="button" onClick={() => { const generated = generateStrongPassword(); setNuTemporaryPassword(generated); setNuTemporaryPasswordConfirm(generated); setShowNuPassword(true); }} className="mt-3 rounded-lg border border-amber-300 bg-white px-3 py-2 text-[11px] font-bold uppercase text-amber-900">Gerar senha</button>
                 </div>
               </div>
 
@@ -1509,7 +1517,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
                 <span className={`material-symbols-outlined text-base ${creating ? 'animate-spin' : ''}`}>
                   {creating ? 'progress_activity' : 'person_add'}
                 </span>
-                {creating ? 'Enviando...' : 'Enviar convite'}
+                {creating ? 'Criando...' : 'Criar funcionário'}
               </button>
             </form>
           </div>
@@ -1551,7 +1559,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
                           <span className="font-data-mono text-slate-500">{u.email}</span>
                           {u.cargo && <span className="text-slate-500">{u.cargo}</span>}
                           <Badge color={u.status === 'ATIVO' && u.firstAccessCompleted ? 'emerald' : u.status === 'ATIVO' ? 'amber' : u.status === 'INATIVO' ? 'amber' : 'slate'}>
-                            {u.status === 'ATIVO' && !u.firstAccessCompleted ? 'Convite pendente' : u.status === 'ATIVO' ? 'Ativo' : u.status === 'INATIVO' ? 'Inativo' : 'Desligado'}
+                            {u.status === 'ATIVO' && !u.firstAccessCompleted ? 'Primeiro acesso pendente' : u.status === 'ATIVO' ? 'Ativo' : u.status === 'INATIVO' ? 'Inativo' : 'Desligado'}
                           </Badge>
                         </>
                       }
@@ -1582,7 +1590,6 @@ export const ContaView: React.FC<ContaViewProps> = ({
                             <option value="DESLIGADO">Desligado</option>
                           </select>
                           <RowAction icon="edit" label="Editar dados" onClick={() => openEditUser(u)} />
-                          {!u.firstAccessCompleted && u.status === 'ATIVO' && <RowAction icon="forward_to_inbox" label="Reenviar convite" onClick={() => handleResendInvite(u)} />}
                           {canReset && !isSelf && (
                             <RowAction icon="lock_reset" label="Redefinir senha" onClick={() => setResetUser(u)} />
                           )}
@@ -1600,6 +1607,19 @@ export const ContaView: React.FC<ContaViewProps> = ({
               <span className="material-symbols-outlined text-sm">info</span>
               Use o status (Ativo/Inativo/Desligado) para o ciclo de vida — nada é excluído. &quot;Excluir&quot; é excepcional; a conta de login é removida no painel do Supabase.
             </p>
+          </div>
+        </div>
+      )}
+
+      {createdTemporaryPassword && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <span className="material-symbols-outlined text-5xl text-emerald-600">task_alt</span>
+            <h3 className="mt-2 text-lg font-bold text-slate-900">Funcionário criado com sucesso</h3>
+            <p className="mt-1 text-xs text-slate-600">Copie e entregue esta senha temporária agora. Depois de fechar, ela não ficará disponível novamente.</p>
+            <div className="mt-4 rounded-xl bg-slate-100 p-3 font-data-mono text-sm font-bold text-slate-900 break-all">{createdTemporaryPassword}</div>
+            <button type="button" onClick={async () => { await navigator.clipboard.writeText(createdTemporaryPassword); toast.success('Senha temporária copiada.'); }} className="mt-3 w-full rounded-lg border border-[#1A1A72] py-2.5 text-xs font-bold uppercase text-[#1A1A72]">Copiar senha temporária</button>
+            <button type="button" onClick={() => { setCreatedTemporaryPassword(null); setNuTemporaryPassword(''); setNuTemporaryPasswordConfirm(''); setShowNuPassword(false); }} className="mt-2 w-full rounded-lg bg-[#1A1A72] py-2.5 text-xs font-bold uppercase text-white">Fechar</button>
           </div>
         </div>
       )}

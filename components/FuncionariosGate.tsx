@@ -7,6 +7,7 @@ import { signIn, signOut, getSessionUser, onSessionLost, authErrorMessage, AuthU
 import { isSupabaseConfigured } from '@/lib/inventory';
 import { isStandalone } from '@/lib/pwa';
 import { TabPath } from '@/lib/types';
+import { FirstAccessRequired } from '@/components/FirstAccessRequired';
 
 /**
  * Porta de entrada da Área do Funcionário e barreira de autenticação.
@@ -90,6 +91,7 @@ export function FuncionariosGate({ initialTab }: { initialTab?: TabPath }) {
 
   // AUTHENTICATED → abre o sistema de gestão.
   if (authUser) {
+    if (!authUser.firstAccessCompleted) return <FirstAccessRequired user={authUser} onCompleted={setAuthUser} />;
     return (
       <CrmApp
         initialRole={authUser.role}
