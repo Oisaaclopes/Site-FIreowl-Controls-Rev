@@ -10,6 +10,7 @@ import {
   FieldPhotoFilters,
   FieldPhotoLinks,
   friendlyPhotoId,
+  groupFieldPhotosByClient,
   GalleryPhoto,
   isUnclassified,
   listLocalFieldPhotos,
@@ -55,7 +56,8 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole }) => {
   const confirm = useConfirm();
   const isManager = userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR';
 
-  const [tab, setTab] = useState<'todas' | 'nao_classificadas' | 'comparacoes'>('todas');
+  const [tab, setTab] = useState<'todas' | 'pendentes' | 'comparacoes'>('todas');
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
   const [comparisons, setComparisons] = useState<FieldPhotoComparison[]>([]);
   const [comparePair, setComparePair] = useState<{ a: GalleryPhoto; b: GalleryPhoto } | null>(null);
@@ -121,11 +123,13 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole }) => {
   }, [photos]);
 
   const visible = useMemo(() => {
-    const f: FieldPhotoFilters = { ...filters, unclassifiedOnly: tab === 'nao_classificadas' || filters.unclassifiedOnly };
+    const f: FieldPhotoFilters = { ...filters, clientId: selectedClientId || undefined, marcador: tab === 'pendentes' ? 'pendente' : filters.marcador };
     return applyFieldPhotoFilters(photos, f);
-  }, [photos, filters, tab]);
+  }, [photos, filters, tab, selectedClientId]);
 
-  const unclassifiedCount = useMemo(() => photos.filter((p) => isUnclassified(p)).length, [photos]);
+  const clientGroups = useMemo(() => groupFieldPhotosByClient(photos, clients, comparisons), [photos, clients, comparisons]);
+  const selectedGroup = clientGroups.find(g=>g.clientId===selectedClientId);
+  const clientComparisons = comparisons.filter(c=>!selectedClientId || c.clientId===selectedClientId);
   const activeFilterCount = ['clientId', 'tecnicoId', 'marcador', 'syncStatus', 'from', 'to'].filter((k) => (filters as any)[k]).length;
 
   const toggleSelect = (uuid: string) => setSelection((prev) => { const n = new Set(prev); n.has(uuid) ? n.delete(uuid) : n.add(uuid); return n; });
@@ -165,23 +169,26 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole }) => {
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined rounded-xl bg-[#1A1A72] p-2 text-white">photo_library</span>
           <div>
-            <h1 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">Fotos de Campo</h1>
-            <p className="text-xs text-slate-500">Evidências operacionais rastreáveis e vinculáveis.</p>
+            <h1 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">{selectedGroup ? selectedGroup.clientName : 'Fotos de Campo'}</h1>
+            <p className="text-xs text-slate-500">{selectedGroup ? `${selectedGroup.photoCount} evidência(s) deste cliente` : 'Selecione um cliente para abrir a galeria.'}</p>
           </div>
+          {selectedClientId&&<button onClick={()=>{setSelectedClientId(null);setTab('todas');setSelection(new Set())}} className="ml-auto min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold uppercase text-slate-600">← Clientes</button>}
         </div>
+        {selectedClientId&&(
         <div className="flex items-center gap-1 rounded-xl bg-slate-100 p-1 text-xs font-bold">
           <button onClick={() => setTab('todas')} className={`min-h-9 flex-1 rounded-lg px-3 uppercase tracking-wide transition-colors ${tab === 'todas' ? 'bg-white text-[#1A1A72] shadow-sm' : 'text-slate-500'}`}>Todas</button>
-          <button onClick={() => setTab('nao_classificadas')} className={`min-h-9 flex-1 rounded-lg px-3 uppercase tracking-wide transition-colors ${tab === 'nao_classificadas' ? 'bg-white text-[#1A1A72] shadow-sm' : 'text-slate-500'}`}>
-            Não classif.{unclassifiedCount > 0 ? ` · ${unclassifiedCount}` : ''}
+          <button onClick={() => setTab('pendentes')} className={`min-h-9 flex-1 rounded-lg px-3 uppercase tracking-wide transition-colors ${tab === 'pendentes' ? 'bg-white text-[#1A1A72] shadow-sm' : 'text-slate-500'}`}>
+            Pendentes{selectedGroup?.pendingCount ? ` · ${selectedGroup.pendingCount}` : ''}
           </button>
           <button onClick={() => setTab('comparacoes')} className={`min-h-9 flex-1 rounded-lg px-3 uppercase tracking-wide transition-colors ${tab === 'comparacoes' ? 'bg-white text-[#1A1A72] shadow-sm' : 'text-slate-500'}`}>
-            Antes × Depois{comparisons.length > 0 ? ` · ${comparisons.length}` : ''}
+            Antes × Depois{clientComparisons.length > 0 ? ` · ${clientComparisons.length}` : ''}
           </button>
         </div>
+        )}
       </div>
 
       {/* Busca + ações (fotos) — ocultas na aba de comparações */}
-      {tab !== 'comparacoes' && (
+      {selectedClientId && tab !== 'comparacoes' && (
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="relative min-w-0 flex-1">
           <span className="material-symbols-outlined pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-lg text-slate-400">search</span>
@@ -207,7 +214,7 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole }) => {
       )}
 
       {/* Barra de seleção em lote */}
-      {tab !== 'comparacoes' && selection.size > 0 && (
+      {selectedClientId && tab !== 'comparacoes' && selection.size > 0 && (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#1A1A72]/20 bg-[#1A1A72]/5 p-2.5">
           <span className="text-xs font-bold text-[#1A1A72]">{selection.size} selecionada(s)</span>
           <div className="flex flex-wrap gap-2">
@@ -224,21 +231,27 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole }) => {
       )}
 
       {/* Conteúdo */}
-      {tab === 'comparacoes' ? (
-        <ComparisonsPanel comparisons={comparisons} photoById={photoById} thumbs={thumbs} onReload={reloadComparisons} onGenerateSheet={(items) => setSheetComparisons(items)} />
+      {!selectedClientId ? (
+        loading ? <div className="py-20 text-center text-sm text-slate-400">Carregando clientes…</div> : clientGroups.length===0 ? <div className="py-20 text-center text-sm text-slate-400">Nenhum cliente possui fotos de campo.</div> :
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{clientGroups.map(group=>{const cover=group.photos[0];return <button key={group.clientId} onClick={()=>setSelectedClientId(group.clientId)} className="flex min-h-24 items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm hover:border-[#1A1A72]/40">
+          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-slate-100">{thumbs[cover.clientUuid]?<img src={thumbs[cover.clientUuid]} alt="Última evidência" className="h-full w-full object-cover"/>:<span className="material-symbols-outlined flex h-full items-center justify-center text-slate-300">photo_library</span>}</div>
+          <div className="min-w-0"><p className="truncate text-sm font-bold text-slate-900">{group.clientName}</p><p className="mt-1 text-[11px] text-slate-500">{group.photoCount} foto(s) · última {fmtDate(group.lastEvidenceAt)}</p><div className="mt-2 flex flex-wrap gap-1">{group.pendingCount>0&&<span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">{group.pendingCount} pendente(s)</span>}{group.comparisonCount>0&&<span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">{group.comparisonCount} Antes×Depois</span>}</div></div>
+        </button>})}</div>
+      ) : tab === 'comparacoes' ? (
+        <ComparisonsPanel comparisons={clientComparisons} photoById={photoById} thumbs={thumbs} onReload={reloadComparisons} onGenerateSheet={(items) => setSheetComparisons(items)} />
       ) : loading ? (
         <div className="py-20 text-center text-sm text-slate-400">Carregando fotos…</div>
       ) : visible.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center text-slate-400">
-          <span className="material-symbols-outlined mb-2 text-5xl text-slate-300">{tab === 'nao_classificadas' ? 'task_alt' : 'no_photography'}</span>
-          <p className="font-semibold text-slate-600">{tab === 'nao_classificadas' ? 'Todas as fotos estão vinculadas.' : 'Nenhuma foto de campo registrada.'}</p>
+          <span className="material-symbols-outlined mb-2 text-5xl text-slate-300">{tab === 'pendentes' ? 'task_alt' : 'no_photography'}</span>
+          <p className="font-semibold text-slate-600">{tab === 'pendentes' ? 'Nenhuma foto pendente para este cliente.' : 'Nenhuma foto de campo registrada.'}</p>
         </div>
       ) : (
         <div className="space-y-6">
           {groups.map((g) => (
             <div key={g.key || 'all'}>
               {groupByDay && g.key && <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">{fmtDate(g.key)}</p>}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                 {g.items.map((p) => (
                   <PhotoCard
                     key={p.clientUuid}
@@ -322,7 +335,7 @@ const PhotoCard: React.FC<{ photo: GalleryPhoto; thumb?: string; selected: boole
   const sync = SYNC_META[photo.syncStatus];
   return (
     <div className={`group relative flex flex-col overflow-hidden rounded-xl border bg-white transition-all ${selected ? 'border-[#1A1A72] ring-2 ring-[#1A1A72]/20' : 'border-slate-200 hover:border-slate-300'}`}>
-      <div className="relative aspect-[4/3] bg-slate-900">
+      <div className="relative aspect-square bg-slate-900">
         {thumb ? <img src={thumb} alt="Evidência de campo" className="h-full w-full object-cover" loading="lazy" /> : <div className="flex h-full items-center justify-center text-slate-500"><span className="material-symbols-outlined text-3xl">image</span></div>}
         <button onClick={onToggleSelect} className={`absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg shadow ${selected ? 'bg-[#1A1A72] text-white' : 'bg-black/40 text-white/80 hover:bg-black/60'}`} aria-label="Selecionar">
           <span className="material-symbols-outlined text-base">{selected ? 'check' : 'check_box_outline_blank'}</span>
@@ -334,12 +347,9 @@ const PhotoCard: React.FC<{ photo: GalleryPhoto; thumb?: string; selected: boole
           {marker && <span className={`rounded-full border px-2 py-0.5 ${marker.tone}`}>{marker.label}</span>}
         </div>
       </div>
-      <button onClick={onOpen} className="flex flex-1 flex-col gap-1 p-2.5 text-left">
-        <p className="truncate text-sm font-bold text-slate-900">{photo.clientName || photo.clientId}</p>
-        <p className="truncate text-[11px] text-slate-500">{[photo.localSetor, photo.tecnicoNome].filter(Boolean).join(' · ') || 'Sem local'}</p>
-        <p className="text-[11px] text-slate-400">{fmtDate(photo.capturadoEm)} · {fmtTime(photo.capturadoEm)}</p>
-        {photo.notaRapida && <p className="line-clamp-2 text-[11px] text-slate-600">{photo.notaRapida}</p>}
-        <div className="mt-1 flex flex-wrap gap-1"><LinkBadges p={photo} /></div>
+      <button onClick={onOpen} className="flex flex-1 flex-col gap-0.5 p-2 text-left">
+        <p className="truncate text-[11px] font-semibold text-slate-600">{photo.localSetor || 'Sem local'}</p>
+        <p className="text-[10px] text-slate-400">{fmtDate(photo.capturadoEm)} · {fmtTime(photo.capturadoEm)}</p>
       </button>
     </div>
   );

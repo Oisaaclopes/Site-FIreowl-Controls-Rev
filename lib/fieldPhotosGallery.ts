@@ -3,6 +3,7 @@ import { FieldPhotoMarker, FieldPhotoSyncStatus, isUnclassifiedFieldPhoto } from
 import { listOfflineJobs } from './offline/outbox';
 import type { FieldPhotoPayload } from './offline/fieldPhotoSync';
 import type { Client } from './types';
+import { clientDisplayName } from './clientSelection';
 
 /* =====================================================================
  * Gestão de Fotos de Campo (Fase 3.1 — Passada 4)
@@ -59,6 +60,16 @@ export interface FieldPhotoFilters {
   to?: string;
   search?: string;
   unclassifiedOnly?: boolean;
+}
+
+export interface FieldPhotoClientGroup {
+  clientId: string;
+  clientName: string;
+  photos: GalleryPhoto[];
+  photoCount: number;
+  pendingCount: number;
+  comparisonCount: number;
+  lastEvidenceAt?: string;
 }
 
 /* ------------------------------- helpers puros ------------------------------- */
@@ -129,6 +140,21 @@ export function applyFieldPhotoFilters(list: GalleryPhoto[], filters: FieldPhoto
     if (!matchesFieldPhotoSearch(p, filters.search)) return false;
     return true;
   });
+}
+
+export function groupFieldPhotosByClient(list: GalleryPhoto[], clients: Client[], comparisons: { clientId:string }[] = []): FieldPhotoClientGroup[] {
+  const clientById = new Map(clients.map(c=>[c.id,c] as const));
+  const grouped = new Map<string,GalleryPhoto[]>();
+  for(const photo of sortByCapturadoDesc(list)) (grouped.get(photo.clientId) || grouped.set(photo.clientId,[]).get(photo.clientId)!).push(photo);
+  return Array.from(grouped.entries()).map(([clientId,photos])=>({
+    clientId,
+    clientName: clientById.has(clientId) ? clientDisplayName(clientById.get(clientId)!) : (photos[0].clientName || clientId),
+    photos,
+    photoCount: photos.length,
+    pendingCount: photos.filter(p=>p.marcador==='pendente').length,
+    comparisonCount: comparisons.filter(c=>c.clientId===clientId).length,
+    lastEvidenceAt: photos[0]?.capturadoEm,
+  })).sort((a,b)=>a.clientName.localeCompare(b.clientName,'pt-BR',{sensitivity:'base'}));
 }
 
 /* ------------------------------ leitura remota ------------------------------ */

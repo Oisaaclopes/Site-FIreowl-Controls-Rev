@@ -3,6 +3,7 @@ import {
   applyFieldPhotoFilters,
   attachClientNames,
   friendlyPhotoId,
+  groupFieldPhotosByClient,
   GalleryPhoto,
   isUnclassified,
   matchesFieldPhotoSearch,
@@ -101,5 +102,21 @@ describe('fotos de campo — gestão (regras puras)', () => {
     expect(out[0].clientName).toBe('Cliente Um');
     expect(out[1].clientName).toBe('Nome Local');
     expect(out[2].clientName).toBeUndefined();
+  });
+
+  it('agrupa somente clientes com foto, em ordem alfabética, com contagens derivadas', () => {
+    const clients = [
+      { id: 'cli-z', name: 'Zeta Ltda. (Zeta)' } as Client,
+      { id: 'cli-a', name: 'Alfa Ltda. (Alfa)' } as Client,
+      { id: 'cli-sem', name: 'Sem Fotos' } as Client,
+    ];
+    const groups = groupFieldPhotosByClient([
+      photo({ clientUuid:'z1', clientId:'cli-z', marcador:'pendente', capturadoEm:'2026-08-20T10:00:00Z' }),
+      photo({ clientUuid:'a1', clientId:'cli-a', capturadoEm:'2026-08-31T10:00:00Z' }),
+      photo({ clientUuid:'a2', clientId:'cli-a', marcador:'pendente', capturadoEm:'2026-08-10T10:00:00Z' }),
+    ], clients, [{clientId:'cli-a'}]);
+    expect(groups.map(g=>g.clientName)).toEqual(['Alfa','Zeta']);
+    expect(groups.find(g=>g.clientId==='cli-a')).toMatchObject({photoCount:2,pendingCount:1,comparisonCount:1,lastEvidenceAt:'2026-08-31T10:00:00Z'});
+    expect(groups.some(g=>g.clientId==='cli-sem')).toBe(false);
   });
 });

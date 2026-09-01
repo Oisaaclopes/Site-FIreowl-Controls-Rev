@@ -8,6 +8,7 @@ import { enqueueFieldPhoto, enqueueFieldPhotoSession } from '@/lib/offline/field
 import { flushOutbox, isOnline, offlineAvailable } from '@/lib/offline/reportSync';
 import { buildFieldPhotoPath, signedFieldPhotoUrl } from '@/lib/fieldPhotoStorage';
 import { useConfirm, useToast } from '@/components/ui/Feedback';
+import { ClientSelector } from '@/components/clients/ClientSelector';
 
 type SavedPhoto = { photo: FieldPhoto; original: Blob; evidence?: Blob; previewUrl: string; evidenceUrl?: string; synced: boolean };
 const MARKERS: { value: FieldPhotoMarker; label: string; tone: string }[] = [
@@ -148,7 +149,7 @@ export const QuickFieldPhotoModal: React.FC<Props> = ({ isOpen, clients, technic
       </header>
       <main className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
         {!session ? <div className="mx-auto max-w-md space-y-4 py-5">
-          <div><label className="text-xs font-bold uppercase tracking-wide text-slate-600">Cliente *</label><select value={clientId} onChange={(e) => setClientId(e.target.value)} className="mt-1.5 min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm"><option value="">Selecione o cliente</option>{clients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
+          <ClientSelector clients={clients} value={clientId} onChange={setClientId} label="Cliente *" />
           <div><label className="text-xs font-bold uppercase tracking-wide text-slate-600">Local / setor</label><input value={sector} onChange={(e) => setSector(e.target.value)} placeholder="Ex.: Bloco B · Casa de máquinas" className="mt-1.5 min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm" /></div>
           <button onClick={start} disabled={!clientId || !technicianId} className="min-h-14 w-full rounded-xl bg-[#1A1A72] px-4 text-sm font-bold uppercase tracking-wide text-white disabled:opacity-50">Iniciar registro</button>
         </div> : summary ? <div className="mx-auto max-w-md space-y-5 py-7 text-center"><span className="material-symbols-outlined rounded-full bg-emerald-100 p-4 text-4xl text-emerald-600">task_alt</span><div><h2 className="text-xl font-bold text-slate-900">Registro concluído</h2><p className="mt-1 text-sm text-slate-500">{client?.name}{session.localSetor ? ` · ${session.localSetor}` : ''}</p></div><div className="grid grid-cols-2 gap-3 text-left"><div className="rounded-xl bg-white p-3"><p className="text-[10px] font-bold uppercase text-slate-400">Fotos</p><p className="text-xl font-bold">{photos.length}</p></div><div className="rounded-xl bg-white p-3"><p className="text-[10px] font-bold uppercase text-slate-400">Pendentes</p><p className="text-xl font-bold">{pending}</p></div></div><button onClick={() => setShowPhotos(true)} className="min-h-12 w-full rounded-xl border border-[#1A1A72] text-sm font-bold uppercase text-[#1A1A72]">Ver fotos</button><button onClick={close} className="min-h-12 w-full rounded-xl bg-[#1A1A72] text-sm font-bold uppercase text-white">Voltar ao painel</button></div> : <>

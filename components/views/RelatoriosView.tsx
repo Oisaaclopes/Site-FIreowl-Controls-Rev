@@ -27,6 +27,7 @@ import { fetchDevices } from '@/lib/devices';
 import { fetchOrdensServico, updateOrdemServico } from '@/lib/ordensServico';
 import { fetchAssignableTechnicians, ManagedUser } from '@/lib/users';
 import { useToast, useConfirm } from '@/components/ui/Feedback';
+import { ClientSelector } from '@/components/clients/ClientSelector';
 import { fetchCicloAtivo, quotaPorVisita } from '@/lib/ciclos';
 import { flushOutbox, pendingCount, isOnline } from '@/lib/offline/reportSync';
 import { EmptyState } from '@/components/EmptyState';
@@ -1558,24 +1559,11 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
               {wizardStep === 2 && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Selecione um cliente existente</label>
-                    <select
-                      value={wClienteId}
-                      onChange={(e) => setWClienteId(e.target.value)}
-                      className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
-                    >
-                      {clients.length === 0 && <option value="">Nenhum cliente</option>}
-                      {clients.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} {c.cnpj ? `(${c.cnpj})` : ''}
-                          {c.pendenteValidacao ? ' [PROVISÓRIO]' : ''}
-                        </option>
-                      ))}
-                    </select>
+                    <ClientSelector clients={clients} value={wClienteId} onChange={setWClienteId} label="Selecione um cliente existente" onCreate={() => document.getElementById('cadastro-rapido-cliente')?.scrollIntoView({ behavior: 'smooth', block: 'center' })} />
                   </div>
 
                   {/* Cadastro provisório em campo (§6.3 / §9.1) */}
-                  <div className="border border-amber-200 bg-amber-50/60 rounded-xl p-3.5 space-y-3">
+                  <div id="cadastro-rapido-cliente" className="border border-amber-200 bg-amber-50/60 rounded-xl p-3.5 space-y-3">
                     <p className="text-[11px] font-bold text-amber-900 uppercase flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-base text-amber-600">person_add</span>
                       Cliente não encontrado? Cadastre em campo (Provisório)
