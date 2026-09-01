@@ -109,6 +109,10 @@ function itemToRow(i: InventoryItem): Record<string, unknown> {
     spec_last_verified_at: i.specLastVerifiedAt || null,
     system_type: i.systemType || null,
     market_segment: i.marketSegment || null,
+    // Classificação canônica: preservada por round-trip nas edições; definível
+    // no cadastro de produto. Ausente → não classificado (default do banco).
+    canonical_taxonomy_id: i.canonicalTaxonomyId ?? null,
+    classification_status: i.classificationStatus ?? 'NAO_CLASSIFICADO',
   };
 }
 

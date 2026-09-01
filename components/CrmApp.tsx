@@ -1227,6 +1227,10 @@ export function CrmApp({
               inventory={inventory}
               inventoryLoading={inventoryLoading}
               userRole={userRole}
+              suppliers={suppliers}
+              onAddInventoryItem={handleAddInventoryItem}
+              onUpdateInventoryItem={handleUpdateInventoryItem}
+              onDeleteInventoryItem={handleDeleteInventoryItem}
             />
           )}
 
