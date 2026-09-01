@@ -1,0 +1,2 @@
+import {describe,expect,it} from 'vitest'; import {gpsLabel} from './fieldPhotoGeo';
+describe('GPS da evidência',()=>{it('não inventa endereço sem GPS',()=>expect(gpsLabel()).toBe('Localização GPS não registrada'));it('mostra coordenadas reais quando endereço não foi resolvido',()=>expect(gpsLabel({latitude:-23.1,longitude:-51.2,capturedAt:'x'})).toBe('-23.100000, -51.200000'));it('prefere endereço derivado',()=>expect(gpsLabel({latitude:1,longitude:2,capturedAt:'x',address:'Rua A, 10 · Londrina - PR'})).toBe('Rua A, 10 · Londrina - PR'));});

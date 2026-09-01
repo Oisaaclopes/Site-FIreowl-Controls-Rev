@@ -1,0 +1,2 @@
+import{describe,expect,it,vi}from'vitest';import{shareEvidence}from'./fieldPhotoShare';
+describe('compartilhar evidência',()=>{it('usa Web Share com arquivo quando suportado',async()=>{const share=vi.fn().mockResolvedValue(undefined);const mode=await shareEvidence(new Blob(['x'],{type:'image/jpeg'}),'e.jpg',{share,canShare:()=>true} as any);expect(mode).toBe('native');expect(share).toHaveBeenCalled();});});

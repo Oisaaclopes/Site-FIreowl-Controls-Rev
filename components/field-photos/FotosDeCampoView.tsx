@@ -28,6 +28,9 @@ import { fetchReports } from '@/lib/reports';
 import { fetchOrdensServico } from '@/lib/ordensServico';
 import { fetchPendencias } from '@/lib/pendencias';
 import { fetchAssignableTechnicians } from '@/lib/users';
+import { QuickFieldPhotoModal } from './QuickFieldPhotoModal';
+import { gpsLabel } from '@/lib/fieldPhotoGeo';
+import { shareEvidence } from '@/lib/fieldPhotoShare';
 
 type ManagedTech = { id: string; name: string };
 
@@ -49,9 +52,11 @@ const fmtTime = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString('pt-BR
 interface Props {
   clients: Client[];
   userRole: UserRole;
+  technicianId?: string;
+  technicianName: string;
 }
 
-export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole }) => {
+export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole, technicianId, technicianName }) => {
   const toast = useToast();
   const confirm = useConfirm();
   const isManager = userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR';
@@ -72,6 +77,7 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole }) => {
   const [detail, setDetail] = useState<GalleryPhoto | null>(null);
   const [linkTarget, setLinkTarget] = useState<{ photos: GalleryPhoto[] } | null>(null);
   const [sheetPhotos, setSheetPhotos] = useState<GalleryPhoto[] | null>(null);
+  const [afterReference,setAfterReference]=useState<GalleryPhoto|null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -286,8 +292,11 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole }) => {
           onClose={() => setDetail(null)}
           onLink={() => setLinkTarget({ photos: [detail] })}
           onRetry={() => retry(detail)}
+          hasComparison={comparisons.some(c=>c.beforePhotoId===detail.id)}
+          onRegisterAfter={()=>{setAfterReference(detail);setDetail(null)}}
         />
       )}
+      <QuickFieldPhotoModal isOpen={!!afterReference} clients={clients} technicianId={technicianId} technicianName={technicianName} afterReference={afterReference||undefined} onClose={()=>setAfterReference(null)} onComparisonCreated={()=>toast.success('Correção registrada. A relação será sincronizada automaticamente.')} />
 
       {linkTarget && (
         <LinkDialog
@@ -416,7 +425,7 @@ const FiltersSheet: React.FC<{ filters: FieldPhotoFilters; onChange: (f: FieldPh
 
 /* ------------------------------- Detalhe ------------------------------- */
 
-const PhotoDetail: React.FC<{ photo: GalleryPhoto; clients: Client[]; onClose: () => void; onLink: () => void; onRetry: () => void }> = ({ photo, onClose, onLink, onRetry }) => {
+const PhotoDetail: React.FC<{ photo: GalleryPhoto; clients: Client[]; onClose: () => void; onLink: () => void; onRetry: () => void; hasComparison:boolean; onRegisterAfter:()=>void }> = ({ photo, onClose, onLink, onRetry, hasComparison, onRegisterAfter }) => {
   const [view, setView] = useState<'evidence' | 'original' | 'markup'>('evidence');
   const [url, setUrl] = useState<string | undefined>();
   const objs = useRef<string[]>([]);
@@ -439,14 +448,15 @@ const PhotoDetail: React.FC<{ photo: GalleryPhoto; clients: Client[]; onClose: (
 
   const hasMarkup = !!(photo.storagePathMarkup || photo.localMarkup);
   const canLink = photo.source === 'remote';
+  const share=async()=>{if(view!=='evidence')setView('evidence');try{const blob=photo.localEvidence||(url?await(await fetch(url)).blob():undefined);if(!blob)throw new Error();await shareEvidence(blob,`Evidencia-Fireowl-${photo.clientUuid.slice(0,8)}.jpg`);}catch{/* fallback indisponível é informado pela ausência da ação */}};
   const meta: [string, string | undefined][] = [
     ['Cliente', photo.clientName || photo.clientId],
     ['Local / Setor', photo.localSetor],
     ['Capturada em', `${fmtDate(photo.capturadoEm)} · ${fmtTime(photo.capturadoEm)}`],
     ['Técnico', photo.tecnicoNome],
     ['Marcador', photo.marcador ? MARKER_META[photo.marcador].label : undefined],
-    ['Sessão', photo.sessionId?.slice(0, 8)],
-    ['Identificador', friendlyPhotoId(photo.clientUuid)],
+    ['Endereço GPS', gpsLabel(photo.geo)],
+    ['Atendimento', photo.reportId?'Vinculado':undefined],['OS',photo.osId?'Vinculada':undefined],['Pendência',photo.pendenciaId?'Vinculada':undefined],['Antes × Depois',hasComparison?'Correção registrada':undefined],['Sincronização',SYNC_META[photo.syncStatus].label],
   ];
 
   return (
@@ -472,6 +482,8 @@ const PhotoDetail: React.FC<{ photo: GalleryPhoto; clients: Client[]; onClose: (
             ))}
           </dl>
           {photo.notaRapida && <div className="mt-3"><p className="text-[10px] font-bold uppercase text-slate-400">Nota</p><p className="text-sm text-slate-700">{photo.notaRapida}</p></div>}
+          {view==='evidence'&&<button onClick={share} className="mt-3 min-h-11 w-full rounded-xl border border-[#1A1A72] bg-white text-xs font-bold uppercase text-[#1A1A72]">Compartilhar evidência</button>}
+          {hasComparison?<p className="mt-3 rounded-xl bg-emerald-50 p-3 text-xs font-bold text-emerald-700">✓ Correção registrada</p>:photo.source==='remote'&&<button onClick={onRegisterAfter} className="mt-3 min-h-12 w-full rounded-xl bg-[#E63946] text-xs font-bold uppercase text-white">Registrar Depois</button>}
 
           <div className="mt-4 rounded-xl border border-slate-200 p-3">
             <div className="mb-2 flex items-center justify-between">

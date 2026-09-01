@@ -1271,6 +1271,8 @@ export function CrmApp({
             <FotosDeCampoView
               clients={clients}
               userRole={userRole}
+              technicianId={userId}
+              technicianName={userName}
             />
           )}
 

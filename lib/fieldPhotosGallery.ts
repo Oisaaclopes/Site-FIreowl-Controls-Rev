@@ -48,6 +48,7 @@ export interface GalleryPhoto extends FieldPhotoLinks {
   localOriginal?: Blob;
   localEvidence?: Blob;
   localMarkup?: Blob;
+  geo?: import('./fieldPhotos').FieldPhotoGeo;
 }
 
 export interface FieldPhotoFilters {
@@ -180,6 +181,7 @@ function rowToGalleryPhoto(r: any): GalleryPhoto {
     storagePathOriginal: r.storage_path_original ?? undefined,
     storagePathEvidencia: r.storage_path_evidencia ?? undefined,
     storagePathMarkup: r.storage_path_markup ?? undefined,
+    geo: r.geo ?? undefined,
   };
 }
 
@@ -230,6 +232,7 @@ export async function listLocalFieldPhotos(): Promise<GalleryPhoto[]> {
       localOriginal: original,
       localEvidence: evidence,
       localMarkup: markup,
+      geo: photo.geo,
     };
   });
 }

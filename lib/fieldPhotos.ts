@@ -2,6 +2,7 @@ import { getSupabaseClient } from './supabaseClient';
 
 export type FieldPhotoSyncStatus = 'pendente' | 'sincronizado' | 'erro';
 export type FieldPhotoMarker = 'antes' | 'depois' | 'falha' | 'corrigido' | 'pendente';
+export interface FieldPhotoGeo { latitude:number; longitude:number; accuracy?:number; capturedAt:string; address?:string; }
 
 export interface FieldPhotoSession {
   id: string;
@@ -27,7 +28,7 @@ export interface FieldPhoto {
   notaRapida?: string;
   marcador?: FieldPhotoMarker;
   capturadoEm: string;
-  geo?: unknown;
+  geo?: FieldPhotoGeo;
   clientUuid: string;
   syncStatus: FieldPhotoSyncStatus;
 }

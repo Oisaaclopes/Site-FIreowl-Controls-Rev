@@ -2,6 +2,8 @@ import { createFieldPhotoSession, FieldPhoto, FieldPhotoSession, insertFieldPhot
 import { buildFieldPhotoPath, uploadFieldPhotoAsset } from '../fieldPhotoStorage';
 import { createFireowlEvidence } from '../fieldPhotoEvidence';
 import { canProcessJob, enqueueOfflineJob, getOutboxOwner, listOfflineJobs, OfflineJob, registerOfflineHandler } from './outbox';
+import { createComparison, FieldPhotoComparison } from '../fieldPhotoComparisons';
+import { reverseGeocode } from '../fieldPhotoGeo';
 
 export interface FieldPhotoSessionPayload {
   session: FieldPhotoSession;
@@ -17,6 +19,7 @@ export interface FieldPhotoPayload {
   /** Necessário para uma evidência que falhou localmente ser recriada no retry. */
   clientName: string;
 }
+export interface FieldPhotoComparisonPayload { comparison: Omit<FieldPhotoComparison, 'id'|'createdBy'|'createdAt'|'updatedAt'>; ownerUserId: string; }
 
 export async function enqueueFieldPhotoSession(session: FieldPhotoSession): Promise<void> {
   await enqueueOfflineJob<FieldPhotoSessionPayload>({
@@ -29,6 +32,9 @@ export async function enqueueFieldPhoto(payload: FieldPhotoPayload): Promise<voi
   await enqueueOfflineJob<FieldPhotoPayload>({
     domain: 'FIELD_PHOTO', entityClientUuid: payload.photo.clientUuid, payload, ownerUserId: payload.session.tecnicoId,
   });
+}
+export async function enqueueFieldPhotoComparison(payload: FieldPhotoComparisonPayload): Promise<void> {
+  await enqueueOfflineJob({ domain:'FIELD_PHOTO_COMPARISON', entityClientUuid:`${payload.comparison.beforePhotoId}:${payload.comparison.afterPhotoId}`, payload, ownerUserId:payload.ownerUserId });
 }
 
 export async function pendingFieldPhotoJobs(): Promise<number> {
@@ -44,7 +50,8 @@ async function syncSession(job: OfflineJob<FieldPhotoSessionPayload>): Promise<v
 }
 
 async function syncPhoto(job: OfflineJob<FieldPhotoPayload>): Promise<void> {
-  const { photo, session, original, markup } = job.payload;
+  let { photo } = job.payload; const { session, original, markup } = job.payload;
+  if(photo.geo && !photo.geo.address) photo={...photo,geo:await reverseGeocode(photo.geo)};
   // Garante que o FK exista antes de subir binários. O id local já é UUID válido,
   // mas a sessão é reconciliada pelo client_uuid para o caso de retry/duplicidade.
   const syncedSession = await createFieldPhotoSession(session);
@@ -52,7 +59,7 @@ async function syncPhoto(job: OfflineJob<FieldPhotoPayload>): Promise<void> {
   const base = { technicianId: owner, sessionClientUuid: session.clientUuid, photoClientUuid: photo.clientUuid };
   const originalPath = await uploadFieldPhotoAsset({ path: buildFieldPhotoPath({ ...base, asset: 'original' }), file: original });
   let evidence = job.payload.evidence;
-  if (!evidence) evidence = await createFireowlEvidence(original, photo, session, job.payload.clientName);
+  if (!evidence || (photo.geo?.address && !job.payload.photo.geo?.address)) evidence = await createFireowlEvidence(original, photo, session, job.payload.clientName);
   const evidencePath = await uploadFieldPhotoAsset({ path: buildFieldPhotoPath({ ...base, asset: 'evidence' }), file: evidence });
   const markupPath = markup
     ? await uploadFieldPhotoAsset({ path: buildFieldPhotoPath({ ...base, asset: 'markup' }), file: markup })
@@ -70,3 +77,4 @@ async function syncPhoto(job: OfflineJob<FieldPhotoPayload>): Promise<void> {
 
 registerOfflineHandler<FieldPhotoSessionPayload>('FIELD_PHOTO_SESSION', syncSession);
 registerOfflineHandler<FieldPhotoPayload>('FIELD_PHOTO', syncPhoto);
+registerOfflineHandler<FieldPhotoComparisonPayload>('FIELD_PHOTO_COMPARISON', async job => { await createComparison(job.payload.comparison); });

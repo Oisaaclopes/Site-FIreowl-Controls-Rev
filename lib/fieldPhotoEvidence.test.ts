@@ -1,0 +1,2 @@
+import{describe,expect,it}from'vitest';import{EVIDENCE_HAS_FIREOWL_LOGO,evidenceLayout}from'./fieldPhotoEvidence';
+describe('Evidência Fireowl',()=>{it('mantém identidade institucional na composição',()=>expect(EVIDENCE_HAS_FIREOWL_LOGO).toBe(true));it('mantém overlay proporcional em portrait e landscape',()=>{expect(evidenceLayout(375,800,4).overlayHeight).toBeLessThanOrEqual(272);expect(evidenceLayout(1200,600,4).overlayHeight).toBeLessThanOrEqual(204);});});
