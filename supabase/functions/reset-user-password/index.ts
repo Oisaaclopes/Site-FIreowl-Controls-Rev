@@ -88,15 +88,22 @@ Deno.serve(async (req: Request) => {
     return json(400, { error: 'reset_failed' }, cors);
   }
 
-  // 7) Trilha de auditoria (best-effort; NUNCA a senha).
-  await admin.from('audit_logs').insert({
-    user_id: caller.id,
-    user_name: prof.name ?? null,
-    user_role: 'ADMINISTRATIVO',
-    action: 'USER_PASSWORD_RESET',
-    module: 'usuarios',
-    details: `target_user_id=${targetUserId} target_email=${target.email ?? ''}`,
-  }).catch(() => {});
+  // 7) Trilha de auditoria (best-effort; NUNCA a senha). O builder do supabase-js
+  //    é "thenable" mas não tem .catch — usar await + erro explícito. A falha da
+  //    auditoria NÃO pode derrubar o reset (que já teve sucesso acima).
+  try {
+    const { error: auditErr } = await admin.from('audit_logs').insert({
+      user_id: caller.id,
+      user_name: prof.name ?? null,
+      user_role: 'ADMINISTRATIVO',
+      action: 'USER_PASSWORD_RESET',
+      module: 'usuarios',
+      details: `target_user_id=${targetUserId} target_email=${target.email ?? ''}`,
+    });
+    if (auditErr) console.error('audit_log USER_PASSWORD_RESET falhou:', auditErr.message);
+  } catch (e) {
+    console.error('audit_log USER_PASSWORD_RESET erro:', e instanceof Error ? e.message : String(e));
+  }
 
   return json(200, { ok: true }, cors);
 });

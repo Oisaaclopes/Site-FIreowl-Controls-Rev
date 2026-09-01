@@ -189,9 +189,15 @@ export async function resetUserPassword(targetUserId: string, password: string):
     body: { targetUserId, password },
   });
   if (error) {
+    // Preserva os códigos específicos vindos no corpo (401/403/422/…).
     let code = '';
     try { const payload = await error.context?.json?.(); code = payload?.error || ''; } catch { /* corpo indisponível */ }
-    if (!code && /not found|failed to (send|fetch)|404/i.test(error.message || '')) code = 'not_deployed';
+    // "Indisponível" só quando a função realmente não existe (404) ou a rede
+    // falhou — NUNCA para um 500 (erro interno), que cai na mensagem genérica.
+    const status: number | undefined = error.context?.status;
+    if (!code && (status === 404 || (status === undefined && /failed to (send|fetch)|not found/i.test(error.message || '')))) {
+      code = 'not_deployed';
+    }
     throw new Error(RESET_ERROR_MSG[code] || RESET_ERROR_MSG.reset_failed);
   }
   if (data?.error) throw new Error(RESET_ERROR_MSG[data.error] || RESET_ERROR_MSG.reset_failed);

@@ -134,18 +134,23 @@ Deno.serve(async (req: Request) => {
     return json(500, { error: 'profile_update_failed' }, cors);
   }
 
-  // 7) Trilha de auditoria (best-effort; nunca bloqueia; sem senha).
-  await admin
-    .from('audit_logs')
-    .insert({
-      user_id: caller.id,
-      user_name: prof.name ?? null,
-      user_role: 'ADMINISTRATIVO',
-      action: 'USER_CREATED',
-      module: 'usuarios',
-      details: `target_user_id=${newId} target_role=${role}`,
-    })
-    .catch(() => {});
+  // 7) Trilha de auditoria (best-effort; nunca bloqueia; sem senha). O builder do
+  //    supabase-js é "thenable" mas não tem .catch — usar await + erro explícito.
+  try {
+    const { error: auditErr } = await admin
+      .from('audit_logs')
+      .insert({
+        user_id: caller.id,
+        user_name: prof.name ?? null,
+        user_role: 'ADMINISTRATIVO',
+        action: 'USER_CREATED',
+        module: 'usuarios',
+        details: `target_user_id=${newId} target_role=${role}`,
+      });
+    if (auditErr) console.error('audit_log USER_CREATED falhou:', auditErr.message);
+  } catch (e) {
+    console.error('audit_log USER_CREATED erro:', e instanceof Error ? e.message : String(e));
+  }
 
   return json(200, { ok: true, id: newId }, cors);
 });
