@@ -44,6 +44,10 @@ export const CATALOG_TAXONOMY_NODES: CatalogTaxonomyNode[] = [
   n('SDAI', 'SDAI.CENTRAIS', 'GROUP', 'SDAI.CENTRAIS.EQUIP', 'Equipamentos', 10),
   n('SDAI', 'SDAI.CENTRAIS.EQUIP', 'TECHNOLOGY', 'SDAI.CENTRAIS.EQUIP.END', 'Endereçável', 10),
   n('SDAI', 'SDAI.CENTRAIS.EQUIP', 'TECHNOLOGY', 'SDAI.CENTRAIS.EQUIP.CONV', 'Convencional', 20),
+  // 0071 — Componentes / Peças de central (só subtipos com produto real)
+  n('SDAI', 'SDAI.CENTRAIS', 'GROUP', 'SDAI.CENTRAIS.COMPONENTES', 'Componentes / Peças', 20),
+  n('SDAI', 'SDAI.CENTRAIS.COMPONENTES', 'TYPE', 'SDAI.CENTRAIS.COMPONENTES.COMUNICACAO', 'Comunicação / Rede', 10),
+  n('SDAI', 'SDAI.CENTRAIS.COMPONENTES', 'TYPE', 'SDAI.CENTRAIS.COMPONENTES.PROGRAMACAO', 'Programação / Endereçamento', 20),
   // SDAI — Detectores
   n('SDAI', 'SDAI.DETECTORES', 'TYPE', 'SDAI.DETECTORES.FUMACA', 'Fumaça', 10),
   n('SDAI', 'SDAI.DETECTORES.FUMACA', 'TECHNOLOGY', 'SDAI.DETECTORES.FUMACA.END', 'Endereçável', 10),
@@ -52,6 +56,9 @@ export const CATALOG_TAXONOMY_NODES: CatalogTaxonomyNode[] = [
   n('SDAI', 'SDAI.DETECTORES.TEMP', 'TECHNOLOGY', 'SDAI.DETECTORES.TEMP.END', 'Endereçável', 10),
   n('SDAI', 'SDAI.DETECTORES.TEMP', 'TECHNOLOGY', 'SDAI.DETECTORES.TEMP.CONV', 'Convencional', 20),
   n('SDAI', 'SDAI.DETECTORES', 'TYPE', 'SDAI.DETECTORES.ASP', 'Aspiração', 30),
+  // 0071 — novos tipos de detector com produto real (Gás, Linear/Feixe)
+  n('SDAI', 'SDAI.DETECTORES', 'TYPE', 'SDAI.DETECTORES.GAS', 'Gás', 40),
+  n('SDAI', 'SDAI.DETECTORES', 'TYPE', 'SDAI.DETECTORES.LINEAR', 'Linear / Feixe', 50),
   // SDAI — Módulos
   n('SDAI', 'SDAI.MODULOS', 'FUNCTION', 'SDAI.MODULOS.ENTRADA', 'Entrada / Monitor', 10),
   n('SDAI', 'SDAI.MODULOS', 'FUNCTION', 'SDAI.MODULOS.SAIDA', 'Saída / Controle', 20),
@@ -61,6 +68,16 @@ export const CATALOG_TAXONOMY_NODES: CatalogTaxonomyNode[] = [
   // SDAI — Acionadores
   n('SDAI', 'SDAI.ACIONADORES', 'TECHNOLOGY', 'SDAI.ACIONADORES.END', 'Endereçável', 10),
   n('SDAI', 'SDAI.ACIONADORES', 'TECHNOLOGY', 'SDAI.ACIONADORES.CONV', 'Convencional', 20),
+  // 0071 — famílias novas justificadas por produto real (Intelbras/Tecnohold/Morey)
+  n('SDAI', null, 'FAMILY', 'SDAI.SINALIZADORES', 'Sirenes / Sinalizadores', 55),
+  n('SDAI', 'SDAI.SINALIZADORES', 'TECHNOLOGY', 'SDAI.SINALIZADORES.END', 'Endereçável', 10),
+  n('SDAI', 'SDAI.SINALIZADORES', 'TECHNOLOGY', 'SDAI.SINALIZADORES.CONV', 'Convencional', 20),
+  n('SDAI', null, 'FAMILY', 'SDAI.ALIMENTACAO', 'Fontes / Alimentação', 70),
+  n('SDAI', 'SDAI.ALIMENTACAO', 'TYPE', 'SDAI.ALIMENTACAO.AUXILIAR', 'Fonte Auxiliar', 10),
+  n('SDAI', null, 'FAMILY', 'SDAI.BATERIAS', 'Baterias', 80),
+  n('SDAI', 'SDAI.BATERIAS', 'TYPE', 'SDAI.BATERIAS.SELADA', 'Selada / VRLA', 10),
+  n('SDAI', null, 'FAMILY', 'SDAI.EMERGENCIA', 'Iluminação de Emergência', 90),
+  n('SDAI', 'SDAI.EMERGENCIA', 'TYPE', 'SDAI.EMERGENCIA.LUMINARIAS', 'Luminárias', 10),
   // CFTV
   n('CFTV', null, 'FAMILY', 'CFTV.CAMERAS', 'Câmeras', 10),
   n('CFTV', 'CFTV.CAMERAS', 'TECHNOLOGY', 'CFTV.CAMERAS.IP', 'IP', 10),
@@ -99,6 +116,17 @@ export const CATALOG_TAXONOMY_ALIASES: CatalogTaxonomyAlias[] = [
   ...aliasList('CFTV.GRAVADORES', ['Gravador', 'Recorder']),
   ...aliasList('CFTV.GRAVADORES.NVR', ['NVR', 'Gravador NVR']),
   ...aliasList('CFTV.GRAVADORES.DVR_HIBRIDO', ['DVR', 'Híbrido', 'Gravador Híbrido']),
+  // 0071 — novos ramos SDAI
+  ...aliasList('SDAI.SINALIZADORES', ['Sirene', 'Sirene Audiovisual', 'Sinalizador', 'Sinalizador Audiovisual', 'Strobe', 'Sounder', 'Beacon']),
+  ...aliasList('SDAI.ALIMENTACAO.AUXILIAR', ['Fonte Auxiliar', 'Fonte de Alimentação Auxiliar', 'Fonte Nobreak', 'QFA', 'QFAE']),
+  ...aliasList('SDAI.BATERIAS', ['Bateria']),
+  ...aliasList('SDAI.BATERIAS.SELADA', ['Bateria Selada', 'Bateria Chumbo Ácida', 'VRLA', 'Chumbo Ácido']),
+  ...aliasList('SDAI.DETECTORES.GAS', ['Detector de Gás', 'Detector Gás', 'Sensor de Gás']),
+  ...aliasList('SDAI.DETECTORES.LINEAR', ['Detector Linear', 'Detector de Feixe', 'Beam Detector', 'Barreira Linear']),
+  ...aliasList('SDAI.CENTRAIS.COMPONENTES.COMUNICACAO', ['Placa de Rede', 'Placa de Comunicação', 'Gateway', 'Módulo de Comunicação']),
+  ...aliasList('SDAI.CENTRAIS.COMPONENTES.PROGRAMACAO', ['Programador de Endereços', 'Programador de Endereço']),
+  ...aliasList('SDAI.CENTRAIS.COMPONENTES', ['Componente de Central', 'Peça de Central']),
+  ...aliasList('SDAI.EMERGENCIA.LUMINARIAS', ['Luminária de Emergência', 'Iluminação de Emergência', 'Bloco Autônomo']),
 ];
 
 function aliasList(code: string, aliases: string[]): CatalogTaxonomyAlias[] {
@@ -210,6 +238,44 @@ export function classifyCatalogItem(item: ClassifiableItem): ClassificationResul
       return REVISAR('SDAI.ACIONADORES');
     }
     if (sub === 'anunciador') return CLASSIFICADO('SDAI.ANUNCIADORES');
+
+    // ---- 0071: subcategorias reais de produção (Intelbras/Tecnohold/Morey) ----
+    // Centrais (tecnologia explícita na subcategoria)
+    if (sub === 'centraldealarmeenderecavel') return CLASSIFICADO('SDAI.CENTRAIS.EQUIP.END');
+    if (sub === 'centraldealarmeconvencional') return CLASSIFICADO('SDAI.CENTRAIS.EQUIP.CONV');
+    // Componentes de central
+    if (sub === 'placaderedecomunicacaointegracao') return CLASSIFICADO('SDAI.CENTRAIS.COMPONENTES.COMUNICACAO');
+    if (sub === 'programadordeenderecos') return CLASSIFICADO('SDAI.CENTRAIS.COMPONENTES.PROGRAMACAO');
+    // Painel repetidor/sinótico = função de repetição remota → família Anunciadores (não Componentes)
+    if (sub === 'painelrepetidorsinoticodisplayremoto') return CLASSIFICADO('SDAI.ANUNCIADORES');
+    // Detectores (tipo explícito; tecnologia é secundária)
+    if (sub === 'detectordefumacaenderecaveloptico') return CLASSIFICADO('SDAI.DETECTORES.FUMACA.END');
+    if (sub === 'detectordetemperaturatermovelocimetricofixo') return CLASSIFICADO('SDAI.DETECTORES.TEMP');
+    if (sub === 'detectordegascoglpamonia') return CLASSIFICADO('SDAI.DETECTORES.GAS');
+    if (sub === 'detectorlineardefumacafeixebarreira') return CLASSIFICADO('SDAI.DETECTORES.LINEAR');
+    // Módulos (função explícita)
+    if (sub === 'moduloderelesaida') return CLASSIFICADO('SDAI.MODULOS.RELE');
+    if (sub === 'modulomonitorentrada') return CLASSIFICADO('SDAI.MODULOS.ENTRADA');
+    if (sub === 'moduloisoladordecurtocircuito') return CLASSIFICADO('SDAI.MODULOS.ISOLADOR');
+    // Endereçador de zona: função de interface incerta (monitor vs interface) → REVISAR
+    if (sub === 'moduloenderecadordezonaconvencional') return REVISAR('SDAI.MODULOS');
+    // Acionadores
+    if (sub === 'acionadormanualenderecavelrearmavel') return CLASSIFICADO('SDAI.ACIONADORES.END');
+    // "À prova de tempo (IP66)" não declara tecnologia → REVISAR na família
+    if (sub === 'acionadormanualaprovadetempoip66') return REVISAR('SDAI.ACIONADORES');
+    // Sirenes / Sinalizadores
+    if (sub === 'sireneaudiovisualenderecavelstrobe') return CLASSIFICADO('SDAI.SINALIZADORES.END');
+    if (sub === 'sireneaudiovisualconvencional') return CLASSIFICADO('SDAI.SINALIZADORES.CONV');
+    // Fonte auxiliar — "Placa Fonte ..." pode ser fonte interna de central → REVISAR
+    if (sub === 'fontedealimentacaoauxiliarsdai') {
+      return normalizedCatalogKey(model).includes('placafonte')
+        ? REVISAR('SDAI.ALIMENTACAO')
+        : CLASSIFICADO('SDAI.ALIMENTACAO.AUXILIAR');
+    }
+    // Baterias / Iluminação de emergência
+    if (sub === 'bateriaseladavrlachumboacido') return CLASSIFICADO('SDAI.BATERIAS.SELADA');
+    if (sub === 'luminariadeemergencia') return CLASSIFICADO('SDAI.EMERGENCIA.LUMINARIAS');
+
     return NAO_CLASSIFICADO;
   }
 
