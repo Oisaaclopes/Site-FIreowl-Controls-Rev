@@ -61,6 +61,8 @@ function rowToItem(r: any): InventoryItem {
     specLastVerifiedAt: r.spec_last_verified_at ?? undefined,
     systemType: r.system_type ?? undefined,
     marketSegment: r.market_segment ?? undefined,
+    canonicalTaxonomyId: r.canonical_taxonomy_id ?? undefined,
+    classificationStatus: r.classification_status ?? undefined,
   };
 }
 

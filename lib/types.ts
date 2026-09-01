@@ -9,6 +9,7 @@ export type TabPath =
   | 'clientes'
   | 'fornecedores'
   | 'estoque'
+  | 'catalogo'
   | 'servicos'
   | 'relatorios'
   | 'fotos-de-campo'
@@ -864,6 +865,9 @@ export interface InventoryItem {
   specLastVerifiedAt?: string;
   systemType?: string;
   marketSegment?: 'PROFESSIONAL' | 'RESIDENTIAL' | 'SMART_HOME';
+  /** Taxonomia canônica (0070/0071). Só leitura na UI de catálogo; nunca editado aqui. */
+  canonicalTaxonomyId?: string;
+  classificationStatus?: 'CLASSIFICADO' | 'REVISAR' | 'NAO_CLASSIFICADO';
 }
 
 export interface StockMovement {

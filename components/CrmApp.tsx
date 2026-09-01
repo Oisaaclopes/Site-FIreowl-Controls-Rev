@@ -79,6 +79,7 @@ import { AgendaView } from '@/components/views/AgendaView';
 import { CrmView } from '@/components/views/CrmView';
 import { FornecedoresView } from '@/components/views/FornecedoresView';
 import { EstoqueView } from '@/components/views/EstoqueView';
+import { CatalogoView } from '@/components/views/CatalogoView';
 import { ServicosView } from '@/components/views/ServicosView';
 import { RelatoriosView } from '@/components/views/RelatoriosView';
 import { FotosDeCampoView } from '@/components/field-photos/FotosDeCampoView';
@@ -1233,6 +1234,14 @@ export function CrmApp({
               onAddSupplier={handleAddSupplier}
               onOpenSupplyOrder={handleOpenSupplyOrder}
               loading={inventoryLoading}
+            />
+          )}
+
+          {currentTab === 'catalogo' && (
+            <CatalogoView
+              inventory={inventory}
+              inventoryLoading={inventoryLoading}
+              userRole={userRole}
             />
           )}
 

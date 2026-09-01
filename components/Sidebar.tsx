@@ -50,7 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { items: ['painel'] },
     { title: 'Comercial', items: ['clientes', 'pedidos', 'contratos'] },
     { title: 'Operação', items: ['agenda', 'relatorios', 'fotos-de-campo', 'ponto'] },
-    { title: 'Suprimentos', items: ['servicos', 'estoque', 'fornecedores'] },
+    { title: 'Suprimentos', items: ['catalogo', 'servicos', 'estoque', 'fornecedores'] },
     { title: 'Financeiro', items: ['receitas', 'despesas', 'financas'] },
     { title: 'Sistema', items: ['conta'] },
   ];
