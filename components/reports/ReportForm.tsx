@@ -169,6 +169,7 @@ function buildPendencias(
 }
 
 import { TriagemFotos, UnclassifiedPhoto } from '@/components/reports/TriagemFotos';
+import { buildSurveyTemplate, surveyBlockSections, SurveyMode, SURVEY_BLOCKS_KEY, SURVEY_MODE_KEY } from '@/lib/surveyMode';
 
 export const ReportForm: React.FC<ReportFormProps> = ({
   template,
@@ -295,14 +296,26 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   const [sectionErr, setSectionErr] = useState<string | null>(null);
   const camInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Seções visíveis (respeita salto condicional pula_se)
+  const surveyMode = template.tipo === 'LEVANTAMENTO' ? values[SURVEY_MODE_KEY] as SurveyMode | undefined : undefined;
+  const selectedSurveyBlocks = useMemo(
+    () => Array.isArray(values[SURVEY_BLOCKS_KEY]) ? values[SURVEY_BLOCKS_KEY] as string[] : [],
+    [values]
+  );
+  const effectiveTemplate = useMemo(
+    () => template.tipo === 'LEVANTAMENTO' && surveyMode
+      ? buildSurveyTemplate(template, surveyMode, selectedSurveyBlocks)
+      : template,
+    [template, surveyMode, selectedSurveyBlocks]
+  );
+
+  // Seções visíveis (respeita modo e salto condicional pula_se)
   const visibleSections = useMemo(
-    () => template.secoes.filter((s) => !(s.pula_se && String(values[s.pula_se.campo]) === s.pula_se.igual)),
-    [template, values]
+    () => effectiveTemplate.secoes.filter((s) => !(s.pula_se && String(values[s.pula_se.campo]) === s.pula_se.igual)),
+    [effectiveTemplate, values]
   );
   const idx = Math.min(currentIdx, Math.max(0, visibleSections.length - 1));
   const currentSection = visibleSections[idx];
-  const stepTemplate = { ...template, secoes: currentSection ? [currentSection] : [] };
+  const stepTemplate = { ...effectiveTemplate, secoes: currentSection ? [currentSection] : [] };
   const isLast = idx >= visibleSections.length - 1;
   const etapaRapida: Record<string, string> = {
     chamado: 'Chamado', diagnostico: 'Diagnóstico', servico_executado: 'Execução', materiais: 'Execução',
@@ -452,7 +465,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
 
   const pendenciasPreview = useMemo<PendenciaPreview[]>(() => {
     const list: PendenciaPreview[] = [];
-    for (const secao of template.secoes) {
+    for (const secao of effectiveTemplate.secoes) {
       if (secao.pula_se && String(values[secao.pula_se.campo]) === secao.pula_se.igual) continue;
       for (const field of secao.campos) {
         if (field.abre_pendencia_se && isNegativeAnswer(field, values[field.key] as never)) {
@@ -494,7 +507,28 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       }
     }
     return list;
-  }, [template, values]);
+  }, [effectiveTemplate, values]);
+
+  const surveySummary = useMemo(() => {
+    const countCards = (key: string) => Array.isArray(values[key]) ? (values[key] as RepeaterCard[]).length : 0;
+    const evidenceIds = new Set<string>();
+    const visit = (value: unknown) => {
+      if (typeof value === 'string' && isPhotoId(value)) evidenceIds.add(value);
+      if (Array.isArray(value)) value.forEach(visit);
+      else if (value && typeof value === 'object') Object.values(value as Record<string, unknown>).forEach(visit);
+    };
+    Object.values(values).forEach(visit);
+    unclassifiedPhotos.forEach((photo) => evidenceIds.add(photo.id));
+    return {
+      evidencias: evidenceIds.size,
+      constatacoes: Array.isArray(values.constatacoes_pontuais) ? values.constatacoes_pontuais.length : 0,
+      pendencias: pendenciasPreview.length,
+      materiais: countCards('materiais_necessarios'),
+      servicos: countCards('servicos_necessarios'),
+      medicoes: countCards('medicoes'),
+      naoVerificado: String(values.verificacao_pontual || '').includes('Não verificado') ? 1 : 0,
+    };
+  }, [values, unclassifiedPhotos, pendenciasPreview]);
 
   const hasPhoto = (fieldKey: string, cardIndex?: number): boolean => {
     if (cardIndex !== undefined) {
@@ -523,7 +557,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         }
       });
     };
-    for (const secao of template.secoes) for (const field of secao.campos) collect(values[field.key]);
+    for (const secao of effectiveTemplate.secoes) for (const field of secao.campos) collect(values[field.key]);
     unclassifiedPhotos.forEach((p) => { if (isPhotoId(p.id)) photoIds.add(p.id); });
 
     const media: BundleMedia[] = [];
@@ -543,7 +577,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
     }
 
     const signatures: BundleSignature[] = [];
-    for (const secao of template.secoes)
+    for (const secao of effectiveTemplate.secoes)
       for (const field of secao.campos) {
         if (field.tipo !== 'assinatura') continue;
         const v = values[field.key];
@@ -562,14 +596,19 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       }
 
     const answers: BundleAnswer[] = [];
-    for (const secao of template.secoes)
+    for (const secao of effectiveTemplate.secoes)
       for (const field of secao.campos) {
         const v = values[field.key];
         if (v === undefined) continue;
         answers.push({ secao: secao.key, fieldKey: field.key, valor: v });
       }
 
-    const pends = buildPendencias(template, values, cliente?.id || '', catalog.itens);
+    if (surveyMode) {
+      answers.push({ secao: 'modo_levantamento', fieldKey: SURVEY_MODE_KEY, valor: surveyMode });
+      if (surveyMode === 'parcial') answers.push({ secao: 'modo_levantamento', fieldKey: SURVEY_BLOCKS_KEY, valor: selectedSurveyBlocks });
+    }
+
+    const pends = buildPendencias(effectiveTemplate, values, cliente?.id || '', catalog.itens);
     const geoFim = await getGeoPoint();
 
     // amostragem: dispositivos efetivamente testados (Aprovado/Reprovado)
@@ -654,7 +693,15 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   };
 
   const handleFinalize = async () => {
-    const found = validateFinalize(template, values, hasPhoto);
+    if (template.tipo === 'LEVANTAMENTO' && !surveyMode) {
+      setIssues([{ secao: 'Modo do levantamento', campo: 'Tipo', motivo: 'Escolha Pontual, Parcial ou Completo.' }]);
+      return;
+    }
+    if (surveyMode === 'parcial' && selectedSurveyBlocks.length === 0) {
+      setIssues([{ secao: 'Modo do levantamento', campo: 'Blocos', motivo: 'Escolha ao menos um bloco para o levantamento parcial.' }]);
+      return;
+    }
+    const found = validateFinalize(effectiveTemplate, values, hasPhoto);
     setIssues(found);
     setPersistErr(null);
     setSavedInfo(null);
@@ -817,6 +864,61 @@ export const ReportForm: React.FC<ReportFormProps> = ({
 
       {/* Conteúdo: uma seção por vez */}
       <div className="flex-1 p-4 md:p-8 pb-28">
+        {template.tipo === 'LEVANTAMENTO' && (
+          <div className="mb-5 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[#1A1A72]">Modo do levantamento</p>
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {([
+                ['pontual', 'Pontual', 'Foto, constatação e observação'],
+                ['parcial', 'Parcial', 'Somente os blocos escolhidos'],
+                ['completo', 'Completo', 'Levantamento integral'],
+              ] as const).map(([mode, label, description]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => { handleChange(SURVEY_MODE_KEY, mode); setCurrentIdx(0); setIssues(null); }}
+                  className={`min-h-16 rounded-xl border p-3 text-left ${surveyMode === mode ? 'border-[#1A1A72] bg-[#1A1A72] text-white' : 'border-slate-200 bg-white text-slate-800'}`}
+                >
+                  <span className="block text-xs font-bold">{label}</span>
+                  <span className={`mt-0.5 block text-[10px] ${surveyMode === mode ? 'text-indigo-100' : 'text-slate-500'}`}>{description}</span>
+                </button>
+              ))}
+            </div>
+            {surveyMode === 'parcial' && (
+              <div className="mt-4">
+                <p className="text-[10px] font-bold uppercase text-slate-600">Blocos a verificar</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {surveyBlockSections(template).map((section) => {
+                    const active = selectedSurveyBlocks.includes(section.key);
+                    return (
+                      <button
+                        key={section.key}
+                        type="button"
+                        onClick={() => {
+                          const next = active
+                            ? selectedSurveyBlocks.filter((key) => key !== section.key)
+                            : [...selectedSurveyBlocks, section.key];
+                          handleChange(SURVEY_BLOCKS_KEY, next);
+                          setCurrentIdx(0);
+                        }}
+                        className={`min-h-10 rounded-full border px-3 text-[11px] font-semibold ${active ? 'border-[#1A1A72] bg-[#1A1A72] text-white' : 'border-slate-300 bg-white text-slate-700'}`}
+                      >
+                        {active ? '✓ ' : ''}{section.titulo}
+                      </button>
+                    );
+                  })}
+                </div>
+                {selectedSurveyBlocks.length === 0 && <p className="mt-2 text-[10px] text-amber-700">Escolha ao menos um bloco técnico.</p>}
+              </div>
+            )}
+          </div>
+        )}
+
+        {template.tipo === 'LEVANTAMENTO' && !surveyMode ? (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-xs text-slate-500">
+            Escolha o modo acima para iniciar. Nenhum campo do levantamento completo será exigido antes disso.
+          </div>
+        ) : <>
         {currentSection?.descricao && <p className="text-[11px] text-slate-500 mb-3">{currentSection.descricao}</p>}
         {modoCampo === 'rapido' && template.tipo === 'CORRETIVA' && currentSection && (
           <QuickCorrectiveActions sectionKey={currentSection.key} values={values} onChange={handleChange} />
@@ -833,6 +935,21 @@ export const ReportForm: React.FC<ReportFormProps> = ({
           onFastPhotoCaptured={handleFastPhotoCaptured}
           hideFloatingCamera
         />
+
+        {template.tipo === 'LEVANTAMENTO' && isLast && (
+          <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Resumo antes de finalizar</p>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {[
+                ['Evidências', surveySummary.evidencias], ['Constatações', surveySummary.constatacoes],
+                ['Pendências formais', surveySummary.pendencias], ['Materiais', surveySummary.materiais],
+                ['Serviços', surveySummary.servicos], ['Medições', surveySummary.medicoes],
+                ['Não verificado', surveySummary.naoVerificado],
+              ].map(([label, count]) => <div key={String(label)} className="rounded-lg bg-slate-50 p-2"><p className="text-lg font-bold text-slate-900">{count}</p><p className="text-[9px] uppercase text-slate-500">{label}</p></div>)}
+            </div>
+            <p className="mt-3 text-[10px] text-slate-500">Uma constatação só vira pendência formal quando registrada em Apontamentos. “Não verificado” preserva a incerteza sem criar um diagnóstico.</p>
+          </div>
+        )}
 
         {sectionErr && (
           <div className="mt-4 border border-amber-200 bg-amber-50 rounded-lg p-3 text-[11px] font-semibold text-amber-800">
@@ -860,6 +977,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
             Relatório válido — {pendenciasPreview.length} pendência(s) (Supabase não configurado; sem gravação).
           </div>
         )}
+        </>}
       </div>
 
       {/* FABs: câmera + contador de triagem (acima do rodapé) */}
@@ -882,7 +1000,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       )}
 
       {/* Rodapé fixo — zona do polegar */}
-      <div className="sticky bottom-0 z-30 bg-white border-t border-slate-200 px-4 py-3 flex items-center gap-2">
+      {(template.tipo !== 'LEVANTAMENTO' || surveyMode) && <div className="sticky bottom-0 z-30 bg-white border-t border-slate-200 px-4 py-3 flex items-center gap-2">
         <button
           onClick={goPrev}
           disabled={idx === 0}
@@ -915,7 +1033,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
             Próximo
           </button>
         )}
-      </div>
+      </div>}
 
       {/* Bottom sheet: pendências a abrir */}
       {showPend && (
