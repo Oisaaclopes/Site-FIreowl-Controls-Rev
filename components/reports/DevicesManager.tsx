@@ -1,4 +1,5 @@
 'use client';
+import { showToast, requestConfirm } from '@/components/ui/Feedback';
 
 import React, { useEffect, useState } from 'react';
 import { Device, PartnerBrand, Supplier, InventoryItem } from '@/lib/types';
@@ -132,12 +133,12 @@ export const DevicesManager: React.FC<DevicesManagerProps> = ({ open, onClose, c
   };
 
   const remove = async (id: string) => {
-    if (!window.confirm('Remover este dispositivo?')) return;
+    if (!await requestConfirm('Remover este dispositivo?')) return;
     try {
       await deleteDevice(id);
       setDevices((prev) => prev.filter((d) => d.id !== id));
     } catch {
-      alert('Não foi possível remover.');
+      showToast('Não foi possível remover.');
     }
   };
 

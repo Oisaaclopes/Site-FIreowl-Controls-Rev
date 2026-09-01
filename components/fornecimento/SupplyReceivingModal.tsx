@@ -1,4 +1,5 @@
 'use client';
+import { requestConfirm } from '@/components/ui/Feedback';
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { SupplyOrder, InventoryItem, SupplyReceipt, RejectionReason } from '@/lib/types';
@@ -100,8 +101,8 @@ export const SupplyReceivingModal: React.FC<Props> = ({ order, inventory, curren
   const excedentes = useMemo(() => rows.filter((r) => excedente(r.pendente, r.receberAgora) > 0), [rows]);
   const conferenciaOk = receberRows.every((r) => validaConferencia(r.receberAgora, r.aceito, r.rejeitado) && (r.rejeitado === 0 || !!r.motivo));
 
-  const avancarReceber = () => {
-    if (excedentes.length > 0 && !window.confirm(`Alguns itens excedem o previsto (${excedentes.map((r) => r.descricao).join(', ')}). Deseja continuar mesmo assim?`)) return;
+  const avancarReceber = async () => {
+    if (excedentes.length > 0 && !await requestConfirm(`Alguns itens excedem o previsto (${excedentes.map((r) => r.descricao).join(', ')}). Deseja continuar mesmo assim?`)) return;
     // sincroniza aceito = receberAgora ao entrar na conferência
     setRows((rs) => rs.map((r) => ({ ...r, aceito: r.receberAgora, rejeitado: 0, motivo: undefined })));
     setStep('conferencia');

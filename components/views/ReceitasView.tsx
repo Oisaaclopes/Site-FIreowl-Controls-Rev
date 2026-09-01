@@ -1,4 +1,5 @@
 'use client';
+import { requestConfirm } from '@/components/ui/Feedback';
 
 import React, { useState } from 'react';
 import { FinancialTransaction, Client, Contract } from '@/lib/types';
@@ -103,9 +104,9 @@ export const ReceitasView: React.FC<ReceitasViewProps> = ({
     setShowModal(true);
   };
 
-  const handleDelete = (t: FinancialTransaction) => {
+  const handleDelete = async (t: FinancialTransaction) => {
     if (!onDeleteTransaction) return;
-    if (!window.confirm(`Excluir o lançamento "${t.description}" (${brl(t.amount)})?\n\nEsta ação não pode ser desfeita.`))
+    if (!await requestConfirm(`Excluir o lançamento "${t.description}" (${brl(t.amount)})?\n\nEsta ação não pode ser desfeita.`))
       return;
     onDeleteTransaction(t.id);
   };

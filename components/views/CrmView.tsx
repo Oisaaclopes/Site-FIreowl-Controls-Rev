@@ -1,4 +1,5 @@
 'use client';
+import { showToast, requestConfirm } from '@/components/ui/Feedback';
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -135,7 +136,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
       const path = await uploadClientFachada(file, editingClient?.id || `c_${Date.now()}`);
       setNFachada(path);
     } catch {
-      alert('Não foi possível enviar a foto. Verifique a conexão com o Supabase.');
+      showToast('Não foi possível enviar a foto. Verifique a conexão com o Supabase.');
     } finally {
       setFachadaBusy(false);
     }
@@ -150,7 +151,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
       const path = await uploadClientLogo(file, editingClient?.id || `c_${Date.now()}`);
       setNLogo(path);
     } catch {
-      alert('Não foi possível enviar a logo. Verifique a conexão com o Supabase.');
+      showToast('Não foi possível enviar a logo. Verifique a conexão com o Supabase.');
     } finally {
       setLogoBusy(false);
     }
@@ -976,7 +977,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
       setClientEvents((events) => events.filter((event) => event.id !== draft.id));
       setEventContent(content);
       console.warn('Não foi possível salvar o evento do cliente:', error);
-      alert('Não foi possível registrar a nota agora. Tente novamente.');
+      showToast('Não foi possível registrar a nota agora. Tente novamente.');
     }
   };
   const data = useMemo(() => {
@@ -1045,10 +1046,10 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
 
   const handleDelete = async () => {
     if (hasLinkedHistory) {
-      alert('Este cliente possui histórico vinculado. Para preservar contratos, propostas, OS, relatórios e pendências, a exclusão não é permitida.');
+      showToast('Este cliente possui histórico vinculado. Para preservar contratos, propostas, OS, relatórios e pendências, a exclusão não é permitida.');
       return;
     }
-    if (!window.confirm(`Excluir o cliente "${client.name}"? Esta ação não pode ser desfeita.`)) return;
+    if (!await requestConfirm(`Excluir o cliente "${client.name}"? Esta ação não pode ser desfeita.`)) return;
     await onDeleteClient(client);
     onClose();
   };

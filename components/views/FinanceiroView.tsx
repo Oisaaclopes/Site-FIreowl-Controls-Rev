@@ -1,4 +1,5 @@
 'use client';
+import { showToast } from '@/components/ui/Feedback';
 
 import React, { useState } from 'react';
 import { FinancialTransaction } from '@/lib/types';
@@ -39,7 +40,7 @@ export const FinanceiroView: React.FC<FinanceiroViewProps> = ({ transactions }) 
         </div>
 
         <button
-          onClick={() => alert('DRE exportado em Excel/PDF com sucesso!')}
+          onClick={() => showToast('DRE exportado em Excel/PDF com sucesso!')}
           className="border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5 uppercase"
         >
           <span className="material-symbols-outlined text-base">download</span> Exportar DRE

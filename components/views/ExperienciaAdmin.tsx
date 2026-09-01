@@ -1,4 +1,5 @@
 'use client';
+import { showToast, requestConfirm } from '@/components/ui/Feedback';
 
 import React, { useMemo, useState } from 'react';
 import { EmpresaAtendida, MarcaTecnologia, AutorizacaoMarca } from '@/lib/types';
@@ -92,7 +93,7 @@ export const ExperienciaAdmin: React.FC<Props> = ({ empresas, marcas, onSaveEmpr
   const uploadLogo = async (file: File, slug: string, set: (path: string) => void) => {
     setBusy(true);
     try { const path = await uploadInstitucionalLogo(file, slug); set(path); setPreview(URL.createObjectURL(file)); }
-    catch { alert('Não foi possível enviar o logo.'); }
+    catch { showToast('Não foi possível enviar o logo.'); }
     finally { setBusy(false); }
   };
   const removeLogo = async (path: string | undefined, clear: () => void) => {
@@ -170,7 +171,7 @@ export const ExperienciaAdmin: React.FC<Props> = ({ empresas, marcas, onSaveEmpr
                   </div>
                 </div>
                 <button type="button" onClick={() => { setEmpDraft(e); setPreview(undefined); }} className="text-slate-400 hover:text-[#0B1E38] p-1" title="Editar"><span className="material-symbols-outlined text-base">edit</span></button>
-                <button type="button" onClick={() => { if (confirm(`Excluir "${e.nome}"?`)) onDeleteEmpresa(e.id); }} className="text-slate-400 hover:text-[#E63946] p-1" title="Excluir"><span className="material-symbols-outlined text-base">delete</span></button>
+                <button type="button" onClick={async () => { if (await requestConfirm(`Excluir "${e.nome}"?`)) onDeleteEmpresa(e.id); }} className="text-slate-400 hover:text-[#E63946] p-1" title="Excluir"><span className="material-symbols-outlined text-base">delete</span></button>
               </div>
             ))}
             {empresasOrd.length === 0 && <p className="text-[11px] text-slate-400 italic">Nenhuma empresa cadastrada.</p>}
@@ -220,7 +221,7 @@ export const ExperienciaAdmin: React.FC<Props> = ({ empresas, marcas, onSaveEmpr
                   </div>
                 </div>
                 <button type="button" onClick={() => { setMarDraft(m); setPreview(undefined); }} className="text-slate-400 hover:text-[#0B1E38] p-1" title="Editar"><span className="material-symbols-outlined text-base">edit</span></button>
-                <button type="button" onClick={() => { if (confirm(`Excluir "${m.nome}"?`)) onDeleteMarca(m.id); }} className="text-slate-400 hover:text-[#E63946] p-1" title="Excluir"><span className="material-symbols-outlined text-base">delete</span></button>
+                <button type="button" onClick={async () => { if (await requestConfirm(`Excluir "${m.nome}"?`)) onDeleteMarca(m.id); }} className="text-slate-400 hover:text-[#E63946] p-1" title="Excluir"><span className="material-symbols-outlined text-base">delete</span></button>
               </div>
             ))}
             {marcasOrd.length === 0 && <p className="text-[11px] text-slate-400 italic">Nenhuma marca cadastrada.</p>}

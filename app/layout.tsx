@@ -2,6 +2,7 @@ import type {Metadata, Viewport} from 'next';
 import { Poppins, Roboto, Montserrat } from 'next/font/google';
 import './globals.css'; // Global styles
 import { PwaClient } from '@/components/pwa/PwaClient';
+import { FeedbackProvider } from '@/components/ui/Feedback';
 
 // Títulos/headings: Poppins (amigável, arredondada) — mesma família dos PDFs.
 // Substitui o antigo Oswald (condensado/industrial, aspecto "quadriculado").
@@ -46,7 +47,7 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="pt-BR" className={`${poppins.variable} ${roboto.variable} ${montserrat.variable}`}>
       <body suppressHydrationWarning className="bg-white antialiased text-gray-800">
-        {children}
+        <FeedbackProvider>{children}</FeedbackProvider>
         <PwaClient />
       </body>
     </html>

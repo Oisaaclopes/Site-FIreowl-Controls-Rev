@@ -1,4 +1,5 @@
 'use client';
+import { showToast } from '@/components/ui/Feedback';
 
 import React, { useState } from 'react';
 
@@ -66,7 +67,7 @@ export const TriagemFotos: React.FC<TriagemFotosProps> = ({
   // Ditado por voz via Web Speech API (se suportado pelo navegador)
   const handleVoiceInput = (photoId: string) => {
     if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-      alert('Ditado por voz não suportado neste navegador.');
+      showToast('Ditado por voz não suportado neste navegador.');
       return;
     }
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;

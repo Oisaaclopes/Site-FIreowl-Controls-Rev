@@ -1,4 +1,5 @@
 'use client';
+import { showToast, requestConfirm, requestText } from '@/components/ui/Feedback';
 
 import React, { useState } from 'react';
 import {
@@ -425,17 +426,17 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     setSecaoFonte((f) => ({ ...f, [key]: 'personalizado' }));
     setTextosTouched(true);
   };
-  const restaurarPadraoSecao = (campo: string) => {
+  const restaurarPadraoSecao = async (campo: string) => {
     const r = restaurarSecaoLista(campo as Parameters<typeof restaurarSecaoLista>[0]);
     if (!r) return;
-    if (!window.confirm('Restaurar o texto padrão ATUAL desta seção? O conteúdo atual dela será substituído (apenas esta seção).')) return;
+    if (!await requestConfirm('Restaurar o texto padrão ATUAL desta seção? O conteúdo atual dela será substituído (apenas esta seção).')) return;
     setSecoesTexto((m) => ({ ...m, [campo]: r.valor }));
     setSecaoFonte((f) => ({ ...f, [r.key]: 'padrao' }));
     setTextosTouched(true);
   };
   const marcarServicosPersonalizado = () => { setSecaoFonte((f) => ({ ...f, servicos: 'personalizado' })); setTextosTouched(true); };
-  const restaurarServicos = () => {
-    if (!window.confirm('Restaurar a Descrição dos Serviços para o padrão ATUAL? O conteúdo atual será substituído.')) return;
+  const restaurarServicos = async () => {
+    if (!await requestConfirm('Restaurar a Descrição dos Serviços para o padrão ATUAL? O conteúdo atual será substituído.')) return;
     setServicosOfertados(servicosOfertadosPadrao());
     setSecaoFonte((f) => ({ ...f, servicos: 'padrao' }));
     setTextosTouched(true);
@@ -553,11 +554,11 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     setRespContratante(template.responsabilidadesContratante);
     setGarantia(template.garantia);
     setConclusao(template.conclusao);
-    alert(`Modelo "${template.name}" aplicado ao formulário!`);
+    showToast(`Modelo "${template.name}" aplicado ao formulário!`);
   };
-  const handleSaveCurrentTemplate = () => {
+  const handleSaveCurrentTemplate = async () => {
     if (!onSaveTemplate) return;
-    const name = window.prompt('Nome do modelo favorito:', referencia || 'Modelo comercial');
+    const name = await requestText('Nome do modelo favorito:', referencia || 'Modelo comercial');
     if (!name?.trim()) return;
     onSaveTemplate({
       id: `tmpl_${Date.now()}`,
@@ -573,11 +574,11 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
       garantia,
       conclusao,
     });
-    alert(selectedClient ? `Modelo salvo para ${selectedClient.name}.` : 'Modelo geral salvo.');
+    showToast(selectedClient ? `Modelo salvo para ${selectedClient.name}.` : 'Modelo geral salvo.');
   };
-  const handleRenameTemplate = (template: PedidoTemplate) => {
+  const handleRenameTemplate = async (template: PedidoTemplate) => {
     if (!onSaveTemplate) return;
-    const name = window.prompt('Novo nome do modelo:', template.name);
+    const name = await requestText('Novo nome do modelo:', template.name);
     if (name?.trim()) onSaveTemplate({ ...template, name: name.trim() });
   };
 
@@ -756,12 +757,12 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const handleSaveWithValidation = (targetStatus: PedidoStatus) => {
     if (targetStatus !== 'rascunho') {
       if (!selectedClient) {
-        alert('Selecione o Cliente.');
+        showToast('Selecione o Cliente.');
         setOpen((o) => ({ ...o, pedido: true }));
         return;
       }
       if (effectiveValorTotal <= 0) {
-        alert('O valor total da proposta deve ser maior que zero.');
+        showToast('O valor total da proposta deve ser maior que zero.');
         setOpen((o) => ({ ...o, valor: true }));
         return;
       }
@@ -1223,7 +1224,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             <div className="flex justify-end mb-2">
               <button
                 type="button"
-                onClick={() => { if (window.confirm('Restaurar o texto padrão da Carta de Apresentação?')) { setCartaApresentacao(CARTA_APRESENTACAO.join('\n')); setTextosTouched(true); } }}
+                onClick={async () => { if (await requestConfirm('Restaurar o texto padrão da Carta de Apresentação?')) { setCartaApresentacao(CARTA_APRESENTACAO.join('\n')); setTextosTouched(true); } }}
                 className="text-[10px] font-bold uppercase text-slate-400 hover:text-[#1A1A72] inline-flex items-center gap-1"
               >
                 <span className="material-symbols-outlined text-sm">restart_alt</span>Restaurar padrão
@@ -1512,7 +1513,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                     {(onSaveTemplate || onDeleteTemplate) && (
                       <div className="flex justify-end gap-1">
                         {onSaveTemplate && <button type="button" onClick={() => handleRenameTemplate(tmpl)} className="px-2 py-1 text-[10px] font-semibold text-slate-500 hover:text-[#1A1A72]">Renomear</button>}
-                        {onDeleteTemplate && <button type="button" onClick={() => { if (window.confirm(`Excluir o modelo \"${tmpl.name}\"?`)) onDeleteTemplate(tmpl.id); }} className="p-1 text-slate-400 hover:text-red-600" title="Excluir modelo"><Trash2 className="w-3.5 h-3.5" /></button>}
+                        {onDeleteTemplate && <button type="button" onClick={async () => { if (await requestConfirm(`Excluir o modelo \"${tmpl.name}\"?`)) onDeleteTemplate(tmpl.id); }} className="p-1 text-slate-400 hover:text-red-600" title="Excluir modelo"><Trash2 className="w-3.5 h-3.5" /></button>}
                       </div>
                     )}
                   </div>

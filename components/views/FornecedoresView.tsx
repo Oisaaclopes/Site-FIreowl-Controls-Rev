@@ -1,4 +1,5 @@
 'use client';
+import { showToast, requestConfirm } from '@/components/ui/Feedback';
 
 import React, { useEffect, useState } from 'react';
 import { InventoryItem, Supplier, SupplierProduct, PartnerBrand } from '@/lib/types';
@@ -110,12 +111,12 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
     setNovaMarca('');
     setBrandHint('');
   };
-  const cadastrarNovoFabricante = () => {
+  const cadastrarNovoFabricante = async () => {
     const nome = novaMarca.trim();
     if (!nome || !onAddBrand) return;
     const existing = partnerBrands.find((brand) => normalizeBrand(brand.name) === normalizeBrand(nome));
     if (existing) { setBrandHint(`A marca já existe como “${existing.name}”. Ela foi selecionada.`); setBrands((prev) => prev.includes(existing.name) ? prev : [...prev, existing.name]); return; }
-    if (!window.confirm(`Cadastrar o fabricante “${nome}” no catálogo global?\n\nConfira a grafia antes de continuar para evitar duplicidade.`)) return;
+    if (!await requestConfirm(`Cadastrar o fabricante “${nome}” no catálogo global?\n\nConfira a grafia antes de continuar para evitar duplicidade.`)) return;
     onAddBrand(nome);
     setBrands((prev) => [...prev, nome]);
     setNovaMarca('');
@@ -161,11 +162,11 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
     try {
       const linked = await fetchSupplierProducts(s.id);
       if (linked.length) {
-        if (window.confirm(`Este fornecedor possui ${linked.length} vínculo(s) de produto. Para preservar o histórico, ele será suspenso em vez de excluído. Continuar?`)) onUpdateSupplier?.({ ...s, activeStatus: 'SUSPENSO' });
+        if (await requestConfirm(`Este fornecedor possui ${linked.length} vínculo(s) de produto. Para preservar o histórico, ele será suspenso em vez de excluído. Continuar?`)) onUpdateSupplier?.({ ...s, activeStatus: 'SUSPENSO' });
         return;
       }
     } catch { /* Sem acesso ao vínculo, mantém a confirmação de exclusão normal. */ }
-    if (window.confirm(`Excluir o fornecedor "${s.name}"?\n\nEsta ação não pode ser desfeita.`)) onDeleteSupplier(s.id);
+    if (await requestConfirm(`Excluir o fornecedor "${s.name}"?\n\nEsta ação não pode ser desfeita.`)) onDeleteSupplier(s.id);
   };
 
   const consultCnpj = async () => {
@@ -174,7 +175,7 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
     try {
       const found = await fetchCnpjData(cnpj);
       const summary = [found.razaoSocial && `Razão social: ${found.razaoSocial}`, found.nomeFantasia && `Fantasia: ${found.nomeFantasia}`, found.cidadeUf && `Cidade/UF: ${found.cidadeUf}`].filter(Boolean).join('\n');
-      if (!window.confirm(`Dados encontrados:\n\n${summary}\n\nDeseja preencher os campos disponíveis? Campos já preenchidos serão atualizados somente com esta confirmação.`)) return;
+      if (!await requestConfirm(`Dados encontrados:\n\n${summary}\n\nDeseja preencher os campos disponíveis? Campos já preenchidos serão atualizados somente com esta confirmação.`)) return;
       if (found.razaoSocial) setName(found.razaoSocial);
       if (found.nomeFantasia) setTradeName(found.nomeFantasia);
       if (found.cep) setZipCode(found.cep);
@@ -183,13 +184,13 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
       if (found.telefone) setPhone(found.telefone);
       if (found.cidadeUf) { const [cityValue, ufValue] = found.cidadeUf.split('/'); setCity(cityValue?.trim() || ''); setStateUf(ufValue?.trim() || ''); }
       if (found.cnaeDescricao && !category) setCategory(found.cnaeDescricao);
-    } catch (error) { alert(error instanceof Error ? error.message : 'Não foi possível consultar o CNPJ.'); }
+    } catch (error) { showToast(error instanceof Error ? error.message : 'Não foi possível consultar o CNPJ.'); }
     finally { setConsultingCnpj(false); }
   };
   const uploadLogo = async (file?: File) => {
     if (!file) return;
     try { setLogoPath(await uploadInstitucionalLogo(file, `supplier_${editing?.id || name || Date.now()}`)); }
-    catch { alert('Não foi possível enviar o logo.'); }
+    catch { showToast('Não foi possível enviar o logo.'); }
   };
   const structuredFields = () => ({
     tradeName,
@@ -210,11 +211,11 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
       const saved = await upsertSupplierProduct({ id: existing?.id || `sp_${Date.now()}`, supplierId: editing.id, inventoryItemId: selected.id, supplierCode: selected.code, supplierDescription: selected.name, cost: productCost ? Number(productCost) : undefined, leadTimeDays: productLeadTime ? Number(productLeadTime) : undefined, minimumOrderQty: productMinimumQty ? Number(productMinimumQty) : undefined, active: true });
       setSupplierProducts((items) => [saved, ...items.filter((item) => item.id !== saved.id)]);
       setSelectedProductId(''); setProductQuery(''); setProductCost(''); setProductLeadTime(''); setProductMinimumQty('');
-    } catch { alert('Não foi possível salvar o vínculo do produto. Verifique se a migration 0058 foi aplicada.'); }
+    } catch { showToast('Não foi possível salvar o vínculo do produto. Verifique se a migration 0058 foi aplicada.'); }
   };
   const deactivateProduct = async (product: SupplierProduct) => {
     try { await deactivateSupplierProduct(product.id); setSupplierProducts((items) => items.map((item) => item.id === product.id ? { ...item, active: false } : item)); }
-    catch { alert('Não foi possível desativar o vínculo.'); }
+    catch { showToast('Não foi possível desativar o vínculo.'); }
   };
 
   const handleCreateSupplier = (e?: React.FormEvent) => {

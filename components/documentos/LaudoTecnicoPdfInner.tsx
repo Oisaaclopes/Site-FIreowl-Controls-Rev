@@ -1,4 +1,5 @@
 'use client';
+import { showToast } from '@/components/ui/Feedback';
 
 import React, { useState } from 'react';
 import { PDFViewer, pdf } from '@react-pdf/renderer';
@@ -34,7 +35,7 @@ export default function LaudoTecnicoPdfInner({ pedido, companyProfile, options, 
       setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch (e) {
       console.error('Falha ao gerar o PDF:', e);
-      alert('Não foi possível gerar o PDF. Tente novamente.');
+      showToast('Não foi possível gerar o PDF. Tente novamente.');
     } finally {
       setDownloading(false);
     }

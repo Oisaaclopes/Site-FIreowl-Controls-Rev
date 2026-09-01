@@ -1,4 +1,5 @@
 'use client';
+import { showToast, requestConfirm, requestText } from '@/components/ui/Feedback';
 
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { PedidoOS, SupplyOrder, Client, Pedido, Contract, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem, DocumentosPadrao, DocumentType, FinancialTransaction, RecebimentoProposta, EmpresaAtendida, MarcaTecnologia } from '@/lib/types';
@@ -392,7 +393,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
       else openDocViewer(ped, doc, initialDocOptions());
       return;
     }
-    alert(`O gerador de "${DOCUMENT_TYPE_LABELS[doc]}" entra em uma próxima fase. Por ora, apenas a Proposta comercial é gerada.`);
+    showToast(`O gerador de "${DOCUMENT_TYPE_LABELS[doc]}" entra em uma próxima fase. Por ora, apenas a Proposta comercial é gerada.`);
   };
 
   // Ponto de entrada ao gerar documento: usa o padrão do tipo do pedido; se não
@@ -474,11 +475,11 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   const handleCapaFile = async (file: File | undefined) => {
     if (!file || !pdfConfigPedido) return;
     if (!/^image\/(jpe?g|png)$/i.test(file.type)) {
-      alert('Envie uma imagem JPG ou PNG.');
+      showToast('Envie uma imagem JPG ou PNG.');
       return;
     }
     if (file.size > 8 * 1024 * 1024) {
-      alert('Imagem muito grande (máximo 8 MB).');
+      showToast('Imagem muito grande (máximo 8 MB).');
       return;
     }
     setCapaBusy(true);
@@ -490,7 +491,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
       try {
         const { width, height } = await readImageSize(file);
         if (width < 1000 || width < height) {
-          alert('Dica: para a capa, prefira uma imagem em paisagem e com boa resolução (largura ≥ 1000px). A imagem atual pode ficar pixelizada ou ser cortada.');
+          showToast('Dica: para a capa, prefira uma imagem em paisagem e com boa resolução (largura ≥ 1000px). A imagem atual pode ficar pixelizada ou ser cortada.');
         }
       } catch {
         /* ignore */
@@ -506,7 +507,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
       }
     } catch (e) {
       console.error('Falha ao salvar a imagem da capa:', e);
-      alert('A imagem foi aplicada nesta pré-visualização, mas não pôde ser salva no servidor. Ela não ficará guardada para a próxima vez.');
+      showToast('A imagem foi aplicada nesta pré-visualização, mas não pôde ser salva no servidor. Ela não ficará guardada para a próxima vez.');
     } finally {
       setCapaBusy(false);
       if (capaInputRef.current) capaInputRef.current.value = '';
@@ -656,8 +657,8 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   };
   // Revisão: registra a versão atual no histórico, incrementa o número (-R01,
   // -R02…) e reabre a proposta para edição. Ao salvar, entra no histórico.
-  const handleRevisar = (ped: Pedido) => {
-    const motivo = window.prompt('Motivo da revisão (ex.: ajuste solicitado pelo cliente):', 'Revisão solicitada pelo cliente');
+  const handleRevisar = async (ped: Pedido) => {
+    const motivo = await requestText('Motivo da revisão (ex.: ajuste solicitado pelo cliente):', 'Revisão solicitada pelo cliente');
     if (motivo === null) return;
     const hoje = new Date().toLocaleDateString('pt-BR');
     const entradaAtual = {
@@ -687,21 +688,21 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     setEditingPedido(revisado);
     setIsProposalModalOpen(true);
   };
-  const confirmGenerateOS = (ped: Pedido) => {
+  const confirmGenerateOS = async (ped: Pedido) => {
     const details = [
       `Cliente: ${ped.clienteNome}`,
       `Escopo: ${ped.referencia || 'Não informado'}`,
       `Valor: ${brl(ped.proposal.valorTotal || 0)}`,
       ped.proposal.surveyOrigin?.reportNumber ? `Origem: levantamento ${ped.proposal.surveyOrigin.reportNumber}` : '',
     ].filter(Boolean).join('\n');
-    if (window.confirm(`Confirmar geração da Ordem de Serviço?\n\n${details}\n\nA OS entrará na fila de atendimento de campo.`)) onGenerateOSFromPedido(ped);
+    if (await requestConfirm(`Confirmar geração da Ordem de Serviço?\n\n${details}\n\nA OS entrará na fila de atendimento de campo.`)) onGenerateOSFromPedido(ped);
   };
-  const confirmGenerateContract = (ped: Pedido) => {
-    if (window.confirm(`Criar contrato recorrente a partir desta proposta?\n\nCliente: ${ped.clienteNome}\nEscopo: ${ped.referencia || 'Não informado'}\nValor mensal: ${brl(ped.proposal.valorMensal || ped.proposal.valorTotal || 0)}\nVigência: ${ped.proposal.vigenciaMeses || 12} meses\n\nVocê poderá completar horas, reajuste e dados técnicos na aba Contratos.`)) onGenerateContractFromPedido?.(ped);
+  const confirmGenerateContract = async (ped: Pedido) => {
+    if (await requestConfirm(`Criar contrato recorrente a partir desta proposta?\n\nCliente: ${ped.clienteNome}\nEscopo: ${ped.referencia || 'Não informado'}\nValor mensal: ${brl(ped.proposal.valorMensal || ped.proposal.valorTotal || 0)}\nVigência: ${ped.proposal.vigenciaMeses || 12} meses\n\nVocê poderá completar horas, reajuste e dados técnicos na aba Contratos.`)) onGenerateContractFromPedido?.(ped);
   };
-  const confirmGenerateSupplyOrder = (ped: Pedido) => {
+  const confirmGenerateSupplyOrder = async (ped: Pedido) => {
     const count = ped.proposal.equipmentItems?.length || 0;
-    if (window.confirm(`Criar pedido de fornecimento desta proposta?\n\nCliente: ${ped.clienteNome}\nItens: ${count}\nValor: ${brl(ped.proposal.valorTotal || 0)}\n\nOs itens serão copiados para o pedido interno de fornecimento.`)) onGenerateSupplyOrderFromPedido?.(ped);
+    if (await requestConfirm(`Criar pedido de fornecimento desta proposta?\n\nCliente: ${ped.clienteNome}\nItens: ${count}\nValor: ${brl(ped.proposal.valorTotal || 0)}\n\nOs itens serão copiados para o pedido interno de fornecimento.`)) onGenerateSupplyOrderFromPedido?.(ped);
   };
   // Cria uma nova proposta a partir da estrutura atual, sem reutilizar número,
   // status, recebimento ou histórico de revisões do documento de origem.
@@ -721,9 +722,9 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     setEditingPedido(copy);
     setIsProposalModalOpen(true);
   };
-  const handleDelete = (ped: Pedido) => {
+  const handleDelete = async (ped: Pedido) => {
     if (!onDeletePedido) return;
-    if (window.confirm(`Excluir a proposta ${ped.numeroPedido} de ${ped.clienteNome}? Esta ação não pode ser desfeita.`))
+    if (await requestConfirm(`Excluir a proposta ${ped.numeroPedido} de ${ped.clienteNome}? Esta ação não pode ser desfeita.`))
       onDeletePedido(ped.id);
   };
   const setDefaultStatus = (st: string) => {
@@ -781,7 +782,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
       </body></html>`;
     const w = window.open('', '_blank');
     if (!w) {
-      alert('Permita pop-ups para gerar o relatório.');
+      showToast('Permita pop-ups para gerar o relatório.');
       return;
     }
     w.document.write(html);
@@ -1632,7 +1633,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           options={pdfOptions}
           onClose={() => setPdfPreviewPedido(null)}
           onSendEmail={(ped) => {
-            alert(`Proposta comercial ${ped.numeroPedido} enviada com sucesso para o e-mail do cliente!`);
+            showToast(`Proposta comercial ${ped.numeroPedido} enviada com sucesso para o e-mail do cliente!`);
           }}
         />
       )}

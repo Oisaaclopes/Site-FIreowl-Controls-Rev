@@ -1,4 +1,5 @@
 'use client';
+import { showToast } from '@/components/ui/Feedback';
 
 import React, { useMemo, useState } from 'react';
 import { Pedido, RecebimentoProposta } from '@/lib/types';
@@ -57,7 +58,7 @@ export const ConclusaoModal: React.FC<Props> = ({ pedido, onClose, onConfirm }) 
 
   const confirmar = () => {
     if (valor <= 0) {
-      alert('Informe o valor recebido.');
+      showToast('Informe o valor recebido.');
       return;
     }
     if (forma === 'avista') {

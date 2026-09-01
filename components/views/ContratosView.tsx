@@ -1,4 +1,5 @@
 'use client';
+import { showToast } from '@/components/ui/Feedback';
 
 import React, { useState } from 'react';
 import QRCode from 'qrcode';
@@ -281,7 +282,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
       </body></html>`;
     const w = window.open('', '_blank');
     if (!w) {
-      alert('Permita pop-ups para gerar o documento.');
+      showToast('Permita pop-ups para gerar o documento.');
       return;
     }
     w.document.write(html);

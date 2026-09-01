@@ -20,7 +20,7 @@ import {
 } from '@/lib/homologacao';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
 import { Toggle, SidePanel } from '@/components/SidePanel';
-import { useToast, useConfirm } from '@/components/ui/Feedback';
+import { useToast, useConfirm, showToast, requestText } from '@/components/ui/Feedback';
 import {
   listUsers,
   createUser,
@@ -185,7 +185,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
       await aprovarClienteProvisorio(c.id);
       await loadHomologacao();
     } catch {
-      alert('Falha ao aprovar cliente.');
+      showToast('Falha ao aprovar cliente.');
     } finally {
       setHomolBusy(null);
     }
@@ -200,7 +200,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
       setMergeOficialId('');
       await loadHomologacao();
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Falha ao mesclar cliente.');
+      showToast(e instanceof Error ? e.message : 'Falha ao mesclar cliente.');
     } finally {
       setHomolBusy(null);
     }
@@ -214,41 +214,41 @@ export const ContaView: React.FC<ContaViewProps> = ({
       await atualizarCatalogoProvisorio(m.id, { status: 'aprovado' });
       await loadHomologacao();
     } catch {
-      alert('Falha ao homologar marca.');
+      showToast('Falha ao homologar marca.');
     } finally {
       setHomolBusy(null);
     }
   };
 
   const precificarItem = async (it: CatalogoProvisorio) => {
-    const entrada = prompt('Preço de venda do item (R$):');
+    const entrada = await requestText('Preço de venda do item (R$):');
     if (entrada == null) return;
     const val = Number(entrada.replace(',', '.'));
     if (!isFinite(val) || val < 0) {
-      alert('Preço inválido.');
+      showToast('Preço inválido.');
       return;
     }
     setHomolBusy(it.id);
     try {
       const novo = await precificarComoEstoque(it, val);
       await loadHomologacao();
-      alert(`Item cadastrado no Estoque (código ${novo.code}) com preço de R$ ${val.toFixed(2)}.`);
+      showToast(`Item cadastrado no Estoque (código ${novo.code}) com preço de R$ ${val.toFixed(2)}.`);
     } catch {
-      alert('Falha ao precificar item.');
+      showToast('Falha ao precificar item.');
     } finally {
       setHomolBusy(null);
     }
   };
 
   const mesclarItem = async (it: CatalogoProvisorio) => {
-    const alvo = prompt('Item oficial do Estoque/Serviços para mesclar (código ou nome):');
+    const alvo = await requestText('Item oficial do Estoque/Serviços para mesclar (código ou nome):');
     if (!alvo) return;
     setHomolBusy(it.id);
     try {
       await atualizarCatalogoProvisorio(it.id, { status: 'mesclado', registroFinalId: alvo.trim() });
       await loadHomologacao();
     } catch {
-      alert('Falha ao mesclar item.');
+      showToast('Falha ao mesclar item.');
     } finally {
       setHomolBusy(null);
     }
@@ -572,7 +572,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
       const path = await uploadPropostaCapa(file, `_areas_${id}`);
       setProfile((prev) => ({ ...prev, capaAreas: { ...(prev.capaAreas || {}), [id]: path } }));
     } catch {
-      alert('Não foi possível enviar a imagem. Verifique a conexão com o Supabase.');
+      showToast('Não foi possível enviar a imagem. Verifique a conexão com o Supabase.');
     } finally {
       setCapaBusy(null);
     }
@@ -597,7 +597,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
       setProfile((prev) => ({ ...prev, [field]: path }));
       setLogoPreview((prev) => ({ ...prev, [field as string]: URL.createObjectURL(file) }));
     } catch {
-      alert('Não foi possível enviar o logo. Verifique a conexão com o Supabase.');
+      showToast('Não foi possível enviar o logo. Verifique a conexão com o Supabase.');
     } finally {
       setLogoBusy(null);
     }
@@ -635,7 +635,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
   const handleSaveCompanyProfile = (e: React.FormEvent) => {
     e.preventDefault();
     onUpdateCompanyProfile(profile);
-    alert('Dados da Empresa atualizados com sucesso!');
+    showToast('Dados da Empresa atualizados com sucesso!');
   };
 
   const handleCreateBrand = (e: React.FormEvent) => {

@@ -5,7 +5,7 @@ import { Client, OrdemServico, OrdemServicoStatus, Pendencia, PendenciaStatus, U
 import { updatePendenciaStatus } from '@/lib/pendencias';
 import { createOrdemServico, fetchOrdensServico, nextOsNumero } from '@/lib/ordensServico';
 import { fetchAssignableTechnicians, ManagedUser } from '@/lib/users';
-import { useToast } from '@/components/ui/Feedback';
+import { useToast, showToast } from '@/components/ui/Feedback';
 
 interface PendenciasBoardProps {
   pendencias: Pendencia[];
@@ -115,7 +115,7 @@ export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, cl
       onChanged();
     } catch (err) {
       console.error('Falha ao mudar status da pendência:', err);
-      alert('Não foi possível alterar o status.');
+      showToast('Não foi possível alterar o status.');
     } finally {
       setBusyId(null);
     }

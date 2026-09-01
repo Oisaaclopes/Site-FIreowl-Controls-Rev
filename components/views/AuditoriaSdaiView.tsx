@@ -1,4 +1,5 @@
 'use client';
+import { showToast } from '@/components/ui/Feedback';
 
 import React, { useState } from 'react';
 import { AuditSDAI } from '@/lib/types';
@@ -118,7 +119,7 @@ export const AuditoriaSdaiView: React.FC<AuditoriaSdaiViewProps> = ({ audit }) =
             <div className="flex gap-2">
               <button
                 onClick={() => {
-                  alert('Plano de Ação NBR 17240 exportado em PDF com sucesso!');
+                  showToast('Plano de Ação NBR 17240 exportado em PDF com sucesso!');
                   setShowModal(false);
                 }}
                 className="flex-1 bg-[#E63946] hover:bg-[#a51515] text-white font-semibold py-2.5 rounded-lg text-xs uppercase transition-colors"

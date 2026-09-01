@@ -1,4 +1,5 @@
 'use client';
+import { showToast } from '@/components/ui/Feedback';
 
 import React, { useState } from 'react';
 import { FinancialTransaction } from '@/lib/types';
@@ -85,7 +86,7 @@ export const FinancasView: React.FC<FinancasViewProps> = ({ transactions }) => {
 
     const w = window.open('', '_blank');
     if (!w) {
-      alert('Permita pop-ups para gerar o DRE.');
+      showToast('Permita pop-ups para gerar o DRE.');
       return;
     }
     w.document.write(html);

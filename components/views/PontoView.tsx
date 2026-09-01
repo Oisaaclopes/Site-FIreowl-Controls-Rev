@@ -1,4 +1,5 @@
 'use client';
+import { showToast, requestConfirm } from '@/components/ui/Feedback';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { TimePunch, UserRole } from '@/lib/types';
@@ -392,11 +393,11 @@ export const PontoView: React.FC<PontoViewProps> = ({
         setLocating(false);
         registerPunch(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
       },
-      (err) => {
+      async (err) => {
         setLocating(false);
         console.warn('GPS indisponível:', err);
         if (err.code === err.PERMISSION_DENIED) {
-          const ok = window.confirm(
+          const ok = await requestConfirm(
             'Permissão de localização negada.\n\nPara registrar com GPS, permita a localização no navegador.\n\nDeseja registrar o ponto MESMO ASSIM (sem localização)?'
           );
           if (!ok) return;
@@ -467,7 +468,7 @@ export const PontoView: React.FC<PontoViewProps> = ({
       loadAdjustments();
     } catch (err) {
       console.error('Falha ao enviar solicitação de ajuste:', err);
-      alert('Não foi possível enviar a solicitação.');
+      showToast('Não foi possível enviar a solicitação.');
     } finally {
       setAdjSaving(false);
     }
@@ -494,13 +495,13 @@ export const PontoView: React.FC<PontoViewProps> = ({
               atMs,
             });
           } else {
-            alert(
+            showToast(
               'Solicitação aprovada, mas não foi possível criar a batida automaticamente (funcionário sem vínculo de usuário). Ajuste manualmente se necessário.'
             );
           }
         }
       } else if (status === 'APROVADO' && !a.requestedTime) {
-        alert('Aprovado. Como a solicitação não informou o horário, nenhuma batida foi criada automaticamente.');
+        showToast('Aprovado. Como a solicitação não informou o horário, nenhuma batida foi criada automaticamente.');
       }
 
       await updateAdjustmentStatus(a.id, status);
@@ -508,7 +509,7 @@ export const PontoView: React.FC<PontoViewProps> = ({
       if (status === 'APROVADO') await onReloadPunches?.();
     } catch (err) {
       console.error('Falha ao revisar solicitação:', err);
-      alert('Não foi possível atualizar a solicitação. Verifique se as migrações do ponto foram aplicadas.');
+      showToast('Não foi possível atualizar a solicitação. Verifique se as migrações do ponto foram aplicadas.');
     } finally {
       setAdjBusy(null);
     }
@@ -543,26 +544,26 @@ export const PontoView: React.FC<PontoViewProps> = ({
       loadDayData();
     } catch (err) {
       console.error('Falha ao salvar ocorrência do dia:', err);
-      alert('Não foi possível salvar a ocorrência.');
+      showToast('Não foi possível salvar a ocorrência.');
     } finally {
       setDaySaving(false);
     }
   };
   const removeDayEntry = async (id: string) => {
-    if (!window.confirm('Remover esta ocorrência?')) return;
+    if (!await requestConfirm('Remover esta ocorrência?')) return;
     try {
       await deleteDayEntry(id);
       setDayEntries((prev) => prev.filter((x) => x.id !== id));
     } catch (err) {
       console.error('Falha ao remover ocorrência:', err);
-      alert('Não foi possível remover.');
+      showToast('Não foi possível remover.');
     }
   };
   const openCertificate = async (path: string) => {
     try {
       window.open(await signedDocUrl(path), '_blank');
     } catch {
-      alert('Não foi possível abrir o atestado.');
+      showToast('Não foi possível abrir o atestado.');
     }
   };
   const dayKindColor = (k: DayEntryKind) =>

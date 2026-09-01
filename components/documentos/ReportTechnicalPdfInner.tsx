@@ -1,4 +1,5 @@
 'use client';
+import { showToast } from '@/components/ui/Feedback';
 
 import React, { useEffect, useState } from 'react';
 import { PDFViewer, pdf } from '@react-pdf/renderer';
@@ -69,7 +70,7 @@ export default function ReportTechnicalPdfInner({ report, cliente, companyProfil
       setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch (e) {
       console.error('Falha ao gerar o PDF do relatório:', e);
-      alert('Não foi possível gerar o PDF. Tente a versão de impressão.');
+      showToast('Não foi possível gerar o PDF. Tente a versão de impressão.');
     } finally {
       setDownloading(false);
     }

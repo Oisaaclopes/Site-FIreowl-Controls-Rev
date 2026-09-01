@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next dev",
-    "lint": "eslint .",
+    "lint": "npm run check:native-dialogs && eslint .",
+    "check:native-dialogs": "node scripts/check-native-dialogs.mjs",
     "clean": "next clean",
     "test": "vitest run"
   },

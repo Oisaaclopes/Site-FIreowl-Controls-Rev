@@ -26,7 +26,7 @@ import { fetchPendencias, updatePendenciaStatus } from '@/lib/pendencias';
 import { fetchDevices } from '@/lib/devices';
 import { fetchOrdensServico, updateOrdemServico } from '@/lib/ordensServico';
 import { fetchAssignableTechnicians, ManagedUser } from '@/lib/users';
-import { useToast, useConfirm } from '@/components/ui/Feedback';
+import { useToast, useConfirm, showToast, requestConfirm } from '@/components/ui/Feedback';
 import { ClientSelector } from '@/components/clients/ClientSelector';
 import { fetchCicloAtivo, quotaPorVisita } from '@/lib/ciclos';
 import { flushOutbox, pendingCount, isOnline } from '@/lib/offline/reportSync';
@@ -237,13 +237,13 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       const warning = result.warnings.length
         ? `\n\nRevise antes de enviar:\n• ${result.warnings.join('\n• ')}`
         : '';
-      alert(result.alreadyExists
+      showToast(result.alreadyExists
         ? `Este levantamento já está vinculado ao Pedido ${result.pedido.numeroPedido}.`
         : `Pedido ${result.pedido.numeroPedido} criado como rascunho.${warning}`);
       refresh();
     } catch (error) {
       console.error('Falha ao criar pedido a partir do levantamento:', error);
-      alert(error instanceof Error ? error.message : 'Não foi possível criar o Pedido.');
+      showToast(error instanceof Error ? error.message : 'Não foi possível criar o Pedido.');
     } finally {
       setCreatingOrderFromReport(null);
     }
@@ -303,7 +303,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     setProvNome('');
     setProvCnpj('');
     setProvCnpjErr('');
-    alert(`Cliente provisório "${nome}" cadastrado com sucesso! Selecionado para este relatório.`);
+    showToast(`Cliente provisório "${nome}" cadastrado com sucesso! Selecionado para este relatório.`);
   };
 
   // Config do formulário aberto
@@ -362,7 +362,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       setPpDone(nome);
     } catch (err) {
       console.error('Falha ao salvar produto provisório no Estoque:', err);
-      alert('Não foi possível enviar o produto ao Estoque. Tente novamente.');
+      showToast('Não foi possível enviar o produto ao Estoque. Tente novamente.');
     } finally {
       setPpSaving(false);
     }
@@ -394,9 +394,9 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 
   // Marcas removíveis (as que têm id, ou seja, vindas do catálogo de marcas).
   const removableBrands = (brands || []).filter((b): b is { id: string; name: string; category?: string } => !!b.id);
-  const handleRemoveBrand = (id: string, nome: string) => {
+  const handleRemoveBrand = async (id: string, nome: string) => {
     if (!onDeletePartnerBrand) return;
-    if (!window.confirm(`Remover a marca "${nome}" do catálogo?`)) return;
+    if (!await requestConfirm(`Remover a marca "${nome}" do catálogo?`)) return;
     onDeletePartnerBrand(id);
   };
 
@@ -432,21 +432,30 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       setEditRep(null);
     } catch (e) {
       console.error('Falha ao atualizar relatório:', e);
-      alert('Não foi possível salvar as alterações do relatório.');
+      showToast('Não foi possível salvar as alterações do relatório.');
     } finally {
       setErSaving(false);
     }
   };
 
   const handleDeleteReport = async (r: ReportInstance) => {
-    if (!window.confirm(`Excluir o relatório ${r.numero || shortId(r.id)}?\n\nEsta ação não pode ser desfeita.`)) return;
-    try {
-      if (isSupabaseConfigured()) await deleteReport(r.id);
-      setReports((prev) => prev.filter((x) => x.id !== r.id));
-    } catch (e) {
-      console.error('Falha ao excluir relatório:', e);
-      alert('Não foi possível excluir o relatório. Tente novamente.');
-    }
+    const numero = r.numero || shortId(r.id);
+    await requestConfirm({
+      title: 'Excluir relatório?',
+      message: `${numero}\n${clientName(r.clienteId)}\n${TIPO_LABEL[r.tipo] || r.tipo}\n\nEste relatório e seus dados associados serão excluídos conforme as regras atuais do sistema.\n\nEsta ação não pode ser desfeita.`,
+      confirmLabel: 'Excluir relatório',
+      danger: true,
+      action: async () => {
+        try {
+          if (isSupabaseConfigured()) await deleteReport(r.id);
+          setReports((prev) => prev.filter((x) => x.id !== r.id));
+          showToast('Relatório excluído com sucesso.', 'success');
+        } catch (e) {
+          console.error('Falha ao excluir relatório:', e);
+          showToast('Não foi possível excluir o relatório. Tente novamente.', 'error');
+        }
+      },
+    });
   };
 
   const confirmBrand = async () => {
@@ -467,7 +476,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       setBDone(existe ? `${nome} (já estava cadastrada)` : nome);
     } catch (err) {
       console.error('Falha ao cadastrar a marca:', err);
-      alert('Não foi possível cadastrar a marca. Tente novamente.');
+      showToast('Não foi possível cadastrar a marca. Tente novamente.');
     } finally {
       setBSaving(false);
     }
@@ -729,7 +738,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 
   const iniciarAtendimentoDaOs = (os: OrdemServico) => {
     if (!os.clienteId) {
-      alert('Esta OS não possui cliente vinculado. Complete o cadastro antes de iniciar o atendimento.');
+      showToast('Esta OS não possui cliente vinculado. Complete o cadastro antes de iniciar o atendimento.');
       return;
     }
     // OSs legadas ainda não possuem área própria. Inferimos pelo título apenas
@@ -1109,7 +1118,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
             setReportPreview(null);
             gerarPdfExecucao(r, clientName(r.clienteId), userRole).catch((e) => {
               console.error(e);
-              alert('Falha ao gerar o PDF.');
+              showToast('Falha ao gerar o PDF.');
             });
           }}
         />

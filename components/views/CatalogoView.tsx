@@ -1,4 +1,5 @@
 'use client';
+import { requestConfirm } from '@/components/ui/Feedback';
 import React, { useEffect, useMemo, useState } from 'react';
 import type { InventoryItem, UserRole, Supplier } from '@/lib/types';
 import { isSupabaseConfigured, insertStockMovement } from '@/lib/inventory';
@@ -148,7 +149,7 @@ export function CatalogoView({ inventory, inventoryLoading = false, userRole, su
     if (item.id) await onUpdateInventoryItem?.(item); else await onAddInventoryItem?.(item);
   };
   const handleDeleteProduct = async (item: InventoryItem) => {
-    if (typeof window !== 'undefined' && !window.confirm(`Excluir "${item.model || item.name}"? Esta ação não pode ser desfeita.`)) return;
+    if (typeof window !== 'undefined' && !await requestConfirm(`Excluir "${item.model || item.name}"? Esta ação não pode ser desfeita.`)) return;
     await onDeleteInventoryItem?.(item.id);
     setSelectedItem(null);
   };

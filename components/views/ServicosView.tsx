@@ -1,4 +1,5 @@
 'use client';
+import { requestConfirm } from '@/components/ui/Feedback';
 
 import React, { useState } from 'react';
 import { ServiceCatalogItem } from '@/lib/types';
@@ -23,9 +24,9 @@ export const ServicosView: React.FC<ServicosViewProps> = ({
   // Edição de serviço do catálogo
   const [editService, setEditService] = useState<ServiceCatalogItem | null>(null);
 
-  const handleDeleteService = (svc: ServiceCatalogItem) => {
+  const handleDeleteService = async (svc: ServiceCatalogItem) => {
     if (!onDeleteService) return;
-    if (!window.confirm(`Excluir o serviço "${svc.title}"?\n\nEsta ação não pode ser desfeita.`)) return;
+    if (!await requestConfirm(`Excluir o serviço "${svc.title}"?\n\nEsta ação não pode ser desfeita.`)) return;
     onDeleteService(svc.id);
   };
 

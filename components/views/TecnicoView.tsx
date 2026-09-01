@@ -1,4 +1,5 @@
 'use client';
+import { showToast } from '@/components/ui/Feedback';
 
 import React, { useState } from 'react';
 import { TechnicalReportSDAI } from '@/lib/types';
@@ -42,7 +43,7 @@ export const TecnicoView: React.FC<TecnicoViewProps> = ({
     };
     setCurrentReport(updated);
     if (onUpdateReport) onUpdateReport(updated);
-    alert('Relatório Técnico SDAI salvo com sucesso!');
+    showToast('Relatório Técnico SDAI salvo com sucesso!');
   };
 
   return (

@@ -1,3 +1,4 @@
+import { showToast } from '@/components/ui/Feedback';
 import { PropostaPublica, assertSemVazamento } from './proposta';
 
 /* Cores da spec (10.7) */
@@ -149,7 +150,7 @@ export function gerarPdfProposta(p: PropostaPublica, opts?: { mascararValor?: bo
 
   const w = window.open('', '_blank');
   if (!w) {
-    alert('Permita pop-ups para gerar a proposta.');
+    showToast('Permita pop-ups para gerar a proposta.');
     return;
   }
   w.document.write(html);

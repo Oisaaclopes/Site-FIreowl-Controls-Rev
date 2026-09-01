@@ -1,3 +1,4 @@
+import { showToast } from '@/components/ui/Feedback';
 import { ReportInstance, UserRole, Pendencia } from './types';
 import { fetchAnswers, fetchBandeja } from './reports';
 import { fetchSignatures } from './signatures';
@@ -236,7 +237,7 @@ export async function gerarPdfExecucao(
 
   const w = window.open('', '_blank');
   if (!w) {
-    alert('Permita pop-ups para gerar o PDF.');
+    showToast('Permita pop-ups para gerar o PDF.');
     return;
   }
   w.document.write(html);

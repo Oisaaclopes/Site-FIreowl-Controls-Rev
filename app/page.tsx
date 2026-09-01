@@ -1,4 +1,5 @@
 'use client';
+import { showToast } from '@/components/ui/Feedback';
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -1442,7 +1443,7 @@ export default function Home() {
   const handleSimulatorSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!quoteFormData.name || !quoteFormData.email || !quoteFormData.company) {
-      alert('Por favor, preencha nome, e-mail e empresa para ver a estimativa.');
+      showToast('Por favor, preencha nome, e-mail e empresa para ver a estimativa.');
       return;
     }
     setSimulatorSubmitted(true);
@@ -2950,7 +2951,7 @@ export default function Home() {
                       </a>
                       <button
                         onClick={() => {
-                          alert('Planta e escopo do e-mail reenviados com sucesso no canal B2B!');
+                          showToast('Planta e escopo do e-mail reenviados com sucesso no canal B2B!');
                         }}
                         className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-3.5 px-4 rounded-xl text-xs uppercase tracking-wider text-center"
                       >

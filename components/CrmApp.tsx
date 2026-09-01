@@ -1,4 +1,5 @@
 'use client';
+import { showToast } from '@/components/ui/Feedback';
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
@@ -10,7 +11,6 @@ import { isHomeEligibleEntry } from '@/lib/modules';
 import { setOutboxOwner } from '@/lib/offline/outbox';
 import { AuthModal } from '@/components/AuthModal';
 import { PrivacyProvider } from '@/lib/privacy';
-import { FeedbackProvider } from '@/components/ui/Feedback';
 import {
   fetchInventory,
   insertInventoryItem,
@@ -433,7 +433,7 @@ export function CrmApp({
         return;
       } catch (err) {
         console.error('Falha ao salvar proposta no Supabase:', err);
-        alert('Não foi possível salvar a proposta no banco. Salva apenas nesta sessão.');
+        showToast('Não foi possível salvar a proposta no banco. Salva apenas nesta sessão.');
       }
     }
     upsertPedidoLocal(savedPedido);
@@ -463,7 +463,7 @@ export function CrmApp({
         await deletePedido(pedidoId);
       } catch (err) {
         console.error('Falha ao excluir proposta:', err);
-        alert('Não foi possível excluir a proposta no banco.');
+        showToast('Não foi possível excluir a proposta no banco.');
       }
     }
     logAction('Exclusão de Proposta', 'Pedidos CRM', `Removida proposta ${ped?.numeroPedido || pedidoId}`);
@@ -508,10 +508,10 @@ export function CrmApp({
         });
       } catch (error) {
         console.error('Falha ao persistir OS operacional:', error);
-        alert('A OS foi criada na sessão comercial, mas não pôde ser enviada para a fila de campo.');
+        showToast('A OS foi criada na sessão comercial, mas não pôde ser enviada para a fila de campo.');
       }
     }
-    alert(`Ordem de Serviço (${newOS.id}) gerada com sucesso a partir da Proposta ${pedido.numeroPedido}!`);
+    showToast(`Ordem de Serviço (${newOS.id}) gerada com sucesso a partir da Proposta ${pedido.numeroPedido}!`);
     setCurrentTab('pedidos');
   };
 
@@ -521,7 +521,7 @@ export function CrmApp({
     if (isSupabaseConfigured()) {
       upsertCompanyProfile(cp).catch((err) => {
         console.error('Falha ao salvar o perfil da empresa no Supabase:', err);
-        alert('Não foi possível salvar o perfil da empresa no banco. Salvo apenas nesta sessão.');
+        showToast('Não foi possível salvar o perfil da empresa no banco. Salvo apenas nesta sessão.');
       });
     }
   };
@@ -532,7 +532,7 @@ export function CrmApp({
     if (isSupabaseConfigured()) {
       upsertEmpresaAtendida(e)
         .then((saved) => setEmpresasAtendidas((prev) => prev.map((x) => (x.id === saved.id ? saved : x))))
-        .catch((err) => { console.error('Empresa atendida: falha ao salvar.', err); alert('Não foi possível salvar a empresa no banco. Salva apenas nesta sessão.'); });
+        .catch((err) => { console.error('Empresa atendida: falha ao salvar.', err); showToast('Não foi possível salvar a empresa no banco. Salva apenas nesta sessão.'); });
     }
   };
   const handleDeleteEmpresaAtendida = (id: string) => {
@@ -544,7 +544,7 @@ export function CrmApp({
     if (isSupabaseConfigured()) {
       upsertMarcaTecnologia(m)
         .then((saved) => setMarcasTecnologias((prev) => prev.map((x) => (x.id === saved.id ? saved : x))))
-        .catch((err) => { console.error('Marca/tecnologia: falha ao salvar.', err); alert('Não foi possível salvar a marca no banco. Salva apenas nesta sessão.'); });
+        .catch((err) => { console.error('Marca/tecnologia: falha ao salvar.', err); showToast('Não foi possível salvar a marca no banco. Salva apenas nesta sessão.'); });
     }
   };
   const handleDeleteMarcaTecnologia = (id: string) => {
@@ -587,7 +587,7 @@ export function CrmApp({
         setClients((prev) => prev.map((x) => (x.id === saved.id ? saved : x)));
       } catch (err) {
         console.error('Falha ao salvar cliente no Supabase:', err);
-        alert('Não foi possível salvar o cliente no banco. Salvo apenas nesta sessão.');
+        showToast('Não foi possível salvar o cliente no banco. Salvo apenas nesta sessão.');
       }
     }
   };
@@ -616,7 +616,7 @@ export function CrmApp({
       artDocumentRef: `ORIG-${pedido.numeroPedido}`,
       sourcePedidoId: pedido.id,
     });
-    alert(`Contrato criado a partir da proposta ${pedido.numeroPedido}. Confira vigência, horas e dados técnicos na aba Contratos.`);
+    showToast(`Contrato criado a partir da proposta ${pedido.numeroPedido}. Confira vigência, horas e dados técnicos na aba Contratos.`);
   };
   const handleGenerateSupplyOrderFromPedido = async (pedido: Pedido) => {
     if (supplyOrders.some((order) => order.sourcePedidoId === pedido.id)) return;
@@ -629,11 +629,11 @@ export function CrmApp({
       } catch (error) {
         setSupplyOrders((orders) => orders.filter((item) => item.id !== order.id));
         console.error('Falha ao salvar pedido de fornecimento:', error);
-        alert('Não foi possível criar o pedido de fornecimento no Supabase.');
+        showToast('Não foi possível criar o pedido de fornecimento no Supabase.');
         return;
       }
     }
-    alert(`Pedido de fornecimento ${order.id} criado. Os itens e valores foram copiados da proposta.`);
+    showToast(`Pedido de fornecimento ${order.id} criado. Os itens e valores foram copiados da proposta.`);
   };
   const handleUpdateSupplyOrder = async (order: SupplyOrder) => {
     const previous = supplyOrders;
@@ -642,7 +642,7 @@ export function CrmApp({
     try {
       const stored = await updateSupplyOrder(order);
       setSupplyOrders((orders) => orders.map((item) => item.id === stored.id ? stored : item));
-    } catch (error) { setSupplyOrders(previous); console.error('Falha ao atualizar pedido de fornecimento:', error); alert('Não foi possível atualizar o pedido de fornecimento.'); }
+    } catch (error) { setSupplyOrders(previous); console.error('Falha ao atualizar pedido de fornecimento:', error); showToast('Não foi possível atualizar o pedido de fornecimento.'); }
   };
   // Novo fluxo (0052/0053): após a entrada segura do recebimento, recarrega
   // estoque e pedidos de fornecimento do banco (fonte de verdade).
@@ -661,9 +661,9 @@ export function CrmApp({
   const handleReceiveSupplyOrderIntoStock = async (order: SupplyOrder) => {
     if (order.stockReceivedAt) return;
     const items = order.items.filter((item) => item.tipo !== 'servico' && item.vinculoEstoqueId);
-    if (!items.length) { alert('Este pedido não possui materiais vinculados ao Estoque. Vincule os itens na proposta antes de dar entrada.'); return; }
+    if (!items.length) { showToast('Este pedido não possui materiais vinculados ao Estoque. Vincule os itens na proposta antes de dar entrada.'); return; }
     const updates = items.map((item) => ({ item, inventoryItem: inventory.find((stock) => stock.id === item.vinculoEstoqueId) })).filter((entry): entry is { item: typeof items[number]; inventoryItem: InventoryItem } => !!entry.inventoryItem);
-    if (!updates.length) { alert('Não encontrei no Estoque os itens vinculados a este pedido.'); return; }
+    if (!updates.length) { showToast('Não encontrei no Estoque os itens vinculados a este pedido.'); return; }
     const receivedAt = new Date().toISOString();
     try {
       for (const { item, inventoryItem } of updates) {
@@ -680,8 +680,8 @@ export function CrmApp({
         setSupplyOrders((orders) => orders.map((current) => current.id === savedOrder.id ? savedOrder : current));
       } else setSupplyOrders((orders) => orders.map((current) => current.id === completed.id ? completed : current));
       const missing = items.length - updates.length;
-      alert(`Entrada de estoque concluída para ${updates.length} item(ns).${missing ? ` ${missing} item(ns) não estavam vinculados e não foram movimentados.` : ''}`);
-    } catch (error) { console.error('Falha ao receber fornecimento no estoque:', error); alert('Não foi possível concluir a entrada no estoque. Nenhuma nova tentativa deve ser feita antes de conferir os saldos.'); }
+      showToast(`Entrada de estoque concluída para ${updates.length} item(ns).${missing ? ` ${missing} item(ns) não estavam vinculados e não foram movimentados.` : ''}`);
+    } catch (error) { console.error('Falha ao receber fornecimento no estoque:', error); showToast('Não foi possível concluir a entrada no estoque. Nenhuma nova tentativa deve ser feita antes de conferir os saldos.'); }
   };
 
   const handleDeleteClient = async (client: Client) => {
@@ -693,7 +693,7 @@ export function CrmApp({
     } catch (err) {
       console.error('Falha ao excluir cliente no Supabase:', err);
       setClients((prev) => [client, ...prev]);
-      alert('Não foi possível excluir o cliente no banco. O cadastro foi restaurado.');
+      showToast('Não foi possível excluir o cliente no banco. O cadastro foi restaurado.');
     }
   };
 
@@ -714,7 +714,7 @@ export function CrmApp({
         setContracts((prev) => prev.map((x) => (x.id === saved.id ? saved : x)));
       } catch (err) {
         console.error('Falha ao salvar contrato no Supabase:', err);
-        alert('Não foi possível salvar o contrato no banco. Salvo apenas nesta sessão.');
+        showToast('Não foi possível salvar o contrato no banco. Salvo apenas nesta sessão.');
       }
     }
   };
@@ -728,7 +728,7 @@ export function CrmApp({
         setTransactions((prev) => prev.map((t) => (t.id === saved.id ? saved : t)));
       } catch (err) {
         console.error('Falha ao salvar lançamento no Supabase:', err);
-        alert('Não foi possível salvar o lançamento no banco. Salvo apenas nesta sessão.');
+        showToast('Não foi possível salvar o lançamento no banco. Salvo apenas nesta sessão.');
       }
     }
   };
@@ -814,7 +814,7 @@ export function CrmApp({
         'Estoque',
         `Item ${newItem.code} - ${newItem.name} adicionado apenas localmente (não persistido)`
       );
-      alert(
+      showToast(
         'Não foi possível salvar no banco de dados (Supabase).\n\n' +
           'O item foi adicionado apenas nesta sessão. Verifique se a tabela ' +
           '"inventory_items" foi criada no Supabase (script lib/db/migrations/0002_inventory_items.sql).'
@@ -849,7 +849,7 @@ export function CrmApp({
     } catch (err) {
       console.error('Falha ao atualizar o item no Supabase:', err);
       setInventory((prev) => prev.map((i) => (i.id === item.id ? item : i)));
-      alert('Não foi possível atualizar o item no banco de dados (Supabase). A alteração vale só nesta sessão.');
+      showToast('Não foi possível atualizar o item no banco de dados (Supabase). A alteração vale só nesta sessão.');
     }
   };
 
@@ -866,7 +866,7 @@ export function CrmApp({
       logAction('Exclusão de Item', 'Estoque', `Item ${target?.code || id} removido`);
     } catch (err) {
       console.error('Falha ao excluir o item no Supabase:', err);
-      alert('Não foi possível excluir o item no banco de dados (Supabase). Tente novamente.');
+      showToast('Não foi possível excluir o item no banco de dados (Supabase). Tente novamente.');
     }
   };
 
@@ -934,7 +934,7 @@ export function CrmApp({
         return;
       } catch (err) {
         console.error('Falha ao salvar orçamento no Supabase:', err);
-        alert('Não foi possível salvar o orçamento no banco. Salvo apenas nesta sessão.');
+        showToast('Não foi possível salvar o orçamento no banco. Salvo apenas nesta sessão.');
       }
     }
     setQuotes((prev) => [newQuote, ...prev]);
@@ -1047,7 +1047,6 @@ export function CrmApp({
 
   return (
     <PrivacyProvider>
-    <FeedbackProvider>
     <div className="min-h-screen bg-slate-50 font-body-md text-[#131c28]">
       {/* Sidebar Navigation (off-canvas no mobile, fixa no desktop) */}
       <Sidebar
@@ -1331,7 +1330,6 @@ export function CrmApp({
         onSelectRole={setUserRole}
       />
     </div>
-    </FeedbackProvider>
     </PrivacyProvider>
   );
 }

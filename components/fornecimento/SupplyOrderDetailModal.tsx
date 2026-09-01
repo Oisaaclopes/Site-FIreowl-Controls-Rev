@@ -1,4 +1,5 @@
 'use client';
+import { requestConfirm } from '@/components/ui/Feedback';
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { SupplyOrder, InventoryItem, UserRole, SupplyPurchase, SupplyReceipt, SupplyReceiptItem } from '@/lib/types';
@@ -200,7 +201,7 @@ export const SupplyOrderDetailModal: React.FC<Props> = ({ order: orderProp, inve
               {primaria()}
               {(userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR') && statusDerivado !== 'CANCELADO' && statusDerivado !== 'CONCLUIDO' && (
                 <button
-                  onClick={() => { if (window.confirm('Cancelar este fornecimento? Compras, recebimentos e movimentações de estoque já feitos são preservados.')) { const upd = { ...order, status: 'CANCELADO' as const }; setOrder(upd); onUpdateSupplyOrder?.(upd); } }}
+                  onClick={async () => { if (await requestConfirm('Cancelar este fornecimento? Compras, recebimentos e movimentações de estoque já feitos são preservados.')) { const upd = { ...order, status: 'CANCELADO' as const }; setOrder(upd); onUpdateSupplyOrder?.(upd); } }}
                   className="text-[11px] font-bold uppercase text-slate-400 hover:text-[#E63946] px-2 py-2"
                 >Cancelar</button>
               )}

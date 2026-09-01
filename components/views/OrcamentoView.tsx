@@ -1,4 +1,5 @@
 'use client';
+import { showToast } from '@/components/ui/Feedback';
 
 import React, { useState } from 'react';
 import { CustomQuote } from '@/lib/types';
@@ -106,7 +107,7 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
                       <button
                         onClick={() => {
                           onConvertToOS(q);
-                          alert(`Orçamento ${q.id} convertido em Pedido e Ordem de Serviço!`);
+                          showToast(`Orçamento ${q.id} convertido em Pedido e Ordem de Serviço!`);
                         }}
                         className="bg-[#E63946] hover:bg-[#a51515] text-white text-[10px] font-semibold px-3 py-1 rounded transition-colors uppercase tracking-wider shadow-sm"
                       >
@@ -142,7 +143,7 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
                 <button
                   onClick={() => {
                     onConvertToOS(q);
-                    alert(`Orçamento ${q.id} convertido em Pedido e Ordem de Serviço!`);
+                    showToast(`Orçamento ${q.id} convertido em Pedido e Ordem de Serviço!`);
                   }}
                   className="shrink-0 bg-[#E63946] hover:bg-[#a51515] text-white text-[10px] font-semibold px-3 py-1.5 rounded uppercase tracking-wider shadow-sm"
                 >

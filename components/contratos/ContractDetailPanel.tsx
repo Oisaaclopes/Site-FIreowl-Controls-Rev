@@ -1,4 +1,5 @@
 'use client';
+import { requestConfirm } from '@/components/ui/Feedback';
 
 import React, { useEffect, useState } from 'react';
 import { Contract, ContractRoutine, ContractRoutineExecution, ContractHourEntry, ContractAttachment, ContractExecutionStatus } from '@/lib/types';
@@ -53,7 +54,7 @@ export const ContractDetailPanel: React.FC<{ contract: Contract; onClose: () => 
     } catch (err) { setErro(err instanceof Error ? err.message : 'Falha ao salvar rotina.'); } finally { setBusy(false); }
   };
   const removerRotina = async (id: string) => {
-    if (!window.confirm('Remover esta rotina? As execuções já geradas serão apagadas (o histórico de OS/relatórios permanece).')) return;
+    if (!await requestConfirm('Remover esta rotina? As execuções já geradas serão apagadas (o histórico de OS/relatórios permanece).')) return;
     setBusy(true);
     try { await deleteContractRoutine(id); await load(); } catch (err) { setErro(err instanceof Error ? err.message : 'Falha.'); } finally { setBusy(false); }
   };
@@ -108,7 +109,7 @@ export const ContractDetailPanel: React.FC<{ contract: Contract; onClose: () => 
     catch (err) { setErro(err instanceof Error ? err.message : 'Falha ao abrir anexo.'); }
   };
   const excluirAnexo = async (attachment: ContractAttachment) => {
-    if (!window.confirm(`Remover o anexo “${attachment.nome || attachment.storagePath}”?`)) return;
+    if (!await requestConfirm(`Remover o anexo “${attachment.nome || attachment.storagePath}”?`)) return;
     setBusy(true); setErro(null);
     try { await removeContractAttachment(attachment); await load(); }
     catch (err) { setErro(err instanceof Error ? err.message : 'Falha ao remover anexo.'); }
