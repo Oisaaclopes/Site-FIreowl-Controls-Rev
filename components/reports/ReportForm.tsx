@@ -14,6 +14,7 @@ import {
   validateFinalize,
   FinalizeIssue,
 } from '@/lib/reportSchema';
+import { isFieldVisible, isFieldRequired, isSectionVisible } from '@/lib/formConditions';
 import { FormEngine, CatalogSources } from '@/components/reports/FormEngine';
 import { isSupabaseConfigured } from '@/lib/inventory';
 import { getCapturedPhoto, getPhotoPreview, isPhotoId, registerPhoto, clearPhotoRegistry } from '@/lib/reportMedia';
@@ -106,8 +107,9 @@ function buildPendencias(
 ): Pendencia[] {
   const out: Pendencia[] = [];
   for (const secao of template.secoes) {
-    if (secao.pula_se && String(values[secao.pula_se.campo]) === secao.pula_se.igual) continue;
+    if (!isSectionVisible(secao, values)) continue;
     for (const field of secao.campos) {
+      if (!isFieldVisible(field, values)) continue; // resposta oculta não gera pendência
       if (field.abre_pendencia_se && isNegativeAnswer(field, values[field.key] as never)) {
         const sug = field.pendencia_sugerida;
         out.push({
@@ -308,9 +310,10 @@ export const ReportForm: React.FC<ReportFormProps> = ({
     [template, surveyMode, selectedSurveyBlocks]
   );
 
-  // Seções visíveis (respeita modo e salto condicional pula_se)
+  // Seções visíveis (modo + pula_se legado + show_if/hide_if) — mesmo evaluator
+  // da renderização e da validação.
   const visibleSections = useMemo(
-    () => effectiveTemplate.secoes.filter((s) => !(s.pula_se && String(values[s.pula_se.campo]) === s.pula_se.igual)),
+    () => effectiveTemplate.secoes.filter((s) => isSectionVisible(s, values)),
     [effectiveTemplate, values]
   );
   const idx = Math.min(currentIdx, Math.max(0, visibleSections.length - 1));
@@ -341,9 +344,11 @@ export const ReportForm: React.FC<ReportFormProps> = ({
     setCurrentIdx(Math.max(0, idx - 1));
   };
   const goNext = () => {
-    // Bloqueia avanço com obrigatório faltando na seção atual (sem modal)
+    // Bloqueia avanço com obrigatório faltando na seção atual (sem modal).
+    // Campo oculto por condição NÃO bloqueia; obrigatoriedade é condicional.
     const faltando = (currentSection?.campos || []).find((f) => {
-      if (!f.obrigatorio) return false;
+      if (!isFieldVisible(f, values)) return false;
+      if (!isFieldRequired(f, values)) return false;
       const v = values[f.key];
       if (f.tipo === 'foto') return !hasPhoto(f.key);
       return v === undefined || v === null || v === '';
@@ -382,8 +387,10 @@ export const ReportForm: React.FC<ReportFormProps> = ({
     };
     for (const f of section.campos) {
       if (!isFieldVisibleForRole(f, roleForEngine)) continue;
+      if (!isFieldVisible(f, values)) continue; // campo oculto não exige foto
       if (f.tipo === 'foto') {
-        if (!hasPhoto(f.key)) return f.label || f.key;
+        // Foto oculta/condicional só é exigida quando o campo está obrigatório.
+        if (isFieldRequired(f, values) && !hasPhoto(f.key)) return f.label || f.key;
         continue;
       }
       // Só os repeaters de itens adicionados pelo técnico (apontamentos,
@@ -466,8 +473,9 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   const pendenciasPreview = useMemo<PendenciaPreview[]>(() => {
     const list: PendenciaPreview[] = [];
     for (const secao of effectiveTemplate.secoes) {
-      if (secao.pula_se && String(values[secao.pula_se.campo]) === secao.pula_se.igual) continue;
+      if (!isSectionVisible(secao, values)) continue;
       for (const field of secao.campos) {
+        if (!isFieldVisible(field, values)) continue;
         if (field.abre_pendencia_se && isNegativeAnswer(field, values[field.key] as never)) {
           list.push({
             grupo: field.pendencia_sugerida?.grupo,

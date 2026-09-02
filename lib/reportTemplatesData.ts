@@ -55,14 +55,18 @@ export const LEVANTAMENTO_SDAI: TemplateSchema = {
       key: 'identificacao',
       titulo: 'Identificação do Sistema Existente',
       campos: [
+        // Piloto CAMPO 2A: se "Não possui" SDAI, os campos da central desaparecem
+        // e não são cobrados (o foto_painel obrigatório deixa de bloquear).
         { key: 'possui_sdai', tipo: 'select', label: 'O local possui SDAI instalado?', opcoes: ['Sim, completo', 'Sim, parcial', 'Não possui'], obrigatorio: true },
-        { key: 'central_fabricante', tipo: 'autocomplete_catalogo', origem: 'marcas', label: 'Fabricante da central', permite_texto_livre: true },
-        { key: 'central_modelo', tipo: 'autocomplete_catalogo', origem: 'modelos', label: 'Modelo da central', permite_texto_livre: true, filtro_por: 'central_fabricante', catalogo_grupo: 'centrais_sdai' },
-        { key: 'tipo_central', tipo: 'select', label: 'Tipo de central', opcoes: ['Convencional', 'Endereçável', 'Não identificado'] },
-        { key: 'qtd_lacos', tipo: 'numero', label: 'Quantidade de laços/zonas' },
-        { key: 'central_operante', tipo: 'select', label: 'A central está operante no momento da visita?', opcoes: ['Sim', 'Sim, com falhas ativas', 'Não', 'Não foi possível acessar'], abre_pendencia_se: ['Não', 'Sim, com falhas ativas'], pendencia_sugerida: { grupo: 'SDAI > Central', acao: 'reparar', descricao: 'Central com falha ativa / inoperante na visita.' } },
-        { key: 'projeto_disponivel', tipo: 'select', label: 'Existe projeto ou as-built disponível?', opcoes: ['Sim, atualizado', 'Sim, desatualizado', 'Não existe'] },
-        { key: 'foto_painel', tipo: 'foto', label: 'Foto do painel e etiqueta de identificação', obrigatorio: true },
+        { key: 'central_fabricante', tipo: 'autocomplete_catalogo', origem: 'marcas', label: 'Fabricante da central', permite_texto_livre: true, hide_if: { field: 'possui_sdai', operator: 'equals', value: 'Não possui' } },
+        { key: 'central_modelo', tipo: 'autocomplete_catalogo', origem: 'modelos', label: 'Modelo da central', permite_texto_livre: true, filtro_por: 'central_fabricante', catalogo_grupo: 'centrais_sdai', hide_if: { field: 'possui_sdai', operator: 'equals', value: 'Não possui' } },
+        { key: 'tipo_central', tipo: 'select', label: 'Tipo de central', opcoes: ['Convencional', 'Endereçável', 'Não identificado'], hide_if: { field: 'possui_sdai', operator: 'equals', value: 'Não possui' } },
+        { key: 'qtd_lacos', tipo: 'numero', label: 'Quantidade de laços/zonas', hide_if: { field: 'possui_sdai', operator: 'equals', value: 'Não possui' } },
+        { key: 'central_operante', tipo: 'select', label: 'A central está operante no momento da visita?', opcoes: ['Sim', 'Sim, com falhas ativas', 'Não', 'Não foi possível acessar'], abre_pendencia_se: ['Não', 'Sim, com falhas ativas'], pendencia_sugerida: { grupo: 'SDAI > Central', acao: 'reparar', descricao: 'Central com falha ativa / inoperante na visita.' }, hide_if: { field: 'possui_sdai', operator: 'equals', value: 'Não possui' } },
+        // Piloto required_if: só aparece (e vira obrigatório) quando a central não pôde ser acessada.
+        { key: 'motivo_sem_acesso', tipo: 'texto', multilinha: true, label: 'Motivo de não ter acessado/testado a central', show_if: { field: 'central_operante', operator: 'equals', value: 'Não foi possível acessar' }, required_if: { field: 'central_operante', operator: 'equals', value: 'Não foi possível acessar' }, hide_if: { field: 'possui_sdai', operator: 'equals', value: 'Não possui' } },
+        { key: 'projeto_disponivel', tipo: 'select', label: 'Existe projeto ou as-built disponível?', opcoes: ['Sim, atualizado', 'Sim, desatualizado', 'Não existe'], hide_if: { field: 'possui_sdai', operator: 'equals', value: 'Não possui' } },
+        { key: 'foto_painel', tipo: 'foto', label: 'Foto do painel e etiqueta de identificação', obrigatorio: true, hide_if: { field: 'possui_sdai', operator: 'equals', value: 'Não possui' } },
       ],
     },
     {

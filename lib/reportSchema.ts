@@ -1,4 +1,5 @@
 import { AcaoRecomendada, ReportTipo } from './types';
+import { Condition, isFieldVisible, isFieldRequired, isSectionVisible } from './formConditions';
 
 /* =====================================================================
  * Contrato de schema do motor de formulários (Fase 2).
@@ -70,6 +71,15 @@ export interface FieldSchema {
   /** Valores desta resposta que disparam pendência (ex.: ['Não','Reprovado']). */
   abre_pendencia_se?: string[];
   pendencia_sugerida?: PendenciaSugerida;
+
+  /* --- condicionais (CAMPO 2A) — avaliadas por lib/formConditions ---
+   * Precedência: hide_if → oculto; show_if falso → oculto; disable_if →
+   * visível porém desabilitado; required = obrigatorio || required_if (só quando
+   * VISÍVEL e habilitado). Campo oculto nunca bloqueia validação/finalização. */
+  show_if?: Condition;
+  hide_if?: Condition;
+  required_if?: Condition;
+  disable_if?: Condition;
 }
 
 export interface SectionSchema {
@@ -77,8 +87,12 @@ export interface SectionSchema {
   titulo: string;
   descricao?: string;
   campos: FieldSchema[];
-  /** Salto condicional: pula a seção quando `campo` == `igual` (ex.: "Não possui SDAI"). */
+  /** Salto condicional LEGADO: pula a seção quando `campo` == `igual`. Continua
+   *  válido (adaptado ao evaluator). Prefira show_if/hide_if em templates novos. */
   pula_se?: { campo: string; igual: string };
+  /** Condicionais genéricas de seção (CAMPO 2A). */
+  show_if?: Condition;
+  hide_if?: Condition;
 }
 
 export interface TemplateSchema {
@@ -137,15 +151,17 @@ export function validateFinalize(
 ): FinalizeIssue[] {
   const issues: FinalizeIssue[] = [];
   for (const secao of template.secoes) {
-    if (secao.pula_se && String(values[secao.pula_se.campo]) === secao.pula_se.igual) {
-      continue;
-    }
+    // Seção oculta (pula_se legado, show_if/hide_if) não valida nada.
+    if (!isSectionVisible(secao, values)) continue;
     for (const field of secao.campos) {
+      // REGRA CRÍTICA (FASE 4): campo oculto por condição não bloqueia nada.
+      if (!isFieldVisible(field, values)) continue;
       const v = values[field.key];
-      if (field.obrigatorio && (v === undefined || v === null || v === '')) {
+      const required = isFieldRequired(field, values);
+      if (required && (v === undefined || v === null || v === '')) {
         issues.push({ secao: secao.titulo, campo: field.label || field.key, motivo: 'Campo obrigatório não preenchido.' });
       }
-      if (field.tipo === 'foto' && field.obrigatorio) {
+      if (field.tipo === 'foto' && required) {
         if (!hasPhoto(field.key)) {
           issues.push({
             secao: secao.titulo,

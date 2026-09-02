@@ -13,6 +13,7 @@ import {
   isFieldVisibleForRole,
   fotoLabels,
 } from '@/lib/reportSchema';
+import { isFieldVisible, isFieldRequired, isFieldDisabled, isSectionVisible } from '@/lib/formConditions';
 import { registerPhoto, getPhotoPreview, setPhotoMarkup, hasMarkup } from '@/lib/reportMedia';
 import { MarkupCanvas } from '@/components/reports/MarkupCanvas';
 import { Combobox } from '@/components/reports/Combobox';
@@ -129,10 +130,14 @@ const FieldControl: React.FC<{
   onCreateCatalogo?: (origem: string, name: string) => void;
   /** Valor do campo-irmão usado como filtro (ex.: marca escolhida, p/ modelos). */
   filtroValor?: string;
-}> = ({ field, value, onValue, catalog, onCreateCatalogo, filtroValor }) => {
+  /** disable_if verdadeiro: visível, porém não editável (não vira obrigatório). */
+  disabled?: boolean;
+}> = ({ field, value, onValue: onValueRaw, catalog, onCreateCatalogo, filtroValor, disabled = false }) => {
   const [sigOpen, setSigOpen] = useState(false);
   const [markupId, setMarkupId] = useState<string | null>(null);
   const [, forceTick] = useState(0); // re-render após gravar markup (registro é mutável)
+  // disable_if: campo visível porém não editável — bloqueia qualquer mutação.
+  const onValue = disabled ? () => {} : onValueRaw;
   const negative = isNegativeAnswer(field, value as never);
 
   const negHint = negative ? (
@@ -478,11 +483,13 @@ const Repeater: React.FC<{
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {schema
-              .filter((f) => isFieldVisibleForRole(f, role))
+              // Visibilidade por item: condicionais internas do card avaliam
+              // contra as respostas DO PRÓPRIO card (contexto do item) — FASE 7.
+              .filter((f) => isFieldVisibleForRole(f, role) && isFieldVisible(f, card as Record<string, unknown>))
               .map((f) => (
                 <div key={f.key} className={f.tipo === 'select_falha' || f.multilinha ? 'md:col-span-2' : ''}>
                   <label className={labelCls}>
-                    {f.label || f.key} {f.obrigatorio && <span className="text-[#E63946]">*</span>}
+                    {f.label || f.key} {isFieldRequired(f, card as Record<string, unknown>) && <span className="text-[#E63946]">*</span>}
                   </label>
                   {f.tipo === 'select_falha' ? (
                     <select
@@ -646,8 +653,9 @@ const Section: React.FC<{
   role: string;
   onCreateCatalogo?: (origem: string, name: string) => void;
 }> = ({ section, values, onChange, catalog, role, onCreateCatalogo }) => {
-  // Salto condicional
-  if (section.pula_se && String(values[section.pula_se.campo]) === section.pula_se.igual) return null;
+  // Visibilidade da seção (pula_se legado + show_if/hide_if) — mesmo evaluator
+  // usado pela validação, sem duplicar lógica.
+  if (!isSectionVisible(section, values)) return null;
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
@@ -657,14 +665,16 @@ const Section: React.FC<{
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {section.campos
-          .filter((f) => isFieldVisibleForRole(f, role))
+          .filter((f) => isFieldVisibleForRole(f, role) && isFieldVisible(f, values))
           .map((field) => {
             const isRepeater = field.tipo === 'repeater' || field.tipo === 'checklist_dispositivos' || field.tipo === 'checklist_pendencias';
             const isWide = isRepeater || field.multilinha || field.tipo === 'multiselect';
+            const required = isFieldRequired(field, values);
+            const disabled = isFieldDisabled(field, values);
             return (
               <div key={field.key} className={isWide ? 'md:col-span-2' : ''}>
                 <label className={labelCls}>
-                  {field.label || field.key} {field.obrigatorio && <span className="text-[#E63946]">*</span>}
+                  {field.label || field.key} {required && <span className="text-[#E63946]">*</span>}
                 </label>
                 {field.help && <p className="text-[10px] text-slate-400 mb-1">{field.help}</p>}
                 {isRepeater ? (
@@ -677,9 +687,11 @@ const Section: React.FC<{
                     onCreateCatalogo={onCreateCatalogo}
                   />
                 ) : (
+                  <div className={disabled ? 'opacity-60 pointer-events-none' : ''}>
                   <FieldControl
                     field={field}
                     value={values[field.key]}
+                    disabled={disabled}
                     onValue={(v) => {
                       onChange(field.key, v);
                       if(field.key==='central_fabricante') { onChange('central_modelo',''); onChange('tipo_central',''); }
@@ -689,6 +701,7 @@ const Section: React.FC<{
                     onCreateCatalogo={onCreateCatalogo}
                     filtroValor={field.filtro_por ? String(values[field.filtro_por] ?? '') : undefined}
                   />
+                  </div>
                 )}
               </div>
             );
