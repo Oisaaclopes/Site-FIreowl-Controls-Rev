@@ -3,6 +3,7 @@ import {
   COMMERCIAL_UNITS, normalizeUnitCode, unitAllowsDecimals, normalizeQuantity,
   isCanonicalUnit, formatUnitDisplay, groupCommercialUnits, quantityUnitError,
   searchCommercialUnits, UNIT_CATEGORY_LABELS, UNIT_CATEGORY_ORDER,
+  validateCustomUnit, registerCustomUnit, getCustomUnits, allUnits, unitByCode,
 } from './commercialUnits';
 import {
   defaultWarranty, normalizeCommercialWarranty, renderWarranty, isLegacyWarranty,
@@ -75,8 +76,10 @@ describe('unidades canônicas', () => {
   });
   it('agrupa na ordem oficial com labels PT-BR', () => {
     const groups = groupCommercialUnits();
-    expect(groups.map((group) => group.category)).toEqual(UNIT_CATEGORY_ORDER);
-    expect(groups.map((group) => group.label)).toEqual(UNIT_CATEGORY_ORDER.map((category) => UNIT_CATEGORY_LABELS[category]));
+    // 'personalizado' só aparece quando há unidades custom (vazio em Node).
+    const catsComBase = UNIT_CATEGORY_ORDER.filter((c) => c !== 'personalizado');
+    expect(groups.map((group) => group.category)).toEqual(catsComBase);
+    expect(groups.map((group) => group.label)).toEqual(catsComBase.map((category) => UNIT_CATEGORY_LABELS[category]));
     expect(groups.find((group) => group.category === 'tempo')?.units.map((unit) => unit.code)).toContain('visita');
     expect(groups.find((group) => group.category === 'comercial')?.units.map((unit) => unit.code)).toEqual(['vb']);
   });
@@ -85,6 +88,36 @@ describe('unidades canônicas', () => {
     expect(searchCommercialUnits('quilometro').map((unit) => unit.code)).toContain('km');
     expect(searchCommercialUnits('kg').map((unit) => unit.code)).toEqual(['kg']);
     expect(searchCommercialUnits('litro').map((unit) => unit.code)).toEqual(expect.arrayContaining(['mL', 'L']));
+  });
+  it('(16) unidade personalizada não duplica canônica (direto ou por alias)', () => {
+    expect(validateCustomUnit('Metro', 'm').ok).toBe(false);
+    expect(validateCustomUnit('Metro', 'm').canonicalSuggestion).toBe('m');
+    // alias também é barrado e orienta à sigla canônica
+    const viaAlias = validateCustomUnit('Unidade', 'unidade');
+    expect(viaAlias.ok).toBe(false);
+    expect(viaAlias.canonicalSuggestion).toBe('un');
+  });
+  it('unidade personalizada válida registra, aparece no grupo e respeita allowDecimals', () => {
+    const v = validateCustomUnit('  Ponto  ', ' pt ');
+    expect(v).toMatchObject({ ok: true, code: 'pt', label: 'Ponto' });
+    registerCustomUnit({ code: v.code!, label: v.label!, allowDecimals: false });
+    expect(getCustomUnits().some((u) => u.code === 'pt')).toBe(true);
+    expect(unitByCode('pt')?.category).toBe('personalizado');
+    expect(allUnits().some((u) => u.code === 'pt')).toBe(true);
+    // allowDecimals=false → decimal é rejeitado; código preservado
+    expect(normalizeUnitCode('pt')).toBe('pt');
+    expect(unitAllowsDecimals('pt')).toBe(false);
+    expect(quantityUnitError(2.5, 'pt')).toContain("'pt'");
+    // aparece no grupo Personalizado do seletor
+    expect(groupCommercialUnits().find((g) => g.category === 'personalizado')?.units.map((u) => u.code)).toContain('pt');
+    // uma personalizada decimal aceita fração
+    registerCustomUnit({ code: 'bob', label: 'Bobina', allowDecimals: true });
+    expect(quantityUnitError(2.5, 'bob')).toBeNull();
+  });
+  it('sigla/nome vazios ou grandes demais são rejeitados', () => {
+    expect(validateCustomUnit('', 'pt').ok).toBe(false);
+    expect(validateCustomUnit('Ponto', '').ok).toBe(false);
+    expect(validateCustomUnit('Ponto', 'abcdefghi').ok).toBe(false); // >8
   });
   it('troca decimal para unidade inteira informa erro sem arredondar', () => {
     expect(quantityUnitError(2.5, 'un')).toBe("A unidade 'un' aceita somente quantidades inteiras.");

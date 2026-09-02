@@ -15,7 +15,8 @@ export type UnitCategory =
   | 'volume'
   | 'massa'
   | 'tempo'
-  | 'comercial';
+  | 'comercial'
+  | 'personalizado';
 
 export interface CommercialUnit {
   /** Sigla canônica exibida na UI e no PDF. */
@@ -29,7 +30,7 @@ export interface CommercialUnit {
 
 /** Ordem canônica dos grupos no seletor. */
 export const UNIT_CATEGORY_ORDER: UnitCategory[] = [
-  'contagem', 'comprimento', 'area', 'volume', 'massa', 'tempo', 'comercial',
+  'contagem', 'comprimento', 'area', 'volume', 'massa', 'tempo', 'comercial', 'personalizado',
 ];
 
 /** Rótulo PT-BR de cada grupo (cabeçalho do seletor). */
@@ -41,6 +42,7 @@ export const UNIT_CATEGORY_LABELS: Record<UnitCategory, string> = {
   massa: 'Massa',
   tempo: 'Tempo / Serviço',
   comercial: 'Comercial',
+  personalizado: 'Personalizado',
 };
 
 export interface UnitGroup {
@@ -76,10 +78,105 @@ export const COMMERCIAL_UNITS: CommercialUnit[] = [
 
 const BY_CODE = new Map(COMMERCIAL_UNITS.map((u) => [u.code, u]));
 
-/** Casa a sigla exatamente como cadastrada (respeita maiúsc./minúsc. canônica). */
+/* ---------------------------------------------------------------------------
+ * Unidades PERSONALIZADAS (registro em runtime).
+ *
+ * A SIGLA (code) é a fonte de verdade e persiste como texto normal em
+ * inventory_items.unit / services.unit / proposal JSONB — sem migração.
+ * O rótulo + allowDecimals são conveniências de UX; ficam no localStorage do
+ * navegador (hidratados via hydrateCustomUnits, só no browser). Em Node/testes
+ * o registro fica vazio, então as funções puras permanecem determinísticas.
+ * ------------------------------------------------------------------------- */
+const CUSTOM_BY_CODE = new Map<string, CommercialUnit>();
+export const CUSTOM_UNITS_STORAGE_KEY = 'fireowl.customUnits.v1';
+
+/** Registra (ou substitui) uma unidade personalizada em memória. */
+export function registerCustomUnit(u: { code: string; label: string; allowDecimals: boolean }): CommercialUnit {
+  const unit: CommercialUnit = {
+    code: u.code.trim(),
+    label: (u.label || u.code).trim(),
+    category: 'personalizado',
+    allowDecimals: !!u.allowDecimals,
+  };
+  CUSTOM_BY_CODE.set(unit.code, unit);
+  return unit;
+}
+
+/** Unidades personalizadas atualmente conhecidas (na ordem de inserção). */
+export function getCustomUnits(): CommercialUnit[] {
+  return [...CUSTOM_BY_CODE.values()];
+}
+
+/** Base canônica + personalizadas. */
+export function allUnits(): CommercialUnit[] {
+  return [...COMMERCIAL_UNITS, ...getCustomUnits()];
+}
+
+/** Carrega personalizadas do localStorage (idempotente; no-op fora do browser). */
+export function hydrateCustomUnits(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = window.localStorage.getItem(CUSTOM_UNITS_STORAGE_KEY);
+    if (!raw) return;
+    const list = JSON.parse(raw) as { code?: string; label?: string; allowDecimals?: boolean }[];
+    if (!Array.isArray(list)) return;
+    for (const u of list) {
+      if (u && typeof u.code === 'string' && u.code.trim() && !BY_CODE.has(u.code.trim())) {
+        registerCustomUnit({ code: u.code, label: u.label || u.code, allowDecimals: !!u.allowDecimals });
+      }
+    }
+  } catch { /* storage indisponível → segue só com canônicas */ }
+}
+
+/** Persiste o registro atual de personalizadas (no-op fora do browser). */
+export function persistCustomUnits(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(CUSTOM_UNITS_STORAGE_KEY, JSON.stringify(getCustomUnits()));
+  } catch { /* storage indisponível → mantém só em memória nesta sessão */ }
+}
+
+export interface CustomUnitValidation {
+  ok: boolean;
+  /** Sigla final a persistir (quando ok). */
+  code?: string;
+  label?: string;
+  /** Mensagem de erro/orientação (quando !ok). */
+  error?: string;
+  /** Quando a sigla digitada já existe como canônica: a sigla canônica sugerida. */
+  canonicalSuggestion?: string;
+}
+
+/**
+ * Valida a criação de uma unidade personalizada (PARTE 12):
+ * normaliza espaços, valida tamanho, impede duplicar canônica (orienta a usar a
+ * existente) e impede duplicar outra personalizada.
+ */
+export function validateCustomUnit(nameRaw: string, siglaRaw: string): CustomUnitValidation {
+  const label = (nameRaw || '').trim().replace(/\s+/g, ' ');
+  const code = (siglaRaw || '').trim().replace(/\s+/g, '');
+  if (!label) return { ok: false, error: 'Informe o nome da unidade.' };
+  if (!code) return { ok: false, error: 'Informe a sigla da unidade.' };
+  if (code.length > 8) return { ok: false, error: 'A sigla deve ter no máximo 8 caracteres.' };
+  if (label.length > 40) return { ok: false, error: 'O nome deve ter no máximo 40 caracteres.' };
+  // Já corresponde a uma unidade canônica (direto ou por alias)? → orientar.
+  const canonical = normalizeUnitCode(code);
+  if (isCanonicalUnit(canonical)) {
+    const u = BY_CODE.get(canonical)!;
+    return { ok: false, canonicalSuggestion: canonical, error: `Já existe a unidade canônica "${u.label} (${canonical})". Use-a em vez de criar uma personalizada.` };
+  }
+  if (isCanonicalUnit(code)) {
+    return { ok: false, canonicalSuggestion: code, error: `"${code}" já é uma unidade padrão. Use-a em vez de criar uma personalizada.` };
+  }
+  if (CUSTOM_BY_CODE.has(code)) return { ok: false, error: `A unidade personalizada "${code}" já existe.` };
+  return { ok: true, code, label };
+}
+
+/** Casa a sigla exatamente como cadastrada (canônica ou personalizada). */
 export function unitByCode(code?: string | null): CommercialUnit | undefined {
   if (!code) return undefined;
-  return BY_CODE.get(code.trim());
+  const c = code.trim();
+  return BY_CODE.get(c) || CUSTOM_BY_CODE.get(c);
 }
 
 /**
@@ -122,14 +219,15 @@ const stripKey = (raw: string) =>
 /** Busca tolerante a caixa, acentos e espaços, pelo nome ou pela sigla. */
 export function searchCommercialUnits(query: string): CommercialUnit[] {
   const term = stripKey(query);
-  if (!term) return COMMERCIAL_UNITS;
-  return COMMERCIAL_UNITS.filter((unit) =>
+  const base = allUnits();
+  if (!term) return base;
+  return base.filter((unit) =>
     stripKey(unit.label).includes(term) || stripKey(unit.code).includes(term),
   );
 }
 
 /** Agrupa na ordem de apresentação oficial, omitindo grupos vazios. */
-export function groupCommercialUnits(units: CommercialUnit[] = COMMERCIAL_UNITS): UnitGroup[] {
+export function groupCommercialUnits(units: CommercialUnit[] = allUnits()): UnitGroup[] {
   return UNIT_CATEGORY_ORDER.map((category) => ({
     category,
     label: UNIT_CATEGORY_LABELS[category],
