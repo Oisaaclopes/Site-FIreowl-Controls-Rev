@@ -47,7 +47,7 @@ export async function uploadSignaturePng(
 ): Promise<string> {
   const supabase = getSupabaseClient() as any;
   const path = `signatures/${reportId}/${papel}_${seq}.png`;
-  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { upsert: false, contentType: 'image/png' });
+  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { upsert: true, contentType: 'image/png' });
   if (error) throw error;
   return path;
 }
@@ -76,7 +76,7 @@ export async function fetchSignatures(reportId: string): Promise<ReportSignature
 
 export async function insertSignature(s: ReportSignature): Promise<void> {
   const supabase = getSupabaseClient() as any;
-  const { error } = await supabase.from('report_signatures').insert({
+  const row: Record<string, unknown> = {
     report_id: s.reportId,
     papel: s.papel,
     nome: s.nome,
@@ -84,6 +84,8 @@ export async function insertSignature(s: ReportSignature): Promise<void> {
     cargo: s.cargo ?? null,
     storage_path: s.storagePath ?? null,
     geo: s.geo ?? null,
-  });
+  };
+  if (s.id) row.id = s.id;
+  const { error } = await supabase.from('report_signatures').upsert(row, { onConflict: 'id' });
   if (error) throw error;
 }

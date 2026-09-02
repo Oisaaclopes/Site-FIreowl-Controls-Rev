@@ -123,7 +123,7 @@ export async function uploadReportPhoto(opts: {
   const path = reportMediaPath(opts);
   const { error } = await supabase.storage
     .from(BUCKET)
-    .upload(path, compressed, { upsert: false, contentType: 'image/jpeg' });
+    .upload(path, compressed, { upsert: true, contentType: 'image/jpeg' });
   if (error) throw error;
   return path;
 }

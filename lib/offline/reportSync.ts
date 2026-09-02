@@ -1,15 +1,15 @@
 import { ReportInstance, ReportTipo, Pendencia, GeoPoint, ReportSignature } from '../types';
 import { TemplateSchema } from '../reportSchema';
-import { createReport, updateReport, upsertAnswer, insertMedia, attachTemplateSnapshot } from '../reports';
+import { createReport, fetchReportByClientUuid, resetIncompleteReportChildren, updateReport, upsertAnswer, insertMedia, attachTemplateSnapshot } from '../reports';
 import { uploadReportPhoto } from '../reportMedia';
 import { uploadSignaturePng, insertSignature } from '../signatures';
 import { updateOrdemServicoStatus } from '../ordensServico';
 import { marcarTesteFuncional } from '../devices';
-import { insertPendencia, updatePendenciaStatus } from '../pendencias';
+import { fetchPendenciasForReconciliation, insertPendencia, updatePendenciaStatus } from '../pendencias';
 import { PendenciaStatus } from '../types';
 import { fetchCicloAtivo, registrarTestesNoCiclo } from '../ciclos';
 import { replaceSurveyRequirements } from '../surveyRequirements';
-import { idbGetAll, idbDelete, idbAvailable, STORE_OUTBOX } from './idb';
+import { idbGet, idbGetAll, idbDelete, idbAvailable, idbPut, STORE_OUTBOX, STORE_REPORT_TOMBSTONES } from './idb';
 import { canProcessJob, enqueueOfflineJob, flushOfflineJobs, getOutboxOwner, listOfflineJobs, registerOfflineHandler, removeOfflineJob } from './outbox';
 // Registra o handler de Fotos de Campo no mesmo núcleo; não cria uma segunda fila.
 import './fieldPhotoSync';
@@ -53,6 +53,8 @@ export interface BundleAnswer {
 export interface ReportBundle {
   clientUuid: string;
   createdAt: string;
+  /** Chave local do atendimento; apagada apenas após sync integral confirmado. */
+  draftKey?: string;
   report: {
     templateId?: string;
     templateCodigo: string;
@@ -107,14 +109,44 @@ function isUniqueViolation(e: unknown): boolean {
   return err?.code === '23505' || /duplicate key|client_uuid/i.test(err?.message || '');
 }
 
+/** UUID estável por bundle/entidade. Evita duplicar children em qualquer retry. */
+export function stableBundleUuid(clientUuid: string, entity: string, index: number): string {
+  const input = `${clientUuid}:${entity}:${index}`;
+  const words = [0x811c9dc5, 0x9e3779b9, 0x85ebca6b, 0xc2b2ae35];
+  for (let w = 0; w < words.length; w++) {
+    let h = words[w] >>> 0;
+    for (let i = 0; i < input.length; i++) {
+      h ^= input.charCodeAt(i) + w * 31;
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    words[w] = h;
+  }
+  const hex = words.map((word) => word.toString(16).padStart(8, '0')).join('').split('');
+  hex[12] = '4';
+  hex[16] = ((parseInt(hex[16], 16) & 0x3) | 0x8).toString(16);
+  const value = hex.join('');
+  return `${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}-${value.slice(16, 20)}-${value.slice(20)}`;
+}
+
+function pendenciaFingerprint(p: Pendencia): string {
+  return JSON.stringify([
+    p.clienteId || '', p.deviceId || '', p.grupo || '', p.descricao || '',
+    p.acaoRecomendada || '', p.normaReferencia || '', p.local || '',
+    Number(p.quantidade || 1), p.unidade || '', p.itemCatalogoId || '',
+    p.itemTextoLivre || '', !!p.precisaCadastroCatalogo, p.status || 'aberta',
+  ]);
+}
+
 /* ------------------------------ Persistência ------------------------------ */
 
 /**
  * Replica um bundle no Supabase, na mesma ordem do fluxo online. Idempotente
- * pelo client_uuid: se o relatório já existe, devolve { duplicate: true }.
+ * pelo client_uuid. Encontrar o report não encerra o job: um rascunho pode ser
+ * resto de tentativa parcial e precisa ter todos os children reconciliados.
  */
 export async function persistReportBundle(b: ReportBundle): Promise<{ reportId?: string; duplicate?: boolean }> {
   let report: ReportInstance;
+  let resumed = false;
   try {
     report = await createReport({
       id: '',
@@ -132,26 +164,33 @@ export async function persistReportBundle(b: ReportBundle): Promise<{ reportId?:
       clientUuid: b.clientUuid,
     });
   } catch (e) {
-    if (isUniqueViolation(e)) return { duplicate: true };
-    throw e;
+    if (!isUniqueViolation(e)) throw e;
+    const existing = await fetchReportByClientUuid(b.clientUuid);
+    if (!existing) throw e;
+    // Um report finalizado só é atingido quando todos os awaits obrigatórios
+    // abaixo terminaram. O job remanescente pode então ser reconhecido.
+    if (existing.status === 'finalizado') return { reportId: existing.id, duplicate: true };
+    report = existing;
+    resumed = true;
+    await resetIncompleteReportChildren(report.id);
   }
 
   // Congela a DEFINIÇÃO usada (snapshot + versão) no relatório. Best-effort:
   // se a 0075 ainda não foi aplicada, não bloqueia a finalização (fica legado).
   if (b.report.templateSnapshot) {
-    await attachTemplateSnapshot(report.id, b.report.templateVersion, b.report.templateSnapshot);
+    const attached = await attachTemplateSnapshot(report.id, b.report.templateVersion, b.report.templateSnapshot);
+    if (!attached) throw new Error('Não foi possível confirmar o snapshot do template do relatório.');
   }
 
   const pathById: Record<string, string> = {};
-  let seq = 0;
-
-  for (const m of b.media) {
+  for (const [index, m] of b.media.entries()) {
+    const mediaId = stableBundleUuid(b.clientUuid, 'media', index);
     const path = await uploadReportPhoto({
       file: m.blob,
       reportId: report.id,
       clienteId: b.report.clienteId,
       tipo: m.tipo,
-      seq: `${Date.now()}_${seq++}`,
+      seq: `${mediaId}_original`,
     });
     pathById[m.photoId] = path;
     let markedPath: string | undefined;
@@ -161,11 +200,11 @@ export async function persistReportBundle(b: ReportBundle): Promise<{ reportId?:
         reportId: report.id,
         clienteId: b.report.clienteId,
         tipo: `${m.tipo}_marcado`,
-        seq: `${Date.now()}_${seq++}`,
+        seq: `${mediaId}_marked`,
       });
     }
     await insertMedia({
-      id: '',
+      id: mediaId,
       reportId: report.id,
       tipo: m.tipo,
       storagePathOriginal: path,
@@ -175,11 +214,12 @@ export async function persistReportBundle(b: ReportBundle): Promise<{ reportId?:
     });
   }
 
-  for (const s of b.signatures) {
-    const path = await uploadSignaturePng(report.id, s.blob, s.papel, `${Date.now()}_${seq++}`);
+  for (const [index, s] of b.signatures.entries()) {
+    const signatureId = stableBundleUuid(b.clientUuid, 'signature', index);
+    const path = await uploadSignaturePng(report.id, s.blob, s.papel, signatureId);
     pathById[s.sigId] = path;
     await insertSignature({
-      id: '',
+      id: signatureId,
       reportId: report.id,
       papel: s.papel,
       nome: s.nome,
@@ -206,13 +246,22 @@ export async function persistReportBundle(b: ReportBundle): Promise<{ reportId?:
       return item;
     });
   };
-  for (const a of b.answers) {
-    await upsertAnswer({ id: '', reportId: report.id, secao: a.secao, fieldKey: a.fieldKey, valor: clean(a.valor) });
+  for (const [index, a] of b.answers.entries()) {
+    await upsertAnswer({ id: stableBundleUuid(b.clientUuid, 'answer', index), reportId: report.id, secao: a.secao, fieldKey: a.fieldKey, valor: clean(a.valor) });
   }
   if (b.report.tipo === 'LEVANTAMENTO') await replaceSurveyRequirements(report.id, b.answers);
 
-  for (const p of b.pendencias) {
-    await insertPendencia({ ...p, reportOrigemId: report.id });
+  const existingPendencias = resumed ? await fetchPendenciasForReconciliation(report.id) : [];
+  const legacyCounts = new Map<string, number>();
+  existingPendencias.forEach((p) => legacyCounts.set(pendenciaFingerprint(p), (legacyCounts.get(pendenciaFingerprint(p)) || 0) + 1));
+  for (const [index, p] of b.pendencias.entries()) {
+    const fingerprint = pendenciaFingerprint(p);
+    const existingCount = legacyCounts.get(fingerprint) || 0;
+    if (existingCount > 0) {
+      legacyCounts.set(fingerprint, existingCount - 1);
+      continue;
+    }
+    await insertPendencia({ ...p, id: stableBundleUuid(b.clientUuid, 'pendencia', index), reportOrigemId: report.id });
   }
 
   await updateReport({
@@ -260,7 +309,7 @@ export async function persistReportBundle(b: ReportBundle): Promise<{ reportId?:
     }
   }
 
-  return { reportId: report.id };
+  return { reportId: report.id, duplicate: resumed || undefined };
 }
 
 /* -------------------------------- Outbox ---------------------------------- */
@@ -280,6 +329,25 @@ export async function removeBundle(clientUuid: string): Promise<void> {
   await idbDelete(STORE_OUTBOX, clientUuid);
 }
 
+export async function isReportTombstoned(clientUuid: string): Promise<boolean> {
+  return !!(await idbGet(STORE_REPORT_TOMBSTONES, clientUuid));
+}
+
+/** Cancela de forma durável qualquer sync capaz de recriar um report excluído. */
+export async function cancelReportBundle(clientUuid?: string): Promise<void> {
+  if (!clientUuid || !offlineAvailable()) return;
+  await idbPut(STORE_REPORT_TOMBSTONES, { clientUuid, deletedAt: new Date().toISOString() }, clientUuid);
+  await removeBundle(clientUuid);
+}
+
+/** Limpeza dirigida dos quatro bundles antigos cuja exclusão foi autorizada. */
+export async function purgeDeletedLegacyReportBundles(): Promise<void> {
+  const deletedNumbers = new Set(['LEV-2026-25460', 'COR-2026-07971', 'LEV-2026-86393', 'LEV-2026-67899']);
+  for (const bundle of await listBundles()) {
+    if (bundle.report.numero && deletedNumbers.has(bundle.report.numero)) await cancelReportBundle(bundle.clientUuid);
+  }
+}
+
 export async function pendingCount(): Promise<number> {
   await migrateLegacyReportBundles();
   const owner = getOutboxOwner();
@@ -296,7 +364,11 @@ async function migrateLegacyReportBundles(): Promise<void> {
 }
 
 registerOfflineHandler<ReportBundle>('REPORT', async (job) => {
+  if (await isReportTombstoned(job.entityClientUuid)) return;
   await persistReportBundle(job.payload);
+  if (job.payload.draftKey && typeof window !== 'undefined') {
+    try { window.localStorage.removeItem(job.payload.draftKey); } catch { /* indisponível */ }
+  }
 });
 
 /** Replica todos os bundles pendentes. Remove os sincronizados/duplicados. */

@@ -77,6 +77,13 @@ export async function createReport(r: ReportInstance): Promise<ReportInstance> {
   return rowToReport(data);
 }
 
+export async function fetchReportByClientUuid(clientUuid: string): Promise<ReportInstance | null> {
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase.from('reports').select('*').eq('client_uuid', clientUuid).maybeSingle();
+  if (error) throw error;
+  return data ? rowToReport(data) : null;
+}
+
 export async function updateReport(r: ReportInstance): Promise<ReportInstance> {
   const supabase = getSupabaseClient() as any;
   const { data, error } = await supabase.from('reports').update(reportToRow(r)).eq('id', r.id).select().single();
@@ -115,6 +122,32 @@ export async function deleteReport(id: string): Promise<void> {
   const supabase = getSupabaseClient() as any;
   const { error } = await supabase.from('reports').delete().eq('id', id);
   if (error) throw error;
+}
+
+
+/** Hard delete canônico: o banco valida perfil e vínculos operacionais numa transação. */
+export async function safelyDeleteReport(id: string): Promise<{ clientUuid?: string; storagePaths: string[] }> {
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase.rpc('delete_report_if_unused', { p_report_id: id });
+  if (error) throw error;
+  const result = (data || {}) as { client_uuid?: string | null; storage_paths?: string[] };
+  return { clientUuid: result.client_uuid || undefined, storagePaths: result.storage_paths || [] };
+}
+
+/**
+ * Um retry recomeça apenas os children internos mutáveis de um report ainda em
+ * rascunho. Pendências são reconciliadas separadamente para não destruir uso
+ * operacional. O report principal e seu snapshot permanecem canônicos.
+ */
+export async function resetIncompleteReportChildren(reportId: string): Promise<void> {
+  const supabase = getSupabaseClient() as any;
+  const tables = [
+    'report_answers', 'report_media', 'report_signatures',
+    'report_required_materials', 'report_required_services', 'report_measurements',
+  ];
+  const results = await Promise.all(tables.map((table) => supabase.from(table).delete().eq('report_id', reportId)));
+  const failed = results.find((result: any) => result.error);
+  if (failed?.error) throw failed.error;
 }
 
 /* --------------------------- report_answers (v2.0) --------------------------- */
@@ -231,9 +264,11 @@ export async function fetchBandeja(reportId: string): Promise<ReportMedia[]> {
 
 export async function insertMedia(m: ReportMedia): Promise<ReportMedia> {
   const supabase = getSupabaseClient() as any;
-  const { id, ...rest } = mediaToRow(m);
-  void id;
-  const { data, error } = await supabase.from('report_media').insert(rest).select().single();
+  const row = mediaToRow(m);
+  const query = m.id
+    ? supabase.from('report_media').upsert(row, { onConflict: 'id' })
+    : supabase.from('report_media').insert(row);
+  const { data, error } = await query.select().single();
   if (error) throw error;
   return rowToMedia(data);
 }

@@ -674,6 +674,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
     return {
       clientUuid: newClientUuid(),
       createdAt: new Date().toISOString(),
+      draftKey: rascunhoKey,
       report: {
         templateId,
         templateCodigo: template.codigo,
@@ -780,7 +781,9 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       setOfflineSaved(!syncedNow);
       setSavedInfo({ reportId: syncedNow ? '' : bundle.clientUuid, count: bundle.pendCount });
       setFinalized(true);
-      try { window.localStorage.removeItem(rascunhoKey); } catch { /* noop */ }
+      if (syncedNow) {
+        try { window.localStorage.removeItem(rascunhoKey); } catch { /* noop */ }
+      }
       onSaved();
       // Baixa de estoque dos materiais aplicados (Corretiva).
       onConsumeMaterials?.(collectConsumedMaterials(), { numero: bundle.report.numero, clienteNome: cliente?.name });

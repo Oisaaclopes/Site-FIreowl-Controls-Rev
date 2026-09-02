@@ -84,11 +84,22 @@ export async function fetchPendencias(
 
 export async function insertPendencia(p: Pendencia): Promise<Pendencia> {
   const supabase = getSupabaseClient() as any;
-  const { id, ...rest } = pendenciaToRow(p); // banco gera o uuid
-  void id;
-  const { data, error } = await supabase.from(TABLE).insert(rest).select().single();
+  const row = pendenciaToRow(p);
+  const { data, error } = p.id
+    ? await supabase.from(TABLE).upsert(row, { onConflict: 'id', ignoreDuplicates: true }).select().maybeSingle()
+    : await supabase.from(TABLE).insert(row).select().single();
   if (error) throw error;
-  return rowToPendencia(data);
+  return data ? rowToPendencia(data) : p;
+}
+
+/** Leitura mínima para reconciliar um bundle parcial sem duplicar pendências legadas. */
+export async function fetchPendenciasForReconciliation(reportId: string): Promise<Pendencia[]> {
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase.from(TABLE)
+    .select('id,cliente_id,device_id,report_origem_id,grupo,descricao,acao_recomendada,norma_referencia,local,quantidade,unidade,item_catalogo_id,item_texto_livre,precisa_cadastro_catalogo,status,proposta_id,report_execucao_id,criada_em,resolvida_em')
+    .eq('report_origem_id', reportId);
+  if (error) throw error;
+  return (data || []).map(rowToPendencia);
 }
 
 /** Atualiza a pendência (status, criticidade, vínculo à proposta...). Admin/Gestor. */

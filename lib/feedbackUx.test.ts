@@ -22,8 +22,8 @@ describe('Feedback Fireowl sem dialogs nativos', () => {
 
   it('identifica o relatório e publica feedback de sucesso e erro', () => {
     expect(reports).toContain("title: 'Excluir relatório?'");
-    expect(reports).toContain("confirmLabel: 'Excluir relatório'");
+    expect(reports).toContain("confirmLabel: 'Excluir permanentemente'");
     expect(reports).toContain("showToast('Relatório excluído com sucesso.', 'success')");
-    expect(reports).toContain("showToast('Não foi possível excluir o relatório. Tente novamente.', 'error')");
+    expect(reports).toContain("'Não foi possível excluir o relatório. O registro foi mantido.'");
   });
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Client,
   InventoryItem,
@@ -21,7 +21,7 @@ import { TemplateSchema } from '@/lib/reportSchema';
 import { CatalogSources } from '@/components/reports/FormEngine';
 import { ReportForm } from '@/components/reports/ReportForm';
 import { isSupabaseConfigured } from '@/lib/inventory';
-import { fetchReports, updateReport, deleteReport } from '@/lib/reports';
+import { fetchReports, updateReport, safelyDeleteReport } from '@/lib/reports';
 import { fetchPendencias, updatePendenciaStatus } from '@/lib/pendencias';
 import { fetchDevices } from '@/lib/devices';
 import { fetchOrdensServico, updateOrdemServico } from '@/lib/ordensServico';
@@ -29,7 +29,8 @@ import { fetchAssignableTechnicians, ManagedUser } from '@/lib/users';
 import { useToast, useConfirm, showToast, requestConfirm } from '@/components/ui/Feedback';
 import { ClientSelector } from '@/components/clients/ClientSelector';
 import { fetchCicloAtivo, quotaPorVisita } from '@/lib/ciclos';
-import { flushOutbox, pendingCount, isOnline } from '@/lib/offline/reportSync';
+import { cancelReportBundle, flushOutbox, pendingCount, isOnline, purgeDeletedLegacyReportBundles } from '@/lib/offline/reportSync';
+import { removeReportPhoto } from '@/lib/reportMedia';
 import { EmptyState } from '@/components/EmptyState';
 import { GRUPOS_FALHA, falhasPorArea, AreaFalha } from '@/lib/catalogoFalhas';
 import { fetchTemplates } from '@/lib/reportTemplates';
@@ -39,6 +40,7 @@ import { PendenciasBoard } from '@/components/reports/PendenciasBoard';
 import { createOrderFromSurvey } from '@/lib/surveyOrderConversion';
 import { fetchPedidos } from '@/lib/pedidos';
 import { centralModelsForBrand, centralType, manufacturersForArea } from '@/lib/technicalCatalogSelection';
+import { canHardDeleteReport, filterReports, isLatestReportRefresh } from '@/lib/reportList';
 
 /** Template disponível ao motor: o schema + o id no banco (quando veio do DB). */
 interface LoadedTemplate {
@@ -141,7 +143,6 @@ function buildProvisionalInventory(data: {
     pendenteValidacao: true,
   };
 }
-const olderThan15d = (iso?: string) => !!iso && Date.now() - new Date(iso).getTime() > 15 * 864e5;
 const shortId = (id: string) => `#${id.slice(0, 8)}`;
 const fmtDate = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '—');
 
@@ -179,7 +180,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const isTecnico = userRole === 'TECNICO';
   const isFinanceiro = userRole === 'FINANCEIRO';
   const canCreate = !isFinanceiro; // §6.1 RBAC: criar relatório — admin/gestor/técnico
-  const canManage = userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR'; // editar/excluir relatório
+  const canManage = canHardDeleteReport(userRole); // editar/excluir relatório
 
   const [mode, setMode] = useState<'index' | 'form'>('index');
   const [board, setBoard] = useState<'atendimentos' | 'relatorios' | 'pendencias'>('atendimentos');
@@ -187,6 +188,8 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const [reportPreview, setReportPreview] = useState<ReportInstance | null>(null);
   const [creatingOrderFromReport, setCreatingOrderFromReport] = useState<string | null>(null);
   const [reports, setReports] = useState<ReportInstance[]>([]);
+  const refreshGeneration = useRef(0);
+  const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
   const [surveyOrders, setSurveyOrders] = useState<Pedido[]>([]);
   const [pendencias, setPendencias] = useState<Pendencia[]>([]);
   const [ordens, setOrdens] = useState<OrdemServico[]>([]);
@@ -439,20 +442,38 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   };
 
   const handleDeleteReport = async (r: ReportInstance) => {
+    if (deletingReportId) return;
     const numero = r.numero || shortId(r.id);
     await requestConfirm({
       title: 'Excluir relatório?',
-      message: `${numero}\n${clientName(r.clienteId)}\n${TIPO_LABEL[r.tipo] || r.tipo}\n\nEste relatório e seus dados associados serão excluídos conforme as regras atuais do sistema.\n\nEsta ação não pode ser desfeita.`,
-      confirmLabel: 'Excluir relatório',
+      message: `${numero}\n${clientName(r.clienteId)}\n${TIPO_LABEL[r.tipo] || r.tipo}\n\nEste relatório será excluído permanentemente. Esta ação só é permitida quando não existem vínculos operacionais que precisem ser preservados.`,
+      confirmLabel: 'Excluir permanentemente',
       danger: true,
       action: async () => {
         try {
-          if (isSupabaseConfigured()) await deleteReport(r.id);
+          setDeletingReportId(r.id);
+          const result = isSupabaseConfigured()
+            ? await safelyDeleteReport(r.id)
+            : { clientUuid: r.clientUuid, storagePaths: [] };
+          // Invalida qualquer resposta de refresh iniciada antes da confirmação.
+          refreshGeneration.current += 1;
+          await cancelReportBundle(result.clientUuid || r.clientUuid);
+          try {
+            window.localStorage.removeItem(`fireowl_atendimento_rascunho:${r.templateCodigo}:${r.clienteId || 'sem_cliente'}:${r.osId || 'avulso'}`);
+          } catch { /* armazenamento local indisponível */ }
+          // O registro já foi removido de forma atômica; limpeza de binários é
+          // best-effort e não pode ressuscitar nem invalidar o delete confirmado.
+          await Promise.allSettled(result.storagePaths.map((path) => removeReportPhoto(path)));
           setReports((prev) => prev.filter((x) => x.id !== r.id));
           showToast('Relatório excluído com sucesso.', 'success');
         } catch (e) {
           console.error('Falha ao excluir relatório:', e);
-          showToast('Não foi possível excluir o relatório. Tente novamente.', 'error');
+          const message = e instanceof Error && /vínculos operacionais|preservado/i.test(e.message)
+            ? 'Este relatório possui vínculos operacionais e precisa ser preservado.'
+            : 'Não foi possível excluir o relatório. O registro foi mantido.';
+          showToast(message, 'error');
+        } finally {
+          setDeletingReportId(null);
         }
       },
     });
@@ -487,16 +508,18 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 
   const refresh = () => {
     if (!isSupabaseConfigured()) return;
+    const generation = ++refreshGeneration.current;
     setLoading(true);
     Promise.all([fetchReports(), fetchPendencias(userRole), fetchOrdensServico(), fetchPedidos().catch(() => [])])
       .then(([rs, ps, os, pedidos]) => {
+        if (!isLatestReportRefresh(refreshGeneration.current, generation)) return;
         setReports(rs);
         setPendencias(ps);
         setOrdens(os);
         setSurveyOrders(pedidos);
       })
-      .catch((err) => console.warn('Relatórios: falha ao carregar.', err))
-      .finally(() => setLoading(false));
+      .catch((err) => { if (isLatestReportRefresh(refreshGeneration.current, generation)) console.warn('Relatórios: falha ao carregar.', err); })
+      .finally(() => { if (isLatestReportRefresh(refreshGeneration.current, generation)) setLoading(false); });
     pendingCount().then(setOfflinePend).catch(() => {});
   };
 
@@ -525,6 +548,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   };
 
   useEffect(() => {
+    purgeDeletedLegacyReportBundles().catch((error) => console.warn('Não foi possível limpar bundles legados excluídos.', error));
     refresh();
     loadTemplates();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -611,52 +635,18 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     return m;
   }, [pendencias]);
 
-  // ---- Indicadores Bloco A (ação necessária) ----
-  const indA = useMemo(() => {
-    const rascunhos = reports.filter((r) => r.status === 'rascunho').length;
-    const pendAbertas15 = pendencias.filter((p) => p.status === 'aberta' && !p.propostaId && olderThan15d(p.criadaEm)).length;
-    const pendAprovadasSemExec = pendencias.filter((p) => p.status === 'aprovada' && !p.reportExecucaoId).length;
-    const provisorios = clients.filter((c) => c.pendenteValidacao).length;
-    return { rascunhos, pendAbertas15, pendAprovadasSemExec, provisorios };
-  }, [reports, pendencias, clients]);
-
-  // ---- Indicadores Bloco B (volume do mês) — oculto para técnico ----
+  // KPIs compactos da fonte canônica remota; não incluem drafts locais.
   const indB = useMemo(() => {
-    const now = new Date();
-    const noMes = reports.filter((r) => {
-      const d = r.finalizadoEm || r.iniciadoEm;
-      if (!d) return false;
-      const dt = new Date(d);
-      return dt.getFullYear() === now.getFullYear() && dt.getMonth() === now.getMonth();
-    });
     const porTipo: Record<string, number> = { LEVANTAMENTO: 0, CORRETIVA: 0, PREVENTIVA: 0 };
-    noMes.forEach((r) => (porTipo[r.tipo] = (porTipo[r.tipo] || 0) + 1));
+    reports.forEach((r) => (porTipo[r.tipo] = (porTipo[r.tipo] || 0) + 1));
     const detectadas = pendencias.length;
     const convertidas = pendencias.filter((p) => p.propostaId).length;
-    return { totalMes: noMes.length, porTipo, detectadas, convertidas };
+    return { total: reports.length, porTipo, detectadas, convertidas };
   }, [reports, pendencias]);
 
   // ---- Lista filtrada ----
   const filtered = useMemo(() => {
-    const s = search.trim().toLowerCase();
-    return reports
-      .filter((r) => (fTipo === 'TODOS' ? true : r.tipo === fTipo))
-      .filter((r) => (fStatus === 'TODOS' ? true : r.status === fStatus))
-      .filter((r) => {
-        if (!s) return true;
-        return (
-          r.id.toLowerCase().includes(s) ||
-          clientName(r.clienteId).toLowerCase().includes(s) ||
-          (r.local || '').toLowerCase().includes(s)
-        );
-      })
-      .sort((a, b) => {
-        if (a.status === 'rascunho' && b.status !== 'rascunho') return -1;
-        if (b.status === 'rascunho' && a.status !== 'rascunho') return 1;
-        const da = new Date(a.finalizadoEm || a.iniciadoEm || 0).getTime();
-        const db = new Date(b.finalizadoEm || b.iniciadoEm || 0).getTime();
-        return db - da;
-      });
+    return filterReports(reports, { tipo: fTipo, status: fStatus, search }, clientName);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reports, fTipo, fStatus, search, clients]);
 
@@ -1128,10 +1118,10 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       {/* Header */}
       <div className="flex flex-row items-center justify-between gap-3 border-b border-slate-200 pb-3">
         <div className="min-w-0">
-          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Atendimentos de Campo — SDAI</span>
           <h1 className="text-lg md:text-2xl font-bold text-slate-900 tracking-tight truncate">
-            {isTecnico ? 'Meu trabalho' : 'Acompanhamento de Atendimentos'}
+            Acompanhamento de Atendimentos
           </h1>
+          <p className="mt-1 text-xs text-slate-500">Relatórios técnicos, levantamentos e atendimentos executados.</p>
         </div>
         <div className="flex items-center gap-2">
           {/* Propostas comerciais são tratadas no módulo PEDIDOS. A partir de um
@@ -1251,33 +1241,18 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 
       {board === 'relatorios' && (
       <>
-      {/* Bloco A — Ação necessária (chips clicáveis) */}
-      <div className="flex gap-3 overflow-x-auto pb-1">
-        <IndChip label="Rascunhos" value={indA.rascunhos} tone="slate" onClick={() => setFStatus('rascunho')} />
-        {!isTecnico && (
-          <>
-            <IndChip label="Pendências >15 dias" value={indA.pendAbertas15} tone="red" />
-            <IndChip label="Aprovadas sem execução" value={indA.pendAprovadasSemExec} tone="amber" />
-            <IndChip label="Cadastros provisórios" value={indA.provisorios} tone="brand" />
-          </>
-        )}
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2" aria-label="Indicadores de relatórios">
+        <VolCard label="Total" value={indB.total} />
+        <VolCard label="Levantamentos" value={indB.porTipo.LEVANTAMENTO} />
+        <VolCard label="Preventivas" value={indB.porTipo.PREVENTIVA} />
+        <VolCard label="Corretivas" value={indB.porTipo.CORRETIVA} />
+        <VolCard label="Pendências" value={indB.detectadas} />
+        {!isTecnico && <VolCard label="Convertidas" value={indB.convertidas} />}
       </div>
 
-      {/* Bloco B — Volume do mês (oculto para técnico) */}
-      {!isTecnico && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <VolCard label="Relatórios no mês" value={indB.totalMes} />
-          <VolCard label="Levantamentos" value={indB.porTipo.LEVANTAMENTO} />
-          <VolCard label="Corretivas" value={indB.porTipo.CORRETIVA} />
-          <VolCard label="Preventivas" value={indB.porTipo.PREVENTIVA} />
-          <VolCard label="Pendências detectadas" value={indB.detectadas} />
-          <VolCard label="Convertidas em proposta" value={indB.convertidas} />
-        </div>
-      )}
-
       {/* Filtros */}
-      <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
-        <div className="relative w-full sm:w-72">
+      <div className="flex flex-col gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+        <div className="relative w-full">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
           <input
             type="text"
@@ -1287,7 +1262,10 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
             className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
           />
         </div>
-        <div className="flex gap-1.5 overflow-x-auto">
+        <div className="grid gap-3 xl:grid-cols-2">
+          <fieldset className="min-w-0">
+            <legend className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">Tipo</legend>
+            <div className="flex gap-1.5 overflow-x-auto pb-1">
           {['TODOS', 'LEVANTAMENTO', 'CORRETIVA', 'PREVENTIVA'].map((t) => (
             <button
               key={t}
@@ -1299,6 +1277,11 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
               {t === 'TODOS' ? 'Todos' : TIPO_LABEL[t]}
             </button>
           ))}
+            </div>
+          </fieldset>
+          <fieldset className="min-w-0">
+            <legend className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">Status</legend>
+            <div className="flex gap-1.5 overflow-x-auto pb-1">
           {['TODOS', 'rascunho', 'finalizado'].map((st) => (
             <button
               key={st}
@@ -1307,22 +1290,28 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                 fStatus === st ? 'bg-[#1A1A72] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              {st === 'TODOS' ? 'Status' : st}
+              {st === 'TODOS' ? 'Todos' : st}
             </button>
           ))}
+            </div>
+          </fieldset>
         </div>
       </div>
 
       {/* Lista */}
       {loading ? (
-        <div className="bg-white rounded-xl shadow-sm py-16 text-center text-slate-400 text-sm">Carregando relatórios…</div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3" aria-label="Carregando relatórios" aria-busy="true">
+          {[0, 1, 2].map((item) => <div key={item} className="h-12 animate-pulse rounded-lg bg-slate-100" />)}
+        </div>
       ) : filtered.length === 0 ? (
         <EmptyState
           variant="relatorio"
-          title="Nenhum relatório"
-          description={canCreate ? 'Abra um novo relatório de campo para começar.' : 'Sem relatórios para exibir com os filtros atuais.'}
-          actionLabel={canCreate ? 'Novo atendimento' : undefined}
-          onAction={canCreate ? openWizard : undefined}
+          title={(search || fTipo !== 'TODOS' || fStatus !== 'TODOS') ? 'Nenhum relatório corresponde aos filtros selecionados.' : 'Nenhum relatório finalizado ainda.'}
+          description={(search || fTipo !== 'TODOS' || fStatus !== 'TODOS') ? 'Ajuste a busca ou limpe os filtros para ver outros resultados.' : 'Os relatórios aparecerão aqui após a conclusão e sincronização de um atendimento.'}
+          actionLabel={(search || fTipo !== 'TODOS' || fStatus !== 'TODOS') ? 'Limpar filtros' : canCreate ? 'Novo atendimento' : undefined}
+          onAction={(search || fTipo !== 'TODOS' || fStatus !== 'TODOS')
+            ? () => { setSearch(''); setFTipo('TODOS'); setFStatus('TODOS'); }
+            : canCreate ? openWizard : undefined}
         />
       ) : (
         <>
@@ -1333,8 +1322,8 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
               <tr className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-200">
                 <th className="py-3 px-4">Nº</th>
                 <th className="py-3 px-4">Tipo</th>
-                <th className="py-3 px-4">Cliente</th>
-                {!isTecnico && <th className="py-3 px-4">Técnico</th>}
+                <th className="py-3 px-4">Cliente / Local</th>
+                <th className="py-3 px-4">Técnico</th>
                 <th className="py-3 px-4">Data</th>
                 <th className="py-3 px-4">Status</th>
                 <th className="py-3 px-4 text-center">Pend.</th>
@@ -1345,61 +1334,29 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
               {filtered.map((r) => (
                 <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="py-3 px-4 font-data-mono font-bold text-slate-500">{r.numero || shortId(r.id)}</td>
-                  <td className="py-3 px-4">{TIPO_LABEL[r.tipo] || r.tipo}</td>
-                  <td className="py-3 px-4 font-bold text-slate-900 uppercase">{clientName(r.clienteId)}</td>
-                  {!isTecnico && <td className="py-3 px-4 text-slate-500">{r.tecnicoNome || '—'}</td>}
+                  <td className="py-3 px-4"><span className="rounded-full bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-800">{TIPO_LABEL[r.tipo] || r.tipo}</span></td>
+                  <td className="py-3 px-4"><p className="font-bold text-slate-900 uppercase">{clientName(r.clienteId)}</p><p className="mt-0.5 max-w-xs truncate text-[11px] font-normal text-slate-500">{r.local || 'Local não informado'}</p></td>
+                  <td className="py-3 px-4 text-slate-500">{r.tecnicoNome || '—'}</td>
                   <td className="py-3 px-4 font-data-mono text-slate-500">{fmtDate(r.finalizadoEm || r.iniciadoEm)}</td>
                   <td className="py-3 px-4">
                     <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${STATUS_COLOR[r.status] || 'bg-slate-100 text-slate-700'}`}>
                       {r.status}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-center font-data-mono font-bold text-[#E63946]">{pendCountByReport[r.id] || 0}</td>
+                  <td className={`py-3 px-4 text-center font-data-mono font-bold ${(pendCountByReport[r.id] || 0) > 0 ? 'text-[#E63946]' : 'text-slate-400'}`}>{pendCountByReport[r.id] || 0}</td>
                   <td className="py-3 px-4">
-                    <div className="flex items-center justify-center gap-1">
-                      {surveyOrderFor(r.id) && (
-                        <button onClick={onNavigateToPedidos} title="Abrir Pedido comercial" className="h-8 rounded-lg bg-indigo-50 px-2 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100">
-                          {surveyOrderFor(r.id)?.numeroPedido}
-                        </button>
-                      )}
-                      {r.status === 'finalizado' && (
-                        <button
-                          onClick={() => setReportPreview(r)}
-                          title="Gerar PDF do relatório"
-                          className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#E63946] hover:bg-red-50 transition-colors"
-                        >
-                          <span className="material-symbols-outlined text-lg">picture_as_pdf</span>
-                        </button>
-                      )}
-                      {canManage && r.tipo === 'LEVANTAMENTO' && r.status === 'finalizado' && (
-                        <button
-                          onClick={() => handleCreateOrderFromSurvey(r)}
-                          disabled={creatingOrderFromReport === r.id}
-                          title="Criar pedido a partir das necessidades deste levantamento"
-                          className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#1A1A72] hover:bg-indigo-50 disabled:opacity-50 transition-colors"
-                        >
-                          <span className={`material-symbols-outlined text-lg ${creatingOrderFromReport === r.id ? 'animate-spin' : ''}`}>{creatingOrderFromReport === r.id ? 'progress_activity' : 'request_quote'}</span>
-                        </button>
-                      )}
-                      {canManage && (
-                        <>
-                          <button
-                            onClick={() => openEditReport(r)}
-                            title="Editar dados do relatório"
-                            className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#1A1A72] hover:bg-slate-100 transition-colors"
-                          >
-                            <span className="material-symbols-outlined text-lg">edit</span>
-                          </button>
-                          <button
-                            onClick={() => handleDeleteReport(r)}
-                            title="Excluir relatório"
-                            className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#E63946] hover:bg-red-50 transition-colors"
-                          >
-                            <span className="material-symbols-outlined text-lg">delete</span>
-                          </button>
-                        </>
-                      )}
-                      {r.status !== 'finalizado' && !canManage && <span className="text-slate-300">—</span>}
+                    <div className="flex items-center justify-center gap-2">
+                      <button onClick={() => r.status === 'finalizado' ? setReportPreview(r) : openEditReport(r)} className="min-h-9 rounded-lg bg-[#1A1A72] px-3 text-[11px] font-bold text-white hover:bg-[#12124f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1A1A72]/40">Abrir</button>
+                      <details className="relative">
+                        <summary aria-label={`Mais ações para ${r.numero || shortId(r.id)}`} title="Mais ações" className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1A1A72]/40"><span className="material-symbols-outlined">more_vert</span></summary>
+                        <div className="absolute right-0 z-30 mt-1 w-48 rounded-lg border border-slate-200 bg-white p-1 shadow-xl">
+                          {r.status === 'finalizado' && <button onClick={() => setReportPreview(r)} className="w-full rounded-md px-3 py-2 text-left text-xs hover:bg-slate-50">Visualizar / gerar PDF</button>}
+                          {surveyOrderFor(r.id) && <button onClick={onNavigateToPedidos} className="w-full rounded-md px-3 py-2 text-left text-xs hover:bg-slate-50">Abrir {surveyOrderFor(r.id)?.numeroPedido}</button>}
+                          {canManage && r.tipo === 'LEVANTAMENTO' && r.status === 'finalizado' && <button onClick={() => handleCreateOrderFromSurvey(r)} disabled={creatingOrderFromReport === r.id} className="w-full rounded-md px-3 py-2 text-left text-xs hover:bg-slate-50 disabled:opacity-50">Gerar proposta</button>}
+                          {canManage && <button onClick={() => openEditReport(r)} className="w-full rounded-md px-3 py-2 text-left text-xs hover:bg-slate-50">Editar dados</button>}
+                          {canManage && <div className="mt-1 border-t border-slate-100 pt-1"><button onClick={() => handleDeleteReport(r)} disabled={deletingReportId === r.id} className="w-full rounded-md px-3 py-2 text-left text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">{deletingReportId === r.id ? 'Excluindo…' : 'Excluir permanentemente'}</button></div>}
+                        </div>
+                      </details>
                     </div>
                   </td>
                 </tr>
@@ -1411,14 +1368,15 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         {/* Mobile: lista de cards */}
         <div className="md:hidden flex flex-col gap-2">
           {filtered.map((r) => (
-            <div key={r.id} className="bg-white rounded-lg border border-slate-200 shadow-sm p-3">
+            <article key={r.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-data-mono text-[11px] font-bold text-slate-500">{r.numero || shortId(r.id)}</span>
                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${STATUS_COLOR[r.status] || 'bg-slate-100 text-slate-700'}`}>
                   {r.status}
                 </span>
               </div>
-              <p className="font-bold text-slate-900 text-sm uppercase truncate mt-1">{clientName(r.clienteId)}</p>
+              <p className="mt-2 font-bold text-slate-900 text-sm uppercase truncate">{clientName(r.clienteId)}</p>
+              <p className="mt-0.5 truncate text-xs text-slate-500">{r.local || 'Local não informado'}</p>
               {surveyOrderFor(r.id) && <button onClick={onNavigateToPedidos} className="mt-1 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">Pedido: {surveyOrderFor(r.id)?.numeroPedido}</button>}
               <div className="flex items-center justify-between gap-2 mt-1.5">
                 <span className="text-[11px] text-slate-500 font-data-mono truncate">
@@ -1428,46 +1386,21 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                   {(pendCountByReport[r.id] || 0) > 0 && (
                     <span className="font-data-mono text-[11px] font-bold text-[#E63946]">{pendCountByReport[r.id]} pend.</span>
                   )}
-                  {r.status === 'finalizado' && (
-                    <button
-                      onClick={() => setReportPreview(r)}
-                      title="Gerar PDF do relatório"
-                      className="w-8 h-8 -my-1 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#E63946] hover:bg-red-50 transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-lg">picture_as_pdf</span>
-                    </button>
-                  )}
-                  {canManage && r.tipo === 'LEVANTAMENTO' && r.status === 'finalizado' && (
-                    <button
-                      onClick={() => handleCreateOrderFromSurvey(r)}
-                      disabled={creatingOrderFromReport === r.id}
-                      title="Criar pedido deste levantamento"
-                      className="w-8 h-8 -my-1 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#1A1A72] hover:bg-indigo-50 disabled:opacity-50"
-                    >
-                      <span className={`material-symbols-outlined text-lg ${creatingOrderFromReport === r.id ? 'animate-spin' : ''}`}>{creatingOrderFromReport === r.id ? 'progress_activity' : 'request_quote'}</span>
-                    </button>
-                  )}
-                  {canManage && (
-                    <>
-                      <button
-                        onClick={() => openEditReport(r)}
-                        title="Editar dados do relatório"
-                        className="w-8 h-8 -my-1 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#1A1A72] hover:bg-slate-100 transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-lg">edit</span>
-                      </button>
-                      <button
-                        onClick={() => handleDeleteReport(r)}
-                        title="Excluir relatório"
-                        className="w-8 h-8 -my-1 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#E63946] hover:bg-red-50 transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-lg">delete</span>
-                      </button>
-                    </>
-                  )}
                 </div>
               </div>
-            </div>
+              <div className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-3">
+                <button onClick={() => r.status === 'finalizado' ? setReportPreview(r) : openEditReport(r)} className="min-h-11 flex-1 rounded-lg bg-[#1A1A72] px-4 text-xs font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1A1A72]/40">Abrir</button>
+                <details className="relative">
+                  <summary aria-label={`Mais ações para ${r.numero || shortId(r.id)}`} className="flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center rounded-lg border border-slate-200 text-slate-600"><span className="material-symbols-outlined">more_vert</span></summary>
+                  <div className="absolute bottom-12 right-0 z-30 w-52 rounded-lg border border-slate-200 bg-white p-1 shadow-xl">
+                    {r.status === 'finalizado' && <button onClick={() => setReportPreview(r)} className="w-full rounded-md px-3 py-2.5 text-left text-xs hover:bg-slate-50">Visualizar / gerar PDF</button>}
+                    {canManage && r.tipo === 'LEVANTAMENTO' && r.status === 'finalizado' && <button onClick={() => handleCreateOrderFromSurvey(r)} className="w-full rounded-md px-3 py-2.5 text-left text-xs hover:bg-slate-50">Gerar proposta</button>}
+                    {canManage && <button onClick={() => openEditReport(r)} className="w-full rounded-md px-3 py-2.5 text-left text-xs hover:bg-slate-50">Editar dados</button>}
+                    {canManage && <div className="border-t border-slate-100"><button onClick={() => handleDeleteReport(r)} disabled={deletingReportId === r.id} className="w-full rounded-md px-3 py-2.5 text-left text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">Excluir permanentemente</button></div>}
+                  </div>
+                </details>
+              </div>
+            </article>
           ))}
         </div>
         </>
@@ -1802,20 +1735,6 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 };
 
 /* --------------------------- subcomponentes --------------------------- */
-
-const IndChip: React.FC<{ label: string; value: number; tone: 'slate' | 'red' | 'amber' | 'brand'; onClick?: () => void }> = ({ label, value, tone, onClick }) => {
-  const toneCls =
-    tone === 'red' ? 'text-[#E63946]' : tone === 'amber' ? 'text-amber-600' : tone === 'brand' ? 'text-[#1A1A72]' : 'text-slate-900';
-  return (
-    <button
-      onClick={onClick}
-      className={`shrink-0 bg-white border border-slate-200 rounded-lg px-3 py-2 text-left shadow-sm ${onClick ? 'hover:border-slate-300' : 'cursor-default'}`}
-    >
-      <p className={`font-data-mono text-lg font-bold leading-none ${toneCls}`}>{value}</p>
-      <p className="text-[9px] text-slate-500 uppercase tracking-wider whitespace-nowrap mt-0.5">{label}</p>
-    </button>
-  );
-};
 
 const VolCard: React.FC<{ label: string; value: number }> = ({ label, value }) => (
   <div className="bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm">

@@ -6,11 +6,13 @@
  * ------------------------------------------------------------------------- */
 
 const DB_NAME = 'fireowl-offline';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 export const STORE_OUTBOX = 'report_outbox';
 /** Fila de jobs por domínio. Blobs são suportados pelo structured clone do IDB. */
 export const STORE_OFFLINE_JOBS = 'offline_jobs';
-const STORES = [STORE_OUTBOX, STORE_OFFLINE_JOBS];
+/** Identidades excluídas confirmadas; impede ressurreição por outra aba/retry. */
+export const STORE_REPORT_TOMBSTONES = 'report_tombstones';
+const STORES = [STORE_OUTBOX, STORE_OFFLINE_JOBS, STORE_REPORT_TOMBSTONES];
 
 function hasIDB(): boolean {
   return typeof indexedDB !== 'undefined';
