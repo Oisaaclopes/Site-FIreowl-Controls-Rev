@@ -13,6 +13,7 @@ import { isSupabaseConfigured } from '@/lib/inventory';
 import { fetchHolidays, Holiday } from '@/lib/holidays';
 import { fetchDayEntries, createDayEntry, deleteDayEntry, DayEntry, DayEntryKind } from '@/lib/dayentries';
 import { uploadCertificate, signedDocUrl } from '@/lib/storage';
+import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 import { TimecardPDFView } from '@/components/documentos/TimecardPDFView';
 import { nextPunchType, buildPunch } from '@/lib/pontoActions';
 import type { TimecardBlock } from '@/components/documentos/TimecardDocument';
@@ -253,6 +254,7 @@ export const PontoView: React.FC<PontoViewProps> = ({
     loadAdjustments();
     loadDayData();
   }, []);
+  useDomainRefresh('point', async () => { await onReloadPunches?.(); loadAdjustments(); loadDayData(); });
 
   // Resolve o logo institucional uma única vez (não bloqueia o PDF; se falhar,
   // o cabeçalho usa o vetor da marca — nunca quebra).

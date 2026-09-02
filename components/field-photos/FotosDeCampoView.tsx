@@ -31,6 +31,7 @@ import { fetchAssignableTechnicians } from '@/lib/users';
 import { QuickFieldPhotoModal } from './QuickFieldPhotoModal';
 import { gpsLabel } from '@/lib/fieldPhotoGeo';
 import { shareEvidence } from '@/lib/fieldPhotoShare';
+import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 
 type ManagedTech = { id: string; name: string };
 
@@ -95,6 +96,7 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole, technicia
   }, [clients, toast]);
 
   useEffect(() => { void load(); }, [load]);
+  useDomainRefresh('fieldPhotos', load);
   useEffect(() => { if (isManager) fetchAssignableTechnicians().then((list) => setTechs(list.map((u) => ({ id: u.id, name: u.name })))).catch(() => {}); }, [isManager]);
 
   // Miniaturas: blobs locais viram object URL (revogados no cleanup deste efeito);

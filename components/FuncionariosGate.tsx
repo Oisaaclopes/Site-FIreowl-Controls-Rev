@@ -8,6 +8,7 @@ import { isSupabaseConfigured } from '@/lib/inventory';
 import { isStandalone } from '@/lib/pwa';
 import { TabPath } from '@/lib/types';
 import { FirstAccessRequired } from '@/components/FirstAccessRequired';
+import { RealtimeProvider } from '@/lib/realtime/RealtimeProvider';
 
 /**
  * Porta de entrada da Área do Funcionário e barreira de autenticação.
@@ -93,7 +94,7 @@ export function FuncionariosGate({ initialTab }: { initialTab?: TabPath }) {
   if (authUser) {
     if (!authUser.firstAccessCompleted) return <FirstAccessRequired user={authUser} onCompleted={setAuthUser} />;
     return (
-      <CrmApp
+      <RealtimeProvider><CrmApp
         initialRole={authUser.role}
         userId={authUser.id}
         userName={authUser.name}
@@ -102,7 +103,7 @@ export function FuncionariosGate({ initialTab }: { initialTab?: TabPath }) {
         userSchedule={authUser.schedule}
         initialTab={initialTab}
         onLogout={handleLogout}
-      />
+      /></RealtimeProvider>
     );
   }
 

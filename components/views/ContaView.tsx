@@ -11,6 +11,7 @@ import {
   isDocumentoImplementado,
 } from '@/lib/documentos';
 import { fetchClients } from '@/lib/clients';
+import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 import {
   aprovarClienteProvisorio,
   mesclarClienteProvisorio,
@@ -426,6 +427,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
       })
       .finally(() => setUsersLoading(false));
   };
+  useDomainRefresh('employees', refreshUsers, canSwitchRole);
 
   useEffect(() => {
     if (canSwitchRole) refreshUsers();

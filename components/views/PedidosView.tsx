@@ -231,6 +231,12 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   // Modais & Overlays
   const [isProposalModalOpen, setIsProposalModalOpen] = useState(false);
   const [editingPedido, setEditingPedido] = useState<Pedido | null>(null);
+  const [externalPedido, setExternalPedido] = useState<Pedido | null>(null);
+  useEffect(() => {
+    if (!isProposalModalOpen || !editingPedido) { setExternalPedido(null); return; }
+    const latest = pedidos.find((pedido) => pedido.id === editingPedido.id);
+    if (latest && latest.updatedAt !== editingPedido.updatedAt) setExternalPedido(latest);
+  }, [pedidos, editingPedido, isProposalModalOpen]);
   const [comparisonPedido, setComparisonPedido] = useState<Pedido | null>(null);
   // P4 — validação antes de gerar (proposta/orçamento).
   const [validacao, setValidacao] = useState<{ pedido: Pedido; doc: DocumentType; issues: ValidationIssue[] } | null>(null);
@@ -1446,7 +1452,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
         salvando por cima e "perdendo" objetivo, premissas, etc.
       */}
       <CommercialProposalModal
-        key={`${isProposalModalOpen ? 'open' : 'closed'}:${editingPedido?.id ?? 'new'}`}
+        key={`${isProposalModalOpen ? 'open' : 'closed'}:${editingPedido?.id ?? 'new'}:${editingPedido?.updatedAt ?? ''}`}
         isOpen={isProposalModalOpen}
         onClose={() => setIsProposalModalOpen(false)}
         onSave={onSavePedido}
@@ -1464,6 +1470,15 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
         onPreviewPDF={(ped) => setPdfPreviewPedido(ped)}
         nextProposalNumber={nextProposalNumber}
       />
+      {externalPedido && isProposalModalOpen && (
+        <div className="fixed top-16 left-1/2 z-[100] -translate-x-1/2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 shadow-lg text-sm text-amber-950" role="status">
+          <p className="font-semibold">Este registro foi atualizado em outro dispositivo.</p>
+          <div className="mt-2 flex gap-2">
+            <button type="button" className="rounded bg-amber-700 px-3 py-1.5 text-xs font-bold text-white" onClick={() => { setEditingPedido(externalPedido); setExternalPedido(null); }}>Recarregar dados</button>
+            <button type="button" className="rounded border border-amber-400 px-3 py-1.5 text-xs font-bold" onClick={() => setExternalPedido(null)}>Continuar edição</button>
+          </div>
+        </div>
+      )}
 
       {comparisonPedido && <RevisionComparisonModal pedido={comparisonPedido} onClose={() => setComparisonPedido(null)} />}
 

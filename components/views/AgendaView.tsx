@@ -9,6 +9,7 @@ import { fetchContracts } from '@/lib/contracts';
 import { fetchClients } from '@/lib/clients';
 import { fetchScheduledExecutions, generateOsFromExecution } from '@/lib/contractRoutines';
 import { fetchAssignableTechnicians, ManagedUser } from '@/lib/users';
+import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 import { useConfirm } from '@/components/ui/Feedback';
 
 interface AgendaViewProps {
@@ -105,6 +106,8 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ onOpenOS, userRole, curr
     } catch (e) { setAviso(e instanceof Error ? e.message : 'Falha ao carregar a agenda.'); } finally { setLoading(false); }
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+  useDomainRefresh('agenda', load);
+  useDomainRefresh('serviceOrders', load);
 
   useEffect(() => {
     setHolidays((prev) => ({ ...fixedNationalHolidays(year), ...prev }));

@@ -97,6 +97,7 @@ import { fetchTransactions, upsertTransaction, deleteTransaction } from '@/lib/t
 import { fetchContracts, upsertContract } from '@/lib/contracts';
 import { fetchSupplyOrders, insertSupplyOrder, updateSupplyOrder } from '@/lib/supplyOrders';
 import { WorkSchedule } from '@/lib/schedule';
+import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 
 let idSeq = 1000;
 function getNextSeq() {
@@ -953,7 +954,6 @@ export function CrmApp({
     } catch {
       /* localStorage indisponível */
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleAddPunch = async (newPunch: TimePunch) => {
@@ -990,6 +990,48 @@ export function CrmApp({
       console.warn('Ponto: falha ao recarregar do Supabase.', err);
     }
   };
+
+  // Realtime atua como invalidação: sempre refaz a consulta autorizada, sem
+  // incorporar payloads do websocket ao estado e sem tocar em estado de modal.
+  const refreshOrders = useCallback(async () => {
+    if (!isSupabaseConfigured()) return;
+    const [nextPedidos, nextOs, nextSupply] = await Promise.all([
+      fetchPedidos(), fetchOrdensServico(), fetchSupplyOrders(),
+    ]);
+    setPedidos(nextPedidos); setOrdensServico(nextOs); setSupplyOrders(nextSupply);
+  }, []);
+  const refreshServiceOrders = useCallback(async () => {
+    if (!isSupabaseConfigured()) return;
+    setOrdensServico(await fetchOrdensServico());
+  }, []);
+  const refreshInventory = useCallback(async () => {
+    if (!isSupabaseConfigured()) return;
+    const [items, orders] = await Promise.all([fetchInventory(), fetchSupplyOrders()]);
+    setInventory(items); setSupplyOrders(orders);
+  }, []);
+  const refreshContracts = useCallback(async () => {
+    if (!isSupabaseConfigured()) return;
+    setContracts(await fetchContracts());
+  }, []);
+  const refreshFinance = useCallback(async () => {
+    if (!isSupabaseConfigured()) return;
+    setTransactions(await fetchTransactions());
+  }, []);
+  const refreshDashboard = useCallback(async () => {
+    if (!isSupabaseConfigured()) return;
+    const [nextPunches, nextPedidos, nextOs, nextContracts, nextTransactions] = await Promise.all([
+      fetchPunches(), fetchPedidos(), fetchOrdensServico(), fetchContracts(), fetchTransactions(),
+    ]);
+    setPunches(nextPunches); setPedidos(nextPedidos); setOrdensServico(nextOs);
+    setContracts(nextContracts); setTransactions(nextTransactions);
+  }, []);
+
+  useDomainRefresh('orders', refreshOrders, currentTab === 'pedidos');
+  useDomainRefresh('serviceOrders', refreshServiceOrders, currentTab === 'pedidos');
+  useDomainRefresh('inventory', refreshInventory, currentTab === 'estoque' || currentTab === 'pedidos');
+  useDomainRefresh('contracts', refreshContracts, currentTab === 'contratos');
+  useDomainRefresh('finance', refreshFinance, currentTab === 'receitas' || currentTab === 'despesas' || currentTab === 'financas');
+  useDomainRefresh('dashboard', refreshDashboard, currentTab === 'painel');
 
   const handleAddQuote = async (newQuote: CustomQuote) => {
     if (isSupabaseConfigured()) {

@@ -39,6 +39,7 @@ import { ReportTechnicalPDFView } from '@/components/documentos/ReportTechnicalP
 import { PendenciasBoard } from '@/components/reports/PendenciasBoard';
 import { createOrderFromSurvey } from '@/lib/surveyOrderConversion';
 import { fetchPedidos } from '@/lib/pedidos';
+import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 import { centralModelsForBrand, centralType, manufacturersForArea } from '@/lib/technicalCatalogSelection';
 import { canHardDeleteReport, filterReports, isLatestReportRefresh } from '@/lib/reportList';
 
@@ -522,6 +523,10 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       .finally(() => { if (isLatestReportRefresh(refreshGeneration.current, generation)) setLoading(false); });
     pendingCount().then(setOfflinePend).catch(() => {});
   };
+
+  useDomainRefresh('reports', refresh, mode === 'index');
+  useDomainRefresh('pending', refresh, mode === 'index');
+  useDomainRefresh('serviceOrders', refresh, mode === 'index');
 
   // Carrega templates do banco; se vazio e admin, semeia os empacotados.
   const loadTemplates = async () => {
