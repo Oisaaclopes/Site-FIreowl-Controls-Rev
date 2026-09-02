@@ -734,6 +734,7 @@ export interface ClientEquipment {
 
 export interface TimePunch {
   id: string;
+  userId?: string;
   employeeName: string;
   timestamp: string;
   type: 'ENTRADA' | 'PAUSA' | 'RETORNO' | 'SAIDA';
@@ -745,6 +746,14 @@ export interface TimePunch {
   notes?: string;
   at?: number; // epoch ms do registro (para cálculos de jornada)
   accuracy?: number; // precisão do GPS em metros
+  /** Metadados da resolução canônica: a evidência original nunca é sobrescrita. */
+  originalAt?: number;
+  effectiveSource?: 'original' | 'adjusted';
+  adjustmentId?: string;
+  adjustmentReason?: string;
+  adjustmentRequestedAt?: string;
+  adjustmentApprovedAt?: string;
+  adjustmentApprovedBy?: string;
 }
 
 export interface TechnicalReportSDAI {

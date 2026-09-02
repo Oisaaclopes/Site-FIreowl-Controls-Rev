@@ -10,6 +10,9 @@ describe('mapa tabela para domínio', () => {
     expect(domainsForTable('time_punches')).toEqual(['point', 'employees', 'dashboard']);
     expect(domainsForTable('time_punches')).not.toContain('inventory');
   });
+  it('ajuste aprovado invalida ponto e dashboard sem criar outra assinatura', () => {
+    expect(domainsForTable('punch_adjustments')).toEqual(['point', 'dashboard']);
+  });
   it('mapeia pedido, relatório e OS com suas dependências', () => {
     expect(domainsForTable('pedidos')).toEqual(['orders', 'dashboard']);
     expect(domainsForTable('reports')).toEqual(['reports', 'dashboard']);

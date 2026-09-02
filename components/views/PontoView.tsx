@@ -8,7 +8,6 @@ import { resolveLogoDataUrls } from '@/lib/institucional';
 import { DataListRow, Badge } from '@/components/DataListRow';
 import { WorkSchedule, DEFAULT_SCHEDULE, normalizeSchedule, hmToMinutes, WEEKDAY_SHORT } from '@/lib/schedule';
 import { fetchAdjustments, createAdjustment, updateAdjustmentStatus, PunchAdjustment } from '@/lib/adjustments';
-import { insertPunchForUser, updatePunchTime } from '@/lib/timepunch';
 import { isSupabaseConfigured } from '@/lib/inventory';
 import { fetchHolidays, Holiday } from '@/lib/holidays';
 import { fetchDayEntries, createDayEntry, deleteDayEntry, DayEntry, DayEntryKind } from '@/lib/dayentries';
@@ -16,6 +15,7 @@ import { uploadCertificate, signedDocUrl } from '@/lib/storage';
 import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 import { TimecardPDFView } from '@/components/documentos/TimecardPDFView';
 import { nextPunchType, buildPunch } from '@/lib/pontoActions';
+import { effectivePunchLabel } from '@/lib/effectivePunches';
 import type { TimecardBlock } from '@/components/documentos/TimecardDocument';
 import {
   buildDailyTimeRecords,
@@ -459,12 +459,22 @@ export const PontoView: React.FC<PontoViewProps> = ({
     if (adjSaving || !adjForm.refDate || !adjForm.reason.trim()) return;
     setAdjSaving(true);
     try {
+      const matching = punches.filter((p) => {
+        const originalAt = p.originalAt ?? p.at;
+        return p.employeeName === currentUser && p.type === adjForm.type && originalAt != null
+          && fmtDateInput(new Date(originalAt)) === adjForm.refDate;
+      });
+      if (matching.length > 1) {
+        showToast('Há mais de uma batida desse tipo no dia. Selecione um registro específico antes de solicitar o ajuste.');
+        return;
+      }
       await createAdjustment({
         employeeName: currentUser,
         refDate: adjForm.refDate,
         type: adjForm.type,
         requestedTime: adjForm.time,
         reason: adjForm.reason.trim(),
+        originalPunchId: matching[0]?.id,
       });
       setShowAdj(false);
       loadAdjustments();
@@ -476,39 +486,27 @@ export const PontoView: React.FC<PontoViewProps> = ({
     }
   };
   const [adjBusy, setAdjBusy] = useState<string | null>(null);
+  const [selectedAdjustedPunch, setSelectedAdjustedPunch] = useState<TimePunch | null>(null);
   const reviewAdj = async (a: PunchAdjustment, status: 'APROVADO' | 'REJEITADO') => {
     if (adjBusy) return;
     setAdjBusy(a.id);
     try {
-      // Ao APROVAR, materializa a batida corrigida no ponto do funcionário.
-      if (status === 'APROVADO' && a.requestedTime) {
-        const atMs = new Date(`${a.refDate}T${a.requestedTime}:00`).getTime();
-        if (!Number.isNaN(atMs)) {
-          const existing = punches.find(
-            (p) => p.employeeName === a.employeeName && p.type === a.type && p.at && sameDay(p.at, atMs)
-          );
-          if (existing) {
-            await updatePunchTime(existing.id, atMs);
-          } else if (a.userId) {
-            await insertPunchForUser({
-              userId: a.userId,
-              employeeName: a.employeeName,
-              type: a.type,
-              atMs,
-            });
-          } else {
-            showToast(
-              'Solicitação aprovada, mas não foi possível criar a batida automaticamente (funcionário sem vínculo de usuário). Ajuste manualmente se necessário.'
-            );
-          }
-        }
-      } else if (status === 'APROVADO' && !a.requestedTime) {
+      if (status === 'APROVADO' && !a.requestedTime) {
         showToast('Aprovado. Como a solicitação não informou o horário, nenhuma batida foi criada automaticamente.');
       }
-
-      await updateAdjustmentStatus(a.id, status);
-      setAdjustments((prev) => prev.map((x) => (x.id === a.id ? { ...x, status } : x)));
-      if (status === 'APROVADO') await onReloadPunches?.();
+      const matching = punches.filter((p) => {
+        const originalAt = p.originalAt ?? p.at;
+        return p.employeeName === a.employeeName && p.type === a.type && originalAt != null
+          && fmtDateInput(new Date(originalAt)) === a.refDate;
+      });
+      const originalPunchId = a.originalPunchId || (matching.length === 1 ? matching[0].id : undefined);
+      if (status === 'APROVADO' && matching.length > 1 && !originalPunchId) {
+        showToast('Aprovação bloqueada: há mais de uma batida compatível e o ajuste não identifica a original.');
+        return;
+      }
+      await updateAdjustmentStatus(a.id, status, undefined, { originalPunchId, reviewerName: currentUser });
+      loadAdjustments();
+      await onReloadPunches?.();
     } catch (err) {
       console.error('Falha ao revisar solicitação:', err);
       showToast('Não foi possível atualizar a solicitação. Verifique se as migrações do ponto foram aplicadas.');
@@ -1404,6 +1402,7 @@ export const PontoView: React.FC<PontoViewProps> = ({
             {filteredRecentPunches.map((p) => (
               <DataListRow
                 key={p.id}
+                onClick={p.effectiveSource === 'adjusted' && p.originalAt != null ? () => setSelectedAdjustedPunch(p) : undefined}
                 leading={
                   <span className="w-10 h-10 rounded-full bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-lg">person</span>
@@ -1442,8 +1441,8 @@ export const PontoView: React.FC<PontoViewProps> = ({
                     <Badge color={p.type === 'ENTRADA' ? 'emerald' : p.type === 'PAUSA' ? 'amber' : p.type === 'SAIDA' ? 'red' : 'blue'}>
                       {p.type}
                     </Badge>
-                    <Badge color={p.status === 'AJUSTADO' ? 'blue' : p.status === 'PENDENTE' ? 'amber' : 'emerald'} outline>
-                      {p.status === 'AJUSTADO' ? 'Ajustado' : p.status === 'PENDENTE' ? 'Pendente' : 'Registro original'}
+                    <Badge color={p.effectiveSource === 'adjusted' ? 'blue' : p.status === 'PENDENTE' ? 'amber' : 'emerald'} outline>
+                      {effectivePunchLabel(p)}
                     </Badge>
                   </>
                 }
@@ -1452,6 +1451,27 @@ export const PontoView: React.FC<PontoViewProps> = ({
           </div>
         )}
       </div>
+
+      {selectedAdjustedPunch && (
+        <div className="fixed inset-0 z-50 bg-[#1A1A72]/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setSelectedAdjustedPunch(null)}>
+          <div className="bg-white max-w-md w-full rounded-xl border border-slate-200 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <h3 className="font-display text-base font-bold text-[#1A1A72] uppercase tracking-wide">Detalhes do registro ajustado</h3>
+              <button onClick={() => setSelectedAdjustedPunch(null)} className="text-slate-400 hover:text-slate-700 font-bold text-xl" aria-label="Fechar">✕</button>
+            </div>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 px-6 py-5 text-xs">
+              <div><dt className={labelCls}>Horário original</dt><dd className="font-data-mono font-semibold">{selectedAdjustedPunch.originalAt ? fmtClock(new Date(selectedAdjustedPunch.originalAt)) : '—'}</dd></div>
+              <div><dt className={labelCls}>Horário ajustado</dt><dd className="font-data-mono font-semibold text-[#1A1A72]">{selectedAdjustedPunch.at ? fmtClock(new Date(selectedAdjustedPunch.at)) : '—'}</dd></div>
+              <div><dt className={labelCls}>Tipo da batida</dt><dd>{TYPE_LABEL[selectedAdjustedPunch.type]}</dd></div>
+              <div><dt className={labelCls}>Quem solicitou</dt><dd>{selectedAdjustedPunch.employeeName}</dd></div>
+              <div className="col-span-2"><dt className={labelCls}>Justificativa</dt><dd className="whitespace-pre-wrap">{selectedAdjustedPunch.adjustmentReason || '—'}</dd></div>
+              <div><dt className={labelCls}>Solicitado em</dt><dd>{selectedAdjustedPunch.adjustmentRequestedAt ? new Date(selectedAdjustedPunch.adjustmentRequestedAt).toLocaleString('pt-BR') : '—'}</dd></div>
+              <div><dt className={labelCls}>Aprovado por</dt><dd>{selectedAdjustedPunch.adjustmentApprovedBy || '—'}</dd></div>
+              <div className="col-span-2"><dt className={labelCls}>Aprovado em</dt><dd>{selectedAdjustedPunch.adjustmentApprovedAt ? new Date(selectedAdjustedPunch.adjustmentApprovedAt).toLocaleString('pt-BR') : '—'}</dd></div>
+            </dl>
+          </div>
+        </div>
+      )}
 
       {/* Modal Nova ocorrência do dia */}
       {showDayModal && (

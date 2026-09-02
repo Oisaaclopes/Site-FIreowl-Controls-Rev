@@ -172,8 +172,9 @@ const EmployeePage = ({ block, periodLabel, emitido, logoUrl }: { block: Timecar
           records.map((r, i) => {
             const ext = occurrences?.[r.dateKey];
             const warn = r.status === 'INCONSISTENTE' || r.status === 'INCOMPLETA';
-            const occText = ext || dayStatusLabel(r.status);
-            const tone: 'none' | 'warn' | 'info' = ext ? 'info' : warn ? 'warn' : 'none';
+            const adjusted = r.punches.some((p) => p.effectiveSource === 'adjusted');
+            const occText = [ext || dayStatusLabel(r.status), adjusted ? 'Ajuste aprovado' : ''].filter(Boolean).join(' · ');
+            const tone: 'none' | 'warn' | 'info' = ext || adjusted ? 'info' : warn ? 'warn' : 'none';
             return (
               <View key={r.dateKey} style={[styles.tr, i % 2 ? styles.trAlt : {}]} wrap={false}>
                 <DataCell w={COLS.data} mono>{dateKeyToBr(r.dateKey)}</DataCell>

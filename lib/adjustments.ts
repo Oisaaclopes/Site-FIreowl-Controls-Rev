@@ -14,11 +14,15 @@ export interface PunchAdjustment {
   status: AdjustmentStatus;
   reviewerNote?: string;
   createdAt?: string;
+  originalPunchId?: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  reviewerName?: string;
 }
 
 const TABLE = 'punch_adjustments';
 
-function rowToAdj(r: any): PunchAdjustment {
+export function rowToAdjustment(r: any): PunchAdjustment {
   return {
     id: String(r.id),
     userId: r.user_id ?? undefined,
@@ -30,6 +34,10 @@ function rowToAdj(r: any): PunchAdjustment {
     status: (r.status || 'PENDENTE') as AdjustmentStatus,
     reviewerNote: r.reviewer_note ?? undefined,
     createdAt: r.created_at ?? undefined,
+    originalPunchId: r.original_punch_id ?? undefined,
+    reviewedAt: r.reviewed_at ?? undefined,
+    reviewedBy: r.reviewed_by ?? undefined,
+    reviewerName: r.reviewer_name ?? undefined,
   };
 }
 
@@ -38,7 +46,7 @@ export async function fetchAdjustments(): Promise<PunchAdjustment[]> {
   const supabase = getSupabaseClient() as any;
   const { data, error } = await supabase.from(TABLE).select('*').order('created_at', { ascending: false }).limit(200);
   if (error) throw error;
-  return (data || []).map(rowToAdj);
+  return (data || []).map(rowToAdjustment);
 }
 
 export async function createAdjustment(input: {
@@ -47,6 +55,7 @@ export async function createAdjustment(input: {
   type: PunchType;
   requestedTime: string;
   reason: string;
+  originalPunchId?: string;
 }): Promise<PunchAdjustment> {
   const supabase = getSupabaseClient() as any;
   const { data, error } = await supabase
@@ -57,22 +66,32 @@ export async function createAdjustment(input: {
       type: input.type,
       requested_time: input.requestedTime || null,
       reason: input.reason || null,
+      original_punch_id: input.originalPunchId || null,
     })
     .select()
     .single();
   if (error) throw error;
-  return rowToAdj(data);
+  return rowToAdjustment(data);
 }
 
 export async function updateAdjustmentStatus(
   id: string,
   status: AdjustmentStatus,
-  reviewerNote?: string
+  reviewerNote?: string,
+  audit?: { originalPunchId?: string; reviewerName?: string }
 ): Promise<void> {
   const supabase = getSupabaseClient() as any;
+  const { data: authData } = await supabase.auth.getUser();
   const { error } = await supabase
     .from(TABLE)
-    .update({ status, reviewer_note: reviewerNote || null, reviewed_at: new Date().toISOString() })
+    .update({
+      status,
+      reviewer_note: reviewerNote || null,
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: authData?.user?.id || null,
+      reviewer_name: audit?.reviewerName || null,
+      ...(audit?.originalPunchId ? { original_punch_id: audit.originalPunchId } : {}),
+    })
     .eq('id', id);
   if (error) throw error;
 }

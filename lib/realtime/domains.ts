@@ -10,7 +10,7 @@ export const REALTIME_DOMAINS = {
   inventory: ['inventory_items', 'stock_movements', 'supply_orders', 'supply_purchases', 'supply_purchase_items', 'supply_receipts', 'supply_receipt_items'],
   contracts: ['contracts', 'contract_routines', 'contract_routine_executions', 'contract_hour_ledger'],
   finance: ['transactions'],
-  dashboard: ['time_punches', 'profiles', 'pedidos', 'ordens_servico', 'reports', 'pendencias', 'contracts', 'transactions'],
+  dashboard: ['time_punches', 'punch_adjustments', 'profiles', 'pedidos', 'ordens_servico', 'reports', 'pendencias', 'contracts', 'transactions'],
 } as const;
 
 export type RealtimeDomain = keyof typeof REALTIME_DOMAINS;
