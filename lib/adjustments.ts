@@ -22,6 +22,14 @@ export interface PunchAdjustment {
 
 const TABLE = 'punch_adjustments';
 
+/**
+ * Regra única: toda solicitação/aprovação de ajuste de horário exige o novo
+ * horário. Sem ele o ajuste não pode ser enviado nem aprovado, e nunca deve
+ * existir APROVADO com requested_time NULL para correções de batida.
+ */
+export const hasRequestedTime = (requestedTime?: string | null): boolean =>
+  typeof requestedTime === 'string' && requestedTime.trim().length > 0;
+
 export function rowToAdjustment(r: any): PunchAdjustment {
   return {
     id: String(r.id),
@@ -56,11 +64,18 @@ export async function createAdjustment(input: {
   requestedTime: string;
   reason: string;
   originalPunchId?: string;
+  userId?: string;
 }): Promise<PunchAdjustment> {
   const supabase = getSupabaseClient() as any;
+  // user_id tem default auth.uid() no banco, mas enviamos explicitamente quando
+  // conhecido para que a solicitação materialize corretamente a batida (o
+  // resolvedor efetivo cruza userId × data × tipo).
+  const { data: authData } = await supabase.auth.getUser();
+  const userId = input.userId || authData?.user?.id || undefined;
   const { data, error } = await supabase
     .from(TABLE)
     .insert({
+      ...(userId ? { user_id: userId } : {}),
       employee_name: input.employeeName,
       ref_date: input.refDate,
       type: input.type,

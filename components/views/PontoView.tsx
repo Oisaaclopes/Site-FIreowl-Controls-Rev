@@ -7,7 +7,7 @@ import { fetchCompanyProfile } from '@/lib/companyProfile';
 import { resolveLogoDataUrls } from '@/lib/institucional';
 import { DataListRow, Badge } from '@/components/DataListRow';
 import { WorkSchedule, DEFAULT_SCHEDULE, normalizeSchedule, hmToMinutes, WEEKDAY_SHORT } from '@/lib/schedule';
-import { fetchAdjustments, createAdjustment, updateAdjustmentStatus, PunchAdjustment } from '@/lib/adjustments';
+import { fetchAdjustments, createAdjustment, updateAdjustmentStatus, hasRequestedTime, PunchAdjustment } from '@/lib/adjustments';
 import { isSupabaseConfigured } from '@/lib/inventory';
 import { fetchHolidays, Holiday } from '@/lib/holidays';
 import { fetchDayEntries, createDayEntry, deleteDayEntry, DayEntry, DayEntryKind } from '@/lib/dayentries';
@@ -446,6 +446,19 @@ export const PontoView: React.FC<PontoViewProps> = ({
     return s;
   }, [punches, currentUser]);
 
+  // Horário original (evidência) da batida que o ajuste corrige, quando há
+  // exatamente uma batida compatível. Usado no formulário e na aprovação.
+  const originalPunchTimeFor = (employeeName: string, refDate: string, type: TimePunch['type']): string | null => {
+    const matching = punches.filter((p) => {
+      const originalAt = p.originalAt ?? p.at;
+      return p.employeeName === employeeName && p.type === type && originalAt != null
+        && fmtDateInput(new Date(originalAt)) === refDate;
+    });
+    if (matching.length !== 1) return null;
+    const originalAt = matching[0].originalAt ?? matching[0].at;
+    return originalAt != null ? fmtClock(new Date(originalAt)) : null;
+  };
+
   const openAdj = (prefill?: Date) => {
     setAdjForm({
       refDate: prefill ? fmtDateInput(prefill) : fmtDateInput(new Date()),
@@ -456,7 +469,9 @@ export const PontoView: React.FC<PontoViewProps> = ({
     setShowAdj(true);
   };
   const submitAdj = async () => {
-    if (adjSaving || !adjForm.refDate || !adjForm.reason.trim()) return;
+    // Novo horário é obrigatório: sem ele o ajuste não pode ser aprovado nem
+    // materializado como batida efetiva.
+    if (adjSaving || !adjForm.refDate || !adjForm.reason.trim() || !hasRequestedTime(adjForm.time)) return;
     setAdjSaving(true);
     try {
       const matching = punches.filter((p) => {
@@ -491,8 +506,11 @@ export const PontoView: React.FC<PontoViewProps> = ({
     if (adjBusy) return;
     setAdjBusy(a.id);
     try {
-      if (status === 'APROVADO' && !a.requestedTime) {
-        showToast('Aprovado. Como a solicitação não informou o horário, nenhuma batida foi criada automaticamente.');
+      // Bloqueio crítico: não é possível aprovar um ajuste de horário sem o
+      // horário solicitado — isso geraria APROVADO + requested_time NULL.
+      if (status === 'APROVADO' && !hasRequestedTime(a.requestedTime)) {
+        showToast('Não é possível aprovar este ajuste porque o novo horário não foi informado.');
+        return;
       }
       const matching = punches.filter((p) => {
         const originalAt = p.originalAt ?? p.at;
@@ -1351,8 +1369,19 @@ export const PontoView: React.FC<PontoViewProps> = ({
                   <p className="font-semibold text-slate-800">
                     {isManager && <span className="text-slate-500">{a.employeeName} · </span>}
                     {a.type} em {a.refDate.split('-').reverse().join('/')}
-                    {a.requestedTime ? ` às ${a.requestedTime}` : ''}
                   </p>
+                  {(() => {
+                    const orig = originalPunchTimeFor(a.employeeName, a.refDate, a.type);
+                    return (
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {orig && <>Original: <span className="font-data-mono font-semibold">{orig}</span> · </>}
+                        Solicitado:{' '}
+                        {a.requestedTime
+                          ? <span className="font-data-mono font-semibold text-[#1A1A72]">{a.requestedTime}</span>
+                          : <span className="text-[#E63946] font-semibold">não informado</span>}
+                      </p>
+                    );
+                  })()}
                   <p className="text-slate-500 truncate">{a.reason || '—'}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -1361,8 +1390,9 @@ export const PontoView: React.FC<PontoViewProps> = ({
                     <>
                       <button
                         onClick={() => reviewAdj(a, 'APROVADO')}
-                        disabled={adjBusy === a.id}
-                        className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold disabled:opacity-60"
+                        disabled={adjBusy === a.id || !hasRequestedTime(a.requestedTime)}
+                        title={!hasRequestedTime(a.requestedTime) ? 'Não é possível aprovar sem o novo horário informado.' : undefined}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         {adjBusy === a.id ? '...' : 'Aprovar'}
                       </button>
@@ -1608,13 +1638,24 @@ export const PontoView: React.FC<PontoViewProps> = ({
                 </div>
               </div>
               <div>
-                <label className={labelCls}>Horário correto</label>
+                <label className={labelCls}>Novo horário *</label>
+                {(() => {
+                  const orig = originalPunchTimeFor(currentUser, adjForm.refDate, adjForm.type);
+                  return orig ? (
+                    <p className="text-[11px] text-slate-500 mb-1">
+                      Horário original: <span className="font-data-mono font-semibold">{orig}</span>
+                    </p>
+                  ) : null;
+                })()}
                 <input
                   type="time"
                   value={adjForm.time}
                   onChange={(e) => setAdjForm({ ...adjForm, time: e.target.value })}
                   className={`${inputCls} font-data-mono`}
                 />
+                {!adjForm.time && (
+                  <p className="text-[11px] text-[#E63946] mt-1">Informe o novo horário para enviar a solicitação.</p>
+                )}
               </div>
               <div>
                 <label className={labelCls}>Motivo *</label>
@@ -1636,7 +1677,7 @@ export const PontoView: React.FC<PontoViewProps> = ({
               </button>
               <button
                 onClick={submitAdj}
-                disabled={adjSaving || !adjForm.reason.trim()}
+                disabled={adjSaving || !adjForm.reason.trim() || !hasRequestedTime(adjForm.time)}
                 className="bg-[#1A1A72] hover:bg-[#12124f] text-white px-5 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 disabled:opacity-60"
               >
                 <span className={`material-symbols-outlined text-base ${adjSaving ? 'animate-spin' : ''}`}>
