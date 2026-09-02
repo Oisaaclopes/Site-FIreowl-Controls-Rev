@@ -15,7 +15,7 @@ export type UnitCategory =
   | 'volume'
   | 'massa'
   | 'tempo'
-  | 'servico';
+  | 'comercial';
 
 export interface CommercialUnit {
   /** Sigla canônica exibida na UI e no PDF. */
@@ -25,6 +25,28 @@ export interface CommercialUnit {
   category: UnitCategory;
   /** Se a quantidade pode ser fracionada (ex.: 150,5 m). */
   allowDecimals: boolean;
+}
+
+/** Ordem canônica dos grupos no seletor. */
+export const UNIT_CATEGORY_ORDER: UnitCategory[] = [
+  'contagem', 'comprimento', 'area', 'volume', 'massa', 'tempo', 'comercial',
+];
+
+/** Rótulo PT-BR de cada grupo (cabeçalho do seletor). */
+export const UNIT_CATEGORY_LABELS: Record<UnitCategory, string> = {
+  contagem: 'Unidade / Contagem',
+  comprimento: 'Comprimento',
+  area: 'Área',
+  volume: 'Volume / Capacidade',
+  massa: 'Massa',
+  tempo: 'Tempo / Serviço',
+  comercial: 'Comercial',
+};
+
+export interface UnitGroup {
+  category: UnitCategory;
+  label: string;
+  units: CommercialUnit[];
 }
 
 /** Catálogo central de unidades suportadas. */
@@ -48,8 +70,8 @@ export const COMMERCIAL_UNITS: CommercialUnit[] = [
   { code: 'g', label: 'Grama', category: 'massa', allowDecimals: true },
   { code: 'h', label: 'Hora', category: 'tempo', allowDecimals: true },
   { code: 'dia', label: 'Dia', category: 'tempo', allowDecimals: false },
-  { code: 'visita', label: 'Visita', category: 'servico', allowDecimals: false },
-  { code: 'vb', label: 'Verba', category: 'servico', allowDecimals: false },
+  { code: 'visita', label: 'Visita', category: 'tempo', allowDecimals: false },
+  { code: 'vb', label: 'Verba', category: 'comercial', allowDecimals: false },
 ];
 
 const BY_CODE = new Map(COMMERCIAL_UNITS.map((u) => [u.code, u]));
@@ -97,6 +119,24 @@ const stripKey = (raw: string) =>
   raw.normalize('NFD').replace(/[̀-ͯ]/g, '')
     .toLowerCase().trim().replace(/[\s._-]+/g, '');
 
+/** Busca tolerante a caixa, acentos e espaços, pelo nome ou pela sigla. */
+export function searchCommercialUnits(query: string): CommercialUnit[] {
+  const term = stripKey(query);
+  if (!term) return COMMERCIAL_UNITS;
+  return COMMERCIAL_UNITS.filter((unit) =>
+    stripKey(unit.label).includes(term) || stripKey(unit.code).includes(term),
+  );
+}
+
+/** Agrupa na ordem de apresentação oficial, omitindo grupos vazios. */
+export function groupCommercialUnits(units: CommercialUnit[] = COMMERCIAL_UNITS): UnitGroup[] {
+  return UNIT_CATEGORY_ORDER.map((category) => ({
+    category,
+    label: UNIT_CATEGORY_LABELS[category],
+    units: units.filter((unit) => unit.category === category),
+  })).filter((group) => group.units.length > 0);
+}
+
 /**
  * Devolve a sigla canônica para um valor de unidade qualquer.
  * - alias conhecido → sigla canônica (ex.: "UN - Unidade" nunca chega aqui, mas
@@ -130,6 +170,15 @@ export function isCanonicalUnit(code?: string | null): boolean {
 export function unitAllowsDecimals(code?: string | null): boolean {
   const u = unitByCode(normalizeUnitCode(code));
   return u ? u.allowDecimals : true;
+}
+
+/** Mensagem de validação sem alterar ou arredondar a quantidade informada. */
+export function quantityUnitError(qty: number, unitCode?: string | null): string | null {
+  const value = Number(qty);
+  if (Number.isFinite(value) && !Number.isInteger(value) && !unitAllowsDecimals(unitCode)) {
+    return `A unidade '${normalizeUnitCode(unitCode)}' aceita somente quantidades inteiras.`;
+  }
+  return null;
 }
 
 /**

@@ -3,7 +3,8 @@ import React, { useMemo, useState } from 'react';
 import type { InventoryItem } from '@/lib/types';
 import { CatalogTree, nodePath } from '@/lib/catalogTree';
 import { calculateProfit, calculateMarkup, calculateMargin, moneyOrDash, percentOrDash, ratioOrDash } from '@/lib/productPricing';
-import { COMMERCIAL_UNITS, normalizeUnitCode } from '@/lib/commercialUnits';
+import { normalizeUnitCode, quantityUnitError } from '@/lib/commercialUnits';
+import { UnitSelector } from '@/components/ui/UnitSelector';
 
 const AREAS = ['SDAI', 'CFTV', 'ALARME', 'BMS'];
 
@@ -67,6 +68,8 @@ export function ProductEditor({ initial, tree, suppliers, onClose, onSave }: {
     if (saving) return;
     if (!(name.trim() || model.trim())) { setErr('Informe ao menos o modelo ou o nome.'); return; }
     if (!area) { setErr('Selecione a área.'); return; }
+    const quantityError = stockManaged && (quantityUnitError(quantity, unit) || quantityUnitError(minQuantity, unit));
+    if (quantityError) { setErr(quantityError); return; }
     setErr('');
     const finalName = name.trim() || model.trim();
     const code = initial?.code || `${area}-${Date.now().toString(36).toUpperCase()}`;
@@ -118,10 +121,7 @@ export function ProductEditor({ initial, tree, suppliers, onClose, onSave }: {
               <option value="">Selecione…</option>
               {[...new Set([...AREAS, area].filter(Boolean))].map((a) => <option key={a} value={a}>{a}</option>)}
             </select></Field>
-            <Field label="Unidade"><select className={input} value={COMMERCIAL_UNITS.some((u) => u.code === unit) ? unit : '__outro'} onChange={(e) => { if (e.target.value !== '__outro') setUnit(e.target.value); }}>
-              {COMMERCIAL_UNITS.map((u) => <option key={u.code} value={u.code}>{u.code} — {u.label}</option>)}
-              {!COMMERCIAL_UNITS.some((u) => u.code === unit) && unit && <option value="__outro">{unit} (não padrão)</option>}
-            </select></Field>
+            <Field label="Unidade"><UnitSelector value={unit} onChange={(code) => { setUnit(code); setErr(quantityUnitError(quantity, code) || quantityUnitError(minQuantity, code) || ''); }} /></Field>
           </div>
           <Field label="Caminho canônico (classificação)">
             <select className={input} value={nodeId} onChange={(e) => setNodeId(e.target.value)} disabled={!area}>

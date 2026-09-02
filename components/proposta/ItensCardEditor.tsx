@@ -3,7 +3,8 @@
 import React, { useMemo, useState } from 'react';
 import { PedidoEquipmentItem } from '@/lib/types';
 import { normalizeSearch } from '@/lib/stockStatus';
-import { COMMERCIAL_UNITS, normalizeQuantity, normalizeUnitCode, unitAllowsDecimals } from '@/lib/commercialUnits';
+import { normalizeQuantity, normalizeUnitCode, quantityUnitError, unitAllowsDecimals } from '@/lib/commercialUnits';
+import { UnitSelector } from '@/components/ui/UnitSelector';
 import { lineTotal } from '@/lib/commercialTotals';
 import { Plus, Minus, Trash2, ChevronUp, ChevronDown, Pencil, Check, X } from 'lucide-react';
 
@@ -53,6 +54,7 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [openMenu, setOpenMenu] = useState<number | null>(null);
   const [catalogoFilter, setCatalogoFilter] = useState('');
+  const [unitError, setUnitError] = useState('');
 
   const filteredCatalogo = useMemo(() => {
     if (!catalogo) return [];
@@ -87,10 +89,12 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
     }
   };
 
-  const resetDraft = () => { setDraft(emptyDraft(tipo)); setEditingIdx(null); };
+  const resetDraft = () => { setDraft(emptyDraft(tipo)); setEditingIdx(null); setUnitError(''); };
 
   const commit = () => {
     if (!draft.descricao.trim()) return;
+    const decimalError = quantityUnitError(draft.quantidade, draft.unidade);
+    if (decimalError) { setUnitError(decimalError); return; }
     const payload: Partial<PedidoEquipmentItem> = {
       descricao: draft.descricao.trim(),
       descricaoDetalhada: draft.descricaoDetalhada.trim() || undefined,
@@ -272,33 +276,21 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
             <label className={miniLabel}>Quantidade{unitAllowsDecimals(draft.unidade) ? '' : ' (inteiro)'}</label>
             <div className="flex items-center gap-1.5">
               <button type="button" onClick={() => set('quantidade', normalizeQuantity((draft.quantidade || 1) - 1, draft.unidade))} className="w-9 h-[42px] rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50 flex items-center justify-center shrink-0"><Minus className="w-4 h-4" /></button>
-              <input type="number" min={0} step={unitAllowsDecimals(draft.unidade) ? 'any' : 1} value={draft.quantidade} onChange={(e) => set('quantidade', Number(e.target.value))} onBlur={(e) => set('quantidade', normalizeQuantity(Number(e.target.value) || 0, draft.unidade))} className={`${inputCls} text-center font-data-mono font-bold`} />
+              <input type="number" min={0} step={unitAllowsDecimals(draft.unidade) ? 'any' : 1} value={draft.quantidade} onChange={(e) => { const next = Number(e.target.value); set('quantidade', next); setUnitError(quantityUnitError(next, draft.unidade) || ''); }} className={`${inputCls} text-center font-data-mono font-bold`} />
               <button type="button" onClick={() => set('quantidade', normalizeQuantity((draft.quantidade || 1) + 1, draft.unidade))} className="w-9 h-[42px] rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50 flex items-center justify-center shrink-0"><Plus className="w-4 h-4" /></button>
             </div>
           </div>
           <div>
             <label className={miniLabel}>Unidade de medida</label>
-            <select
-              value={COMMERCIAL_UNITS.some((u) => u.code === draft.unidade) ? draft.unidade : '__outro'}
-              onChange={(e) => {
-                const code = e.target.value === '__outro' ? draft.unidade : e.target.value;
-                setDraft((d) => ({ ...d, unidade: code, quantidade: normalizeQuantity(d.quantidade || 1, code) }));
-              }}
-              className={inputCls}
-            >
-              {COMMERCIAL_UNITS.map((u) => (
-                <option key={u.code} value={u.code}>{u.code}</option>
-              ))}
-              {!COMMERCIAL_UNITS.some((u) => u.code === draft.unidade) && draft.unidade && (
-                <option value="__outro">{draft.unidade} (não padrão)</option>
-              )}
-            </select>
+            <UnitSelector value={draft.unidade} onChange={(code) => { setDraft((d) => ({ ...d, unidade: code })); setUnitError(quantityUnitError(draft.quantidade, code) || ''); }} />
           </div>
           <div>
             <label className={miniLabel}>Desconto (R$)</label>
             <input type="number" min={0} step="0.01" value={draft.desconto} onChange={(e) => set('desconto', Number(e.target.value))} className={`${inputCls} font-data-mono`} />
           </div>
         </div>
+
+        {unitError && <p role="alert" className="mb-3 text-xs font-semibold text-[#E63946]">{unitError} Corrija a quantidade para continuar.</p>}
 
         <div className="flex items-center justify-between">
           <span className="text-[11px] text-slate-500 font-data-mono">Total do item: <b className="text-slate-800">{brl(lineTotal({ precoUnitario: draft.precoUnitario, quantidade: draft.quantidade, desconto: draft.desconto }))}</b></span>

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   COMMERCIAL_UNITS, normalizeUnitCode, unitAllowsDecimals, normalizeQuantity,
-  isCanonicalUnit, formatUnitDisplay,
+  isCanonicalUnit, formatUnitDisplay, groupCommercialUnits, quantityUnitError,
+  searchCommercialUnits, UNIT_CATEGORY_LABELS, UNIT_CATEGORY_ORDER,
 } from './commercialUnits';
 import {
   defaultWarranty, normalizeCommercialWarranty, renderWarranty, isLegacyWarranty,
@@ -71,6 +72,24 @@ describe('unidades canônicas', () => {
   it('vazio → un', () => {
     expect(normalizeUnitCode('')).toBe('un');
     expect(normalizeUnitCode(undefined)).toBe('un');
+  });
+  it('agrupa na ordem oficial com labels PT-BR', () => {
+    const groups = groupCommercialUnits();
+    expect(groups.map((group) => group.category)).toEqual(UNIT_CATEGORY_ORDER);
+    expect(groups.map((group) => group.label)).toEqual(UNIT_CATEGORY_ORDER.map((category) => UNIT_CATEGORY_LABELS[category]));
+    expect(groups.find((group) => group.category === 'tempo')?.units.map((unit) => unit.code)).toContain('visita');
+    expect(groups.find((group) => group.category === 'comercial')?.units.map((unit) => unit.code)).toEqual(['vb']);
+  });
+  it('busca por label e sigla ignora caixa e acentos', () => {
+    expect(searchCommercialUnits('METRO').map((unit) => unit.code)).toEqual(expect.arrayContaining(['mm', 'cm', 'm', 'km', 'm²', 'm³']));
+    expect(searchCommercialUnits('quilometro').map((unit) => unit.code)).toContain('km');
+    expect(searchCommercialUnits('kg').map((unit) => unit.code)).toEqual(['kg']);
+    expect(searchCommercialUnits('litro').map((unit) => unit.code)).toEqual(expect.arrayContaining(['mL', 'L']));
+  });
+  it('troca decimal para unidade inteira informa erro sem arredondar', () => {
+    expect(quantityUnitError(2.5, 'un')).toBe("A unidade 'un' aceita somente quantidades inteiras.");
+    expect(quantityUnitError(2.5, 'm')).toBeNull();
+    expect(normalizeUnitCode('Metro')).toBe('m');
   });
 });
 
