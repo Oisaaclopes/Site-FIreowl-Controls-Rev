@@ -2,7 +2,8 @@
 import { showToast, requestConfirm, requestText } from '@/components/ui/Feedback';
 
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { PedidoOS, SupplyOrder, Client, Pedido, Contract, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem, DocumentosPadrao, DocumentType, FinancialTransaction, RecebimentoProposta, EmpresaAtendida, MarcaTecnologia, OrdemServico } from '@/lib/types';
+import { SupplyOrder, Client, Pedido, Contract, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem, DocumentosPadrao, DocumentType, FinancialTransaction, RecebimentoProposta, EmpresaAtendida, MarcaTecnologia, OrdemServico } from '@/lib/types';
+import { OS_STATUS_ATIVOS, osHistoryForPedido, isHardDeleteEligible, isCancelable } from '@/lib/ordensServico';
 import { selecionarEmpresas, selecionarMarcas, experienciaAtiva } from '@/lib/experienciaSelecao';
 import { resolveLogoDataUrls } from '@/lib/institucional';
 import { nomeFantasiaCliente } from '@/lib/utils';
@@ -57,7 +58,9 @@ import {
 } from 'lucide-react';
 
 interface PedidosViewProps {
-  pedidosOS: PedidoOS[];
+  /** Fonte canônica ÚNICA de OS (tabela ordens_servico). O mock PedidoOS foi
+   *  removido na 2B. Alimenta a subview de OS e o histórico por Pedido. */
+  ordensServico: OrdemServico[];
   pedidos: Pedido[];
   supplyOrders?: SupplyOrder[];
   /** Abre automaticamente o detalhe deste pedido de fornecimento ao montar/atualizar. */
@@ -74,14 +77,19 @@ interface PedidosViewProps {
   companyProfile: any;
   empresasAtendidas?: EmpresaAtendida[];
   marcasTecnologias?: MarcaTecnologia[];
-  onAddOS: (os: PedidoOS) => void;
   onSavePedido: (pedido: Pedido) => void;
   onUpdatePedidoStatus: (pedidoId: string, newStatus: PedidoStatus) => void;
   onDeletePedido?: (pedidoId: string) => void;
   onGenerateOSFromPedido: (pedido: Pedido) => void;
+  /** Cancelamento formal (0074). Deve rejeitar se a RPC falhar (não otimista). */
+  onCancelOs?: (osId: string, motivo: string) => Promise<void>;
+  /** Hard delete de OS virgem (0074). O banco valida a ausência de evidências. */
+  onDeleteOs?: (osId: string) => Promise<void>;
   /** OS ATIVA de cada Pedido, indexada por pedidos.id (vínculo estrutural real,
    *  source_pedido_id). Fonte da verdade do card — sobrevive a refresh. */
   activeOsByPedido?: Record<string, OrdemServico>;
+  /** UUID do usuário autenticado — filtra "Minhas OS" do técnico por responsável. */
+  userId?: string;
   onGenerateContractFromPedido?: (pedido: Pedido) => void;
   onGenerateSupplyOrderFromPedido?: (pedido: Pedido) => void;
   onUpdateSupplyOrder?: (order: SupplyOrder) => void;
@@ -128,7 +136,7 @@ const brl = (v: number) => `R$ ${(v || 0).toLocaleString('pt-BR', { minimumFract
 const razaoSocialCliente = (name: string) => name.replace(/\s*\([^)]*\)\s*$/, '').trim();
 
 export const PedidosView: React.FC<PedidosViewProps> = ({
-  pedidosOS,
+  ordensServico,
   pedidos,
   supplyOrders = [],
   initialDetailOrderId = null,
@@ -144,12 +152,14 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   companyProfile,
   empresasAtendidas = [],
   marcasTecnologias = [],
-  onAddOS,
   onSavePedido,
   onUpdatePedidoStatus,
   onDeletePedido,
   onGenerateOSFromPedido,
+  onCancelOs,
+  onDeleteOs,
   activeOsByPedido = {},
+  userId,
   onGenerateContractFromPedido,
   onGenerateSupplyOrderFromPedido,
   onUpdateSupplyOrder,
@@ -170,8 +180,11 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   const [receivingOrder, setReceivingOrder] = useState<SupplyOrder | null>(null);
   const [purchasingOrder, setPurchasingOrder] = useState<SupplyOrder | null>(null);
   const [detailOrder, setDetailOrder] = useState<SupplyOrder | null>(null);
-  // OS ativa exibida em modal read-only ("Ver Ordem de Serviço" do card).
+  // OS exibida em modal de detalhe (a partir do card ou da subview).
   const [osDetail, setOsDetail] = useState<OrdemServico | null>(null);
+  // Alvos dos modais de lifecycle (cancelar / hard delete).
+  const [osCancelTarget, setOsCancelTarget] = useState<OrdemServico | null>(null);
+  const [osDeleteTarget, setOsDeleteTarget] = useState<OrdemServico | null>(null);
   const isTecnico = userRole === 'TECNICO';
 
   // Aba inicial: atalho "Nova OS" força OS; técnico começa em OS; demais em propostas
@@ -639,17 +652,31 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     return Array.from(groups.entries()).sort((a, b) => b[0].localeCompare(a[0]));
   }, [filteredPedidos]);
 
-  // Técnico só enxerga as OS onde ele é o responsável
-  const baseOS = isTecnico ? pedidosOS.filter((p) => p.technicianName === currentUserName) : pedidosOS;
+  const clientNameById = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const c of clients) m[c.id] = c.name;
+    return m;
+  }, [clients]);
+  const osClientName = (o: OrdemServico) => clientNameById[o.clienteId || ''] || o.clienteId || '';
 
-  const filteredOS = baseOS.filter((p) => {
-    const matchesStatus = filterStatus === 'TODOS' || p.status === filterStatus;
+  // Técnico só enxerga as OS onde ele é o responsável (por tecnicoResponsavelId).
+  const baseOS = isTecnico
+    ? ordensServico.filter((o) => o.tecnicoResponsavelId && o.tecnicoResponsavelId === userId)
+    : ordensServico;
+
+  // Só aceita filtro de status quando ele é um status canônico de OS — evita
+  // lista vazia se sobrar um filtro de proposta (persistido) ao abrir a subview.
+  const osStatusFilter = (OS_STATUS_ATIVOS as string[]).concat('concluida', 'cancelada').includes(filterStatus)
+    ? filterStatus
+    : 'TODOS';
+  const filteredOS = baseOS.filter((o) => {
+    const matchesStatus = osStatusFilter === 'TODOS' || o.status === osStatusFilter;
     const q = searchTerm.toLowerCase();
     const matchesSearch =
-      p.id.toLowerCase().includes(q) ||
-      p.clientName.toLowerCase().includes(q) ||
-      p.title.toLowerCase().includes(q) ||
-      p.technicianName.toLowerCase().includes(q);
+      (o.numero || o.id).toLowerCase().includes(q) ||
+      osClientName(o).toLowerCase().includes(q) ||
+      (o.titulo || '').toLowerCase().includes(q) ||
+      (o.tipo || '').toLowerCase().includes(q);
     return matchesStatus && matchesSearch;
   });
 
@@ -806,6 +833,10 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     // OS ATIVA pelo vínculo ESTRUTURAL (source_pedido_id === pedidos.id), nunca
     // por numero_pedido (que não é único). Coerente com contrato/fornecimento abaixo.
     const existingOs = activeOsByPedido[ped.id];
+    // Histórico estrutural (todas as OS deste pedido, recentes primeiro). As
+    // ANTERIORES (canceladas/concluídas fora a ativa) alimentam o rastreio.
+    const osHistorico = osHistoryForPedido(ordensServico, ped.id);
+    const osAnteriores = osHistorico.filter((o) => o.id !== existingOs?.id);
     const existingContract = contracts.find((contract) => contract.sourcePedidoId === ped.id);
     const existingSupplyOrder = supplyOrders.find((order) => order.sourcePedidoId === ped.id);
     const daysLeft = validityDaysLeft(ped);
@@ -828,6 +859,21 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           {daysLeft !== null && daysLeft <= 7 && <p className={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold ${daysLeft < 0 ? 'bg-red-50 text-red-700' : daysLeft <= 2 ? 'bg-amber-100 text-amber-800' : 'bg-amber-50 text-amber-700'}`}><span className="material-symbols-outlined text-xs">schedule</span>{daysLeft < 0 ? `Vencida há ${Math.abs(daysLeft)} dia(s)` : daysLeft === 0 ? 'Vence hoje' : `Vence em ${daysLeft} dia(s)`}</p>}
           {ped.proposal.motivoRecusa && (ped.status === 'recusado' || ped.status === 'expirado') && (
             <p className="text-[10px] text-red-600 truncate" title={ped.proposal.motivoRecusa}>Motivo: {ped.proposal.motivoRecusa}</p>
+          )}
+          {osAnteriores.length > 0 && (
+            <div className="mt-1 flex flex-wrap items-center gap-1">
+              <span className="text-[10px] font-bold uppercase text-slate-400">Histórico OS:</span>
+              {osAnteriores.slice(0, 4).map((o) => (
+                <button
+                  key={o.id}
+                  onClick={() => setOsDetail(o)}
+                  title={`Abrir ${o.numero || o.id} (${OS_STATUS_LABEL[o.status]?.label || o.status})`}
+                  className="inline-flex items-center gap-1 rounded bg-slate-100 hover:bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 font-data-mono"
+                >
+                  {o.numero || o.id.slice(0, 8)} · {OS_STATUS_LABEL[o.status]?.label || o.status}
+                </button>
+              ))}
+            </div>
           )}
           </div>
         </div>
@@ -978,7 +1024,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
             viewTab === 'ordens_servico' ? 'bg-[#0B1E38] text-white shadow-md' : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <Wrench className="w-4 h-4 text-emerald-400" /> Ordens de Serviço (Campo) ({pedidosOS.length})
+          <Wrench className="w-4 h-4 text-emerald-400" /> Ordens de Serviço (Campo) ({ordensServico.length})
         </button>
         <button onClick={() => { setViewTab('fornecimento'); setFilterStatus('TODOS'); }} className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all ${viewTab === 'fornecimento' ? 'bg-[#0B1E38] text-white shadow-md' : 'text-slate-600 hover:text-slate-900'}`}>
           <span className="material-symbols-outlined text-base text-sky-600">shopping_cart</span> Fornecimento ({supplyOrders.length})
@@ -1243,57 +1289,72 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           os={osDetail}
           clients={clients}
           contracts={contracts}
+          canManage={!isTecnico}
+          onCancel={onCancelOs ? () => { setOsCancelTarget(osDetail); setOsDetail(null); } : undefined}
+          onDelete={onDeleteOs ? () => { setOsDeleteTarget(osDetail); setOsDetail(null); } : undefined}
           onClose={() => setOsDetail(null)}
+        />
+      )}
+      {osCancelTarget && onCancelOs && (
+        <CancelOsModal
+          os={osCancelTarget}
+          onClose={() => setOsCancelTarget(null)}
+          onConfirm={(motivo) => onCancelOs(osCancelTarget.id, motivo)}
+        />
+      )}
+      {osDeleteTarget && onDeleteOs && (
+        <DeleteOsModal
+          os={osDeleteTarget}
+          onClose={() => setOsDeleteTarget(null)}
+          onConfirm={() => onDeleteOs(osDeleteTarget.id)}
         />
       )}
 
       {/* ===================== ORDENS DE SERVIÇO ===================== */}
       {viewTab === 'ordens_servico' && (
         <>
-          {/* Métricas de OS */}
-          <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${isTecnico ? 'md:grid-cols-3' : 'md:grid-cols-4'}`}>
+          {/* Métricas de OS (entidade real ordens_servico) */}
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
               <p className="text-[11px] font-semibold text-slate-500 uppercase">
-                {isTecnico ? 'Minhas Ordens de Serviço' : 'Ordens de Serviço'}
+                {isTecnico ? 'Minhas OS' : 'Ordens de Serviço'}
               </p>
               <p className="font-data-mono text-2xl font-bold text-slate-900 mt-1">{baseOS.length}</p>
             </div>
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-              <p className="text-[11px] font-semibold text-slate-500 uppercase">Em Andamento</p>
+              <p className="text-[11px] font-semibold text-slate-500 uppercase">Ativas</p>
               <p className="font-data-mono text-2xl font-bold text-amber-600 mt-1">
-                {baseOS.filter((p) => p.status === 'EM ANDAMENTO').length}
+                {baseOS.filter((o) => OS_STATUS_ATIVOS.includes(o.status)).length}
               </p>
             </div>
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
               <p className="text-[11px] font-semibold text-slate-500 uppercase">Concluídas</p>
               <p className="font-data-mono text-2xl font-bold text-emerald-600 mt-1">
-                {baseOS.filter((p) => p.status === 'CONCLUIDA').length}
+                {baseOS.filter((o) => o.status === 'concluida').length}
               </p>
             </div>
-            {!isTecnico && (
-              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                <p className="text-[11px] font-semibold text-slate-500 uppercase">Faturamento de OS</p>
-                <p className="font-data-mono text-2xl font-bold text-[#E63946] mt-1">
-                  {maskMoney(`R$ ${pedidosOS.reduce((acc, p) => acc + p.value, 0).toLocaleString('pt-BR')}`)}
-                </p>
-              </div>
-            )}
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+              <p className="text-[11px] font-semibold text-slate-500 uppercase">Canceladas</p>
+              <p className="font-data-mono text-2xl font-bold text-slate-500 mt-1">
+                {baseOS.filter((o) => o.status === 'cancelada').length}
+              </p>
+            </div>
           </div>
 
-          {/* Busca + status */}
+          {/* Busca + status canônico */}
           <div className="flex flex-col sm:flex-row gap-3 justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <div className="relative w-full sm:w-80">
               <Search className="absolute left-3 top-2.5 text-slate-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder="Buscar por OS, cliente, título, técnico..."
+                placeholder="Buscar por OS, cliente, título, tipo..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
               />
             </div>
             <div className="flex gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
-              {['TODOS', 'ABERTA', 'EM ANDAMENTO', 'CONCLUIDA', 'ATRASADA'].map((st) => (
+              {(['TODOS', 'aberta', 'agendada', 'em_execucao', 'concluida', 'cancelada'] as const).map((st) => (
                 <button
                   key={st}
                   onClick={() => setFilterStatus(st)}
@@ -1301,7 +1362,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                     filterStatus === st ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
-                  {st}
+                  {st === 'TODOS' ? 'Todas' : OS_STATUS_LABEL[st].label}
                 </button>
               ))}
             </div>
@@ -1314,53 +1375,43 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              {filteredOS.map((p) => (
-                <DataListRow
-                  key={p.id}
-                  leading={(() => { const client = clients.find((item) => item.id === p.clientId || item.name === p.clientName); const logo = client?.logoPath ? clientLogoUrls[client.logoPath] : undefined; return logo ? <span className="w-14 h-14 rounded-xl bg-white border border-slate-200 p-1.5 shrink-0"><img src={logo} alt={`Logo ${nomeFantasiaCliente(p.clientName)}`} className="w-full h-full object-contain" /></span> : <span className="w-14 h-14 rounded-xl bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0"><Wrench className="w-6 h-6" /></span>; })()}
-                  title={<span className="text-sm">{p.title || 'Ordem de serviço sem título'}</span>}
-                  meta={
-                    <>
-                      <span className="text-[#1A1A72] font-semibold">{nomeFantasiaCliente(p.clientName)}</span>
-                      {nomeFantasiaCliente(p.clientName) !== razaoSocialCliente(p.clientName) && <span className="text-slate-400 truncate">{razaoSocialCliente(p.clientName)}</span>}
-                      <RowMeta label="OS" value={<span className="font-data-mono">{p.id}</span>} />
-                      <RowMeta label="Pedido" value={<span className="font-data-mono">{p.pedidoId}</span>} />
-                      <Badge color="slate">{p.type}</Badge>
-                    </>
-                  }
-                  center={
-                    <div className="text-left md:text-center">
-                      <p className="text-slate-700 font-semibold">{p.technicianName}</p>
-                      <p className="text-[10px] text-slate-400 font-data-mono">{p.scheduledDate}</p>
-                    </div>
-                  }
-                  right={
-                    <>
-                      {!isTecnico && (
-                        <span className="font-data-mono font-bold text-slate-900 text-base md:text-lg text-right">
-                          {maskMoney(`R$ ${p.value.toLocaleString('pt-BR')}`)}
-                        </span>
-                      )}
-                      <Badge color={p.priority === 'CRITICA' ? 'red' : p.priority === 'ALTA' ? 'amber' : 'slate'} outline>
-                        {p.priority}
-                      </Badge>
-                      <Badge
-                        color={
-                          p.status === 'CONCLUIDA'
-                            ? 'emerald'
-                            : p.status === 'EM ANDAMENTO'
-                            ? 'blue'
-                            : p.status === 'ATRASADA'
-                            ? 'red'
-                            : 'slate'
-                        }
-                      >
-                        {p.status}
-                      </Badge>
-                    </>
-                  }
-                />
-              ))}
+              {filteredOS.map((o) => {
+                const cliNome = osClientName(o);
+                const client = clients.find((item) => item.id === o.clienteId);
+                const logo = client?.logoPath ? clientLogoUrls[client.logoPath] : undefined;
+                const st = OS_STATUS_LABEL[o.status] || { label: o.status, color: 'slate' as const };
+                return (
+                  <DataListRow
+                    key={o.id}
+                    onClick={() => setOsDetail(o)}
+                    leading={logo
+                      ? <span className="w-14 h-14 rounded-xl bg-white border border-slate-200 p-1.5 shrink-0"><img src={logo} alt={`Logo ${nomeFantasiaCliente(cliNome)}`} className="w-full h-full object-contain" /></span>
+                      : <span className="w-14 h-14 rounded-xl bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0"><Wrench className="w-6 h-6" /></span>}
+                    title={<span className="text-sm">{o.titulo || 'Ordem de serviço sem título'}</span>}
+                    meta={
+                      <>
+                        <span className="text-[#1A1A72] font-semibold">{nomeFantasiaCliente(cliNome)}</span>
+                        {nomeFantasiaCliente(cliNome) !== razaoSocialCliente(cliNome) && <span className="text-slate-400 truncate">{razaoSocialCliente(cliNome)}</span>}
+                        <RowMeta label="OS" value={<span className="font-data-mono">{o.numero || o.id.slice(0, 8)}</span>} />
+                        <Badge color="slate">{o.tipo}</Badge>
+                      </>
+                    }
+                    center={
+                      <div className="text-left md:text-center">
+                        <p className="text-[10px] text-slate-400 font-data-mono">{o.dataPrevista ? `Previsto ${o.dataPrevista}` : o.dataAbertura || ''}</p>
+                      </div>
+                    }
+                    right={
+                      <>
+                        <Badge color={o.prioridade === 'critica' ? 'red' : o.prioridade === 'alta' ? 'amber' : 'slate'} outline>
+                          {o.prioridade}
+                        </Badge>
+                        <Badge color={st.color}>{st.label}</Badge>
+                      </>
+                    }
+                  />
+                );
+              })}
             </div>
           )}
         </>
@@ -1744,11 +1795,16 @@ const OrdemServicoDetailModal: React.FC<{
   os: OrdemServico;
   clients: Client[];
   contracts: Contract[];
+  canManage?: boolean;
+  onCancel?: () => void;
+  onDelete?: () => void;
   onClose: () => void;
-}> = ({ os, clients, contracts, onClose }) => {
+}> = ({ os, clients, contracts, canManage = false, onCancel, onDelete, onClose }) => {
   const clienteNome = clients.find((c) => c.id === os.clienteId)?.name || os.clienteId || '—';
   const contrato = contracts.find((c) => c.id === os.contratoId);
   const st = OS_STATUS_LABEL[os.status] || { label: os.status, color: 'slate' as const };
+  const podeCancelar = canManage && !!onCancel && isCancelable(os);
+  const podeExcluir = canManage && !!onDelete && isHardDeleteEligible(os);
   const linha = (label: string, value: React.ReactNode) => (
     <div className="flex gap-3 py-1.5 border-b border-slate-100 last:border-0">
       <span className="w-32 shrink-0 text-[11px] font-bold text-slate-500 uppercase">{label}</span>
@@ -1776,9 +1832,118 @@ const OrdemServicoDetailModal: React.FC<{
           {contrato ? linha('Contrato', <span className="font-data-mono">{contrato.id}</span>) : null}
           {linha('Abertura', os.dataAbertura || '—')}
           {os.dataPrevista ? linha('Prevista', os.dataPrevista) : null}
+          {os.status === 'cancelada' && (
+            <>
+              {os.motivoCancelamento ? linha('Motivo do cancelamento', <span className="whitespace-pre-wrap">{os.motivoCancelamento}</span>) : null}
+              {os.canceladaEm ? linha('Cancelada em', new Date(os.canceladaEm).toLocaleString('pt-BR')) : null}
+            </>
+          )}
         </div>
-        <div className="p-4 border-t border-slate-200 flex justify-end">
+        <div className="p-4 border-t border-slate-200 flex justify-between items-center gap-2">
+          <div className="flex gap-2">
+            {podeExcluir && (
+              <button onClick={onDelete} className="px-3 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold">Excluir OS</button>
+            )}
+            {podeCancelar && (
+              <button onClick={onCancel} className="px-3 py-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold">Cancelar OS</button>
+            )}
+          </div>
           <button onClick={onClose} className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-bold">Fechar</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Modal Fireowl de CANCELAMENTO (motivo obrigatório). Não otimista: só fecha
+// após a Promise resolver; erro da RPC mantém o modal e exibe a mensagem.
+const CancelOsModal: React.FC<{
+  os: OrdemServico;
+  onConfirm: (motivo: string) => Promise<void>;
+  onClose: () => void;
+}> = ({ os, onConfirm, onClose }) => {
+  const [motivo, setMotivo] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const podeConfirmar = motivo.trim().length > 0 && !busy;
+  const confirmar = async () => {
+    if (!podeConfirmar) return;
+    setBusy(true); setErro(null);
+    try {
+      await onConfirm(motivo.trim());
+      onClose();
+    } catch (e: any) {
+      setErro(e?.message || 'Não foi possível cancelar a Ordem de Serviço.');
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="fixed inset-0 z-[75] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white w-full max-w-md rounded-xl shadow-2xl flex flex-col">
+        <div className="p-5 border-b border-slate-200">
+          <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">Cancelar Ordem de Serviço</p>
+          <h3 className="font-bold text-slate-900 mt-1 font-data-mono">{os.numero || os.id}</h3>
+        </div>
+        <div className="p-5">
+          <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Motivo do cancelamento</label>
+          <textarea
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            rows={4}
+            autoFocus
+            placeholder="Descreva por que esta OS não será mais executada…"
+            className="w-full border border-slate-200 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+          />
+          <p className="text-[11px] text-slate-400 mt-1">O histórico, evidências e relatórios são preservados. O Pedido poderá gerar uma nova OS.</p>
+          {erro && <p className="text-xs text-red-600 mt-2 font-semibold">{erro}</p>}
+        </div>
+        <div className="p-4 border-t border-slate-200 flex justify-end gap-2">
+          <button onClick={onClose} disabled={busy} className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-bold disabled:opacity-50">Voltar</button>
+          <button onClick={confirmar} disabled={!podeConfirmar} className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold disabled:opacity-50">
+            {busy ? 'Cancelando…' : 'Confirmar cancelamento'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Modal Fireowl de HARD DELETE (OS virgem). O banco revalida a ausência de uso.
+const DeleteOsModal: React.FC<{
+  os: OrdemServico;
+  onConfirm: () => Promise<void>;
+  onClose: () => void;
+}> = ({ os, onConfirm, onClose }) => {
+  const [busy, setBusy] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const excluir = async () => {
+    if (busy) return;
+    setBusy(true); setErro(null);
+    try {
+      await onConfirm();
+      onClose();
+    } catch (e: any) {
+      setErro(e?.message || 'Não foi possível excluir a Ordem de Serviço.');
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="fixed inset-0 z-[75] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white w-full max-w-md rounded-xl shadow-2xl flex flex-col">
+        <div className="p-5 border-b border-slate-200">
+          <p className="text-[10px] font-bold text-red-700 uppercase tracking-wide">Excluir Ordem de Serviço</p>
+          <h3 className="font-bold text-slate-900 mt-1 font-data-mono">{os.numero || os.id}</h3>
+        </div>
+        <div className="p-5">
+          <p className="text-sm text-slate-700">Esta Ordem de Serviço ainda não possui atendimento, relatório ou evidências operacionais e pode ser excluída permanentemente.</p>
+          <p className="text-[11px] text-slate-400 mt-2">A verificação é refeita no servidor: se houver qualquer vínculo, a exclusão é bloqueada.</p>
+          {erro && <p className="text-xs text-red-600 mt-2 font-semibold">{erro}</p>}
+        </div>
+        <div className="p-4 border-t border-slate-200 flex justify-end gap-2">
+          <button onClick={onClose} disabled={busy} className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-bold disabled:opacity-50">Voltar</button>
+          <button onClick={excluir} disabled={busy} className="px-4 py-2 rounded-lg bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-bold disabled:opacity-50">
+            {busy ? 'Excluindo…' : 'Excluir permanentemente'}
+          </button>
         </div>
       </div>
     </div>

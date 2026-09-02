@@ -470,26 +470,10 @@ export interface Client {
   logoPath?: string;
 }
 
-/**
- * LEGADO/mock da vitrine comercial (CrmView/Dashboard). NÃO é a Ordem de Serviço
- * operacional persistida (ver OrdemServico + tabela ordens_servico). Vive apenas
- * em memória de sessão. O campo `pedidoId` aqui guarda o numero_pedido humano
- * (não a identidade estrutural) e por isso NÃO serve para vínculo — o vínculo
- * real é OrdemServico.sourcePedidoId → pedidos.id. Ver 0073.
- */
-export interface PedidoOS {
-  id: string; // OS-2024-001
-  pedidoId: string; // numero_pedido humano (LEGADO) — não é pedidos.id
-  clientId: string;
-  clientName: string;
-  title: string;
-  type: 'Preventiva SDAI' | 'Corretiva Urgente' | 'Instalação CFTV' | 'Inspeção NBR 17240';
-  technicianName: string;
-  scheduledDate: string;
-  status: 'ABERTA' | 'EM ANDAMENTO' | 'CONCLUIDA' | 'ATRASADA';
-  priority: 'ALTA' | 'CRITICA' | 'NORMAL';
-  value: number;
-}
+// PedidoOS (mock efêmero da vitrine comercial) foi REMOVIDO na OPERACIONAL 2B.
+// A única fonte canônica operacional de Ordem de Serviço é a entidade
+// `OrdemServico` (tabela ordens_servico). Ver findActiveOsForPedido /
+// osHistoryForPedido em lib/ordensServico.ts.
 
 /** Pedido interno de fornecimento, rastreável até a proposta aceita. */
 export interface SupplyOrder {
@@ -1094,6 +1078,11 @@ export interface OrdemServico {
    *  NUNCA usar numero_pedido para vincular: ele NÃO é único (0073). Null = OS
    *  legada/avulsa sem origem conhecida em Pedido. */
   sourcePedidoId?: string;
+  /** Cancelamento formal (0074). Fonte da verdade do servidor — não confiar em
+   *  timestamp do frontend. Preenchidos apenas quando status = 'cancelada'. */
+  canceladaEm?: string;
+  canceladaPor?: string; // profiles.id do responsável pelo cancelamento
+  motivoCancelamento?: string;
 }
 
 /** Custos de logística versionados por vigência. */

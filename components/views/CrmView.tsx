@@ -4,7 +4,7 @@ import { showToast, requestConfirm } from '@/components/ui/Feedback';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Client,
-  PedidoOS,
+  OrdemServico,
   InventoryItem,
   Contract,
   Pedido,
@@ -27,13 +27,14 @@ import { uploadClientFachada, uploadClientLogo, removePropostaCapa } from '@/lib
 import { nomeFantasiaCliente } from '@/lib/utils';
 import { resolveLogoDataUrls } from '@/lib/institucional';
 import { fetchReports } from '@/lib/reports';
+import { OS_STATUS_ATIVOS } from '@/lib/ordensServico';
 import { fetchPendencias } from '@/lib/pendencias';
 import { isSupabaseConfigured } from '@/lib/inventory';
 import { fetchClientEvents, insertClientEvent } from '@/lib/clientEvents';
 
 interface CrmViewProps {
   clients: Client[];
-  pedidosOS: PedidoOS[];
+  ordensServico: OrdemServico[];
   pedidos: Pedido[];
   contracts: Contract[];
   transactions: FinancialTransaction[];
@@ -44,7 +45,6 @@ interface CrmViewProps {
   onAddPartnerBrand: (brand: PartnerBrand) => void;
   onAddClient: (client: Client) => void;
   onDeleteClient: (client: Client) => Promise<void>;
-  onAddOS: (os: PedidoOS) => void;
   onSelectClientForReport?: (clientName: string) => void;
   onNavigateToTab?: (tab: TabPath) => void;
   userRole?: UserRole;
@@ -72,6 +72,15 @@ const PROPOSAL_ACEITO: Pedido['status'][] = ['aceito'];
 const PROPOSAL_ABERTO: Pedido['status'][] = ['rascunho', 'em_revisao', 'aprovado_interno', 'enviado_ao_cliente', 'visualizado_cliente', 'em_negociacao'];
 const PROPOSAL_CANCELADO: Pedido['status'][] = ['recusado', 'expirado'];
 
+// Rótulo/cor canônicos da OS real (ordens_servico). Sem statuses MAIÚSCULOS de mock.
+const OS_STATUS_UI: Record<OrdemServico['status'], { label: string; color: 'emerald' | 'amber' | 'blue' | 'red' | 'slate' }> = {
+  aberta: { label: 'Aberta', color: 'amber' },
+  agendada: { label: 'Agendada', color: 'blue' },
+  em_execucao: { label: 'Em execução', color: 'amber' },
+  concluida: { label: 'Concluída', color: 'emerald' },
+  cancelada: { label: 'Cancelada', color: 'red' },
+};
+
 const proposalStatusLabel: Record<Pedido['status'], string> = {
   rascunho: 'Rascunho',
   em_revisao: 'Em revisão',
@@ -87,7 +96,7 @@ const proposalStatusLabel: Record<Pedido['status'], string> = {
 
 export const CrmView: React.FC<CrmViewProps> = ({
   clients,
-  pedidosOS,
+  ordensServico,
   pedidos,
   contracts,
   transactions,
@@ -436,9 +445,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
                 const nProposals = pedidos.filter(
                   (p) => p.clienteId === client.id || norm(p.clienteNome) === norm(client.name)
                 ).length;
-                const nOS = pedidosOS.filter(
-                  (o) => o.clientId === client.id || norm(o.clientName) === norm(client.name)
-                ).length;
+                const nOS = ordensServico.filter((o) => o.clienteId === client.id).length;
                 return (
                   <DataListRow
                     key={client.id}
@@ -513,32 +520,31 @@ export const CrmView: React.FC<CrmViewProps> = ({
             Ordens de Serviço Ativas &amp; Manutenções
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {pedidosOS.map((os) => (
-              <div key={os.id} className="border border-slate-200 rounded-lg p-4 bg-slate-50/50 flex flex-col justify-between gap-3">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="font-data-mono text-xs font-bold text-[#E63946]">{os.id}</span>
-                    <h4 className="font-bold text-slate-900 text-sm uppercase">{os.title}</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">{os.clientName}</p>
+            {ordensServico
+              .filter((os) => OS_STATUS_ATIVOS.includes(os.status))
+              .map((os) => {
+                const ui = OS_STATUS_UI[os.status];
+                const clienteNome = clients.find((c) => c.id === os.clienteId)?.name || os.clienteId || '—';
+                return (
+                  <div key={os.id} className="border border-slate-200 rounded-lg p-4 bg-slate-50/50 flex flex-col justify-between gap-3">
+                    <div className="flex justify-between items-start">
+                      <div className="min-w-0">
+                        <span className="font-data-mono text-xs font-bold text-[#E63946]">{os.numero || os.id}</span>
+                        <h4 className="font-bold text-slate-900 text-sm uppercase truncate">{os.titulo || 'Ordem de serviço'}</h4>
+                        <p className="text-xs text-slate-500 mt-0.5">{nomeFantasiaCliente(clienteNome)}</p>
+                      </div>
+                      <span className="shrink-0"><Badge color={ui.color}>{ui.label}</Badge></span>
+                    </div>
+                    <div className="flex justify-between items-center font-data-mono text-xs text-slate-500 pt-3 border-t border-slate-200">
+                      <span className="uppercase">{os.tipo}</span>
+                      <span>{os.dataPrevista ? `Previsto ${os.dataPrevista}` : os.dataAbertura || ''}</span>
+                    </div>
                   </div>
-                  <span
-                    className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase ${
-                      os.status === 'CONCLUIDA'
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : os.status === 'EM ANDAMENTO'
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}
-                  >
-                    {os.status}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center font-data-mono text-xs text-slate-500 pt-3 border-t border-slate-200">
-                  <span>Técnico: {os.technicianName}</span>
-                  <span className="font-bold text-slate-900">{maskMoney(`R$ ${os.value.toLocaleString('pt-BR')}`)}</span>
-                </div>
-              </div>
-            ))}
+                );
+              })}
+            {ordensServico.filter((os) => OS_STATUS_ATIVOS.includes(os.status)).length === 0 && (
+              <p className="text-sm text-slate-400 col-span-full py-6 text-center">Nenhuma ordem de serviço ativa.</p>
+            )}
           </div>
         </div>
       )}
@@ -882,7 +888,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
           client={selectedClientDetail}
           contracts={contracts}
           pedidos={pedidos}
-          pedidosOS={pedidosOS}
+          ordensServico={ordensServico}
           transactions={transactions}
           maskMoney={maskMoney}
           fabricantes={partnerBrands}
@@ -916,7 +922,7 @@ interface ClientDetailProps {
   client: Client;
   contracts: Contract[];
   pedidos: Pedido[];
-  pedidosOS: PedidoOS[];
+  ordensServico: OrdemServico[];
   transactions: FinancialTransaction[];
   maskMoney: (v: string) => string;
   fabricantes: PartnerBrand[];
@@ -935,7 +941,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
   client,
   contracts,
   pedidos,
-  pedidosOS,
+  ordensServico,
   transactions,
   maskMoney,
   fabricantes,
@@ -982,11 +988,11 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
   };
   const data = useMemo(() => {
     const belongsPedido = (p: Pedido) => p.clienteId === client.id || norm(p.clienteNome) === norm(client.name);
-    const belongsOS = (o: PedidoOS) => o.clientId === client.id || norm(o.clientName) === norm(client.name);
+    const belongsOS = (o: OrdemServico) => o.clienteId === client.id;
 
     const clientContracts = contracts.filter((c) => norm(c.clientName) === norm(client.name));
     const clientPedidos = pedidos.filter(belongsPedido);
-    const clientOS = pedidosOS.filter(belongsOS);
+    const clientOS = ordensServico.filter(belongsOS);
     const clientReceitas = transactions.filter(
       (t) => t.type === 'RECEITA' && norm(t.clientOrVendor) === norm(client.name)
     );
@@ -995,9 +1001,9 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
     const propostasAbertas = clientPedidos.filter((p) => PROPOSAL_ABERTO.includes(p.status));
     const propostasCanceladas = clientPedidos.filter((p) => PROPOSAL_CANCELADO.includes(p.status));
 
-    const osRealizadas = clientOS.filter((o) => o.status === 'CONCLUIDA');
-    const osAndamento = clientOS.filter((o) => o.status === 'EM ANDAMENTO' || o.status === 'ABERTA');
-    const osCanceladas = clientOS.filter((o) => o.status === 'ATRASADA');
+    const osRealizadas = clientOS.filter((o) => o.status === 'concluida');
+    const osAndamento = clientOS.filter((o) => OS_STATUS_ATIVOS.includes(o.status));
+    const osCanceladas = clientOS.filter((o) => o.status === 'cancelada');
 
     const mrr = clientContracts.reduce((acc, c) => acc + c.monthlyValue, 0);
     const totalRecebido = clientReceitas
@@ -1019,7 +1025,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
       totalRecebido,
       volumeAberto,
     };
-  }, [client, contracts, pedidos, pedidosOS, transactions]);
+  }, [client, contracts, pedidos, ordensServico, transactions]);
 
   const brlM = (n: number) => maskMoney(brl(n));
   const timeline = useMemo(() => {
@@ -1033,7 +1039,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({
     const entries: { id: string; date?: string; type: string; icon: string; title: string; detail: string; tone: string }[] = [
       ...data.clientPedidos.map((p) => ({ id: `ped-${p.id}`, date: p.dataEmissao, type: 'Proposta', icon: 'description', title: p.numeroPedido, detail: `${p.referencia} · ${p.status}`, tone: 'text-[#1A1A72] bg-[#1A1A72]/10' })),
       ...data.clientContracts.map((c) => ({ id: `contract-${c.id}`, date: c.startDate || c.renewalDate, type: 'Contrato', icon: 'handshake', title: c.contractType || c.id, detail: `${c.status} · renovação ${c.renewalDate || 'não informada'}`, tone: 'text-emerald-700 bg-emerald-50' })),
-      ...data.osRealizadas.concat(data.osAndamento, data.osCanceladas).map((o) => ({ id: `os-${o.id}`, date: o.scheduledDate, type: 'OS', icon: 'engineering', title: o.title || o.id, detail: `${o.status} · ${o.technicianName || 'Sem responsável'}`, tone: 'text-amber-700 bg-amber-50' })),
+      ...data.osRealizadas.concat(data.osAndamento, data.osCanceladas).map((o) => ({ id: `os-${o.id}`, date: o.dataPrevista || o.dataAbertura || '', type: 'OS', icon: 'engineering', title: o.numero || o.titulo || o.id, detail: `${OS_STATUS_UI[o.status].label}${o.titulo ? ` · ${o.titulo}` : ''}`, tone: 'text-amber-700 bg-amber-50' })),
       ...clientReports.map((r) => ({ id: `report-${r.id}`, date: r.finalizadoEm || r.iniciadoEm, type: 'Relatório', icon: 'assignment', title: r.numero || r.titulo || r.tipo, detail: `${r.tipo} · ${r.status}`, tone: 'text-violet-700 bg-violet-50' })),
       ...data.clientReceitas.map((t) => ({ id: `income-${t.id}`, date: t.date, type: 'Receita', icon: 'payments', title: t.description || t.id, detail: `${brlM(t.amount)} · ${t.status}`, tone: 'text-emerald-700 bg-emerald-50' })),
       ...clientEvents.map((event) => ({ id: `event-${event.id}`, date: event.createdAt, type: event.type === 'contato' ? 'Contato' : event.type === 'negociacao' ? 'Negociação' : event.type === 'visita' ? 'Visita' : 'Nota', icon: event.type === 'contato' ? 'phone_in_talk' : event.type === 'visita' ? 'location_on' : 'sticky_note_2', title: event.content, detail: event.authorName ? `Registrado por ${event.authorName}` : 'Registro manual', tone: 'text-sky-700 bg-sky-50' })),
@@ -1329,7 +1335,7 @@ const ProposalGroup: React.FC<{ title: string; color: 'emerald' | 'amber' | 'red
   );
 };
 
-const OSGroup: React.FC<{ title: string; color: 'emerald' | 'amber' | 'red'; list: PedidoOS[]; brlM: (n: number) => string }> = ({ title, color, list, brlM }) => {
+const OSGroup: React.FC<{ title: string; color: 'emerald' | 'amber' | 'red'; list: OrdemServico[]; brlM: (n: number) => string }> = ({ title, color, list }) => {
   if (list.length === 0) return null;
   return (
     <div className="mb-2">
@@ -1338,12 +1344,11 @@ const OSGroup: React.FC<{ title: string; color: 'emerald' | 'amber' | 'red'; lis
         {list.map((o) => (
           <div key={o.id} className="flex items-center justify-between border border-slate-100 rounded-lg px-3 py-2">
             <div className="min-w-0">
-              <p className="font-data-mono text-[11px] text-slate-400">{o.id} · {o.scheduledDate}</p>
-              <p className="font-semibold text-slate-800 truncate">{o.title}</p>
+              <p className="font-data-mono text-[11px] text-slate-400">{o.numero || o.id}{o.dataPrevista ? ` · ${o.dataPrevista}` : ''}</p>
+              <p className="font-semibold text-slate-800 truncate">{o.titulo || 'Ordem de serviço'}</p>
             </div>
             <div className="text-right shrink-0">
-              <p className="font-data-mono font-bold text-slate-900">{brlM(o.value)}</p>
-              <Badge color={color}>{o.status}</Badge>
+              <Badge color={OS_STATUS_UI[o.status].color === 'blue' ? 'slate' : color}>{OS_STATUS_UI[o.status].label}</Badge>
             </div>
           </div>
         ))}

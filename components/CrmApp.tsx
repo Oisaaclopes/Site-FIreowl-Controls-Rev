@@ -24,7 +24,6 @@ import {
   TabPath,
   UserRole,
   Client,
-  PedidoOS,
   Contract,
   ClientEquipment,
   TimePunch,
@@ -45,13 +44,12 @@ import {
   ,SupplyOrder
   ,OrdemServico
 } from '@/lib/types';
-import { fetchOrdensServico, getOrCreateOsFromPedido, findActiveOsForPedido } from '@/lib/ordensServico';
+import { fetchOrdensServico, getOrCreateOsFromPedido, findActiveOsForPedido, cancelOs, deleteOsIfUnused } from '@/lib/ordensServico';
 import { fetchPendencias } from '@/lib/pendencias';
 import { deletePedidoTemplate, fetchPedidoTemplates, upsertPedidoTemplate } from '@/lib/pedidoTemplates';
 
 import {
   INITIAL_CLIENTS,
-  INITIAL_PEDIDOS_OS,
   INITIAL_CONTRACTS,
   INITIAL_EQUIPMENT,
   INITIAL_PUNCH_LOGS,
@@ -206,10 +204,9 @@ export function CrmApp({
 
   // System State Data
   const [clients, setClients] = useState<Client[]>(isSupabaseConfigured() ? [] : INITIAL_CLIENTS);
-  const [pedidosOS, setPedidosOS] = useState<PedidoOS[]>(INITIAL_PEDIDOS_OS);
-  // OS operacionais REAIS (tabela ordens_servico). Fonte da verdade do vínculo
-  // Pedido → OS (source_pedido_id). O card da proposta lê daqui, não do mock
-  // pedidosOS — por isso o estado "Ver OS" sobrevive a refresh (0073).
+  // OS operacionais REAIS (tabela ordens_servico) — ÚNICA fonte canônica de OS
+  // (2B removeu o mock PedidoOS/pedidosOS). Alimenta card do Pedido, subview de
+  // OS, Dashboard e CRM. Sobrevive a refresh (source_pedido_id, 0073).
   const [ordensServico, setOrdensServico] = useState<OrdemServico[]>([]);
   const [pedidos, setPedidos] = useState<Pedido[]>(isSupabaseConfigured() ? [] : INITIAL_PEDIDOS);
   const [supplyOrders, setSupplyOrders] = useState<SupplyOrder[]>([]);
@@ -499,18 +496,26 @@ export function CrmApp({
       : 'corretiva';
     const titulo = `${pedido.referencia || 'Execução de proposta aceita'}${pedido.proposal.surveyOrigin?.reportNumber ? ` · origem ${pedido.proposal.surveyOrigin.reportNumber}` : ''}`;
 
-    // Demo/local (sem Supabase): mantém o mock efêmero da vitrine comercial.
+    // Demo/local (sem Supabase): cria uma OrdemServico REAL em memória (mesma
+    // entidade canônica), idempotente contra a OS ativa já existente do Pedido.
     if (!isSupabaseConfigured()) {
-      const legacy: PedidoOS = {
-        id: `OS-${new Date().getFullYear()}-${getNextSeq()}`, pedidoId: pedido.numeroPedido,
-        clientId: pedido.clienteId, clientName: pedido.clienteNome, title: titulo,
-        type: tipo === 'instalacao' ? 'Instalação CFTV' : tipo === 'preventiva' ? 'Preventiva SDAI' : 'Corretiva Urgente',
-        technicianName: pedido.responsavelComercialNome || 'Isaac Lopes',
-        scheduledDate: `${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).toUpperCase()} | 08:30`,
-        status: 'ABERTA', priority: 'ALTA', value: pedido.proposal.valorTotal || 0,
+      const existente = findActiveOsForPedido(ordensServico, pedido.id);
+      if (existente) {
+        showToast(`Este Pedido já possui a OS ${existente.numero || ''} ativa.`);
+        setCurrentTab('pedidos');
+        return;
+      }
+      const local: OrdemServico = {
+        id: `os_local_${Date.now()}`,
+        numero: `OS-${new Date().getFullYear()}-${String(getNextSeq()).padStart(4, '0')}`,
+        clienteId: pedido.clienteId, tipo, titulo,
+        descricao: `Gerada do Pedido ${pedido.numeroPedido}.`,
+        status: 'aberta', prioridade: 'alta', pendenciaIds: [],
+        dataAbertura: new Date().toISOString().slice(0, 10),
+        sourcePedidoId: pedido.id,
       };
-      handleAddOS(legacy);
-      showToast(`Ordem de Serviço (${legacy.id}) gerada a partir da Proposta ${pedido.numeroPedido}.`);
+      setOrdensServico((prev) => [local, ...prev]);
+      showToast(`Ordem de Serviço ${local.numero} gerada a partir da Proposta ${pedido.numeroPedido}.`);
       setCurrentTab('pedidos');
       return;
     }
@@ -732,9 +737,35 @@ export function CrmApp({
     }
   };
 
-  const handleAddOS = (newOS: PedidoOS) => {
-    setPedidosOS([newOS, ...pedidosOS]);
-    logAction('Abertura de Pedido / OS', 'Pedidos', `Aberto pedido ${newOS.id} para ${newOS.clientName}`);
+  // Cancela formalmente uma OS ativa (RPC cancel_os, 0074). Não é otimista:
+  // só atualiza a UI após o banco confirmar. Preserva histórico e evidências.
+  const handleCancelOs = async (osId: string, motivo: string) => {
+    if (!isSupabaseConfigured()) {
+      // Demo/local: aplica o cancelamento no estado em memória.
+      setOrdensServico((prev) => prev.map((o) => (o.id === osId
+        ? { ...o, status: 'cancelada', canceladaEm: new Date().toISOString(), motivoCancelamento: motivo.trim() }
+        : o)));
+      showToast('Ordem de Serviço cancelada.');
+      return;
+    }
+    const atualizada = await cancelOs(osId, motivo);
+    setOrdensServico((prev) => prev.map((o) => (o.id === atualizada.id ? atualizada : o)));
+    logAction('Cancelamento de OS', 'Ordens de Serviço', `OS ${atualizada.numero || osId} cancelada.`);
+    showToast(`Ordem de Serviço ${atualizada.numero || ''} cancelada.`);
+  };
+
+  // Hard delete de exceção (RPC delete_os_if_unused, 0074). O banco bloqueia se
+  // houver qualquer evidência operacional. Só remove da UI após confirmação.
+  const handleDeleteOs = async (osId: string) => {
+    if (!isSupabaseConfigured()) {
+      setOrdensServico((prev) => prev.filter((o) => o.id !== osId));
+      showToast('Ordem de Serviço excluída.');
+      return;
+    }
+    const { numero } = await deleteOsIfUnused(osId);
+    setOrdensServico((prev) => prev.filter((o) => o.id !== osId));
+    logAction('Exclusão de OS', 'Ordens de Serviço', `OS ${numero || osId} excluída (sem uso operacional).`);
+    showToast(`Ordem de Serviço ${numero || ''} excluída.`);
   };
 
   const handleAddContract = async (newContract: Contract) => {
@@ -1141,7 +1172,7 @@ export function CrmApp({
           {currentTab === 'painel' && userRole !== 'TECNICO' && (
             <DashboardView
               transactions={transactions}
-              pedidosOS={pedidosOS}
+              ordensServico={ordensServico}
               contracts={contracts}
               onNewOSClick={handleNewOSQuick}
               onNavigateToTab={setCurrentTab}
@@ -1150,7 +1181,7 @@ export function CrmApp({
 
           {currentTab === 'pedidos' && (
             <PedidosView
-              pedidosOS={pedidosOS}
+              ordensServico={ordensServico}
               pedidos={pedidos}
               supplyOrders={supplyOrders}
               initialDetailOrderId={pendingSupplyOrderId}
@@ -1166,12 +1197,14 @@ export function CrmApp({
               companyProfile={companyProfile}
               empresasAtendidas={empresasAtendidas}
               marcasTecnologias={marcasTecnologias}
-              onAddOS={handleAddOS}
               onSavePedido={handleSavePedido}
               onUpdatePedidoStatus={handleUpdatePedidoStatus}
               onDeletePedido={handleDeletePedido}
               onGenerateOSFromPedido={handleGenerateOSFromPedido}
+              onCancelOs={handleCancelOs}
+              onDeleteOs={handleDeleteOs}
               activeOsByPedido={activeOsByPedido}
+              userId={userId}
               onGenerateContractFromPedido={handleGenerateContractFromPedido}
               onGenerateSupplyOrderFromPedido={handleGenerateSupplyOrderFromPedido}
               onUpdateSupplyOrder={handleUpdateSupplyOrder}
@@ -1227,7 +1260,7 @@ export function CrmApp({
           {currentTab === 'clientes' && (
             <CrmView
               clients={clients}
-              pedidosOS={pedidosOS}
+              ordensServico={ordensServico}
               pedidos={pedidos}
               contracts={contracts}
               transactions={transactions}
@@ -1238,7 +1271,6 @@ export function CrmApp({
               onAddPartnerBrand={handleAddPartnerBrand}
               onAddClient={handleAddClient}
               onDeleteClient={handleDeleteClient}
-              onAddOS={handleAddOS}
               onSelectClientForReport={handleSelectClientForReport}
               onNavigateToTab={setCurrentTab}
               userRole={userRole}

@@ -1,6 +1,5 @@
 import {
   Client,
-  PedidoOS,
   Contract,
   ClientEquipment,
   TimePunch,
@@ -99,9 +98,8 @@ export const INITIAL_CLIENTS: Client[] = [
   }
 ];
 
-// Demo/seed removido (ETAPA 4): nenhuma OS fictícia. As OS reais vivem em
-// ordens_servico; a Agenda e demais telas mostram estado vazio quando não há dados.
-export const INITIAL_PEDIDOS_OS: PedidoOS[] = [];
+// OPERACIONAL 2B: nenhuma OS fictícia. A única fonte canônica de OS é a tabela
+// ordens_servico (entidade OrdemServico). INITIAL_PEDIDOS_OS/PedidoOS removidos.
 
 export const INITIAL_CONTRACTS: Contract[] = [
   {

@@ -22,12 +22,44 @@ function rowToOS(r: any): OrdemServico {
     criadoPor: r.criado_por ?? undefined,
     tecnicoResponsavelId: r.tecnico_responsavel_id ?? undefined,
     sourcePedidoId: r.source_pedido_id ?? undefined,
+    canceladaEm: r.cancelada_em ?? undefined,
+    canceladaPor: r.cancelada_por ?? undefined,
+    motivoCancelamento: r.motivo_cancelamento ?? undefined,
   };
 }
 
 /** Status considerados ATIVOS (uma OS ativa por Pedido). Espelha o índice
  *  único parcial de 0073 e o CHECK de 0033. */
 export const OS_STATUS_ATIVOS: OrdemServicoStatus[] = ['aberta', 'agendada', 'em_execucao'];
+
+/** Lifecycle (0074): só uma OS recém-'aberta' e virgem é elegível a HARD DELETE.
+ *  Espelha a regra do banco (delete_os_if_unused). A ausência de evidência é
+ *  validada transacionalmente no banco; aqui é só o gate de status para a UI. */
+export function isHardDeleteEligible(os: Pick<OrdemServico, 'status'>): boolean {
+  return os.status === 'aberta';
+}
+
+/** Cancelamento permitido para OS ATIVA (aberta/agendada/em_execucao). */
+export function isCancelable(os: Pick<OrdemServico, 'status'>): boolean {
+  return OS_STATUS_ATIVOS.includes(os.status);
+}
+
+/**
+ * Histórico de OS de um Pedido pela identidade estrutural (sourcePedidoId →
+ * pedidos.id), da mais recente para a mais antiga. Inclui canceladas/concluídas.
+ * NUNCA relaciona por numero_pedido.
+ */
+export function osHistoryForPedido(ordens: OrdemServico[], pedidoId: string): OrdemServico[] {
+  if (!pedidoId) return [];
+  return ordens
+    .filter((o) => o.sourcePedidoId === pedidoId)
+    .sort((a, b) => {
+      const da = a.dataAbertura || '';
+      const db = b.dataAbertura || '';
+      if (da !== db) return db.localeCompare(da);
+      return (b.numero || b.id).localeCompare(a.numero || a.id);
+    });
+}
 
 /**
  * Encontra a OS ATIVA de um Pedido pela IDENTIDADE ESTRUTURAL (sourcePedidoId →
@@ -165,6 +197,37 @@ export async function getOrCreateOsFromPedido(
   if (error) throw error;
   if (!data?.os) throw new Error('A geração da OS não retornou a ordem de serviço.');
   return { os: rowToOS(data.os), created: data.created === true };
+}
+
+/**
+ * Cancela formalmente uma OS ativa (RPC cancel_os, 0074). Transacional no banco:
+ * valida auth/papel/status e exige motivo. Preserva histórico e evidências.
+ * Retorna a OS já com status 'cancelada' e os campos de cancelamento do servidor.
+ */
+export async function cancelOs(osId: string, motivo: string): Promise<OrdemServico> {
+  if (!osId) throw new Error('OS obrigatória para cancelamento.');
+  const trimmed = (motivo || '').trim();
+  if (!trimmed) throw new Error('Motivo do cancelamento é obrigatório.');
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase.rpc('cancel_os', { p_os_id: osId, p_motivo: trimmed });
+  if (error) throw error;
+  if (!data?.os) throw new Error('O cancelamento não retornou a OS atualizada.');
+  return rowToOS(data.os);
+}
+
+/**
+ * HARD DELETE de exceção para OS criada por engano e completamente virgem
+ * (RPC delete_os_if_unused, 0074). O banco valida transacionalmente a AUSÊNCIA
+ * de qualquer evidência operacional (relatório por ambos os caminhos, fotos,
+ * comparações, execução de rotina, horas, financeiro) e o status. Se houver
+ * qualquer vínculo, a RPC bloqueia e lança erro — nada é apagado em cascata.
+ */
+export async function deleteOsIfUnused(osId: string): Promise<{ numero?: string }> {
+  if (!osId) throw new Error('OS obrigatória para exclusão.');
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase.rpc('delete_os_if_unused', { p_os_id: osId });
+  if (error) throw error;
+  return { numero: data?.numero ?? undefined };
 }
 
 export async function deleteOrdemServico(id: string): Promise<void> {

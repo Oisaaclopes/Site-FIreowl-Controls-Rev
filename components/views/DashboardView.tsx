@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { FinancialTransaction, PedidoOS, Contract, TabPath } from '@/lib/types';
+import { FinancialTransaction, OrdemServico, Contract, TabPath } from '@/lib/types';
+import { OS_STATUS_ATIVOS } from '@/lib/ordensServico';
 import { usePrivacy } from '@/lib/privacy';
 
 /** Máscara curta para os números dos cards (o prefixo "R$" já é exibido à parte). */
@@ -9,7 +10,7 @@ const MASK_DIGITS = '•••••••';
 
 interface DashboardViewProps {
   transactions: FinancialTransaction[];
-  pedidosOS: PedidoOS[];
+  ordensServico: OrdemServico[];
   contracts: Contract[];
   onNewOSClick: () => void;
   onNavigateToTab: (tab: TabPath) => void;
@@ -17,7 +18,7 @@ interface DashboardViewProps {
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   transactions,
-  pedidosOS,
+  ordensServico,
   contracts,
   onNewOSClick,
   onNavigateToTab,
@@ -35,7 +36,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const receitaContratadaMensal = contracts
     .filter((c) => c.status === 'ATIVO')
     .reduce((acc, c) => acc + c.monthlyValue, 0);
-  const osAtrasadas = pedidosOS.filter((p) => p.status === 'ATRASADA').length;
+  // OS atrasada = ativa (aberta/agendada/em_execucao) com data prevista vencida.
+  const hojeISO = new Date().toISOString().slice(0, 10);
+  const osAtrasadas = ordensServico.filter(
+    (o) => OS_STATUS_ATIVOS.includes(o.status) && !!o.dataPrevista && o.dataPrevista < hojeISO
+  ).length;
   const cashMax = Math.max(receitaTotal, despesaTotal, 1);
   const cashBars = [
     { label: 'Receitas', value: receitaTotal, color: 'bg-emerald-600' },
