@@ -44,6 +44,35 @@ export async function pendingFieldPhotoJobs(): Promise<number> {
   ).length;
 }
 
+export interface FieldPhotoJobState { status: OfflineJob['status']; lastError?: string; attempts: number }
+
+/**
+ * Estado real (na outbox) das fotos indicadas. Uma foto AUSENTE do mapa saiu da
+ * fila = sincronizada de verdade; presente com status 'ERROR' falhou. Evita marcar
+ * como "sincronizada" uma foto que só foi pulada por backoff (falso sucesso).
+ */
+export async function fieldPhotoJobStates(photoClientUuids: string[]): Promise<Map<string, FieldPhotoJobState>> {
+  const wanted = new Set(photoClientUuids);
+  const map = new Map<string, FieldPhotoJobState>();
+  if (wanted.size === 0) return map;
+  for (const job of await listOfflineJobs('FIELD_PHOTO')) {
+    if (wanted.has(job.entityClientUuid)) map.set(job.entityClientUuid, { status: job.status, lastError: job.lastError, attempts: job.attempts });
+  }
+  return map;
+}
+
+/** Mensagem PT curta para falha de sincronização de foto, sem vazar erro técnico cru. */
+export function friendlyFieldPhotoSyncError(raw?: string): string {
+  const msg = (raw || '').toLowerCase();
+  if (/row-level security|violates row|not authorized|permission|42501|403/.test(msg)) {
+    return 'A foto não pôde ser registrada: seu acesso a Fotos de Campo precisa ser revisado. Fale com o administrador.';
+  }
+  if (/network|fetch|timeout|offline/.test(msg)) {
+    return 'Sem conexão estável para enviar a foto agora. Ela ficou salva e será reenviada automaticamente.';
+  }
+  return 'Não foi possível enviar a foto agora. Ela ficou salva e o envio será tentado novamente.';
+}
+
 async function syncSession(job: OfflineJob<FieldPhotoSessionPayload>): Promise<void> {
   const session = await createFieldPhotoSession(job.payload.session);
   await updateFieldPhotoSessionStatus(session.id, 'sincronizado');

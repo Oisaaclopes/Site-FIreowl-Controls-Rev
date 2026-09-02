@@ -4,7 +4,7 @@ import React, { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { Client } from '@/lib/types';
 import { FieldPhoto, FieldPhotoMarker, FieldPhotoSession, newFieldPhoto, newFieldPhotoSession } from '@/lib/fieldPhotos';
 import { createFireowlEvidence } from '@/lib/fieldPhotoEvidence';
-import { enqueueFieldPhoto, enqueueFieldPhotoComparison, enqueueFieldPhotoSession } from '@/lib/offline/fieldPhotoSync';
+import { enqueueFieldPhoto, enqueueFieldPhotoComparison, enqueueFieldPhotoSession, fieldPhotoJobStates, friendlyFieldPhotoSyncError } from '@/lib/offline/fieldPhotoSync';
 import { flushOutbox, isOnline, offlineAvailable } from '@/lib/offline/reportSync';
 import { buildFieldPhotoPath, signedFieldPhotoUrl } from '@/lib/fieldPhotoStorage';
 import { useConfirm, useToast } from '@/components/ui/Feedback';
@@ -68,11 +68,17 @@ export const QuickFieldPhotoModal: React.FC<Props> = ({ isOpen, clients, technic
   const sync = async () => {
     if (!isOnline()) return;
     try {
-      const result = await flushOutbox();
-      // A fila remove jobs confirmados; como a sessão atual é local, refletimos o êxito sem recarregar a tela.
-      if (result.failed > 0) return;
-      setPhotos((items) => items.map((item) => ({ ...item, synced: true })));
+      await flushOutbox();
+      // Fonte de verdade: só está sincronizada a foto que SAIU da outbox. Uma foto
+      // pulada por backoff continua pendente (evita falso "Sincronizado"); uma com
+      // status 'ERROR' informa o técnico em vez de falhar em silêncio.
+      const uuids = photosRef.current.map((item) => item.photo.clientUuid);
+      const states = await fieldPhotoJobStates(uuids);
+      setPhotos((items) => items.map((item) => ({ ...item, synced: !states.has(item.photo.clientUuid) })));
+      const errored = uuids.map((u) => states.get(u)).find((st) => st?.status === 'ERROR');
+      if (errored) { toast.error(friendlyFieldPhotoSyncError(errored.lastError)); return; }
       await Promise.all(photosRef.current.map(async (item) => {
+        if (states.has(item.photo.clientUuid)) return; // ainda não confirmada no servidor
         try {
           const evidenceUrl = await signedFieldPhotoUrl(item.photo.storagePathEvidencia || item.photo.storagePathOriginal);
           if (item.evidenceUrl?.startsWith('blob:')) URL.revokeObjectURL(item.evidenceUrl);
