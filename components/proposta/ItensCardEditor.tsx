@@ -3,11 +3,13 @@
 import React, { useMemo, useState } from 'react';
 import { PedidoEquipmentItem } from '@/lib/types';
 import { normalizeSearch } from '@/lib/stockStatus';
+import { COMMERCIAL_UNITS, normalizeQuantity, normalizeUnitCode, unitAllowsDecimals } from '@/lib/commercialUnits';
+import { lineTotal } from '@/lib/commercialTotals';
 import { Plus, Minus, Trash2, ChevronUp, ChevronDown, Pencil, Check, X } from 'lucide-react';
 
 const brl = (n: number) => `R$ ${(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-const lineTotal = (it: { precoUnitario?: number; quantidade: number; desconto?: number }) =>
-  Math.max(0, (it.precoUnitario || 0) * it.quantidade - (it.desconto || 0));
+/** Formata a quantidade sem casas decimais desnecessárias (2 → "2", 150.5 → "150,5"). */
+const fmtQtd = (n: number) => (Number(n) || 0).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 
 type Draft = {
   descricao: string;
@@ -93,8 +95,8 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
       descricao: draft.descricao.trim(),
       descricaoDetalhada: draft.descricaoDetalhada.trim() || undefined,
       marcaModelo: draft.marcaModelo.trim(),
-      unidade: draft.unidade.trim() || (isServico ? 'vb' : 'un'),
-      quantidade: Math.max(1, Math.floor(draft.quantidade || 1)),
+      unidade: normalizeUnitCode(draft.unidade) || (isServico ? 'vb' : 'un'),
+      quantidade: normalizeQuantity(draft.quantidade || 1, draft.unidade),
       precoUnitario: draft.precoUnitario || 0,
       desconto: draft.desconto ? Math.max(0, draft.desconto) : undefined,
       stockSnapshot: !isServico && draft.stockSnapshot !== undefined ? draft.stockSnapshot : undefined,
@@ -123,7 +125,7 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
   };
 
   const stepQtd = (idx: number, it: PedidoEquipmentItem, delta: number) =>
-    onUpdate(idx, { quantidade: Math.max(1, (it.quantidade || 1) + delta) });
+    onUpdate(idx, { quantidade: normalizeQuantity((it.quantidade || 1) + delta, it.unidade) });
 
   const inputCls = `w-full border border-slate-300 rounded-lg p-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 ${accentRing}`;
   const miniLabel = 'block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1';
@@ -141,7 +143,7 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
                   <p className="font-semibold text-slate-800 text-sm leading-snug break-words">{it.descricao || <span className="text-slate-400 italic">Sem descrição</span>}</p>
                   {it.descricaoDetalhada && <p className="text-[11px] text-slate-500 leading-snug mt-0.5 break-words">{it.descricaoDetalhada}</p>}
                   <p className="text-[11px] text-slate-500 font-data-mono mt-1">
-                    {(it.unidade || 'un').toUpperCase()} · {it.quantidade}× {brl(it.precoUnitario || 0)}
+                    {normalizeUnitCode(it.unidade)} · {fmtQtd(it.quantidade)}× {brl(it.precoUnitario || 0)}
                     {it.desconto ? <span className="text-[#E63946]"> · desc {brl(it.desconto)}</span> : null}
                   </p>
                   {(it.sourceOrigins?.length || it.stockSnapshot !== undefined) ? (
@@ -174,9 +176,9 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
                 <div className="flex items-center gap-2">
                   <button type="button" onClick={() => stepQtd(idx, it, -1)} className="w-7 h-7 rounded-full border border-slate-300 text-slate-500 hover:bg-slate-50 flex items-center justify-center"><Minus className="w-3.5 h-3.5" /></button>
                   <input
-                    type="number" min={1} value={it.quantidade}
-                    onChange={(e) => onUpdate(idx, { quantidade: Math.max(1, Math.floor(Number(e.target.value) || 1)) })}
-                    className="w-14 text-center font-data-mono font-bold text-slate-800 border border-slate-200 rounded-lg p-1.5"
+                    type="number" min={0} step={unitAllowsDecimals(it.unidade) ? 'any' : 1} value={it.quantidade}
+                    onChange={(e) => onUpdate(idx, { quantidade: normalizeQuantity(Number(e.target.value) || 0, it.unidade) })}
+                    className="w-16 text-center font-data-mono font-bold text-slate-800 border border-slate-200 rounded-lg p-1.5"
                   />
                   <button type="button" onClick={() => stepQtd(idx, it, 1)} className={`w-7 h-7 rounded-full border flex items-center justify-center ${accent === 'emerald' ? 'border-emerald-300 text-emerald-600 hover:bg-emerald-50' : 'border-[#E63946]/40 text-[#E63946] hover:bg-red-50'}`}><Plus className="w-3.5 h-3.5" /></button>
                 </div>
@@ -189,7 +191,7 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
           <div className="flex items-center justify-between bg-slate-100 rounded-xl px-4 py-3">
             <div>
               <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Quantidade</span>
-              <span className="text-sm font-bold text-slate-700">{itens.reduce((a, x) => a + (x.it.quantidade || 0), 0)}</span>
+              <span className="text-sm font-bold text-slate-700">{fmtQtd(itens.reduce((a, x) => a + (x.it.quantidade || 0), 0))}</span>
             </div>
             <div className="text-right">
               <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Valor total ({isServico ? 'serviços' : 'materiais'})</span>
@@ -267,16 +269,30 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
             <input type="number" min={0} step="0.01" value={draft.precoUnitario} onChange={(e) => set('precoUnitario', Number(e.target.value))} className={`${inputCls} font-data-mono`} />
           </div>
           <div>
-            <label className={miniLabel}>Quantidade</label>
+            <label className={miniLabel}>Quantidade{unitAllowsDecimals(draft.unidade) ? '' : ' (inteiro)'}</label>
             <div className="flex items-center gap-1.5">
-              <button type="button" onClick={() => set('quantidade', Math.max(1, (draft.quantidade || 1) - 1))} className="w-9 h-[42px] rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50 flex items-center justify-center shrink-0"><Minus className="w-4 h-4" /></button>
-              <input type="number" min={1} value={draft.quantidade} onChange={(e) => set('quantidade', Math.max(1, Math.floor(Number(e.target.value) || 1)))} className={`${inputCls} text-center font-data-mono font-bold`} />
-              <button type="button" onClick={() => set('quantidade', (draft.quantidade || 1) + 1)} className="w-9 h-[42px] rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50 flex items-center justify-center shrink-0"><Plus className="w-4 h-4" /></button>
+              <button type="button" onClick={() => set('quantidade', normalizeQuantity((draft.quantidade || 1) - 1, draft.unidade))} className="w-9 h-[42px] rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50 flex items-center justify-center shrink-0"><Minus className="w-4 h-4" /></button>
+              <input type="number" min={0} step={unitAllowsDecimals(draft.unidade) ? 'any' : 1} value={draft.quantidade} onChange={(e) => set('quantidade', Number(e.target.value))} onBlur={(e) => set('quantidade', normalizeQuantity(Number(e.target.value) || 0, draft.unidade))} className={`${inputCls} text-center font-data-mono font-bold`} />
+              <button type="button" onClick={() => set('quantidade', normalizeQuantity((draft.quantidade || 1) + 1, draft.unidade))} className="w-9 h-[42px] rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50 flex items-center justify-center shrink-0"><Plus className="w-4 h-4" /></button>
             </div>
           </div>
           <div>
             <label className={miniLabel}>Unidade de medida</label>
-            <input type="text" value={draft.unidade} onChange={(e) => set('unidade', e.target.value)} placeholder="un, vb, m, rl…" className={`${inputCls} uppercase`} />
+            <select
+              value={COMMERCIAL_UNITS.some((u) => u.code === draft.unidade) ? draft.unidade : '__outro'}
+              onChange={(e) => {
+                const code = e.target.value === '__outro' ? draft.unidade : e.target.value;
+                setDraft((d) => ({ ...d, unidade: code, quantidade: normalizeQuantity(d.quantidade || 1, code) }));
+              }}
+              className={inputCls}
+            >
+              {COMMERCIAL_UNITS.map((u) => (
+                <option key={u.code} value={u.code}>{u.code}</option>
+              ))}
+              {!COMMERCIAL_UNITS.some((u) => u.code === draft.unidade) && draft.unidade && (
+                <option value="__outro">{draft.unidade} (não padrão)</option>
+              )}
+            </select>
           </div>
           <div>
             <label className={miniLabel}>Desconto (R$)</label>

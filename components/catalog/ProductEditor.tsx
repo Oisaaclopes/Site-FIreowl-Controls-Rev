@@ -3,6 +3,7 @@ import React, { useMemo, useState } from 'react';
 import type { InventoryItem } from '@/lib/types';
 import { CatalogTree, nodePath } from '@/lib/catalogTree';
 import { calculateProfit, calculateMarkup, calculateMargin, moneyOrDash, percentOrDash, ratioOrDash } from '@/lib/productPricing';
+import { COMMERCIAL_UNITS, normalizeUnitCode } from '@/lib/commercialUnits';
 
 const AREAS = ['SDAI', 'CFTV', 'ALARME', 'BMS'];
 
@@ -36,7 +37,7 @@ export function ProductEditor({ initial, tree, suppliers, onClose, onSave }: {
   const [description, setDescription] = useState(initial?.description ?? '');
   const [area, setArea] = useState(initial?.category ?? '');
   const [nodeId, setNodeId] = useState(initial?.canonicalTaxonomyId ?? '');
-  const [unit, setUnit] = useState(initial?.unit ?? 'UN');
+  const [unit, setUnit] = useState(normalizeUnitCode(initial?.unit ?? 'un'));
   const [supplier, setSupplier] = useState(initial?.supplier ?? '');
   const [stockManaged, setStockManaged] = useState(initial?.stockManaged !== false);
   const [quantity, setQuantity] = useState(initial?.quantity ?? 0);
@@ -78,7 +79,7 @@ export function ProductEditor({ initial, tree, suppliers, onClose, onSave }: {
       brand: brand.trim() || undefined,
       model: model.trim() || undefined,
       description: description.trim() || undefined,
-      unit,
+      unit: normalizeUnitCode(unit),
       supplier: supplier.trim(),
       stockManaged,
       quantity: stockManaged ? Number(quantity) || 0 : 0,
@@ -117,7 +118,10 @@ export function ProductEditor({ initial, tree, suppliers, onClose, onSave }: {
               <option value="">Selecione…</option>
               {[...new Set([...AREAS, area].filter(Boolean))].map((a) => <option key={a} value={a}>{a}</option>)}
             </select></Field>
-            <Field label="Unidade"><input className={input} value={unit} onChange={(e) => setUnit(e.target.value)} /></Field>
+            <Field label="Unidade"><select className={input} value={COMMERCIAL_UNITS.some((u) => u.code === unit) ? unit : '__outro'} onChange={(e) => { if (e.target.value !== '__outro') setUnit(e.target.value); }}>
+              {COMMERCIAL_UNITS.map((u) => <option key={u.code} value={u.code}>{u.code} — {u.label}</option>)}
+              {!COMMERCIAL_UNITS.some((u) => u.code === unit) && unit && <option value="__outro">{unit} (não padrão)</option>}
+            </select></Field>
           </div>
           <Field label="Caminho canônico (classificação)">
             <select className={input} value={nodeId} onChange={(e) => setNodeId(e.target.value)} disabled={!area}>

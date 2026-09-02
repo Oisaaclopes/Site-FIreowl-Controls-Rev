@@ -5,6 +5,8 @@ import { fetchReports } from './reports';
 import { fetchSurveyOrderLinks, fetchSurveyRequirements } from './surveyRequirements';
 import { getSupabaseClient } from './supabaseClient';
 import { CommercialProposalData, Pedido, PedidoEquipmentItem, TechnicalOrigin } from './types';
+import { normalizeUnitCode } from './commercialUnits';
+import { COMMERCIAL_SCHEMA_VERSION } from './commercialProposal';
 
 export type SurveyOrderConversionResult = { pedido: Pedido; alreadyExists: boolean; warnings: string[] };
 
@@ -104,7 +106,7 @@ export async function createOrderFromSurvey(reportId: string): Promise<SurveyOrd
       descricao: material.descricao,
       descricaoDetalhada: material.observacao || inventoryItem?.commercialDescription || inventoryItem?.shortDescription || inventoryItem?.description,
       marcaModelo: brandModel,
-      unidade: material.unidade || inventoryItem?.unit || 'un',
+      unidade: normalizeUnitCode(material.unidade || inventoryItem?.unit || 'un'),
       quantidade: numeric(material.quantidade, 1),
       vinculoEstoqueId: material.catalogItemId,
       tipo: 'material',
@@ -124,7 +126,7 @@ export async function createOrderFromSurvey(reportId: string): Promise<SurveyOrd
       descricao: measurement.descricao,
       descricaoDetalhada: [measurement.local, measurement.observacao, inventoryItem?.commercialDescription || inventoryItem?.shortDescription].filter(Boolean).join(' — ') || undefined,
       marcaModelo: [inventoryItem?.brand, inventoryItem?.model].filter(Boolean).join(' · '),
-      unidade: measurement.unidade || inventoryItem?.unit || 'un',
+      unidade: normalizeUnitCode(measurement.unidade || inventoryItem?.unit || 'un'),
       quantidade: numeric(measurement.quantidade),
       vinculoEstoqueId: measurement.catalogItemId,
       tipo: 'material',
@@ -139,7 +141,7 @@ export async function createOrderFromSurvey(reportId: string): Promise<SurveyOrd
       descricao: service.descricao,
       descricaoDetalhada: service.observacao,
       marcaModelo: '',
-      unidade: service.unidade || 'un',
+      unidade: normalizeUnitCode(service.unidade || 'un'),
       quantidade: numeric(service.quantidade, 1),
       vinculoServicoId: service.serviceId,
       tipo: 'servico',
@@ -153,6 +155,7 @@ export async function createOrderFromSurvey(reportId: string): Promise<SurveyOrd
   if (!equipmentItems.length) warnings.push('Nenhuma necessidade foi incluída; o Pedido foi aberto vazio para revisão.');
   const now = new Date().toISOString();
   const proposal: CommercialProposalData = {
+    schemaVersion: COMMERCIAL_SCHEMA_VERSION,
     pedidoTipo: 'orcamento',
     surveyOrigin: { reportId, reportNumber: report.numero, reportArea: report.templateCodigo, createdAt: now },
     objetivo: `Atender às necessidades identificadas no levantamento técnico ${report.numero || report.id}.`,

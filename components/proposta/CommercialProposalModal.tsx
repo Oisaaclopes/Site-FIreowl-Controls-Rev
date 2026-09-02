@@ -22,6 +22,10 @@ import { AREAS_PROPOSTA, TIPOS_SERVICO, gerarTituloProposta, conclusaoPorTipo, p
 import { montarEstruturaProposta, ordenarEstrutura, SECOES_FIXAS_INICIO, SECOES_FIXAS_FIM } from '@/lib/propostaEstrutura';
 import { CARTA_APRESENTACAO } from '@/lib/propostaTextos';
 import { SECOES_TEXTO, servicosOfertadosPadrao, restaurarSecaoLista, fonteDaSecaoLista, fonteServicos } from '@/lib/propostaMaterializacao';
+import { normalizeUnitCode } from '@/lib/commercialUnits';
+import { calculateCommercialProposalTotals } from '@/lib/commercialTotals';
+import { CommercialWarranty, StructuredWarranty, WarrantyLeg, WarrantyMode, defaultWarranty, normalizeCommercialWarranty, isLegacyWarranty, isStructuredWarranty, renderWarranty, legText } from '@/lib/commercialWarranty';
+import { COMMERCIAL_SCHEMA_VERSION } from '@/lib/commercialProposal';
 import { ItensCardEditor } from '@/components/proposta/ItensCardEditor';
 import {
   X,
@@ -286,6 +290,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const [open, setOpen] = useState<Record<string, boolean>>({
     materiais: true,
     servicos: true,
+    garantia: true,
     basicas: true,
   });
   const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }));
@@ -389,9 +394,69 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const [prazoExecucao, setPrazoExecucao] = useState<string>(
     initialPedido?.proposal?.prazoExecucao || '10 dias úteis após autorização formal de início'
   );
-  const [garantia, setGarantia] = useState<string>(
-    initialPedido?.proposal?.garantia || '90 dias para serviços de instalação e 12 meses para equipamentos fornecidos'
-  );
+  // ETAPA COMERCIAL — Garantia estruturada (mão de obra × materiais). Fonte única
+  // do default (90 dias / 12 meses) em [[lib/commercialWarranty]]. Propostas antigas
+  // (garantia string) entram em modo legado, preservando o texto histórico.
+  const [warranty, setWarranty] = useState<CommercialWarranty>(() => {
+    if (!initialProposal) return defaultWarranty();
+    const w = initialProposal.warranty
+      ? normalizeCommercialWarranty(initialProposal.warranty)
+      : normalizeCommercialWarranty(initialProposal.garantia);
+    // Proposta sem garantia efetiva (ex.: vinda de levantamento) recebe o default sugerido.
+    if (isLegacyWarranty(w) && !w.text.trim()) return defaultWarranty();
+    return w;
+  });
+  const updWarrantyLeg = (leg: 'maoDeObra' | 'materiais', patch: Partial<WarrantyLeg>) =>
+    setWarranty((w) => {
+      const base = isStructuredWarranty(w) ? w : defaultWarranty();
+      return { ...base, [leg]: { ...base[leg], ...patch } };
+    });
+  const setWarrantyObs = (v: string) =>
+    setWarranty((w) => ({ ...(isStructuredWarranty(w) ? w : defaultWarranty()), observacoes: v || undefined }));
+  // Texto plano da garantia — compat. com o campo legado `garantia: string`
+  // (leitura por versões antigas / modelos / snapshot de revisão).
+  const garantiaTexto = (() => {
+    const r = renderWarranty(warranty);
+    if (isLegacyWarranty(warranty)) return r.legacyText || '';
+    const parts: string[] = [];
+    if (r.maoDeObra) parts.push(`Mão de obra: ${r.maoDeObra}`);
+    if (r.materiais) parts.push(`Materiais/equipamentos: ${r.materiais}`);
+    if (r.observacoes) parts.push(r.observacoes);
+    return parts.join('. ');
+  })();
+  const WARRANTY_MODES: { id: WarrantyMode; label: string }[] = [
+    { id: 'dias', label: 'Dias' },
+    { id: 'meses', label: 'Meses' },
+    { id: 'fabricante', label: 'Do fabricante' },
+    { id: 'personalizado', label: 'Personalizado' },
+  ];
+  // Bloco de edição de uma "perna" da garantia (mão de obra ou materiais).
+  const warrantyLegBlock = (title: string, key: 'maoDeObra' | 'materiais') => {
+    const leg: WarrantyLeg = isStructuredWarranty(warranty) ? warranty[key] : defaultWarranty()[key];
+    const preview = legText(leg);
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white p-3">
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input type="checkbox" checked={leg.enabled} onChange={(e) => updWarrantyLeg(key, { enabled: e.target.checked })} className="w-4 h-4 accent-emerald-600" />
+          <span className="text-sm font-bold text-slate-800">{title}</span>
+        </label>
+        {leg.enabled && (
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            <select value={leg.mode} onChange={(e) => updWarrantyLeg(key, { mode: e.target.value as WarrantyMode })} className={`${inputCls} w-40`}>
+              {WARRANTY_MODES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+            </select>
+            {(leg.mode === 'dias' || leg.mode === 'meses') && (
+              <input type="number" min={1} value={leg.value ?? ''} onChange={(e) => updWarrantyLeg(key, { value: Math.max(0, Math.floor(Number(e.target.value) || 0)) })} placeholder="prazo" className={`${inputCls} w-24 font-data-mono text-center`} />
+            )}
+            {leg.mode === 'personalizado' && (
+              <input type="text" value={leg.textoPersonalizado ?? ''} onChange={(e) => updWarrantyLeg(key, { textoPersonalizado: e.target.value })} placeholder="Texto da garantia…" className={`${inputCls} flex-1 min-w-[180px]`} />
+            )}
+          </div>
+        )}
+        <p className="text-[10px] text-slate-400 mt-1.5">{leg.enabled ? (preview ? `No PDF: “${preview}”` : 'Selecione um prazo ou texto — perna ativa sem condição não aparece.') : 'Sem garantia informada — não aparece no PDF.'}</p>
+      </div>
+    );
+  };
   const [validadeDias, setValidadeDias] = useState<number>(initialPedido?.proposal?.validadePropostaDias || 15);
   const [validadeComplemento, setValidadeComplemento] = useState<string>(
     initialPedido?.proposal?.validadePropostaComplemento || 'dias corridos a partir da emissão'
@@ -485,7 +550,18 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const [incluirTermoAceite, setIncluirTermoAceite] = useState<boolean>(initialPedido?.proposal?.incluirTermoAceite !== false);
 
   const [maoDeObra, setMaoDeObra] = useState<number>(initialPedido?.proposal?.maoDeObra ?? 0);
-  const [manualValorTotal, setManualValorTotal] = useState<number | null>(null);
+  // Override do total comercial. Reidratado do snapshot: usa o flag explícito
+  // (valorTotalManual) e, para propostas antigas sem flag, recupera o override
+  // histórico quando o total gravado diverge do calculado. Ver [[lib/commercialProposal]].
+  const [manualValorTotal, setManualValorTotal] = useState<number | null>(() => {
+    const p = initialPedido?.proposal;
+    if (!p) return null;
+    if (p.valorTotalManual != null && Number.isFinite(Number(p.valorTotalManual))) return Number(p.valorTotalManual);
+    const calc = calculateCommercialProposalTotals({ equipmentItems: p.equipmentItems, maoDeObra: p.maoDeObra });
+    const stored = Number(p.valorTotal) || 0;
+    if (!p.recorrente && stored > 0 && Math.abs(stored - calc.calculatedTotal) > 0.01) return stored;
+    return null;
+  });
 
   // §15 — Contrato recorrente (valor mensal / anual / vigência).
   const [recorrente, setRecorrente] = useState<boolean>(initialPedido?.proposal?.recorrente ?? false);
@@ -506,9 +582,11 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   // Subtotal = soma dos itens (materiais e/ou serviços). Mão de obra é opcional
   // (0 por padrão); o botão "Sugerir 70/30" preenche pela regra material 30% /
   // mão de obra 70% quando a proposta for de fornecimento com instalação.
-  const subtotalItens = round2(equipmentItems.reduce((acc, item) => acc + Math.max(0, (item.precoUnitario || 0) * item.quantidade - (item.desconto || 0)), 0));
-  const valorBase = round2(subtotalItens + (Number(maoDeObra) || 0));
-  const effectiveValorTotal = manualValorTotal !== null ? manualValorTotal : valorBase;
+  // Fonte ÚNICA de cálculo (mesma do PDF). Ver [[lib/commercialTotals]].
+  const totals = calculateCommercialProposalTotals({ equipmentItems, maoDeObra, valorTotalManual: manualValorTotal });
+  const subtotalItens = totals.itemsSubtotal;
+  const valorBase = totals.calculatedTotal;
+  const effectiveValorTotal = totals.finalTotal;
   const sugerir7030 = () => setMaoDeObra(round2(subtotalItens > 0 ? subtotalItens * (0.7 / 0.3) : 0));
 
   // Separa os itens em Materiais (do estoque) e Serviços, mantendo o índice
@@ -552,7 +630,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     setPremissas(template.premissas);
     setRespContratada(template.responsabilidadesContratada);
     setRespContratante(template.responsabilidadesContratante);
-    setGarantia(template.garantia);
+    setWarranty(template.garantia ? normalizeCommercialWarranty(template.garantia) : defaultWarranty());
     setConclusao(template.conclusao);
     showToast(`Modelo "${template.name}" aplicado ao formulário!`);
   };
@@ -571,7 +649,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
       premissas,
       responsabilidadesContratada: respContratada,
       responsabilidadesContratante: respContratante,
-      garantia,
+      garantia: garantiaTexto,
       conclusao,
     });
     showToast(selectedClient ? `Modelo salvo para ${selectedClient.name}.` : 'Modelo geral salvo.');
@@ -624,7 +702,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     if ((before.objetivo || '') !== objetivo) changed.push('objetivo');
     if ((before.escopoServico || '') !== escopoServico) changed.push('escopo');
     if ((before.prazoExecucao || '') !== prazoExecucao) changed.push('prazo de execução');
-    if ((before.garantia || '') !== garantia) changed.push('garantia');
+    if ((before.garantia || '') !== garantiaTexto) changed.push('garantia');
     if (Number(before.validadePropostaDias || 0) !== Number(validadeDias || 0)) changed.push('validade');
     if (JSON.stringify(before.equipmentItems || []) !== JSON.stringify(equipmentItems || [])) changed.push('itens e quantidades');
     if (JSON.stringify(before.formasPagamento || []) !== JSON.stringify(formasPagamento || []) || JSON.stringify(before.condicoesPagamento || []) !== JSON.stringify(condicoesPagamento || [])) changed.push('condições de pagamento');
@@ -691,8 +769,10 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
       createdAt: initialPedido?.createdAt || now,
       updatedAt: now,
       proposal: {
+        schemaVersion: COMMERCIAL_SCHEMA_VERSION,
         areaPrincipal,
         tipoServico: tipoServico || undefined,
+        tituloManual: tituloDinamico || initialProposal?.tituloManual || undefined,
         nivelProposta,
         ordemSecoes: ordemSecoes.length ? ordemSecoes : undefined,
         incluirExperiencia,
@@ -719,7 +799,8 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         slaCritico: slaCritico.trim() || undefined,
         slaTabela: slaTabela.filter((r) => r.situacao.trim() || r.prazo.trim()),
         prazoExecucao,
-        garantia,
+        garantia: garantiaTexto,
+        warranty,
         validadePropostaDias: validadeDias,
         validadePropostaComplemento: validadeComplemento,
         conclusao,
@@ -728,6 +809,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         responsabilidadesContratada: respContratada,
         responsabilidadesContratante: respContratante,
         valorTotal: effectiveValorTotal,
+        valorTotalManual: manualValorTotal,
         recorrente,
         valorMensal: recorrente ? valorMensal : undefined,
         vigenciaMeses: recorrente ? vigenciaMeses : undefined,
@@ -1168,7 +1250,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                   descricaoDetalhada: inv.commercialDescription || inv.shortDescription || inv.description,
                   marcaModelo: [inv.brand, inv.model].filter(Boolean).join(' · ') || inv.supplier || inv.category,
                   precoUnitario: inv.salePrice ?? inv.unitPrice,
-                  unidade: inv.unit || 'un',
+                  unidade: normalizeUnitCode(inv.unit),
                   stockSnapshot: inv.quantity,
                 };
               }}
@@ -1198,7 +1280,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               resolveCatalogo={(id) => {
                 const svc = services.find((s) => s.id === id);
                 if (!svc) return undefined;
-                return { descricao: svc.title, precoUnitario: svc.standardValue, unidade: 'vb' };
+                return { descricao: svc.title, precoUnitario: svc.standardValue, unidade: normalizeUnitCode(svc.unit || 'vb') };
               }}
               onAdd={handleAddEquipmentItem}
               onUpdate={handleUpdateEquipmentPatch}
@@ -1471,10 +1553,32 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             })()}
           </Accordion>
 
+          {/* ---- Garantia (bloco próprio, visível) ---- */}
+          <Accordion title="Garantia" icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />} open={!!open.garantia} onToggle={() => toggle('garantia')}>
+            {isLegacyWarranty(warranty) ? (
+              <div className="space-y-2">
+                <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">Garantia herdada em texto livre. A edição preserva o histórico; converta para o formato estruturado quando quiser separar mão de obra e materiais.</p>
+                <textarea rows={3} value={warranty.text} onChange={(e) => setWarranty({ mode: 'legacy_text', text: e.target.value })} placeholder="Condição de garantia…" className={`${inputCls} resize-y`} />
+                <button type="button" onClick={() => setWarranty(defaultWarranty())} className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 underline">Converter para garantia estruturada (90 dias / 12 meses)</button>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {warrantyLegBlock('Mão de obra', 'maoDeObra')}
+                {warrantyLegBlock('Materiais / equipamentos', 'materiais')}
+                <div>
+                  <label className={labelCls}>Observações da garantia (opcional)</label>
+                  <textarea rows={2} value={(isStructuredWarranty(warranty) && warranty.observacoes) || ''} onChange={(e) => setWarrantyObs(e.target.value)} placeholder="Ex.: garantia condicionada à manutenção preventiva…" className={`${inputCls} resize-y`} />
+                </div>
+                {!renderWarranty(warranty).hasAny && (
+                  <p className="text-[11px] text-slate-500 italic">Nenhuma garantia informada — a seção “Garantia” não aparecerá no documento.</p>
+                )}
+              </div>
+            )}
+          </Accordion>
+
           {/* ---- Informações Básicas (colapsável com +/lixeira) ---- */}
           <Accordion title="Informações Básicas" icon={<DollarSign className="w-4 h-4 text-emerald-600" />} open={!!open.basicas} onToggle={() => toggle('basicas')}>
             <div className="space-y-2.5">
-              <BasicInfoRow label="Garantia Técnica" value={garantia} onChange={setGarantia} placeholder="Ex.: 90 dias serviços / 12 meses equipamentos" multiline />
               <BasicInfoRow label="Prazo de Execução" value={prazoExecucao} onChange={setPrazoExecucao} placeholder="Ex.: 10 dias úteis após liberação" />
               <BasicInfoRow label="Faturamento" value={faturamento} onChange={setFaturamento} placeholder="Ex.: Nota Fiscal de Serviços" />
               <BasicInfoRow label="Impostos" value={impostos} onChange={setImpostos} placeholder="Ex.: Inclusos, Simples Nacional" />

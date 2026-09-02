@@ -4,6 +4,7 @@ import type { InventoryItem } from '@/lib/types';
 import { CatalogTree, productPathNames, ClassificationStatus } from '@/lib/catalogTree';
 import { productPricing, moneyOrDash, percentOrDash } from '@/lib/productPricing';
 import { stockStatus } from '@/lib/stockStatus';
+import { normalizeUnitCode } from '@/lib/commercialUnits';
 
 const STATUS_STYLE: Record<ClassificationStatus, { label: string; cls: string; icon: string }> = {
   CLASSIFICADO: { label: 'Classificado', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: 'check_circle' },
@@ -55,7 +56,7 @@ function ProductCard({ item, tree, canSeePrice, dense, onOpen }: { item: Invento
         ) : controlled && (
           <span className="text-[11px] font-semibold text-slate-600 inline-flex items-center gap-1">
             <span className="material-symbols-outlined text-[14px] text-slate-400">inventory_2</span>
-            {item.quantity} {item.unit || 'un'}
+            {item.quantity} {normalizeUnitCode(item.unit)}
           </span>
         )}
         {canSeePrice && price != null && <span className="text-[11px] font-bold text-emerald-700">Venda: {moneyOrDash(price)}</span>}

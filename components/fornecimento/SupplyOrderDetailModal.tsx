@@ -6,6 +6,7 @@ import { SupplyOrder, InventoryItem, UserRole, SupplyPurchase, SupplyReceipt, Su
 import { fetchReceipts, reverseReceiptItemPartial, disponivelParaEstorno, estornadoDoItem, resumoItensFornecimento, deriveSupplyStatus, syncSupplyOrderStatus, mensagemErroFornecimento } from '@/lib/supplyReceipts';
 import { fetchPurchases } from '@/lib/supplyPurchases';
 import { isSupabaseConfigured } from '@/lib/inventory';
+import { normalizeUnitCode } from '@/lib/commercialUnits';
 import { SupplyPurchaseModal } from './SupplyPurchaseModal';
 import { SupplyReceivingModal } from './SupplyReceivingModal';
 
@@ -129,7 +130,7 @@ export const SupplyOrderDetailModal: React.FC<Props> = ({ order: orderProp, inve
         name: novo.name.trim(),
         category: novo.category.trim() || 'A DEFINIR',
         quantity: 0, minQuantity: 0, unitPrice: 0, supplier: '', location: '',
-        unit: novo.unit || 'UN',
+        unit: normalizeUnitCode(novo.unit || 'un'),
         brand: novo.brand.trim() || undefined,
         model: novo.model.trim() || undefined,
         stockManaged: true,

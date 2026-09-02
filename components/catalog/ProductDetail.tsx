@@ -4,6 +4,7 @@ import type { InventoryItem } from '@/lib/types';
 import { CatalogTree, productPathNames } from '@/lib/catalogTree';
 import { productPricing, moneyOrDash, percentOrDash, ratioOrDash } from '@/lib/productPricing';
 import { stockStatus, STOCK_STATUS_META, textOrNull } from '@/lib/stockStatus';
+import { normalizeUnitCode } from '@/lib/commercialUnits';
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -86,15 +87,15 @@ export function ProductDetail({ item, tree, canManage, canSeePrice, onClose, onE
 
           <Section title="Estoque" icon="inventory_2">
             <Row label="Situação" value={<span className={`text-${STOCK_STATUS_META[st].tone}-700`}>{STOCK_STATUS_META[st].label}</span>} />
-            {!catalogOnly && <Row label="Saldo" value={`${item.quantity} ${item.unit || 'un'}`} />}
-            {!catalogOnly && <Row label="Estoque mínimo" value={`${item.minQuantity} ${item.unit || 'un'}`} />}
+            {!catalogOnly && <Row label="Saldo" value={`${item.quantity} ${normalizeUnitCode(item.unit)}`} />}
+            {!catalogOnly && <Row label="Estoque mínimo" value={`${item.minQuantity} ${normalizeUnitCode(item.unit)}`} />}
             <Row label="Controla estoque" value={item.stockManaged === false ? 'Não (somente catálogo)' : 'Sim'} />
           </Section>
 
           <Section title="Cadastro" icon="badge">
             <Row label="Fabricante" value={textOrNull(item.brand)} />
             <Row label="Modelo" value={textOrNull(item.model)} />
-            <Row label="Unidade" value={textOrNull(item.unit)} />
+            <Row label="Unidade" value={normalizeUnitCode(item.unit)} />
             <Row label="Fornecedor" value={textOrNull(item.supplier)} />
             {item.description && <Row label="Descrição" value={item.description} />}
           </Section>
@@ -122,7 +123,7 @@ export function ProductDetail({ item, tree, canManage, canSeePrice, onClose, onE
                 <input type="text" value={movNote} onChange={(e) => setMovNote(e.target.value)} placeholder="Observação (opcional)"
                   className="flex-1 border border-slate-300 rounded-md px-2 py-1.5 text-sm" aria-label="Observação" />
               </div>
-              <p className="text-[11px] text-slate-400 mt-1.5">Novo saldo: <b>{movType === 'entrada' ? item.quantity + Math.max(0, Math.floor(Number(movQty) || 0)) : Math.max(0, item.quantity - Math.max(0, Math.floor(Number(movQty) || 0)))}</b> {item.unit || 'un'}</p>
+              <p className="text-[11px] text-slate-400 mt-1.5">Novo saldo: <b>{movType === 'entrada' ? item.quantity + Math.max(0, Math.floor(Number(movQty) || 0)) : Math.max(0, item.quantity - Math.max(0, Math.floor(Number(movQty) || 0)))}</b> {normalizeUnitCode(item.unit)}</p>
               <button type="button" onClick={doMove} disabled={busy}
                 className="mt-2 w-full bg-[#1A1A72] text-white text-sm font-bold py-2 rounded-md disabled:opacity-60">
                 {busy ? 'Registrando…' : 'Confirmar movimentação'}
