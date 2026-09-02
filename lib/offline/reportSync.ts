@@ -1,5 +1,6 @@
 import { ReportInstance, ReportTipo, Pendencia, GeoPoint, ReportSignature } from '../types';
-import { createReport, updateReport, upsertAnswer, insertMedia } from '../reports';
+import { TemplateSchema } from '../reportSchema';
+import { createReport, updateReport, upsertAnswer, insertMedia, attachTemplateSnapshot } from '../reports';
 import { uploadReportPhoto } from '../reportMedia';
 import { uploadSignaturePng, insertSignature } from '../signatures';
 import { updateOrdemServicoStatus } from '../ordensServico';
@@ -64,6 +65,10 @@ export interface ReportBundle {
     tecnicoNome?: string;
     titulo?: string;
     geoInicio?: GeoPoint | null;
+    /** Versionamento/snapshot congelados no INÍCIO do atendimento (CAMPO 2B).
+     *  O sync NUNCA troca para a versão vigente — replica o que foi congelado. */
+    templateVersion?: number;
+    templateSnapshot?: TemplateSchema;
   };
   answers: BundleAnswer[];
   pendencias: Pendencia[];
@@ -129,6 +134,12 @@ export async function persistReportBundle(b: ReportBundle): Promise<{ reportId?:
   } catch (e) {
     if (isUniqueViolation(e)) return { duplicate: true };
     throw e;
+  }
+
+  // Congela a DEFINIÇÃO usada (snapshot + versão) no relatório. Best-effort:
+  // se a 0075 ainda não foi aplicada, não bloqueia a finalização (fica legado).
+  if (b.report.templateSnapshot) {
+    await attachTemplateSnapshot(report.id, b.report.templateVersion, b.report.templateSnapshot);
   }
 
   const pathById: Record<string, string> = {};

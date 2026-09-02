@@ -102,6 +102,10 @@ export interface TemplateSchema {
   /** Disciplina: SDAI | CFTV | CONTROLE_ACESSO | BMS | ALARME. Default SDAI. */
   area?: string;
   secoes: SectionSchema[];
+  /** Versão da DEFINIÇÃO (CAMPO 2B). Ao mudar o schema, INCREMENTE aqui: o seed
+   *  publica a nova versão sem sobrescrever a histórica, e novos relatórios
+   *  congelam esta versão no snapshot. Ausente = 1. */
+  versao?: number;
 }
 
 /** Valores do formulário. Campo repeater guarda um array de cards. */

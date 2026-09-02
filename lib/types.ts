@@ -983,6 +983,13 @@ export interface ReportInstance {
   observacoesGerais?: string;
   syncStatus?: SyncStatus;
   clientUuid?: string;
+  /** Versionamento/snapshot imutável (CAMPO 2B, migration 0075). A versão e a
+   *  DEFINIÇÃO do formulário usada neste relatório são congeladas no início e
+   *  nunca reinterpretadas por evoluções futuras do template. `templateSnapshot`
+   *  é o TemplateSchema (JSON) — sem answers/fotos/assinatura. Null em relatórios
+   *  legados (fallback controlado para o template vigente). */
+  templateVersion?: number;
+  templateSnapshot?: import('./reportSchema').TemplateSchema | null;
 }
 
 /** Resposta de um campo do relatório (campo_key = texto, não FK). */

@@ -515,7 +515,9 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         rows = await fetchTemplates();
       }
       if (rows.length > 0) {
-        setTemplates(rows.map((r) => ({ id: r.id, schema: r.schema as TemplateSchema })));
+        // Propaga a versão vigente do banco para o schema (o ReportForm congela
+        // essa versão no snapshot ao iniciar um novo relatório) — CAMPO 2B.
+        setTemplates(rows.map((r) => ({ id: r.id, schema: { ...(r.schema as TemplateSchema), versao: r.versao } })));
       }
     } catch (err) {
       console.warn('Templates: falha ao carregar do banco (usando empacotados).', err);

@@ -1,5 +1,5 @@
 import { TemplateSchema, FieldSchema } from './reportSchema';
-import { upsertTemplate } from './reportTemplates';
+import { publishTemplate, reportTemplatesSupportsVersioning, PublishResult } from './reportTemplates';
 
 /* =====================================================================
  * Templates dos Relatórios Técnicos (seções 4, 5 e 6 do documento),
@@ -711,20 +711,51 @@ export const ALL_TEMPLATES: TemplateSchema[] = [
   LEVANTAMENTO_ALARME, CORRETIVA_ALARME, PREVENTIVA_ALARME,
 ];
 
+export interface SeedTemplatesSummary {
+  supported: boolean;                 // false = migration 0075 pendente (nada publicado)
+  inserted: string[];
+  aligned: string[];                  // baseline de hash estabelecido (linha pré-versão)
+  advanced: string[];                 // versão nova publicada (código > banco)
+  noop: string[];
+  behind: string[];                   // banco à frente do código
+  conflicts: string[];                // mesma versão, schema diferente → EXIGE bump
+}
+
 /**
- * Grava/atualiza os três templates na tabela report_templates (schema em jsonb).
- * Requer perfil ADMINISTRATIVO (RLS de report_templates). Idempotente por código.
+ * Publica os templates empacotados na tabela report_templates de forma
+ * VERSIONADA e NÃO-DESTRUTIVA (CAMPO 2B). Requer perfil ADMINISTRATIVO (RLS).
+ * NUNCA sobrescreve o schema de uma versão já publicada: mudar um template exige
+ * INCREMENTAR `versao` no código (ver docs/TEMPLATE_VERSIONING.md). Enquanto a
+ * migration 0075 não estiver aplicada, é um NO-OP seguro (não roda o upsert
+ * destrutivo antigo).
  */
-export async function seedReportTemplates(): Promise<void> {
-  for (const t of ALL_TEMPLATES) {
-    await upsertTemplate({
-      id: '',
-      codigo: t.codigo,
-      nome: t.nome,
-      tipo: t.tipo,
-      schema: t as unknown as Record<string, unknown>,
-      ativo: true,
-      versao: 1,
-    });
+export async function seedReportTemplates(): Promise<SeedTemplatesSummary> {
+  const summary: SeedTemplatesSummary = {
+    supported: true, inserted: [], aligned: [], advanced: [], noop: [], behind: [], conflicts: [],
+  };
+  if (!(await reportTemplatesSupportsVersioning())) {
+    return { ...summary, supported: false };
   }
+  for (const t of ALL_TEMPLATES) {
+    let r: PublishResult;
+    try {
+      r = await publishTemplate(t);
+    } catch (e) {
+      console.warn(`Template ${t.codigo}: falha ao publicar.`, e);
+      continue;
+    }
+    if (r === 'inserted') summary.inserted.push(t.codigo);
+    else if (r === 'aligned') summary.aligned.push(t.codigo);
+    else if (r === 'advanced') summary.advanced.push(t.codigo);
+    else if (r === 'noop') summary.noop.push(t.codigo);
+    else if (r === 'behind') summary.behind.push(t.codigo);
+    else if (r === 'conflict') summary.conflicts.push(t.codigo);
+  }
+  if (summary.conflicts.length > 0) {
+    console.warn(
+      'Templates com schema alterado SEM bump de versão (não publicados; incremente `versao`): '
+      + summary.conflicts.join(', ')
+    );
+  }
+  return summary;
 }

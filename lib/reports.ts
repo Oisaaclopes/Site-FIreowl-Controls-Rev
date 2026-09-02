@@ -26,6 +26,8 @@ function rowToReport(r: any): ReportInstance {
     observacoesGerais: r.observacoes_gerais ?? undefined,
     syncStatus: r.sync_status ?? undefined,
     clientUuid: r.client_uuid ?? undefined,
+    templateVersion: r.template_version ?? undefined,
+    templateSnapshot: r.template_snapshot ?? undefined,
   };
 }
 
@@ -80,6 +82,33 @@ export async function updateReport(r: ReportInstance): Promise<ReportInstance> {
   const { data, error } = await supabase.from('reports').update(reportToRow(r)).eq('id', r.id).select().single();
   if (error) throw error;
   return rowToReport(data);
+}
+
+/**
+ * Congela a DEFINIÇÃO do formulário no relatório (CAMPO 2B). Escrito em passo
+ * SEPARADO e NÃO-FATAL: se a migration 0075 ainda não foi aplicada (colunas
+ * ausentes), a falha é engolida e o relatório permanece "legado" (fallback ao
+ * template vigente) — nada quebra entre o deploy e a migration. Idempotente: o
+ * trigger de imutabilidade (0075) só permite preencher quando NULL. Não é
+ * incluído em reportToRow de propósito, para manter insert/update compatíveis.
+ */
+export async function attachTemplateSnapshot(
+  reportId: string,
+  version: number | undefined,
+  snapshot: unknown
+): Promise<boolean> {
+  if (!reportId || snapshot == null) return false;
+  const supabase = getSupabaseClient() as any;
+  const { error } = await supabase
+    .from('reports')
+    .update({ template_version: version ?? null, template_snapshot: snapshot })
+    .eq('id', reportId);
+  if (error) {
+    // 42703 (undefined_column) / PGRST204 = migration 0075 pendente. Não é erro fatal.
+    console.warn('Snapshot do template não persistido (0075 pendente?):', error?.message || error);
+    return false;
+  }
+  return true;
 }
 
 export async function deleteReport(id: string): Promise<void> {

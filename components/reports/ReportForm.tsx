@@ -174,7 +174,7 @@ import { TriagemFotos, UnclassifiedPhoto } from '@/components/reports/TriagemFot
 import { buildSurveyTemplate, surveyBlockSections, SurveyMode, SURVEY_BLOCKS_KEY, SURVEY_MODE_KEY } from '@/lib/surveyMode';
 
 export const ReportForm: React.FC<ReportFormProps> = ({
-  template,
+  template: templateProp,
   templateId,
   cliente,
   catalog,
@@ -194,6 +194,29 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   const roleForEngine = userRole.toLowerCase();
   const isTecnico = userRole === 'TECNICO';
 
+  // Chave do rascunho por CÓDIGO (independe da versão), cliente e contexto.
+  const rascunhoKey = `fireowl_atendimento_rascunho:${templateProp.codigo}:${cliente?.id || 'sem_cliente'}:${contexto?.osId || 'avulso'}`;
+
+  // CAMPO 2B — CONGELAMENTO no INÍCIO: se já existe rascunho com snapshot, o
+  // atendimento continua PRESO àquela definição/versão (FASE 4/11); senão,
+  // congela a versão vigente recebida. O sync/reload nunca troca de versão.
+  const [frozen] = useState<{ template: TemplateSchema; version: number }>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const raw = window.localStorage.getItem(rascunhoKey);
+        if (raw) {
+          const s = JSON.parse(raw) as { templateSnapshot?: TemplateSchema; templateVersion?: number };
+          if (s.templateSnapshot && Array.isArray(s.templateSnapshot.secoes)) {
+            return { template: s.templateSnapshot, version: s.templateVersion ?? s.templateSnapshot.versao ?? 1 };
+          }
+        }
+      }
+    } catch { /* rascunho inválido: usa a versão vigente */ }
+    return { template: templateProp, version: templateProp.versao ?? 1 };
+  });
+  const template = frozen.template;
+  const templateVersion = frozen.version;
+
   const [values, setValues] = useState<FormValues>({});
   const [issues, setIssues] = useState<FinalizeIssue[] | null>(null);
   const [finalized, setFinalized] = useState(false);
@@ -208,8 +231,6 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   const [rascunhoRestaurado, setRascunhoRestaurado] = useState(false);
   const [iniciadoEm] = useState(() => Date.now());
   const [agora, setAgora] = useState(() => Date.now());
-
-  const rascunhoKey = `fireowl_atendimento_rascunho:${template.codigo}:${cliente?.id || 'sem_cliente'}:${contexto?.osId || 'avulso'}`;
 
   // Rascunho local de respostas: permite sair/retomar o atendimento mesmo
   // antes da finalização. Mídias continuam sob gestão do registro de fotos e
@@ -230,8 +251,9 @@ export const ReportForm: React.FC<ReportFormProps> = ({
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    try { window.localStorage.setItem(rascunhoKey, JSON.stringify({ values, currentIdx })); } catch { /* espaço/localStorage indisponível */ }
-  }, [rascunhoKey, values, currentIdx]);
+    // Persiste também o snapshot/versão congelados, para o reopen manter a versão.
+    try { window.localStorage.setItem(rascunhoKey, JSON.stringify({ values, currentIdx, templateSnapshot: template, templateVersion })); } catch { /* espaço/localStorage indisponível */ }
+  }, [rascunhoKey, values, currentIdx, template, templateVersion]);
 
   useEffect(() => {
     if (modoCampo !== 'rapido' || pausado) return;
@@ -664,6 +686,9 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         tecnicoNome: currentUserName || undefined,
         titulo: `${template.nome} — ${cliente?.name || ''}`.trim(),
         geoInicio: geoInicio || undefined,
+        // Definição CONGELADA no início (snapshot imutável + versão) — CAMPO 2B.
+        templateSnapshot: template,
+        templateVersion,
       },
       answers,
       pendencias: pends,

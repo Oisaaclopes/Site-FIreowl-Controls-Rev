@@ -7,6 +7,7 @@ import { formatGeo } from './geo';
 import { nomeFantasiaCliente, slugArquivo } from './utils';
 import { ALL_TEMPLATES } from './reportTemplatesData';
 import { FieldSchema } from './reportSchema';
+import { resolveReportTemplate } from './reportTemplateVersioning';
 import { verificationUrl } from './documentVerification';
 
 /**
@@ -167,9 +168,11 @@ const textoValor = (value: unknown): string | undefined => {
   return undefined;
 };
 
-const campoPorKey = (templateCodigo: string, key: string): { field?: FieldSchema; secao?: string } => {
-  const template = ALL_TEMPLATES.find((t) => t.codigo === templateCodigo);
-  for (const secao of template?.secoes || []) {
+// CAMPO 2B: interpreta o relatório pela DEFINIÇÃO usada nele (snapshot imutável);
+// legado sem snapshot cai para o template vigente por código (fallback).
+const campoPorKey = (report: ReportInstance, key: string): { field?: FieldSchema; secao?: string } => {
+  const secoes = resolveReportTemplate(report, ALL_TEMPLATES).template?.secoes || [];
+  for (const secao of secoes) {
     for (const field of secao.campos) {
       if (field.key === key) return { field, secao: secao.titulo };
     }
@@ -181,7 +184,7 @@ const campoPorKey = (templateCodigo: string, key: string): { field?: FieldSchema
 function extrairRespostasPorSecao(report: ReportInstance, answers: ReportAnswer[]): RpRespostaSecao[] {
   const porSecao = new Map<string, RpCampo[]>();
   for (const answer of answers) {
-    const { field, secao } = campoPorKey(report.templateCodigo, answer.fieldKey);
+    const { field, secao } = campoPorKey(report, answer.fieldKey);
     if (field && (field.tipo === 'foto' || field.tipo === 'assinatura' || field.tipo === 'select_interno')) continue;
     const valor = textoValor(answer.valor);
     if (!valor) continue;
@@ -261,7 +264,7 @@ export function assembleReportPdfData(input: {
     .filter((m) => !classificadas.has(m.storagePathOriginal))
     .map((m) => {
       const answer = answers.find((a) => a.id === m.answerId);
-      const field = answer ? campoPorKey(report.templateCodigo, answer.fieldKey).field : undefined;
+      const field = answer ? campoPorKey(report, answer.fieldKey).field : undefined;
       return fotoDe(m.storagePathOriginal, m.tipo, field?.label);
     })
     .filter((f): f is RpFoto => !!f?.url);
