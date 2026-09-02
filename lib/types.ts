@@ -1,3 +1,5 @@
+import type { CommercialWarranty } from './commercialWarranty';
+
 export type TabPath =
   | 'painel'
   | 'pedidos'
@@ -125,6 +127,9 @@ export interface PedidoBrand {
 }
 
 export interface CommercialProposalData {
+  /** Versão do schema do snapshot comercial no JSONB. Ausente/undefined = v1
+   * (garantia texto livre). v2 = garantia estruturada + override explícito. */
+  schemaVersion?: number;
   /** P1 — áreas de atuação da proposta (ids de AREAS_PROPOSTA). Compõe o título. */
   areaPrincipal?: string[];
   /** P1 — tipo de serviço (id de TIPOS_SERVICO). Compõe o título dinâmico. */
@@ -184,7 +189,12 @@ export interface CommercialProposalData {
   /** §17 — tabela de SLA (situação → prazo). Só aparece se preenchida. */
   slaTabela?: { situacao: string; prazo: string }[];
   prazoExecucao: string;
+  /** LEGADO (v1): garantia como texto livre único. Mantido para compatibilidade
+   * de leitura; o fluxo vivo consome `warranty` (estruturada). Ver [[commercialWarranty]]. */
   garantia: string;
+  /** v2 — garantia estruturada (mão de obra × materiais) ou modo legado.
+   * Fonte de verdade da garantia. Ausente = derivar de `garantia` (string). */
+  warranty?: CommercialWarranty;
   validadePropostaDias: number;
   validadePropostaComplemento?: string;
   conclusao: string;
@@ -192,7 +202,15 @@ export interface CommercialProposalData {
   marcas: PedidoBrand[];
   responsabilidadesContratada: string[];
   responsabilidadesContratante: string[];
+  /** Total COMERCIAL FINAL persistido (= override quando houver, senão o calculado).
+   * Também espelhado na coluna `pedidos.valor_total` para listagem/financeiro. */
   valorTotal: number;
+  /** Override manual do total. null/ausente = usar o total calculado dos itens.
+   * Persistido para sobreviver ao round-trip (reabrir não recalcula por cima). */
+  valorTotalManual?: number | null;
+  /** Título resolvido no momento da emissão (snapshot). O PDF usa este valor;
+   * só recompõe de Área×Tipo quando ausente (propostas antigas). */
+  tituloManual?: string;
   /** Contrato recorrente (mensal): quando true, o PDF destaca "R$ X / mês". */
   recorrente?: boolean;
   /** Valor mensal do contrato recorrente. */
@@ -438,6 +456,9 @@ export interface ServiceCatalogItem {
   estimatedHours: number;
   nbrNormRef: string;
   active: boolean;
+  /** Unidade de medida canônica do serviço (sigla). Ver [[commercialUnits]].
+   * Ausente = 'vb' (verba) como fallback histórico. */
+  unit?: string;
 }
 
 export interface User {
@@ -1137,6 +1158,8 @@ export interface Service {
   estimatedHours?: number;
   nbrNormRef?: string;
   active?: boolean;
+  /** Unidade de medida canônica do serviço (sigla). Ver [[commercialUnits]]. */
+  unit?: string;
 }
 
 /** Entrada persistida da trilha de auditoria. */
