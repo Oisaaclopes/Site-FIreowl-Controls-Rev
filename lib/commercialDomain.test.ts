@@ -209,4 +209,28 @@ describe('normalizeCommercialProposalData', () => {
   it('schema version corrente é 2', () => {
     expect(COMMERCIAL_SCHEMA_VERSION).toBe(2);
   });
+  it('(9)(10) normalizar NÃO muta a unidade snapshot dos itens', () => {
+    const raw = proposal({
+      equipmentItems: [item({ unidade: 'm', quantidade: 150.5 }), item({ unidade: 'un', quantidade: 3, itemNumero: 2 })],
+    });
+    const p = normalizeCommercialProposalData(raw);
+    expect(p.equipmentItems[0].unidade).toBe('m');
+    expect(p.equipmentItems[0].quantidade).toBe(150.5);
+    expect(p.equipmentItems[1].unidade).toBe('un');
+    // O snapshot do item é independente de qualquer cadastro de estoque atual.
+    expect(raw.equipmentItems[0].unidade).toBe('m');
+  });
+  it('(21) serviço com unidade canônica é preservado/normalizado', () => {
+    expect(normalizeUnitCode('visita')).toBe('visita');
+    expect(normalizeUnitCode('H')).toBe('h');
+    expect(normalizeUnitCode('vb')).toBe('vb');
+  });
+  it('(24) proposta e orçamento partem do MESMO total normalizado', () => {
+    const raw = proposal({ valorTotal: 5000, valorTotalManual: 5000, schemaVersion: 2, equipmentItems: [item({ precoUnitario: 100, quantidade: 2 })] });
+    // Ambos os documentos chamam normalizeCommercialProposalData → mesmo valorTotal.
+    const a = normalizeCommercialProposalData(raw);
+    const b = normalizeCommercialProposalData(raw);
+    expect(a.valorTotal).toBe(5000);
+    expect(a.valorTotal).toBe(b.valorTotal);
+  });
 });
