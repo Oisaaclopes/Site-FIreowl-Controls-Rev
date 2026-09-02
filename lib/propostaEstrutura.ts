@@ -35,6 +35,9 @@ export interface EstruturaCtx {
   historicoVisivel: boolean;
   /** Há materiais (habilita "Embalagem, Transporte e Armazenamento"). */
   temMateriais: boolean;
+  /** Garantia visível (há alguma condição informada). undefined = visível
+   * (compatibilidade com propostas antigas / chamadas sem o campo). */
+  garantiaVisivel?: boolean;
 }
 
 const inc = (v?: boolean) => v !== false;
@@ -82,7 +85,7 @@ export function montarEstruturaProposta(p: EstruturaProposalLike, ctx: Estrutura
     { key: 'multas', titulo: 'Multas por Atraso de Pagamento', visible: inc(p.incluirMultas), opcional: true },
     { key: 'limitacao', titulo: 'Limitação de Responsabilidade', visible: inc(p.incluirLimitacao), opcional: true },
     { key: 'prazo', titulo: 'Prazo de Fornecimento', visible: true, opcional: false },
-    { key: 'garantia', titulo: 'Garantia', visible: true, opcional: false },
+    { key: 'garantia', titulo: 'Garantia', visible: ctx.garantiaVisivel !== false, opcional: true },
     { key: 'confidencialidade', titulo: 'Confidencialidade', visible: inc(p.incluirConfidencialidade), opcional: true },
     { key: 'termoAceite', titulo: 'Termo de Aceite da Proposta', visible: inc(p.incluirTermoAceite), opcional: true },
     { key: 'condicoesGerais', titulo: 'Condições Gerais', visible: inc(p.incluirCondicoesGerais), opcional: true },

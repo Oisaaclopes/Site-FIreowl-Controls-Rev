@@ -1,6 +1,7 @@
 import React from 'react';
 import { Page, View, Text, Svg, Path, Line, Rect, Circle, Image, Font } from '@react-pdf/renderer';
 import QRCode from 'qrcode';
+import { lineTotal } from '@/lib/commercialTotals';
 
 /**
  * Primitivos compartilhados de PDF (fontes, paleta, logo, rodapé) para os
@@ -53,9 +54,9 @@ export const C = {
 export const A4 = { w: 595.28, h: 841.89 };
 
 export const brl = (n: number) => `R$ ${(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-/** Total da linha do item: preço × qtd − desconto (nunca negativo). */
-export const itemTotal = (eq: { precoUnitario?: number; quantidade: number; desconto?: number }) =>
-  Math.max(0, (eq.precoUnitario || 0) * eq.quantidade - (eq.desconto || 0));
+/** Total da linha do item: preço × qtd − desconto (nunca negativo).
+ * Delega à fonte única de cálculo comercial ([[lib/commercialTotals]]). */
+export const itemTotal = (eq: { precoUnitario?: number; quantidade?: number; desconto?: number }) => lineTotal(eq);
 export const nv = (s?: string) => !!s && s.trim().length > 0;
 export const lnv = (a?: string[]) => Array.isArray(a) && a.filter((x) => nv(x)).length > 0;
 

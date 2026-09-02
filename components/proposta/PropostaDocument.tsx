@@ -5,6 +5,10 @@ import { InclusoExcluso, ResumoExecutivoPage, SlaBloco, QrCode, contatoQrUrl, Ex
 import { verificationUrl } from '@/lib/documentVerification';
 import { experienciaAtiva } from '@/lib/experienciaSelecao';
 import { gerarTituloProposta, faixaSiglas, tituloEscopo, conclusaoPorTipo, apresentacaoAreas } from '@/lib/propostaTitulo';
+import { normalizeCommercialProposalData } from '@/lib/commercialProposal';
+import { renderWarranty } from '@/lib/commercialWarranty';
+import { normalizeUnitCode } from '@/lib/commercialUnits';
+import { lineTotal } from '@/lib/commercialTotals';
 import { montarEstruturaProposta, ordenarEstrutura } from '@/lib/propostaEstrutura';
 import {
   CARTA_APRESENTACAO,
@@ -944,7 +948,7 @@ const ItensTable = ({
   showMarca?: boolean;
   accent?: string;
 }) => {
-  const subtotal = itens.reduce((a, e) => a + Math.max(0, (e.precoUnitario || 0) * e.quantidade - (e.desconto || 0)), 0);
+  const subtotal = itens.reduce((a, e) => a + lineTotal(e), 0);
   return (
     <View style={{ marginBottom: 10 }} minPresenceAhead={56}>
       <Text style={styles.subTitle}>{titulo}</Text>
@@ -960,14 +964,14 @@ const ItensTable = ({
         </View>
         {itens.map((eq, i) => {
           const unit = eq.precoUnitario || 0;
-          const tot = Math.max(0, unit * eq.quantidade - (eq.desconto || 0));
+          const tot = lineTotal(eq);
           return (
             <View key={i} style={[styles.tr, i % 2 === 1 ? styles.trAlt : {}]} wrap={false}>
               <Text style={[styles.td, { width: 26, textAlign: 'center', color: C.red, fontFamily: 'Roboto', fontWeight: 700 }]}>{i + 1}</Text>
               <View style={[styles.td, { flex: 1 }]}><Text style={{ color: C.ink, fontFamily: 'Roboto', fontWeight: 700, fontSize: 8 }}>{eq.descricao}</Text>{eq.descricaoDetalhada ? <Text style={{ color: C.s500, fontSize: 7, marginTop: 1, lineHeight: 1.3 }}>{eq.descricaoDetalhada}</Text> : null}</View>
               {showMarca && <Text style={[styles.td, { width: 90 }]}>{eq.marcaModelo}</Text>}
-              <Text style={[styles.td, { width: 34, textAlign: 'center', textTransform: 'uppercase' }]}>{eq.unidade}</Text>
-              <Text style={[styles.td, { width: 34, textAlign: 'center', fontFamily: 'Roboto', fontWeight: 700 }]}>{eq.quantidade}</Text>
+              <Text style={[styles.td, { width: 34, textAlign: 'center' }]}>{normalizeUnitCode(eq.unidade)}</Text>
+              <Text style={[styles.td, { width: 34, textAlign: 'center', fontFamily: 'Roboto', fontWeight: 700 }]}>{(eq.quantidade || 0).toLocaleString('pt-BR', { maximumFractionDigits: 3 })}</Text>
               {detailed && <Text style={[styles.td, { width: 64, textAlign: 'right' }]}>{unit > 0 ? unit.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}</Text>}
               {detailed && <Text style={[styles.td, { width: 70, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.ink }]}>{tot > 0 ? tot.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}</Text>}
             </View>
@@ -993,7 +997,8 @@ export function PropostaDocument({
   companyProfile: CompanyProfile;
   options?: PropostaPdfOptions;
 }) {
-  const p = pedido.proposal;
+  const p = normalizeCommercialProposalData(pedido.proposal);
+  const warrantyView = renderWarranty(p.warranty);
   const razao = companyProfile.razaoSocial || 'Fireowl Controls';
   const fantasia = companyProfile.nomeFantasia || razao;
   // §15 — contrato recorrente (valor mensal / anual / vigência).
@@ -1017,7 +1022,9 @@ export function PropostaDocument({
   const assinante = pedido.responsavelComercialNome || 'Responsável Comercial';
   const escopoTitulo = pedido.referencia || 'Fornecimento e Serviços de Engenharia';
   // P1 — título dinâmico (área × tipo) e faixa de siglas (§3/§7).
-  const tituloDin = gerarTituloProposta(p.areaPrincipal || [], p.tipoServico);
+  // Título: snapshot persistido (tituloManual) tem prioridade; só recompõe de
+  // Área×Tipo quando ausente (propostas antigas). Ver PARTE 19.
+  const tituloDin = (p.tituloManual && p.tituloManual.trim()) || gerarTituloProposta(p.areaPrincipal || [], p.tipoServico);
   const siglas = faixaSiglas(p.areaPrincipal || []);
   // §22/§23 — Áreas de atuação contextuais (destaca as selecionadas).
   const areaSel = new Set(p.areaPrincipal || []);
@@ -1057,7 +1064,7 @@ export function PropostaDocument({
     : (p.textosMaterializados ? [] : SERVICOS_OFERTADOS);
 
   const secoes = ordenarEstrutura(
-    montarEstruturaProposta(p, { cartaVisivel: showCarta, historicoVisivel: showHistorico, temMateriais }),
+    montarEstruturaProposta(p, { cartaVisivel: showCarta, historicoVisivel: showHistorico, temMateriais, garantiaVisivel: warrantyView.hasAny }),
     p.ordemSecoes
   );
   const vis = secoes.filter((s) => s.visible);
@@ -1257,7 +1264,25 @@ export function PropostaDocument({
       <Sec k="garantia">
         <View style={styles.greenCard} wrap={false}>
           <Text style={styles.greenBadge}>Garantia Assegurada</Text>
-          <Text style={{ fontSize: 9, color: C.s700, textAlign: 'justify', lineHeight: 1.4 }}>{nv(p.garantia) ? p.garantia : 'Garantia de 90 (noventa) dias sobre os serviços de instalação e de 12 (doze) meses para os equipamentos fornecidos, contra defeitos de fabricação, a contar da entrega.'}</Text>
+          {warrantyView.legacyText !== undefined ? (
+            <Text style={{ fontSize: 9, color: C.s700, textAlign: 'justify', lineHeight: 1.4 }}>{warrantyView.legacyText}</Text>
+          ) : (
+            <View>
+              {warrantyView.maoDeObra && (
+                <Text style={{ fontSize: 9, color: C.s700, lineHeight: 1.4 }}>
+                  <Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Mão de obra: </Text>{warrantyView.maoDeObra}
+                </Text>
+              )}
+              {warrantyView.materiais && (
+                <Text style={{ fontSize: 9, color: C.s700, lineHeight: 1.4 }}>
+                  <Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Materiais/equipamentos: </Text>{warrantyView.materiais}
+                </Text>
+              )}
+              {warrantyView.observacoes && (
+                <Text style={{ fontSize: 8.5, color: C.s500, textAlign: 'justify', lineHeight: 1.4, marginTop: 3 }}>{warrantyView.observacoes}</Text>
+              )}
+            </View>
+          )}
         </View>
       </Sec>
     ),

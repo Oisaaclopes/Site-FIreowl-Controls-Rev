@@ -3,6 +3,9 @@ import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import { C, brl, nv, lnv, PdfHeader, PdfFooter, CamposExtras, itemTotal, DocCover, AreasAtuacaoPage, InclusoExcluso, ResumoExecutivoPage, SlaBloco, QrCode, contatoQrUrl, AuthenticityStamp } from './pdfKit';
 import { gerarTituloProposta, apresentacaoAreas } from '@/lib/propostaTitulo';
+import { normalizeCommercialProposalData } from '@/lib/commercialProposal';
+import { renderWarranty } from '@/lib/commercialWarranty';
+import { normalizeUnitCode } from '@/lib/commercialUnits';
 import { DocOptions } from '@/lib/documentos';
 import { verificationUrl } from '@/lib/documentVerification';
 
@@ -112,8 +115,8 @@ const ItensTable = ({ titulo, itens, showUnit, showTotal, showMarca, accent }: {
               <Text style={[styles.td, { width: 24, textAlign: 'center', color: C.red, fontFamily: 'Roboto', fontWeight: 700 }]}>{i + 1}</Text>
               <View style={[styles.td, { flex: 1 }]}><Text style={{ color: C.ink, fontFamily: 'Roboto', fontWeight: 700, fontSize: 8 }}>{eq.descricao}</Text>{showMarca && eq.descricaoDetalhada ? <Text style={{ color: C.s500, fontSize: 7, marginTop: 1, lineHeight: 1.3 }}>{eq.descricaoDetalhada}</Text> : null}{eq.desconto ? <Text style={{ color: C.red, fontSize: 6.5, marginTop: 1 }}>{`desconto: ${brl(eq.desconto)}`}</Text> : null}</View>
               {showMarca && <Text style={[styles.td, { width: 88 }]}>{eq.marcaModelo}</Text>}
-              <Text style={[styles.td, { width: 30, textAlign: 'center', textTransform: 'uppercase' }]}>{eq.unidade}</Text>
-              <Text style={[styles.td, { width: 30, textAlign: 'center', fontFamily: 'Roboto', fontWeight: 700 }]}>{eq.quantidade}</Text>
+              <Text style={[styles.td, { width: 30, textAlign: 'center' }]}>{normalizeUnitCode(eq.unidade)}</Text>
+              <Text style={[styles.td, { width: 30, textAlign: 'center', fontFamily: 'Roboto', fontWeight: 700 }]}>{(eq.quantidade || 0).toLocaleString('pt-BR', { maximumFractionDigits: 3 })}</Text>
               {showUnit && <Text style={[styles.td, { width: 62, textAlign: 'right' }]}>{unit > 0 ? unit.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}</Text>}
               {showTotal && <Text style={[styles.td, { width: 68, textAlign: 'right', fontFamily: 'Roboto', fontWeight: 700, color: C.ink }]}>{tot > 0 ? tot.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}</Text>}
             </View>
@@ -131,7 +134,8 @@ const ItensTable = ({ titulo, itens, showUnit, showTotal, showMarca, accent }: {
 };
 
 export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido: Pedido; companyProfile: CompanyProfile; options?: OrcamentoPdfOptions }) {
-  const p = pedido.proposal;
+  const p = normalizeCommercialProposalData(pedido.proposal);
+  const warrantyView = renderWarranty(p.warranty);
   const razao = companyProfile.razaoSocial || 'Fireowl Controls';
   const fantasia = companyProfile.nomeFantasia || razao;
   const numero = pedido.numeroPedido;
@@ -182,7 +186,7 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
   const qrUrl = contatoQrUrl(companyProfile.telefone, companyProfile.email); // §32
   const authenticityUrl = verificationUrl('orcamento', pedido.id);
   // P1 — título dinâmico (área × tipo) usado como subtítulo da capa.
-  const tituloDin = gerarTituloProposta(p.areaPrincipal || [], p.tipoServico);
+  const tituloDin = (p.tituloManual && p.tituloManual.trim()) || gerarTituloProposta(p.areaPrincipal || [], p.tipoServico);
 
   return (
     <Document title={`Orçamento ${numero}`} author={razao}>
@@ -308,11 +312,25 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
         {/* Seção 17 (SLA) — SLA em destaque, quando cadastrado */}
         <SlaBloco tabela={p.slaTabela} slaCritico={p.slaCritico} />
 
-        {/* Seção 18 — Garantia */}
-        <View minPresenceAhead={50} wrap={false}>
-          <SecHead n="07" titulo="Garantia" />
-          <Text style={styles.para}>{nv(p.garantia) ? p.garantia : 'Garantia de 90 (noventa) dias sobre os serviços de instalação e de 12 (doze) meses para os equipamentos fornecidos, contra defeitos de fabricação, a contar da entrega.'}</Text>
-        </View>
+        {/* Seção 18 — Garantia (só aparece quando há condição informada) */}
+        {warrantyView.hasAny && (
+          <View minPresenceAhead={50} wrap={false}>
+            <SecHead n="07" titulo="Garantia" />
+            {warrantyView.legacyText !== undefined ? (
+              <Text style={styles.para}>{warrantyView.legacyText}</Text>
+            ) : (
+              <View>
+                {warrantyView.maoDeObra && (
+                  <Text style={styles.para}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Mão de obra: </Text>{warrantyView.maoDeObra}</Text>
+                )}
+                {warrantyView.materiais && (
+                  <Text style={styles.para}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Materiais/equipamentos: </Text>{warrantyView.materiais}</Text>
+                )}
+                {warrantyView.observacoes && <Text style={styles.para}>{warrantyView.observacoes}</Text>}
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Seção 22 — Validade da Proposta */}
         <View minPresenceAhead={50} wrap={false}>
