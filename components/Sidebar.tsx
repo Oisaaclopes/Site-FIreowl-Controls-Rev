@@ -11,10 +11,6 @@ interface SidebarProps {
   currentTab: TabPath;
   onSelectTab: (tab: TabPath) => void;
   userRole: UserRole;
-  userName: string;
-  onOpenAuthModal: () => void;
-  onLogout?: () => void;
-  canSwitchRole?: boolean;
   mobileOpen?: boolean;
   onCloseMobile?: () => void;
   /** Modo mini-sidebar (apenas ícones) no desktop. */
@@ -28,10 +24,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentTab,
   onSelectTab,
   userRole,
-  userName,
-  onOpenAuthModal,
-  onLogout,
-  canSwitchRole = false,
   mobileOpen = false,
   onCloseMobile,
   collapsed = false,
@@ -46,13 +38,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ) as Record<TabPath, { path: TabPath; label: string; icon: string }>;
 
   // Agrupamento por domínio (Painel fica solto no topo, sem cabeçalho).
+  // A sidebar é EXCLUSIVAMENTE módulos/navegação da empresa. Conta, sessão,
+  // preferências e "simular perfil" vivem no menu do avatar (UserMenu), não aqui.
   const GROUPS: { title?: string; items: TabPath[] }[] = [
     { items: ['painel'] },
     { title: 'Comercial', items: ['clientes', 'pedidos', 'contratos'] },
     { title: 'Operação', items: ['agenda', 'relatorios', 'fotos-de-campo', 'ponto'] },
     { title: 'Suprimentos', items: ['estoque', 'servicos', 'fornecedores'] },
     { title: 'Financeiro', items: ['receitas', 'despesas', 'financas'] },
-    { title: 'Sistema', items: ['conta'] },
   ];
   const visibleGroups = GROUPS.map((g) => ({
     title: g.title,
@@ -184,43 +177,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         ))}
       </nav>
-
-      {/* Footer System Status / Operator Info */}
-      <div className={`p-3 border-t border-white/10 bg-black/15 flex flex-col gap-2 ${isCollapsed ? 'lg:items-center lg:px-2' : ''}`}>
-        <div className={`flex items-center justify-between ${isCollapsed ? 'lg:justify-center' : ''}`}>
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></div>
-            <span className={`font-data-mono text-[10px] text-emerald-300 uppercase font-semibold ${isCollapsed ? 'lg:hidden' : ''}`}>SISTEMA ONLINE</span>
-          </div>
-          {canSwitchRole && (
-            <button
-              onClick={onOpenAuthModal}
-              className={`font-label-caps text-[10px] text-white/60 hover:text-white underline uppercase transition-colors ${isCollapsed ? 'lg:hidden' : ''}`}
-            >
-              Simular perfil
-            </button>
-          )}
-        </div>
-        <div className={`flex items-center justify-between bg-white/10 p-2 rounded-md border border-white/10 ${isCollapsed ? 'lg:hidden' : ''}`}>
-          <div className="flex flex-col">
-            <span className="text-xs text-white font-bold truncate max-w-36">{userName}</span>
-            <span className="font-label-caps text-[9px] text-white/60">{userRole}</span>
-          </div>
-          <span className="material-symbols-outlined text-white/60 text-base">badge</span>
-        </div>
-        {onLogout && (
-          <button
-            onClick={onLogout}
-            title={isCollapsed ? 'Sair do Sistema' : undefined}
-            className={`w-full flex items-center justify-center gap-1.5 mt-0.5 py-1.5 rounded-md bg-white/10 hover:bg-danger text-white/80 hover:text-white transition-colors font-label-caps text-[10px] uppercase tracking-wider ${
-              isCollapsed ? 'lg:px-0' : ''
-            }`}
-          >
-            <span className="material-symbols-outlined text-base">logout</span>
-            <span className={isCollapsed ? 'lg:hidden' : ''}>Sair do Sistema</span>
-          </button>
-        )}
-      </div>
+      {/* Sem rodapé: conta/usuário, "simular perfil", status online e logout
+          foram centralizados no menu do avatar (UserMenu) no header. A lista de
+          módulos ocupa naturalmente toda a altura disponível. */}
       </aside>
     </>
   );

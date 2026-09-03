@@ -1163,10 +1163,6 @@ export function CrmApp({
         currentTab={currentTab}
         onSelectTab={handleSelectTab}
         userRole={userRole}
-        userName={userName}
-        onOpenAuthModal={() => setIsAuthModalOpen(true)}
-        onLogout={onLogout}
-        canSwitchRole={canSwitchRole}
         mobileOpen={sidebarOpen}
         onCloseMobile={() => setSidebarOpen(false)}
         collapsed={isSidebarCollapsed}
