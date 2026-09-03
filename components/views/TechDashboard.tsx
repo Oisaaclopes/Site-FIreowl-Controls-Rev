@@ -1,8 +1,10 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { TabPath, TimePunch, Client, OrdemServico } from '@/lib/types';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { TabPath, TimePunch, Client, OrdemServico, FieldOperation } from '@/lib/types';
 import { fetchOrdensServico } from '@/lib/ordensServico';
+import { fetchFieldOperations } from '@/lib/fieldOperationsDomain';
+import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 import { QuickFieldPhotoModal } from '@/components/field-photos/QuickFieldPhotoModal';
 import { QuickPunchCard } from '@/components/ponto/QuickPunchCard';
 import { SyncIndicator } from '@/components/ui/SyncIndicator';
@@ -42,12 +44,20 @@ export const TechDashboard: React.FC<TechDashboardProps> = ({
   usesTimeClock = true,
 }) => {
   const [ordens, setOrdens] = useState<OrdemServico[]>([]);
+  const [operacoes, setOperacoes] = useState<FieldOperation[]>([]);
   const [quickPhotoOpen, setQuickPhotoOpen] = useState(false);
 
   useEffect(() => {
     // A RLS já restringe o TÉCNICO às OS dele; filtramos por UUID como reforço.
     fetchOrdensServico().then(setOrdens).catch(() => setOrdens([]));
   }, []);
+
+  // Operações de campo ATIVAS do técnico (a RLS só retorna as em que está alocado).
+  const refreshOperacoes = useCallback(() => {
+    fetchFieldOperations({ status: 'ATIVA' }).then(setOperacoes).catch(() => setOperacoes([]));
+  }, []);
+  useEffect(() => { refreshOperacoes(); }, [refreshOperacoes]);
+  useDomainRefresh('fieldOps', refreshOperacoes);
 
   const now = new Date();
   const hora = now.getHours();
@@ -89,6 +99,50 @@ export const TechDashboard: React.FC<TechDashboardProps> = ({
         usesTimeClock={usesTimeClock}
         onOpenPonto={() => onNavigateToTab('ponto')}
       />
+
+      {/* OPERAÇÃO DE HOJE — operação de campo recorrente do técnico (§17). Não é
+          OS: é a atividade contínua (ex.: Auditoria SDAI no Catuaí). */}
+      {operacoes.length > 0 && (
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-fg-secondary mb-2">Operação de hoje</p>
+          <div className="flex flex-col gap-2">
+            {operacoes.map((op) => (
+              <div key={op.id} className="bg-surface rounded-xl border border-border shadow-sm p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-bold text-fg text-sm truncate">{clientName(op.clientId)}</p>
+                    <p className="text-[11px] text-fg-secondary truncate">{op.name}</p>
+                  </div>
+                  <span className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold bg-indigo-50 text-indigo-700 uppercase">
+                    {op.operationType.replace('_', ' ')}
+                  </span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => onNavigateToTab('agenda')}
+                    className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-surface-2 border border-border text-fg-secondary hover:border-border-strong transition-colors uppercase tracking-wide"
+                  >
+                    Abrir operação
+                  </button>
+                  {/* Link externo opcional (§18/§19): só aparece se configurado
+                      administrativamente na operação. NUNCA hardcoded aqui. */}
+                  {op.externalSystemUrl && (
+                    <a
+                      href={op.externalSystemUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors uppercase tracking-wide flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-sm">open_in_new</span>
+                      Abrir auditoria
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Atalhos operacionais */}
       <div className="grid grid-cols-2 gap-3">

@@ -7,6 +7,7 @@ import { usePrivacy } from '@/lib/privacy';
 import { fetchTimeClockParticipants, TimeClockParticipant } from '@/lib/users';
 import { requestPunchAddress } from '@/lib/timepunch';
 import { deriveFieldOperatorStates } from '@/lib/fieldOperations';
+import { fetchActiveFieldState, buildDeriveContext, ActiveFieldState } from '@/lib/fieldStateContext';
 import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 import { QuickPunchCard } from '@/components/ponto/QuickPunchCard';
 
@@ -41,10 +42,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 }) => {
   const { isPrivacyModeActive, maskMoney } = usePrivacy();
   const [fieldTechnicians, setFieldTechnicians] = useState<TimeClockParticipant[]>([]);
-  const refreshFieldTechnicians = useCallback(async () => setFieldTechnicians(await fetchTimeClockParticipants()), []);
+  const [activeFieldState, setActiveFieldState] = useState<ActiveFieldState>({ operations: [], assignments: [], attendances: [] });
+  const refreshFieldTechnicians = useCallback(async () => {
+    // Diretório de participantes + estado de campo ativo (operações/atendimentos).
+    const [participants, fieldState] = await Promise.all([
+      fetchTimeClockParticipants(),
+      fetchActiveFieldState(),
+    ]);
+    setFieldTechnicians(participants);
+    setActiveFieldState(fieldState);
+  }, []);
   useEffect(() => { void refreshFieldTechnicians(); }, [refreshFieldTechnicians]);
   useDomainRefresh('dashboard', refreshFieldTechnicians);
-  const fieldStates = useMemo(() => deriveFieldOperatorStates(fieldTechnicians, punches, ordensServico, clients), [fieldTechnicians, punches, ordensServico, clients]);
+  const fieldStates = useMemo(() => {
+    const context = buildDeriveContext(activeFieldState, ordensServico);
+    return deriveFieldOperatorStates(fieldTechnicians, punches, ordensServico, clients, Date.now(), context);
+  }, [fieldTechnicians, activeFieldState, punches, ordensServico, clients]);
   // Resolução sob demanda do endereço da última batida exibida (lat/lng sem
   // location_address). Best-effort: nunca bloqueia a UI. O guard evita repetir
   // indefinidamente a mesma batida a cada refresh se o provedor falhar.
@@ -337,10 +350,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {/* Estado operacional derivado de vínculos reais de Ponto, OS e cliente. */}
           <div className="bg-surface p-4 rounded-xl border border-border shadow-soft flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold text-fg uppercase tracking-wider">Manutenção de Campo em Tempo Real</h4>
+              <h4 className="text-xs font-bold text-fg uppercase tracking-wider">Operação de Campo</h4>
               <button onClick={() => onNavigateToTab('agenda')} className="text-[10px] font-semibold text-primary hover:underline">Abrir agenda</button>
             </div>
-            <p className="text-[10px] text-fg-secondary">Último evento operacional conhecido — sem rastreamento contínuo.</p>
+            <p className="text-[10px] text-fg-secondary">Estado real por jornada, operação e atendimento — sem rastreamento contínuo.</p>
             <div className="max-h-72 overflow-y-auto divide-y divide-border">
               {fieldStates.length === 0 ? (
                 <div className="min-h-[76px] text-fg-muted flex flex-col items-center justify-center text-center">
@@ -348,8 +361,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <span className="text-[11px] font-semibold">Nenhum técnico ativo encontrado</span>
                 </div>
               ) : fieldStates.map((operator) => {
-                const chip = operator.status === 'EM ATENDIMENTO' ? 'bg-primary-soft text-primary' : operator.status === 'EM JORNADA' ? 'bg-emerald-50 text-emerald-700' : 'bg-surface-3 text-fg-secondary';
+                const chip = operator.status === 'EM ATENDIMENTO' ? 'bg-primary-soft text-primary'
+                  : operator.status === 'EM OPERAÇÃO' ? 'bg-indigo-50 text-indigo-700'
+                  : operator.status === 'EM JORNADA' ? 'bg-emerald-50 text-emerald-700'
+                  : 'bg-surface-3 text-fg-secondary';
                 const time = operator.updatedAt ? new Date(operator.updatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : undefined;
+                // Rótulo de atividade: operação (nome) / atendimento (OS) / ponto.
+                const atStart = operator.activeAttendance?.startedAt;
+                const activityLabel = operator.status === 'EM OPERAÇÃO'
+                  ? operator.activeOperation?.name
+                  : operator.status === 'EM ATENDIMENTO'
+                    ? (operator.activeAttendance?.osNumero || operator.activeOs?.numero || 'Atendimento em execução')
+                    : (operator.lastPunch ? `${operator.lastPunch.type} ${new Date(operator.lastPunch.at || 0).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : 'Sem registro de ponto');
                 return (
                   <div key={operator.userId} className="py-3 first:pt-1 last:pb-1">
                     <div className="flex items-start justify-between gap-2">
@@ -357,9 +380,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold ${chip}`}>{operator.status}</span>
                     </div>
                     {operator.clientName && <p className="mt-1 text-[11px] font-semibold text-fg-secondary">{operator.clientName}</p>}
+                    {operator.status === 'EM OPERAÇÃO' && operator.activeOperation?.name && (
+                      <p className="mt-0.5 text-[10px] font-semibold text-indigo-600">{operator.activeOperation.name}</p>
+                    )}
                     <p className="mt-0.5 text-[10px] leading-snug text-fg-muted flex gap-1"><span className="material-symbols-outlined text-[13px] shrink-0">location_on</span><span className="min-w-0 break-words">{operator.location}</span></p>
                     <div className="mt-1 flex justify-between gap-2 text-[9px] text-fg-muted">
-                      <span className="min-w-0 truncate">{operator.activeOs?.numero || (operator.lastPunch ? `${operator.lastPunch.type} ${new Date(operator.lastPunch.at || 0).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : 'Sem registro de ponto')}</span>
+                      <span className="min-w-0 truncate">{activityLabel}{atStart ? ` · iniciado ${new Date(atStart).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}</span>
                       {time && <span className="shrink-0">Atualizado {time}</span>}
                     </div>
                   </div>

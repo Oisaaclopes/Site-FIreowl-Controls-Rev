@@ -1124,6 +1124,70 @@ export interface OrdemServico {
   motivoCancelamento?: string;
 }
 
+/* ===================================================================
+ * ETAPA 3A — Operação de Campo (recorrente) e Atendimento (execução real).
+ * CONTRATO = relação contínua; OPERAÇÃO = atividade recorrente ligada ao
+ * contrato/cliente (não gera OS por dia); ATENDIMENTO = visita real de UMA OS
+ * (0..N por OS). Ver migração 0083.
+ * =================================================================== */
+
+export type FieldOperationType =
+  | 'AUDITORIA' | 'PREVENTIVA' | 'OPERACAO_RESIDENTE' | 'INSPECAO' | 'ACOMPANHAMENTO' | 'OUTRO';
+export type FieldOperationStatus = 'PLANEJADA' | 'ATIVA' | 'PAUSADA' | 'ENCERRADA';
+
+/** Operação de campo recorrente executada em um cliente (ex.: Auditoria SDAI). */
+export interface FieldOperation {
+  id: string;
+  clientId?: string;
+  contractId?: string;
+  name: string;
+  description?: string;
+  operationType: FieldOperationType;
+  status: FieldOperationStatus;
+  startDate?: string;
+  endDate?: string;
+  /** Preparação p/ sistema externo de auditoria (opcional; NUNCA hardcoded). */
+  externalSystemUrl?: string;
+  externalReference?: string;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** Alocação técnico↔operação (N:N). Uma operação pode ter 1..N técnicos. */
+export interface FieldOperationAssignment {
+  id: string;
+  operationId: string;
+  technicianId: string;
+  startDate?: string;
+  endDate?: string;
+  status: 'ATIVO' | 'ENCERRADO';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type AttendanceStatus = 'EM_EXECUCAO' | 'FINALIZADO';
+export type AttendanceResult = 'RESOLVIDO' | 'PARCIALMENTE_RESOLVIDO' | 'NAO_RESOLVIDO';
+
+/** Atendimento — execução/visita real de UMA OS. Resultado ≠ status da OS. */
+export interface ServiceAttendance {
+  id: string;
+  workOrderId: string;
+  technicianId?: string;
+  startedAt?: string;
+  finishedAt?: string;
+  status: AttendanceStatus;
+  result?: AttendanceResult;
+  diagnosis?: string;
+  executionNotes?: string;
+  latitudeStart?: number;
+  longitudeStart?: number;
+  latitudeEnd?: number;
+  longitudeEnd?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 /** Custos de logística versionados por vigência. */
 export interface CustoLogistica {
   id: string;

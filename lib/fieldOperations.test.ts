@@ -82,3 +82,82 @@ describe('localização operacional', () => {
     expect(deriveFieldOperatorStates([{ id: 'u1', name: 'Ana', usesTimeClock: false }], [punch('ENTRADA', 8)], [], [], now)).toEqual([]);
   });
 });
+
+describe('ETAPA 3A — jornada, operação e atendimento (precedência §11/§33)', () => {
+  const operationLink = {
+    technicianId: 'u1', operationId: 'op1', operationName: 'Auditoria SDAI', operationType: 'AUDITORIA', clientId: 'c1',
+  };
+  const attendanceLink = {
+    technicianId: 'u1', attendanceId: 'att1', workOrderId: 'os1', clientId: 'c1', osNumero: 'OS-2026-0001', startedAt: new Date(2026, 8, 3, 9, 42).getTime(),
+  };
+
+  it('técnico em jornada + operação ativa => EM OPERAÇÃO', () => {
+    const state = deriveFieldOperatorStates(
+      [technician], [punch('ENTRADA', 8)], [], [client], now, { operations: [operationLink] }
+    )[0];
+    expect(state.status).toBe('EM OPERAÇÃO');
+    expect(state.activeOperation).toMatchObject({ id: 'op1', name: 'Auditoria SDAI', type: 'AUDITORIA', clientName: 'Cliente Real' });
+    expect(state.location).toBe('Av. da OS, 10');
+    expect(state.locationSource).toBe('operation');
+  });
+
+  it('operação ativa com técnico FORA de jornada NÃO gera EM OPERAÇÃO', () => {
+    const state = deriveFieldOperatorStates(
+      [technician], [punch('SAIDA', 18), punch('ENTRADA', 8)], [], [client], now, { operations: [operationLink] }
+    )[0];
+    expect(state.status).toBe('FORA DE JORNADA');
+    expect(state.activeOperation).toBeUndefined();
+  });
+
+  it('técnico em jornada + atendimento em execução => EM ATENDIMENTO', () => {
+    const state = deriveFieldOperatorStates(
+      [technician], [punch('ENTRADA', 8)], [order('em_execucao')], [client], now, { attendances: [attendanceLink] }
+    )[0];
+    expect(state.status).toBe('EM ATENDIMENTO');
+    expect(state.activeAttendance).toMatchObject({ id: 'att1', workOrderId: 'os1', osNumero: 'OS-2026-0001' });
+    expect(state.activeAttendance?.startedAt).toBe(new Date(2026, 8, 3, 9, 42).getTime());
+  });
+
+  it('precedência: atendimento em execução > operação ativa', () => {
+    const state = deriveFieldOperatorStates(
+      [technician], [punch('ENTRADA', 8)], [], [client], now, { operations: [operationLink], attendances: [attendanceLink] }
+    )[0];
+    expect(state.status).toBe('EM ATENDIMENTO');
+    expect(state.activeOperation).toBeUndefined();
+  });
+
+  it('OS aberta sem atendimento NÃO gera EM ATENDIMENTO (fica EM OPERAÇÃO se houver operação)', () => {
+    const state = deriveFieldOperatorStates(
+      [technician], [punch('ENTRADA', 8)], [order('aberta')], [client], now, { operations: [operationLink] }
+    )[0];
+    expect(state.status).toBe('EM OPERAÇÃO');
+  });
+
+  it('atendimento FORA de jornada NÃO gera EM ATENDIMENTO (SAÍDA prevalece)', () => {
+    const state = deriveFieldOperatorStates(
+      [technician], [punch('SAIDA', 18), punch('ENTRADA', 8)], [], [client], now, { attendances: [attendanceLink] }
+    )[0];
+    expect(state.status).toBe('FORA DE JORNADA');
+    expect(state.activeAttendance).toBeUndefined();
+  });
+
+  it('ordenação por prioridade: ATENDIMENTO < OPERAÇÃO < JORNADA < FORA', () => {
+    const techs = [
+      { id: 'u1', name: 'Ana', usesTimeClock: true },
+      { id: 'u2', name: 'Bruno', usesTimeClock: true },
+      { id: 'u3', name: 'Caio', usesTimeClock: true },
+      { id: 'u4', name: 'Davi', usesTimeClock: true },
+    ] as typeof technician[];
+    const p = (uid: string, type: TimePunch['type'], hour: number): TimePunch => ({ ...punch(type, hour), userId: uid });
+    const states = deriveFieldOperatorStates(
+      techs,
+      [p('u1', 'ENTRADA', 8), p('u2', 'ENTRADA', 8), p('u3', 'ENTRADA', 8), p('u4', 'SAIDA', 18)],
+      [], [client], now,
+      {
+        attendances: [{ ...attendanceLink, technicianId: 'u1' }],
+        operations: [{ ...operationLink, technicianId: 'u2' }],
+      }
+    );
+    expect(states.map((s) => s.status)).toEqual(['EM ATENDIMENTO', 'EM OPERAÇÃO', 'EM JORNADA', 'FORA DE JORNADA']);
+  });
+});
