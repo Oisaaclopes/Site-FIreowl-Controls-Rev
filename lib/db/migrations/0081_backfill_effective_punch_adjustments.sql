@@ -60,12 +60,13 @@ begin
     and (tp.user_id = v_user or (v_user is null and tp.employee_name ilike 'Rhuan%'))
     and (tp.punched_at at time zone 'America/Sao_Paulo')::date = date '2026-09-01';
 
+  -- requested_time é TEXT no schema; usa literal de texto (não TIME).
   update public.punch_adjustments
-  set requested_time = time '08:01',
+  set requested_time = '08:01',
       original_punch_id = v_punch_id
   where id = v_adj_id
     and status = 'APROVADO'
-    and ( requested_time is distinct from time '08:01'
+    and ( requested_time is distinct from '08:01'
        or original_punch_id is distinct from v_punch_id );
 
   raise notice '0081/Rhuan: ajuste % vinculado à batida % com requested_time 08:01.', v_adj_id, v_punch_id;
