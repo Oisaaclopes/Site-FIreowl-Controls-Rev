@@ -3,6 +3,7 @@ import { Poppins, Roboto, Montserrat } from 'next/font/google';
 import './globals.css'; // Global styles
 import { PwaClient } from '@/components/pwa/PwaClient';
 import { FeedbackProvider } from '@/components/ui/Feedback';
+import { ThemeProvider, themeNoFlashScript } from '@/lib/theme';
 
 // Títulos/headings: Poppins (amigável, arredondada) — mesma família dos PDFs.
 // Substitui o antigo Oswald (condensado/industrial, aspecto "quadriculado").
@@ -45,9 +46,15 @@ export const viewport: Viewport = { themeColor: '#1A1A72', viewportFit: 'cover' 
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
-    <html lang="pt-BR" className={`${poppins.variable} ${roboto.variable} ${montserrat.variable}`}>
-      <body suppressHydrationWarning className="bg-white antialiased text-gray-800">
-        <FeedbackProvider>{children}</FeedbackProvider>
+    <html lang="pt-BR" className={`${poppins.variable} ${roboto.variable} ${montserrat.variable}`} suppressHydrationWarning>
+      <head>
+        {/* Aplica o tema antes da primeira pintura (sem flash). */}
+        <script dangerouslySetInnerHTML={{ __html: themeNoFlashScript }} />
+      </head>
+      <body suppressHydrationWarning className="bg-bg antialiased text-fg">
+        <ThemeProvider>
+          <FeedbackProvider>{children}</FeedbackProvider>
+        </ThemeProvider>
         <PwaClient />
       </body>
     </html>

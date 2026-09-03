@@ -41,7 +41,7 @@ export const DataListRow: React.FC<DataListRowProps> = ({
   return (
     <div
       onClick={onClick}
-      className={`bg-white rounded-xl shadow-sm border border-slate-100 p-4 flex flex-col md:flex-row md:items-center gap-4 transition-all hover:shadow-md hover:border-slate-200 ${
+      className={`bg-surface rounded-xl shadow-soft border border-border p-4 flex flex-col md:flex-row md:items-center gap-4 transition-all hover:shadow-card hover:border-border-strong ${
         clickable ? 'cursor-pointer' : ''
       } ${className}`}
     >
@@ -49,9 +49,9 @@ export const DataListRow: React.FC<DataListRowProps> = ({
       <div className="flex items-center gap-3 flex-1 min-w-0">
         {leading}
         <div className="min-w-0">
-          <div className="font-semibold text-slate-900 text-sm truncate">{title}</div>
+          <div className="font-semibold text-fg text-sm truncate">{title}</div>
           {meta && (
-            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-500">
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-fg-secondary">
               {meta}
             </div>
           )}
@@ -60,7 +60,7 @@ export const DataListRow: React.FC<DataListRowProps> = ({
 
       {/* Centro (opcional): informação extra discreta */}
       {center && (
-        <div className="text-[11px] text-slate-500 md:text-center md:px-4 shrink-0">{center}</div>
+        <div className="text-[11px] text-fg-secondary md:text-center md:px-4 shrink-0">{center}</div>
       )}
 
       {/* Direita: valores/status + ações */}
@@ -74,8 +74,8 @@ export const DataListRow: React.FC<DataListRowProps> = ({
 /** Metadado no formato "Rótulo: valor" para a área de metadados. */
 export const RowMeta: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
   <span className="whitespace-nowrap">
-    <span className="text-slate-400">{label}:</span>{' '}
-    <span className="text-slate-600 font-semibold">{value}</span>
+    <span className="text-fg-muted">{label}:</span>{' '}
+    <span className="text-fg-secondary font-semibold">{value}</span>
   </span>
 );
 
@@ -89,7 +89,7 @@ const BADGE_SOLID: Record<BadgeColor, string> = {
   green: 'bg-emerald-50 text-emerald-700',
   red: 'bg-red-50 text-red-700',
   amber: 'bg-amber-50 text-amber-700',
-  brand: 'bg-[#1A1A72]/5 text-[#1A1A72]',
+  brand: 'bg-primary-soft text-primary',
 };
 
 const BADGE_OUTLINE: Record<BadgeColor, string> = {
@@ -97,9 +97,9 @@ const BADGE_OUTLINE: Record<BadgeColor, string> = {
   blue: 'border border-blue-400 text-blue-700',
   emerald: 'border border-emerald-500 text-emerald-700',
   green: 'border border-emerald-500 text-emerald-700',
-  red: 'border border-[#E63946] text-[#E63946]',
+  red: 'border border-danger text-danger',
   amber: 'border border-amber-500 text-amber-700',
-  brand: 'border border-[#1A1A72]/30 text-[#1A1A72]',
+  brand: 'border border-primary/30 text-primary',
 };
 
 /** Etiqueta de status colorida (sólida suave ou vazada). */
@@ -132,8 +132,8 @@ export const RowAction: React.FC<{
     }}
     title={label}
     aria-label={label}
-    className={`w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 transition-colors ${
-      danger ? 'hover:text-[#E63946] hover:bg-red-50' : 'hover:text-[#1A1A72] hover:bg-slate-100'
+    className={`w-8 h-8 rounded-lg flex items-center justify-center text-fg-muted transition-colors ${
+      danger ? 'hover:text-danger hover:bg-danger-soft' : 'hover:text-primary hover:bg-surface-3'
     }`}
   >
     <span className="material-symbols-outlined text-lg">{icon}</span>

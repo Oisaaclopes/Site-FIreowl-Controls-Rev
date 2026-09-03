@@ -13,9 +13,11 @@ interface EmptyStateProps {
 
 /* Ilustrações SVG leves (sem dependência externa), em tons da marca. */
 const Ilustracao: React.FC<{ variant: NonNullable<EmptyStateProps['variant']> }> = ({ variant }) => {
-  const navy = '#1A1A72';
-  const red = '#E63946';
-  const soft = '#E9E9F6';
+  // Cores theme-aware (via CSS vars) — a ilustração acompanha claro/escuro e usa
+  // o acento azul da marca no lugar do vermelho para um visual mais premium.
+  const navy = 'var(--primary)';
+  const red = 'var(--primary)';
+  const soft = 'var(--surface-3)';
   if (variant === 'clientes') {
     return (
       <svg width="120" height="96" viewBox="0 0 120 96" fill="none" aria-hidden="true">
@@ -55,14 +57,14 @@ const Ilustracao: React.FC<{ variant: NonNullable<EmptyStateProps['variant']> }>
 };
 
 export const EmptyState: React.FC<EmptyStateProps> = ({ title, description, variant = 'generico', actionLabel, onAction }) => (
-  <div className="bg-white rounded-xl border border-dashed border-slate-200 py-10 px-6 flex flex-col items-center text-center">
+  <div className="bg-surface rounded-xl border border-dashed border-border py-10 px-6 flex flex-col items-center text-center">
     <Ilustracao variant={variant} />
-    <p className="mt-3 text-sm font-bold text-slate-700 uppercase tracking-wider">{title}</p>
-    {description && <p className="text-[12px] text-slate-400 mt-1 max-w-xs">{description}</p>}
+    <p className="mt-3 text-sm font-bold text-fg-secondary uppercase tracking-wider">{title}</p>
+    {description && <p className="text-[12px] text-fg-muted mt-1 max-w-xs">{description}</p>}
     {actionLabel && onAction && (
       <button
         onClick={onAction}
-        className="mt-4 inline-flex items-center gap-1.5 bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg uppercase tracking-wide shadow-sm transition-colors"
+        className="mt-4 inline-flex items-center gap-1.5 bg-primary hover:bg-primary-hover text-white text-xs font-semibold px-4 py-2 rounded-lg uppercase tracking-wide shadow-sm transition-colors"
       >
         <span className="material-symbols-outlined text-base">add</span> {actionLabel}
       </button>

@@ -1,5 +1,105 @@
 @import "tailwindcss";
 
+/* ==========================================================================
+   TEMA — variante dark
+   O modo é resolvido em JS (light | dark | system) e materializado no atributo
+   [data-theme] do <html>. "system" acompanha prefers-color-scheme convertendo
+   para light/dark em tempo de execução, portanto aqui só existe o gatilho do
+   atributo (sem media-query concorrente).
+   ========================================================================== */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* --------------------------------------------------------------------------
+   DESIGN TOKENS (raw) — fonte única de verdade. Definidos em variáveis brutas
+   para uso tanto em CSS puro (body, etc.) quanto expostos como utilitários
+   Tailwind via @theme inline logo abaixo.
+   -------------------------------------------------------------------------- */
+:root {
+  /* Superfícies / fundo (light) */
+  --bg: #F6F8FC;
+  --surface: #FFFFFF;
+  --surface-2: #F9FAFC;
+  --surface-3: #F1F5FB; /* hover / linhas alternadas */
+  --border: #E5EAF2;
+  --border-strong: #D4DCEA;
+
+  /* Texto */
+  --fg: #111827;
+  --fg-secondary: #64748B;
+  --fg-muted: #94A3B8;
+  --fg-on-navy: #F8FAFC;
+
+  /* Marca — navy (chrome escuro: sidebar, cabeçalhos de tabela) */
+  --navy: #0B1739;
+  --navy-2: #12224A;
+  --navy-3: #1B2E5A; /* hover sobre navy */
+
+  /* Acento — azul royal (destaques, estados ativos, ações primárias) */
+  --primary: #2563EB;
+  --primary-hover: #1D4ED8;
+  --primary-soft: #EFF4FF; /* fundo suave do acento (light) */
+  --primary-fg: #FFFFFF;
+
+  /* Semânticas de estado */
+  --success: #16A34A;
+  --success-soft: #ECFDF3;
+  --warning: #D97706;
+  --warning-soft: #FEF6E7;
+  --danger: #DC2626;
+  --danger-hover: #B91C1C;
+  --danger-soft: #FEF2F2;
+
+  /* Sombras (leves no light) */
+  --shadow-soft: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
+  --shadow-card: 0 1px 3px rgba(16, 24, 40, 0.06), 0 4px 12px rgba(16, 24, 40, 0.05);
+  --shadow-pop: 0 8px 28px rgba(16, 24, 40, 0.12);
+
+  /* Aliases legados preservados (não desestabilizar telas ainda não refinadas) */
+  --primary-blue: #1A1A72;
+  --action-red: #E63946;
+  --warning-yellow: #FFD700;
+  --text-dark: #4D4D4D;
+  --bg-white: #FFFFFF;
+  --bg-light-gray: #F8F9FA;
+}
+
+/* Dark mode — baseado em azul-marinho profundo (nunca preto puro). */
+:root[data-theme="dark"] {
+  --bg: #050B18;
+  --surface: #081225;
+  --surface-2: #0D1930;
+  --surface-3: #12213D;
+  --border: #1D2C48;
+  --border-strong: #274063;
+
+  --fg: #F8FAFC;
+  --fg-secondary: #CBD5E1;
+  --fg-muted: #8190AA;
+  --fg-on-navy: #F8FAFC;
+
+  --navy: #081225;
+  --navy-2: #0D1930;
+  --navy-3: #12213D;
+
+  --primary: #3B82F6;
+  --primary-hover: #2563EB;
+  --primary-soft: #14264A;
+  --primary-fg: #FFFFFF;
+
+  --success: #34D399;
+  --success-soft: #0C2A20;
+  --warning: #FBBF24;
+  --warning-soft: #2A2109;
+  --danger: #F87171;
+  --danger-hover: #EF4444;
+  --danger-soft: #2A1315;
+
+  /* Em dark preferimos borda + contraste de superfície a sombras pesadas. */
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.45);
+  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+
 @theme {
   --color-primary-blue: #1A1A72;
   --color-action-red: #E63946;
@@ -10,21 +110,65 @@
   --font-sans: var(--font-roboto), sans-serif;
   --font-display: var(--font-poppins), sans-serif;
   --font-montserrat: var(--font-montserrat), sans-serif;
+
+  /* Radius — suavização global (sistema menos "quadrado"). */
+  --radius-md: 0.5rem;   /* 8px  */
+  --radius-lg: 0.7rem;   /* ~11px */
+  --radius-xl: 1rem;     /* 16px */
+  --radius-2xl: 1.25rem; /* 20px */
 }
 
-:root {
-  --primary-blue: #1A1A72;
-  --action-red: #E63946;
-  --warning-yellow: #FFD700;
-  --text-dark: #4D4D4D;
-  --bg-white: #FFFFFF;
-  --bg-light-gray: #F8F9FA;
+/* Tokens semânticos theme-aware expostos como utilitários Tailwind
+   (bg-surface, text-fg, border-border, bg-primary, text-navy, etc.).
+   @theme inline emite var(--token) diretamente, então a troca light/dark
+   flui pelos overrides de [data-theme="dark"] acima. */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-fg: var(--fg);
+  --color-fg-secondary: var(--fg-secondary);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-on-navy: var(--fg-on-navy);
+
+  --color-navy: var(--navy);
+  --color-navy-2: var(--navy-2);
+  --color-navy-3: var(--navy-3);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-fg: var(--primary-fg);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-soft: var(--danger-soft);
+}
+
+/* Sombras leves theme-aware como utilitários dedicados. */
+@layer utilities {
+  .shadow-soft { box-shadow: var(--shadow-soft); }
+  .shadow-card { box-shadow: var(--shadow-card); }
+  .shadow-pop { box-shadow: var(--shadow-pop); }
 }
 
 body {
   font-family: var(--font-roboto), sans-serif;
-  color: var(--text-dark);
-  background-color: var(--bg-white);
+  color: var(--fg);
+  background-color: var(--bg);
+}
+
+/* Suaviza a barra de rolagem no dark (evita trilho branco berrante). */
+:root[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 /* Só acrescenta área útil em aparelhos com recorte; desktop permanece inalterado. */

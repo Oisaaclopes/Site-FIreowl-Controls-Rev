@@ -1157,7 +1157,7 @@ export function CrmApp({
 
   return (
     <PrivacyProvider>
-    <div className="min-h-screen bg-slate-50 font-body-md text-[#131c28]">
+    <div className="min-h-screen bg-bg font-body-md text-fg">
       {/* Sidebar Navigation (off-canvas no mobile, fixa no desktop) */}
       <Sidebar
         currentTab={currentTab}

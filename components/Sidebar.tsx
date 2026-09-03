@@ -75,7 +75,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       <aside
-        className={`fixed left-0 top-0 h-full w-60 max-w-[85%] bg-[#1A1A72] z-50 flex flex-col border-r border-white/10 shadow-xl transform transition-[width,transform] duration-300 ease-out lg:translate-x-0 ${
+        className={`fixed left-0 top-0 h-full w-60 max-w-[85%] bg-navy z-50 flex flex-col border-r border-white/10 shadow-xl transform transition-[width,transform] duration-300 ease-out lg:translate-x-0 ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         } ${isCollapsed ? 'lg:w-20' : 'lg:w-60'}`}
       >
@@ -96,7 +96,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 FIREOWL<span className="text-[#E63946]">.</span>
               </span>
               <span className="font-label-caps text-white/60 text-[9px] tracking-widest mt-0.5">
-                CONTROLS SYSTEMS
+                CONTROLS
               </span>
             </div>
           </button>
@@ -155,7 +155,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       isCollapsed ? 'lg:justify-center lg:px-0' : ''
                     } ${
                       isActive
-                        ? 'bg-[#E63946] text-white font-semibold shadow-sm'
+                        ? 'bg-primary text-white font-semibold shadow-sm'
                         : 'text-white/70 hover:text-white hover:bg-white/10'
                     }`}
                   >
@@ -212,7 +212,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={onLogout}
             title={isCollapsed ? 'Sair do Sistema' : undefined}
-            className={`w-full flex items-center justify-center gap-1.5 mt-0.5 py-1.5 rounded-md bg-white/10 hover:bg-[#E63946] text-white/80 hover:text-white transition-colors font-label-caps text-[10px] uppercase tracking-wider ${
+            className={`w-full flex items-center justify-center gap-1.5 mt-0.5 py-1.5 rounded-md bg-white/10 hover:bg-danger text-white/80 hover:text-white transition-colors font-label-caps text-[10px] uppercase tracking-wider ${
               isCollapsed ? 'lg:px-0' : ''
             }`}
           >
