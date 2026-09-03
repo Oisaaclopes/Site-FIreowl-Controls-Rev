@@ -31,6 +31,7 @@ import { OS_STATUS_ATIVOS } from '@/lib/ordensServico';
 import { fetchPendencias } from '@/lib/pendencias';
 import { isSupabaseConfigured } from '@/lib/inventory';
 import { fetchClientEvents, insertClientEvent } from '@/lib/clientEvents';
+import { ClientDossie } from '@/components/clients/ClientDossie';
 
 interface CrmViewProps {
   clients: Client[];
@@ -121,6 +122,37 @@ export const CrmView: React.FC<CrmViewProps> = ({
   const [clientLogoUrls, setClientLogoUrls] = useState<Record<string, string>>({});
   const [showAddClientModal, setShowAddClientModal] = useState(false);
   const [selectedClientDetail, setSelectedClientDetail] = useState<Client | null>(null);
+
+  // Dossiê do cliente (Client 360) em página cheia. A seleção é refletida na URL
+  // (?cliente=<id>) para que o dossiê seja compartilhável e sobreviva a reload —
+  // sem rota dinâmica de arquivo (incompatível com output:'export').
+  const openClientDossie = React.useCallback((client: Client) => {
+    setSelectedClientDetail(client);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('cliente', client.id);
+      window.history.replaceState(window.history.state, '', url.toString());
+    }
+  }, []);
+  const closeClientDossie = React.useCallback(() => {
+    setSelectedClientDetail(null);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('cliente');
+      window.history.replaceState(window.history.state, '', url.toString());
+    }
+  }, []);
+  // Restaura o dossiê a partir de ?cliente=<id> quando os clientes estão prontos.
+  const dossieRestored = React.useRef(false);
+  useEffect(() => {
+    if (dossieRestored.current || clients.length === 0 || typeof window === 'undefined') return;
+    const id = new URLSearchParams(window.location.search).get('cliente');
+    if (id) {
+      const found = clients.find((c) => c.id === id);
+      if (found) setSelectedClientDetail(found);
+    }
+    dossieRestored.current = true;
+  }, [clients]);
 
   // Formulário de novo cliente (cadastro completo)
   const [nTipoPessoa, setNTipoPessoa] = useState<'PJ' | 'PF'>('PJ');
@@ -449,7 +481,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
                 return (
                   <DataListRow
                     key={client.id}
-                    onClick={() => setSelectedClientDetail(client)}
+                    onClick={() => openClientDossie(client)}
                     leading={client.logoPath && clientLogoUrls[client.logoPath] ? (
                       <span className="w-14 h-14 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 p-1.5 overflow-hidden">
                         {/* eslint-disable-next-line @next/next/no-img-element */}<img src={clientLogoUrls[client.logoPath]} alt={`Logo ${nomeFantasiaCliente(client.name)}`} className="w-full h-full object-contain" />
@@ -492,7 +524,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
                           <RowAction
                             icon="visibility"
                             label="Ver ficha completa do cliente"
-                            onClick={() => setSelectedClientDetail(client)}
+                            onClick={() => openClientDossie(client)}
                           />
                           <RowAction
                             icon="description"
@@ -882,477 +914,35 @@ export const CrmView: React.FC<CrmViewProps> = ({
         </div>
       )}
 
-      {/* Client Detail Modal — ficha interligada */}
+      {/* Client 360 — dossiê operacional em página cheia (substitui o antigo modal). */}
       {selectedClientDetail && (
-        <ClientDetail
+        <ClientDossie
           client={selectedClientDetail}
           contracts={contracts}
           pedidos={pedidos}
           ordensServico={ordensServico}
           transactions={transactions}
-          maskMoney={maskMoney}
-          fabricantes={partnerBrands}
-          suppliers={suppliers}
           inventory={inventory}
+          suppliers={suppliers}
+          fabricantes={partnerBrands}
           onAddFabricante={(name) => onAddPartnerBrand({ id: `pb_${Date.now()}`, name, category: 'SDAI' })}
-          onClose={() => setSelectedClientDetail(null)}
+          onClose={closeClientDossie}
           onEditClient={(c) => {
-            setSelectedClientDetail(null);
+            closeClientDossie();
             startEditClient(c);
           }}
           onDeleteClient={onDeleteClient}
           onOpenReport={(name) => {
-            setSelectedClientDetail(null);
+            closeClientDossie();
             onSelectClientForReport?.(name);
           }}
           onNavigateToTab={(tab) => {
-            setSelectedClientDetail(null);
+            closeClientDossie();
             onNavigateToTab?.(tab);
           }}
           userRole={userRole}
         />
       )}
-    </div>
-  );
-};
-
-/* ============================ Ficha do cliente ============================ */
-
-interface ClientDetailProps {
-  client: Client;
-  contracts: Contract[];
-  pedidos: Pedido[];
-  ordensServico: OrdemServico[];
-  transactions: FinancialTransaction[];
-  maskMoney: (v: string) => string;
-  fabricantes: PartnerBrand[];
-  suppliers: Supplier[];
-  inventory: InventoryItem[];
-  onAddFabricante: (name: string) => void;
-  onClose: () => void;
-  onEditClient?: (c: Client) => void;
-  onDeleteClient: (client: Client) => Promise<void>;
-  onOpenReport: (name: string) => void;
-  onNavigateToTab: (tab: TabPath) => void;
-  userRole: UserRole;
-}
-
-const ClientDetail: React.FC<ClientDetailProps> = ({
-  client,
-  contracts,
-  pedidos,
-  ordensServico,
-  transactions,
-  maskMoney,
-  fabricantes,
-  suppliers,
-  inventory,
-  onAddFabricante,
-  onClose,
-  onEditClient,
-  onDeleteClient,
-  onOpenReport,
-  onNavigateToTab,
-  userRole,
-}) => {
-  const [showDevices, setShowDevices] = useState(false);
-  const [clientReports, setClientReports] = useState<ReportInstance[]>([]);
-  const [clientPendencias, setClientPendencias] = useState<Pendencia[]>([]);
-  const [clientEvents, setClientEvents] = useState<ClientEvent[]>([]);
-  const [eventContent, setEventContent] = useState('');
-  const [eventType, setEventType] = useState<ClientEvent['type']>('nota');
-  useEffect(() => {
-    if (!isSupabaseConfigured()) return;
-    let alive = true;
-    Promise.all([fetchReports({ clienteId: client.id }), fetchPendencias(userRole, { clienteId: client.id }), fetchClientEvents(client.id)])
-      .then(([reports, pendencias, events]) => { if (alive) { setClientReports(reports); setClientPendencias(pendencias); setClientEvents(events); } })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, [client.id, userRole]);
-  const addClientEvent = async () => {
-    const content = eventContent.trim();
-    if (!content) return;
-    const draft: ClientEvent = { id: `evt_${Date.now()}`, clientId: client.id, type: eventType, content, authorName: userRole, createdAt: new Date().toISOString() };
-    setClientEvents((events) => [draft, ...events]);
-    setEventContent('');
-    if (!isSupabaseConfigured()) return;
-    try {
-      const stored = await insertClientEvent(draft);
-      setClientEvents((events) => [stored, ...events.filter((event) => event.id !== draft.id)]);
-    } catch (error) {
-      setClientEvents((events) => events.filter((event) => event.id !== draft.id));
-      setEventContent(content);
-      console.warn('Não foi possível salvar o evento do cliente:', error);
-      showToast('Não foi possível registrar a nota agora. Tente novamente.');
-    }
-  };
-  const data = useMemo(() => {
-    const belongsPedido = (p: Pedido) => p.clienteId === client.id || norm(p.clienteNome) === norm(client.name);
-    const belongsOS = (o: OrdemServico) => o.clienteId === client.id;
-
-    const clientContracts = contracts.filter((c) => norm(c.clientName) === norm(client.name));
-    const clientPedidos = pedidos.filter(belongsPedido);
-    const clientOS = ordensServico.filter(belongsOS);
-    const clientReceitas = transactions.filter(
-      (t) => t.type === 'RECEITA' && norm(t.clientOrVendor) === norm(client.name)
-    );
-
-    const propostasAceitas = clientPedidos.filter((p) => PROPOSAL_ACEITO.includes(p.status));
-    const propostasAbertas = clientPedidos.filter((p) => PROPOSAL_ABERTO.includes(p.status));
-    const propostasCanceladas = clientPedidos.filter((p) => PROPOSAL_CANCELADO.includes(p.status));
-
-    const osRealizadas = clientOS.filter((o) => o.status === 'concluida');
-    const osAndamento = clientOS.filter((o) => OS_STATUS_ATIVOS.includes(o.status));
-    const osCanceladas = clientOS.filter((o) => o.status === 'cancelada');
-
-    const mrr = clientContracts.reduce((acc, c) => acc + c.monthlyValue, 0);
-    const totalRecebido = clientReceitas
-      .filter((t) => t.status === 'CONFIRMADO')
-      .reduce((acc, t) => acc + t.amount, 0);
-    const volumeAberto = propostasAbertas.reduce((acc, p) => acc + (p.proposal?.valorTotal || 0), 0);
-
-    return {
-      clientContracts,
-      clientPedidos,
-      clientReceitas,
-      propostasAceitas,
-      propostasAbertas,
-      propostasCanceladas,
-      osRealizadas,
-      osAndamento,
-      osCanceladas,
-      mrr,
-      totalRecebido,
-      volumeAberto,
-    };
-  }, [client, contracts, pedidos, ordensServico, transactions]);
-
-  const brlM = (n: number) => maskMoney(brl(n));
-  const timeline = useMemo(() => {
-    const toTime = (value?: string) => {
-      if (!value) return 0;
-      const parsed = Date.parse(value);
-      if (!Number.isNaN(parsed)) return parsed;
-      const br = value.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-      return br ? new Date(Number(br[3]), Number(br[2]) - 1, Number(br[1])).getTime() : 0;
-    };
-    const entries: { id: string; date?: string; type: string; icon: string; title: string; detail: string; tone: string }[] = [
-      ...data.clientPedidos.map((p) => ({ id: `ped-${p.id}`, date: p.dataEmissao, type: 'Proposta', icon: 'description', title: p.numeroPedido, detail: `${p.referencia} · ${p.status}`, tone: 'text-[#1A1A72] bg-[#1A1A72]/10' })),
-      ...data.clientContracts.map((c) => ({ id: `contract-${c.id}`, date: c.startDate || c.renewalDate, type: 'Contrato', icon: 'handshake', title: c.contractType || c.id, detail: `${c.status} · renovação ${c.renewalDate || 'não informada'}`, tone: 'text-emerald-700 bg-emerald-50' })),
-      ...data.osRealizadas.concat(data.osAndamento, data.osCanceladas).map((o) => ({ id: `os-${o.id}`, date: o.dataPrevista || o.dataAbertura || '', type: 'OS', icon: 'engineering', title: o.numero || o.titulo || o.id, detail: `${OS_STATUS_UI[o.status].label}${o.titulo ? ` · ${o.titulo}` : ''}`, tone: 'text-amber-700 bg-amber-50' })),
-      ...clientReports.map((r) => ({ id: `report-${r.id}`, date: r.finalizadoEm || r.iniciadoEm, type: 'Relatório', icon: 'assignment', title: r.numero || r.titulo || r.tipo, detail: `${r.tipo} · ${r.status}`, tone: 'text-violet-700 bg-violet-50' })),
-      ...data.clientReceitas.map((t) => ({ id: `income-${t.id}`, date: t.date, type: 'Receita', icon: 'payments', title: t.description || t.id, detail: `${brlM(t.amount)} · ${t.status}`, tone: 'text-emerald-700 bg-emerald-50' })),
-      ...clientEvents.map((event) => ({ id: `event-${event.id}`, date: event.createdAt, type: event.type === 'contato' ? 'Contato' : event.type === 'negociacao' ? 'Negociação' : event.type === 'visita' ? 'Visita' : 'Nota', icon: event.type === 'contato' ? 'phone_in_talk' : event.type === 'visita' ? 'location_on' : 'sticky_note_2', title: event.content, detail: event.authorName ? `Registrado por ${event.authorName}` : 'Registro manual', tone: 'text-sky-700 bg-sky-50' })),
-    ];
-    return entries.sort((a, b) => toTime(b.date) - toTime(a.date)).slice(0, 14);
-  }, [data, clientReports]);
-  const hasLinkedHistory =
-    data.clientContracts.length > 0 || data.clientPedidos.length > 0 || data.osRealizadas.length > 0 ||
-    data.osAndamento.length > 0 || clientReports.length > 0 || clientPendencias.length > 0;
-
-  const handleDelete = async () => {
-    if (hasLinkedHistory) {
-      showToast('Este cliente possui histórico vinculado. Para preservar contratos, propostas, OS, relatórios e pendências, a exclusão não é permitida.');
-      return;
-    }
-    if (!await requestConfirm(`Excluir o cliente "${client.name}"? Esta ação não pode ser desfeita.`)) return;
-    await onDeleteClient(client);
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-3xl rounded-xl shadow-2xl relative border border-slate-200 max-h-[92vh] flex flex-col">
-        {/* Cabeçalho */}
-        <div className="flex items-start justify-between p-6 border-b border-slate-100">
-          <div className="min-w-0">
-            <span className="font-data-mono text-xs text-[#E63946] font-bold">{client.code}</span>
-            <h3 className="text-xl font-bold text-slate-900 uppercase mt-0.5 truncate">{client.name}</h3>
-            <p className="text-xs text-slate-500">
-              {client.cnpj} · {client.segment} ·{' '}
-              <span
-                className={
-                  client.contractStatus === 'EM DIA'
-                    ? 'text-emerald-600 font-semibold'
-                    : client.contractStatus === 'PENDENTE'
-                    ? 'text-amber-600 font-semibold'
-                    : 'text-red-600 font-semibold'
-                }
-              >
-                {client.contractStatus}
-              </span>
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {onEditClient && (
-              <button
-                onClick={() => onEditClient(client)}
-                className="text-xs font-bold text-[#1A1A72] bg-[#1A1A72]/10 hover:bg-[#1A1A72] hover:text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
-                title="Editar dados cadastrais deste cliente"
-              >
-                <span className="material-symbols-outlined text-sm">edit</span> Editar dados
-              </button>
-            )}
-            {(userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR') && (
-              <button
-                onClick={() => void handleDelete()}
-                className="text-xs font-bold text-[#E63946] bg-red-50 hover:bg-[#E63946] hover:text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
-                title={hasLinkedHistory ? 'Clientes com histórico não podem ser excluídos' : 'Excluir cliente sem vínculos'}
-              >
-                <span className="material-symbols-outlined text-sm">delete</span> Excluir
-              </button>
-            )}
-            <button onClick={onClose} className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none shrink-0 p-1">
-              ✕
-            </button>
-          </div>
-        </div>
-
-        <div className="p-6 space-y-5 overflow-y-auto text-xs">
-          {/* Resumo financeiro */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <SummaryTile label="MRR (contratos)" value={brlM(data.mrr)} tone="brand" />
-            <SummaryTile label="Recebido (confirmado)" value={brlM(data.totalRecebido)} tone="emerald" />
-            <SummaryTile label="Propostas em aberto" value={brlM(data.volumeAberto)} tone="amber" />
-            <SummaryTile label="OS realizadas" value={String(data.osRealizadas.length)} tone="slate" />
-          </div>
-
-          <Section title="Registrar nota ou contato" icon="edit_note">
-            <div className="flex flex-col sm:flex-row gap-2">
-              <select value={eventType} onChange={(e) => setEventType(e.target.value as ClientEvent['type'])} className="border border-slate-200 rounded-lg px-2.5 py-2 text-xs bg-white sm:w-32">
-                <option value="nota">Nota</option><option value="contato">Contato</option><option value="negociacao">Negociação</option><option value="visita">Visita</option>
-              </select>
-              <input value={eventContent} onChange={(e) => setEventContent(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void addClientEvent(); }} placeholder="Ex.: comprador pediu retorno na sexta-feira" className="flex-1 min-w-0 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
-              <button type="button" onClick={() => void addClientEvent()} className="px-3 py-2 rounded-lg bg-[#1A1A72] hover:bg-[#0B1E38] text-white text-xs font-bold">Registrar</button>
-            </div>
-          </Section>
-
-          <Section title={`Linha do tempo (${timeline.length})`} icon="timeline">
-            {timeline.length === 0 ? <EmptyLine text="Ainda não há eventos vinculados a este cliente." /> : (
-              <div className="relative ml-2 border-l border-slate-200 pl-4 space-y-3">
-                {timeline.map((event) => (
-                  <div key={event.id} className="relative min-w-0">
-                    <span className={`absolute -left-[1.65rem] top-0.5 w-5 h-5 rounded-full flex items-center justify-center ${event.tone}`}><span className="material-symbols-outlined text-[13px]">{event.icon}</span></span>
-                    <div className="flex items-baseline justify-between gap-3"><p className="font-semibold text-slate-800 truncate">{event.title}</p><span className="shrink-0 text-[10px] font-data-mono text-slate-400">{event.date || 'Sem data'}</span></div>
-                    <p className="text-[10px] uppercase tracking-wide text-slate-400 mt-0.5">{event.type}</p>
-                    <p className="text-[11px] text-slate-500 truncate">{event.detail}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Section>
-
-          {/* Dados cadastrais + contatos */}
-          <Section title="Dados cadastrais" icon="badge">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 bg-slate-50 border border-slate-200 rounded-lg p-3 font-data-mono">
-              <div><strong className="text-slate-900">Endereço:</strong> {client.address}</div>
-              <div><strong className="text-slate-900">Última OS:</strong> {client.lastOSDate} ({client.lastOSType})</div>
-            </div>
-            {client.contacts && client.contacts.length > 0 && (
-              <div className="mt-2 space-y-1.5">
-                {client.contacts.map((ct, i) => (
-                  <div key={i} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 border border-slate-100 rounded-lg px-3 py-2">
-                    <span className="font-semibold text-slate-900">{ct.name}</span>
-                    <span className="text-slate-400">·</span>
-                    <span className="text-slate-500">{ct.role}</span>
-                    {ct.phone && <><span className="text-slate-300">|</span><span className="font-data-mono text-slate-600">{ct.phone}</span></>}
-                    {ct.email && <><span className="text-slate-300">|</span><span className="font-data-mono text-slate-600">{ct.email}</span></>}
-                  </div>
-                ))}
-              </div>
-            )}
-          </Section>
-
-          {/* Contratos */}
-          <Section title={`Contratos (${data.clientContracts.length})`} icon="description" onAction={() => onNavigateToTab('contratos')} actionLabel="Ir para Contratos">
-            {data.clientContracts.length === 0 ? (
-              <EmptyLine text="Nenhum contrato vinculado a este cliente." />
-            ) : (
-              <div className="flex flex-col gap-2">
-                {data.clientContracts.map((c) => (
-                  <div key={c.id} className="flex items-center justify-between border border-slate-100 rounded-lg px-3 py-2">
-                    <div className="min-w-0">
-                      <p className="font-data-mono text-[11px] text-slate-400">{c.id}</p>
-                      <p className="font-semibold text-slate-800 truncate">{c.contractType || c.unit}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="font-data-mono font-bold text-emerald-600">{brlM(c.monthlyValue)}<span className="text-[10px] text-slate-400">/mês</span></p>
-                      <Badge color={c.status === 'ATIVO' ? 'emerald' : c.status === 'A VENCER' ? 'amber' : 'red'}>{c.status}</Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Section>
-
-          {/* Propostas / Pedidos */}
-          <Section title={`Propostas & Pedidos (${data.propostasAceitas.length + data.propostasAbertas.length + data.propostasCanceladas.length})`} icon="receipt_long" onAction={() => onNavigateToTab('pedidos')} actionLabel="Ir para Pedidos">
-            <ProposalGroup title="Aceitos / Realizados" color="emerald" list={data.propostasAceitas} brlM={brlM} />
-            <ProposalGroup title="Em aberto" color="amber" list={data.propostasAbertas} brlM={brlM} />
-            <ProposalGroup title="Recusados / Cancelados" color="red" list={data.propostasCanceladas} brlM={brlM} />
-            {data.propostasAceitas.length + data.propostasAbertas.length + data.propostasCanceladas.length === 0 && (
-              <EmptyLine text="Nenhuma proposta registrada para este cliente." />
-            )}
-          </Section>
-
-          {/* Ordens de Serviço */}
-          <Section title={`Ordens de Serviço (${data.osRealizadas.length + data.osAndamento.length + data.osCanceladas.length})`} icon="engineering">
-            <OSGroup title="Realizadas" color="emerald" list={data.osRealizadas} brlM={brlM} />
-            <OSGroup title="Em andamento / abertas" color="amber" list={data.osAndamento} brlM={brlM} />
-            <OSGroup title="Atrasadas / canceladas" color="red" list={data.osCanceladas} brlM={brlM} />
-            {data.osRealizadas.length + data.osAndamento.length + data.osCanceladas.length === 0 && (
-              <EmptyLine text="Nenhuma ordem de serviço para este cliente." />
-            )}
-          </Section>
-
-          <Section title={`Histórico técnico (${clientReports.length} relatórios · ${clientPendencias.length} pendências)`} icon="history" onAction={() => onNavigateToTab('relatorios')} actionLabel="Ver relatórios">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <div className="border border-slate-100 rounded-lg p-3"><p className="text-[10px] font-bold uppercase text-slate-400 mb-2">Relatórios</p>{clientReports.length ? clientReports.slice(0, 4).map((report) => <div key={report.id} className="py-1.5 border-b border-slate-50 last:border-0"><p className="font-semibold text-slate-800 truncate">{report.titulo || report.numero || report.tipo}</p><p className="text-[10px] text-slate-400">{report.tipo} · {report.status}</p></div>) : <p className="text-xs text-slate-400">Nenhum relatório disponível.</p>}</div>
-              <div className="border border-slate-100 rounded-lg p-3"><p className="text-[10px] font-bold uppercase text-slate-400 mb-2">Pendências</p>{clientPendencias.length ? clientPendencias.slice(0, 4).map((pendencia) => <div key={pendencia.id} className="py-1.5 border-b border-slate-50 last:border-0"><p className="font-semibold text-slate-800 truncate">{pendencia.descricao || pendencia.grupo || 'Pendência técnica'}</p><p className="text-[10px] text-slate-400">{pendencia.status}</p></div>) : <p className="text-xs text-slate-400">Nenhuma pendência disponível.</p>}</div>
-            </div>
-          </Section>
-
-          {/* Receitas */}
-          <Section title={`Receitas (${data.clientReceitas.length})`} icon="trending_up" onAction={() => onNavigateToTab('receitas')} actionLabel="Ir para Receitas">
-            {data.clientReceitas.length === 0 ? (
-              <EmptyLine text="Nenhum lançamento de receita para este cliente." />
-            ) : (
-              <div className="flex flex-col gap-2">
-                {data.clientReceitas.map((t) => (
-                  <div key={t.id} className="flex items-center justify-between border border-slate-100 rounded-lg px-3 py-2">
-                    <div className="min-w-0">
-                      <p className="font-data-mono text-[11px] text-slate-400">{t.id} · {t.date}</p>
-                      <p className="font-semibold text-slate-800 truncate">{t.description}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="font-data-mono font-bold text-emerald-600">{brlM(t.amount)}</p>
-                      <Badge color={t.status === 'CONFIRMADO' ? 'emerald' : t.status === 'PENDENTE' ? 'amber' : 'red'}>{t.status}</Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Section>
-        </div>
-
-        {/* Rodapé de ações */}
-        <div className="flex gap-2 p-4 border-t border-slate-100">
-          <button
-            onClick={() => onOpenReport(client.name)}
-            className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 rounded-lg text-xs uppercase transition-colors"
-          >
-            Abrir Relatório Técnico SDAI
-          </button>
-          <button
-            onClick={() => setShowDevices(true)}
-            className="px-4 border border-[#1A1A72] text-[#1A1A72] hover:bg-[#1A1A72] hover:text-white font-semibold rounded-lg text-xs uppercase transition-colors flex items-center gap-1"
-          >
-            <span className="material-symbols-outlined text-base">memory</span> Dispositivos
-          </button>
-          <button
-            onClick={onClose}
-            className="px-4 border border-slate-200 text-slate-700 font-semibold rounded-lg text-xs hover:bg-slate-50 transition-colors uppercase"
-          >
-            Fechar
-          </button>
-        </div>
-      </div>
-
-      <DevicesManager
-        open={showDevices}
-        onClose={() => setShowDevices(false)}
-        clienteId={client.id}
-        clienteNome={client.name}
-        fabricantes={fabricantes}
-        suppliers={suppliers}
-        inventory={inventory}
-        onAddFabricante={onAddFabricante}
-      />
-    </div>
-  );
-};
-
-/* ============================ Subcomponentes ============================ */
-
-const SummaryTile: React.FC<{ label: string; value: string; tone: 'brand' | 'emerald' | 'amber' | 'slate' }> = ({ label, value, tone }) => {
-  const toneCls =
-    tone === 'brand' ? 'text-[#1A1A72]' : tone === 'emerald' ? 'text-emerald-600' : tone === 'amber' ? 'text-amber-600' : 'text-slate-900';
-  return (
-    <div className="bg-white border border-slate-200 rounded-lg p-3">
-      <p className="text-[10px] text-slate-400 uppercase tracking-wider">{label}</p>
-      <p className={`font-data-mono text-base font-bold mt-1 ${toneCls}`}>{value}</p>
-    </div>
-  );
-};
-
-const Section: React.FC<{
-  title: string;
-  icon: string;
-  children: React.ReactNode;
-  onAction?: () => void;
-  actionLabel?: string;
-}> = ({ title, icon, children, onAction, actionLabel }) => (
-  <div>
-    <div className="flex items-center justify-between mb-2">
-      <h4 className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-        <span className="material-symbols-outlined text-base text-slate-400">{icon}</span>
-        {title}
-      </h4>
-      {onAction && actionLabel && (
-        <button onClick={onAction} className="text-[10px] font-semibold text-[#1A1A72] hover:text-[#E63946] uppercase tracking-wider">
-          {actionLabel} →
-        </button>
-      )}
-    </div>
-    {children}
-  </div>
-);
-
-const EmptyLine: React.FC<{ text: string }> = ({ text }) => (
-  <p className="text-[11px] text-slate-400 italic px-1 py-2">{text}</p>
-);
-
-const ProposalGroup: React.FC<{ title: string; color: 'emerald' | 'amber' | 'red'; list: Pedido[]; brlM: (n: number) => string }> = ({ title, color, list, brlM }) => {
-  if (list.length === 0) return null;
-  return (
-    <div className="mb-2">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">{title} · {list.length}</p>
-      <div className="flex flex-col gap-1.5">
-        {list.map((p) => (
-          <div key={p.id} className="flex items-center justify-between border border-slate-100 rounded-lg px-3 py-2">
-            <div className="min-w-0">
-              <p className="font-data-mono text-[11px] text-slate-400">{p.numeroPedido}</p>
-              <p className="font-semibold text-slate-800 truncate">{p.referencia || 'Proposta comercial'}</p>
-            </div>
-            <div className="text-right shrink-0">
-              <p className="font-data-mono font-bold text-slate-900">{brlM(p.proposal?.valorTotal || 0)}</p>
-              <Badge color={color}>{proposalStatusLabel[p.status]}</Badge>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const OSGroup: React.FC<{ title: string; color: 'emerald' | 'amber' | 'red'; list: OrdemServico[]; brlM: (n: number) => string }> = ({ title, color, list }) => {
-  if (list.length === 0) return null;
-  return (
-    <div className="mb-2">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">{title} · {list.length}</p>
-      <div className="flex flex-col gap-1.5">
-        {list.map((o) => (
-          <div key={o.id} className="flex items-center justify-between border border-slate-100 rounded-lg px-3 py-2">
-            <div className="min-w-0">
-              <p className="font-data-mono text-[11px] text-slate-400">{o.numero || o.id}{o.dataPrevista ? ` · ${o.dataPrevista}` : ''}</p>
-              <p className="font-semibold text-slate-800 truncate">{o.titulo || 'Ordem de serviço'}</p>
-            </div>
-            <div className="text-right shrink-0">
-              <Badge color={OS_STATUS_UI[o.status].color === 'blue' ? 'slate' : color}>{OS_STATUS_UI[o.status].label}</Badge>
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 };
