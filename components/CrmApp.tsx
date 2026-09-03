@@ -1211,6 +1211,7 @@ export function CrmApp({
               onNavigateToTab={setCurrentTab}
               onNewOSClick={handleNewOSQuick}
               onNewAtendimento={handleNewAtendimento}
+              usesTimeClock={usesTimeClock}
             />
           )}
           {currentTab === 'painel' && userRole !== 'TECNICO' && (

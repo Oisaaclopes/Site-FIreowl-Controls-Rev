@@ -15,7 +15,7 @@ import { uploadCertificate, signedDocUrl } from '@/lib/storage';
 import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 import { fetchTimeClockParticipants } from '@/lib/users';
 import { TimecardPDFView } from '@/components/documentos/TimecardPDFView';
-import { nextPunchType, buildPunch } from '@/lib/pontoActions';
+import { derivePunchState, buildPunch, PUNCH_SHORT } from '@/lib/pontoActions';
 import { effectivePunchLabel } from '@/lib/effectivePunches';
 import type { TimecardBlock } from '@/components/documentos/TimecardDocument';
 import {
@@ -57,7 +57,6 @@ const FEEDBACK_LABEL: Record<PunchType, string> = {
 const pad2 = (n: number) => n.toString().padStart(2, '0');
 const fmtClock = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
 const fmtHM = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-const sameDay = (a: number, b: number) => new Date(a).toDateString() === new Date(b).toDateString();
 const fmtDuration = (ms: number) => {
   const totalMin = Math.max(0, Math.floor(ms / 60000));
   return `${pad2(Math.floor(totalMin / 60))}h${pad2(totalMin % 60)}min`;
@@ -326,25 +325,11 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
     };
   }, []);
 
-  // Batidas de HOJE do usuário logado (apenas registros com epoch)
+  // Batidas de HOJE do usuário logado (estado canônico compartilhado com o
+  // Painel do Técnico — mesma regra de sequência e mesmas batidas efetivas).
   const nowMs = now.getTime();
-  const todays = useMemo(
-    () =>
-      punches
-        .filter((p) => p.employeeName === currentUser && p.at && sameDay(p.at, nowMs))
-        .sort((a, b) => (a.at || 0) - (b.at || 0)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [punches, currentUser, new Date(nowMs).toDateString()]
-  );
-
-  const byType = (t: PunchType) => todays.find((p) => p.type === t);
-  const entrada = byType('ENTRADA');
-  const almoco = byType('PAUSA');
-  const retorno = byType('RETORNO');
-  const saida = byType('SAIDA');
-
-  // Próxima batida da sequência (regra compartilhada em lib/pontoActions).
-  const nextType: PunchType | null = nextPunchType(punches, currentUser, nowMs);
+  const punchState = derivePunchState(punches, currentUser, nowMs);
+  const { todays, entrada, almoco, retorno, saida, nextType } = punchState;
 
   // Horas trabalhadas (manhã + tarde)
   let workedMs = 0;
@@ -357,14 +342,14 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
     workedMs += Math.max(0, bEnd - retorno.at);
   }
 
-  // Status da jornada
-  const status = !entrada
-    ? { label: 'Fora do expediente', dot: 'bg-blue-500', badge: 'blue' as const }
-    : almoco && !retorno
-    ? { label: 'Em almoço', dot: 'bg-amber-500', badge: 'amber' as const }
-    : saida
-    ? { label: 'Jornada encerrada', dot: 'bg-slate-400', badge: 'slate' as const }
-    : { label: 'Trabalhando', dot: 'bg-emerald-500', badge: 'emerald' as const };
+  // Apresentação do status (cor/dot) a partir do estado canônico.
+  const STATUS_UI = {
+    FORA: { dot: 'bg-blue-500', badge: 'blue' as const },
+    ALMOCO: { dot: 'bg-amber-500', badge: 'amber' as const },
+    ENCERRADA: { dot: 'bg-slate-400', badge: 'slate' as const },
+    TRABALHANDO: { dot: 'bg-emerald-500', badge: 'emerald' as const },
+  } as const;
+  const status = { label: punchState.statusLabel, ...STATUS_UI[punchState.statusKind] };
 
   const punchTime = (p?: TimePunch) => (p?.at ? fmtHM(new Date(p.at)) : '--');
 
@@ -979,7 +964,9 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
       {/* Atalhos rápidos */}
       <div className="flex flex-wrap gap-2">
         {[
-          { id: 'card-jornada', label: 'Registrar', icon: 'touch_app' },
+          // "Registrar" é redundante no mobile (o botão principal de próxima
+          // batida já está visível) — some abaixo de md.
+          { id: 'card-jornada', label: 'Registrar', icon: 'touch_app', mobileHidden: true },
           { id: 'card-timeline', label: 'Histórico', icon: 'timeline' },
           { id: 'card-banco', label: 'Banco de Horas', icon: 'savings' },
           { id: 'card-registros', label: 'Registros', icon: 'fact_check' },
@@ -987,7 +974,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
           <button
             key={s.id}
             onClick={() => shortcut(s.id)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-surface text-fg-secondary hover:border-primary hover:text-primary text-xs font-semibold transition-colors"
+            className={`items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-surface text-fg-secondary hover:border-primary hover:text-primary text-xs font-semibold transition-colors ${s.mobileHidden ? 'hidden md:inline-flex' : 'inline-flex'}`}
           >
             <span className="material-symbols-outlined text-base">{s.icon}</span>
             {s.label}
@@ -1001,7 +988,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
             value={myMonth}
             onChange={(e) => setMyMonth(e.target.value || myMonth)}
             title="Período do espelho de ponto"
-            className="border border-border rounded-lg px-2 py-1.5 text-xs text-fg-secondary bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="min-w-[9.5rem] border border-border rounded-lg px-2 py-1.5 text-xs text-fg-secondary bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
           <button
             onClick={openMyTimecard}
@@ -1083,8 +1070,9 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
             </Badge>
           </div>
 
-          {/* Marcos da jornada */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
+          {/* Marcos da jornada — grade completa apenas no desktop. No mobile a
+              tela é orientada à próxima ação (bloco md:hidden abaixo). */}
+          <div className="hidden md:grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
             {[
               { label: 'Entrada', p: entrada },
               { label: 'Almoço', p: almoco },
@@ -1098,6 +1086,22 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
                 </p>
               </div>
             ))}
+          </div>
+
+          {/* Mobile: última marca relevante + próxima batida (foco na ação) */}
+          <div className="md:hidden mt-4 space-y-2.5">
+            {punchState.lastRelevant && punchState.statusKind !== 'FORA' && (
+              <div className="flex items-center justify-between rounded-lg bg-surface-2 border border-border px-3 py-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-fg-muted">
+                  {PUNCH_SHORT[punchState.lastRelevant.type]}
+                </span>
+                <span className="font-data-mono text-base font-bold text-fg">{punchTime(punchState.lastRelevant)}</span>
+              </div>
+            )}
+            <div className="text-center">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-fg-muted">Próxima batida</p>
+              <p className="text-lg font-bold text-fg">{nextType ? PUNCH_SHORT[nextType] : 'Nenhuma batida pendente'}</p>
+            </div>
           </div>
 
           {/* Previsto x trabalhado */}
@@ -1444,8 +1448,8 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
       <div id="card-registros">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 mb-3">
           <h3 className="text-xs font-bold text-fg-secondary uppercase tracking-wider">Registros recentes de frequência</h3>
-          <div className="grid grid-cols-3 gap-2 w-full sm:w-auto">
-            <input aria-label="Mês dos registros" type="month" value={recordPeriod} onChange={(e) => setRecordPeriod(e.target.value)} className="min-w-0 border border-border rounded-lg px-2 py-2 text-[11px]" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 w-full sm:w-auto">
+            <input aria-label="Mês dos registros" type="month" value={recordPeriod} onChange={(e) => setRecordPeriod(e.target.value)} className="col-span-2 sm:col-span-1 min-w-0 border border-border rounded-lg px-2 py-2 text-[11px]" />
             <select aria-label="Tipo de batida" value={recordType} onChange={(e) => setRecordType(e.target.value as 'TODOS' | PunchType)} className="min-w-0 border border-border rounded-lg px-2 py-2 text-[11px]"><option value="TODOS">Tipos</option><option value="ENTRADA">Entrada</option><option value="PAUSA">Almoço</option><option value="RETORNO">Retorno</option><option value="SAIDA">Saída</option></select>
             <select aria-label="Situação da localização" value={recordGps} onChange={(e) => setRecordGps(e.target.value as 'TODOS' | 'COM_GPS' | 'SEM_GPS')} className="min-w-0 border border-border rounded-lg px-2 py-2 text-[11px]"><option value="TODOS">Localização</option><option value="COM_GPS">Com GPS</option><option value="SEM_GPS">Sem GPS</option></select>
           </div>

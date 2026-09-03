@@ -32,6 +32,74 @@ export function nextPunchType(punches: TimePunch[], employeeName: string, nowMs:
   return !has('ENTRADA') ? 'ENTRADA' : !has('PAUSA') ? 'PAUSA' : !has('RETORNO') ? 'RETORNO' : !has('SAIDA') ? 'SAIDA' : null;
 }
 
+/** Rótulo curto do TIPO da próxima batida (para o texto "Próxima batida"). */
+export const PUNCH_SHORT: Record<PunchType, string> = {
+  ENTRADA: 'Entrada',
+  PAUSA: 'Saída para almoço',
+  RETORNO: 'Retorno do almoço',
+  SAIDA: 'Saída',
+};
+
+export type PunchStatusKind = 'FORA' | 'TRABALHANDO' | 'ALMOCO' | 'ENCERRADA';
+
+export interface PunchDayState {
+  /** Batidas de HOJE do funcionário, ordenadas por horário (efetivas). */
+  todays: TimePunch[];
+  /** Marcas do dia (batidas efetivas — ajustes aprovados já vêm aplicados na fonte). */
+  entrada?: TimePunch;
+  almoco?: TimePunch;
+  retorno?: TimePunch;
+  saida?: TimePunch;
+  /** Próxima batida esperada (null = jornada encerrada). */
+  nextType: PunchType | null;
+  statusKind: PunchStatusKind;
+  statusLabel: string;
+  /** Última marca relevante do dia (para exibição compacta). */
+  lastRelevant?: TimePunch;
+}
+
+const STATUS_LABEL: Record<PunchStatusKind, string> = {
+  FORA: 'Fora do expediente',
+  TRABALHANDO: 'Em jornada',
+  ALMOCO: 'Em almoço',
+  ENCERRADA: 'Jornada encerrada',
+};
+
+/**
+ * Estado canônico da jornada de HOJE — fonte única consumida por PontoView e
+ * pelo Painel do Técnico. NÃO recalcula ponto nem regras de jornada: apenas
+ * deriva o estado da sequência a partir das batidas efetivas recebidas.
+ */
+export function derivePunchState(punches: TimePunch[], employeeName: string, nowMs: number): PunchDayState {
+  const todays = punches
+    .filter((p) => p.employeeName === employeeName && p.at && sameDay(p.at!, nowMs))
+    .sort((a, b) => (a.at || 0) - (b.at || 0));
+  const byType = (t: PunchType) => todays.find((p) => p.type === t);
+  const entrada = byType('ENTRADA');
+  const almoco = byType('PAUSA');
+  const retorno = byType('RETORNO');
+  const saida = byType('SAIDA');
+  const nextType = nextPunchType(punches, employeeName, nowMs);
+  const statusKind: PunchStatusKind = !entrada
+    ? 'FORA'
+    : almoco && !retorno
+    ? 'ALMOCO'
+    : saida
+    ? 'ENCERRADA'
+    : 'TRABALHANDO';
+  return {
+    todays,
+    entrada,
+    almoco,
+    retorno,
+    saida,
+    nextType,
+    statusKind,
+    statusLabel: STATUS_LABEL[statusKind],
+    lastRelevant: saida || retorno || almoco || entrada,
+  };
+}
+
 /** Constrói a batida (mesma estrutura do PontoView). Não inventa localização. */
 export function buildPunch(
   type: PunchType,
