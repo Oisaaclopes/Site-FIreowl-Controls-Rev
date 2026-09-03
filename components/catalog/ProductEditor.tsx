@@ -11,13 +11,13 @@ const AREAS = ['SDAI', 'CFTV', 'ALARME', 'BMS'];
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</span>
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-fg-secondary">{label}</span>
       <div className="mt-1">{children}</div>
     </label>
   );
 }
 
-const input = 'w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[#1A1A72]';
+const input = 'w-full border border-border-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:border-primary';
 
 /**
  * Formulário de cadastro/edição de produto. Taxonomia canônica como fonte
@@ -102,10 +102,10 @@ export function ProductEditor({ initial, tree, suppliers, onClose, onSave }: {
   return (
     <div className="fixed inset-0 z-[60] flex justify-end">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <form onSubmit={submit} className="relative w-full sm:max-w-md bg-white h-full overflow-y-auto shadow-2xl flex flex-col" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        <div className="sticky top-0 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between z-10">
-          <p className="text-base font-bold text-[#1A1A72]">{editing ? 'Editar produto' : 'Novo produto'}</p>
-          <button type="button" onClick={onClose} aria-label="Fechar" className="h-9 w-9 flex items-center justify-center rounded-md text-slate-400 hover:text-[#E63946]"><span className="material-symbols-outlined">close</span></button>
+      <form onSubmit={submit} className="relative w-full sm:max-w-md bg-surface h-full overflow-y-auto shadow-2xl flex flex-col" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <div className="sticky top-0 bg-surface border-b border-border px-4 py-3 flex items-center justify-between z-10">
+          <p className="text-base font-bold text-primary">{editing ? 'Editar produto' : 'Novo produto'}</p>
+          <button type="button" onClick={onClose} aria-label="Fechar" className="h-9 w-9 flex items-center justify-center rounded-md text-fg-muted hover:text-danger"><span className="material-symbols-outlined">close</span></button>
         </div>
 
         <div className="flex flex-col gap-3 p-4">
@@ -135,7 +135,7 @@ export function ProductEditor({ initial, tree, suppliers, onClose, onSave }: {
             <datalist id="supplier-list">{suppliers.map((s) => <option key={s} value={s} />)}</datalist>
           </Field>
 
-          <label className="flex items-center gap-2 text-sm font-semibold text-slate-600">
+          <label className="flex items-center gap-2 text-sm font-semibold text-fg-secondary">
             <input type="checkbox" checked={stockManaged} onChange={(e) => setStockManaged(e.target.checked)} />
             Controla estoque físico (desmarque para “somente catálogo”)
           </label>
@@ -151,17 +151,17 @@ export function ProductEditor({ initial, tree, suppliers, onClose, onSave }: {
             <Field label="Custo (R$)"><input type="number" min={0} step="0.01" className={input} value={costPrice} onChange={(e) => setCostPrice(e.target.value === '' ? '' : Number(e.target.value))} /></Field>
             <Field label="Preço de venda (R$)"><input type="number" min={0} step="0.01" className={input} value={salePrice} onChange={(e) => setSalePrice(e.target.value === '' ? '' : Number(e.target.value))} /></Field>
           </div>
-          <div className="flex items-center gap-3 flex-wrap text-[11px] font-semibold text-slate-500 bg-slate-50 rounded-lg px-3 py-2">
+          <div className="flex items-center gap-3 flex-wrap text-[11px] font-semibold text-fg-secondary bg-surface-2 rounded-lg px-3 py-2">
             <span>Lucro: <b className="text-emerald-700">{moneyOrDash(profit)}</b></span>
             <span>Margem: <b>{percentOrDash(margin)}</b></span>
             <span>Markup: <b>{ratioOrDash(markup)}</b></span>
           </div>
 
-          {err && <p role="alert" className="text-xs font-semibold text-[#E63946]">{err}</p>}
+          {err && <p role="alert" className="text-xs font-semibold text-danger">{err}</p>}
         </div>
 
-        <div className="sticky bottom-0 bg-white border-t border-slate-200 px-4 py-3 mt-auto">
-          <button type="submit" disabled={saving} className="w-full bg-[#E63946] hover:bg-[#a51515] text-white text-sm font-bold py-2.5 rounded-lg uppercase tracking-wide disabled:opacity-60">
+        <div className="sticky bottom-0 bg-surface border-t border-border px-4 py-3 mt-auto">
+          <button type="submit" disabled={saving} className="w-full bg-danger hover:bg-danger-hover text-white text-sm font-bold py-2.5 rounded-lg uppercase tracking-wide disabled:opacity-60">
             {saving ? 'Salvando…' : editing ? 'Salvar alterações' : 'Cadastrar produto'}
           </button>
         </div>

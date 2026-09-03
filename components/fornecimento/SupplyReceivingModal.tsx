@@ -139,25 +139,25 @@ export const SupplyReceivingModal: React.FC<Props> = ({ order, inventory, curren
     }
   };
 
-  const th = 'text-[10px] font-bold uppercase tracking-wide text-slate-400 px-2 py-1 text-left';
-  const td = 'px-2 py-1.5 text-xs text-slate-700';
-  const inputMini = 'w-16 border border-slate-300 rounded px-1.5 py-1 text-xs text-right font-data-mono';
+  const th = 'text-[10px] font-bold uppercase tracking-wide text-fg-muted px-2 py-1 text-left';
+  const td = 'px-2 py-1.5 text-xs text-fg-secondary';
+  const inputMini = 'w-16 border border-border-strong rounded px-1.5 py-1 text-xs text-right font-data-mono';
 
   return (
     <div className="fixed inset-0 z-[60] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5">
-      <div className="bg-white w-full max-w-3xl rounded-2xl border border-slate-200 shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
-        <div className="bg-[#0B1E38] text-white p-4 px-5 flex items-center justify-between shrink-0">
+      <div className="bg-surface w-full max-w-3xl rounded-2xl border border-border shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
+        <div className="bg-navy-3 text-white p-4 px-5 flex items-center justify-between shrink-0">
           <div>
             <h3 className="text-sm font-bold uppercase tracking-wide">Registrar recebimento</h3>
-            <p className="text-[11px] text-slate-300">{order.id} · {order.clientName}</p>
+            <p className="text-[11px] text-fg-muted">{order.id} · {order.clientName}</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white p-1"><span className="material-symbols-outlined">close</span></button>
+          <button onClick={onClose} className="text-fg-muted hover:text-white p-1"><span className="material-symbols-outlined">close</span></button>
         </div>
 
         {/* stepper */}
-        <div className="flex items-center gap-2 px-5 py-2 border-b border-slate-200 text-[10px] font-bold uppercase tracking-wide shrink-0">
+        <div className="flex items-center gap-2 px-5 py-2 border-b border-border text-[10px] font-bold uppercase tracking-wide shrink-0">
           {(['receber', 'conferencia', 'entrada'] as const).map((s, i) => (
-            <span key={s} className={`px-2 py-0.5 rounded ${step === s || (step === 'done' && s === 'entrada') ? 'bg-[#0B1E38] text-white' : 'text-slate-400'}`}>{i + 1}. {s === 'receber' ? 'Receber' : s === 'conferencia' ? 'Conferência' : 'Entrada'}</span>
+            <span key={s} className={`px-2 py-0.5 rounded ${step === s || (step === 'done' && s === 'entrada') ? 'bg-navy-3 text-white' : 'text-fg-muted'}`}>{i + 1}. {s === 'receber' ? 'Receber' : s === 'conferencia' ? 'Conferência' : 'Entrada'}</span>
           ))}
         </div>
 
@@ -165,24 +165,24 @@ export const SupplyReceivingModal: React.FC<Props> = ({ order, inventory, curren
           {erro && <div className="mb-3 text-xs bg-red-50 border border-red-200 text-red-700 rounded-lg p-2.5">{erro}</div>}
           {!online && <div className="mb-3 text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-2.5">Sem conexão com o servidor. A entrada no estoque exige internet.</div>}
           {receipts === null && online ? (
-            <p className="text-xs text-slate-400">Carregando…</p>
+            <p className="text-xs text-fg-muted">Carregando…</p>
           ) : step === 'receber' ? (
             <>
               <div className="mb-3">
-                <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Fornecedor (deste recebimento)</label>
-                <input value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} placeholder="Nome do fornecedor" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                <label className="block text-[10px] font-bold uppercase text-fg-secondary mb-1">Fornecedor (deste recebimento)</label>
+                <input value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} placeholder="Nome do fornecedor" className="w-full border border-border-strong rounded-lg px-3 py-2 text-sm" />
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[520px]">
-                  <thead><tr className="border-b border-slate-200"><th className={th}>Produto</th><th className={th}>Pedido</th><th className={th}>Recebido</th><th className={th}>Pendente</th><th className={th}>Estoque</th><th className={th}>Receber agora</th></tr></thead>
+                  <thead><tr className="border-b border-border"><th className={th}>Produto</th><th className={th}>Pedido</th><th className={th}>Recebido</th><th className={th}>Pendente</th><th className={th}>Estoque</th><th className={th}>Receber agora</th></tr></thead>
                   <tbody>
                     {rows.map((r) => (
-                      <tr key={r.key} className="border-b border-slate-100">
-                        <td className={td}><div className="font-semibold text-slate-800">{r.descricao}</div>{!r.vinculado && <span className="text-[10px] text-amber-600">não vinculado ao estoque</span>}</td>
+                      <tr key={r.key} className="border-b border-border">
+                        <td className={td}><div className="font-semibold text-fg">{r.descricao}</div>{!r.vinculado && <span className="text-[10px] text-amber-600">não vinculado ao estoque</span>}</td>
                         <td className={`${td} text-center font-data-mono`}>{r.pedido}</td>
-                        <td className={`${td} text-center font-data-mono text-slate-400`}>{r.recebidoAntes}</td>
+                        <td className={`${td} text-center font-data-mono text-fg-muted`}>{r.recebidoAntes}</td>
                         <td className={`${td} text-center font-data-mono font-bold`}>{r.pendente}</td>
-                        <td className={`${td} text-center font-data-mono text-slate-400`}>{r.estoqueAtual ?? '—'}</td>
+                        <td className={`${td} text-center font-data-mono text-fg-muted`}>{r.estoqueAtual ?? '—'}</td>
                         <td className={`${td} text-right`}><input type="number" min={0} value={r.receberAgora} onChange={(e) => set(r.key, { receberAgora: Math.max(0, Number(e.target.value) || 0) })} className={`${inputMini} ${excedente(r.pendente, r.receberAgora) > 0 ? 'border-amber-400 bg-amber-50' : ''}`} /></td>
                       </tr>
                     ))}
@@ -193,21 +193,21 @@ export const SupplyReceivingModal: React.FC<Props> = ({ order, inventory, curren
             </>
           ) : step === 'conferencia' ? (
             <div className="space-y-3">
-              <p className="text-[11px] text-slate-500">Confira o que foi aceito e o que foi rejeitado. <b>Aceito + Rejeitado = Recebido.</b></p>
+              <p className="text-[11px] text-fg-secondary">Confira o que foi aceito e o que foi rejeitado. <b>Aceito + Rejeitado = Recebido.</b></p>
               {receberRows.map((r) => {
                 const ok = validaConferencia(r.receberAgora, r.aceito, r.rejeitado);
                 return (
-                  <div key={r.key} className="rounded-lg border border-slate-200 p-3">
+                  <div key={r.key} className="rounded-lg border border-border p-3">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold text-slate-800">{r.descricao}</p>
-                      <span className="text-[10px] font-data-mono text-slate-400">Recebido: {r.receberAgora}</span>
+                      <p className="text-xs font-bold text-fg">{r.descricao}</p>
+                      <span className="text-[10px] font-data-mono text-fg-muted">Recebido: {r.receberAgora}</span>
                     </div>
                     {!r.vinculado && <p className="text-[10px] text-amber-600 mt-0.5">Produto não vinculado ao estoque — será registrado no recebimento, mas não dará entrada até ser vinculado.</p>}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 items-end">
-                      <div><label className="block text-[9px] uppercase text-slate-400 mb-0.5">Aceito</label><input type="number" min={0} value={r.aceito} onChange={(e) => set(r.key, { aceito: Math.max(0, Number(e.target.value) || 0) })} className={`${inputMini} w-full`} /></div>
-                      <div><label className="block text-[9px] uppercase text-slate-400 mb-0.5">Rejeitado</label><input type="number" min={0} value={r.rejeitado} onChange={(e) => set(r.key, { rejeitado: Math.max(0, Number(e.target.value) || 0) })} className={`${inputMini} w-full`} /></div>
-                      <div><label className="block text-[9px] uppercase text-slate-400 mb-0.5">Custo un.</label><input type="number" min={0} step="0.01" value={r.custo ?? ''} onChange={(e) => set(r.key, { custo: e.target.value === '' ? undefined : Number(e.target.value) })} className={`${inputMini} w-full`} /></div>
-                      {r.rejeitado > 0 && <div><label className="block text-[9px] uppercase text-slate-400 mb-0.5">Motivo</label><select value={r.motivo || ''} onChange={(e) => set(r.key, { motivo: (e.target.value || undefined) as RejectionReason })} className="w-full border border-slate-300 rounded px-1 py-1 text-xs"><option value="">—</option>{REJEITO_MOTIVOS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select></div>}
+                      <div><label className="block text-[9px] uppercase text-fg-muted mb-0.5">Aceito</label><input type="number" min={0} value={r.aceito} onChange={(e) => set(r.key, { aceito: Math.max(0, Number(e.target.value) || 0) })} className={`${inputMini} w-full`} /></div>
+                      <div><label className="block text-[9px] uppercase text-fg-muted mb-0.5">Rejeitado</label><input type="number" min={0} value={r.rejeitado} onChange={(e) => set(r.key, { rejeitado: Math.max(0, Number(e.target.value) || 0) })} className={`${inputMini} w-full`} /></div>
+                      <div><label className="block text-[9px] uppercase text-fg-muted mb-0.5">Custo un.</label><input type="number" min={0} step="0.01" value={r.custo ?? ''} onChange={(e) => set(r.key, { custo: e.target.value === '' ? undefined : Number(e.target.value) })} className={`${inputMini} w-full`} /></div>
+                      {r.rejeitado > 0 && <div><label className="block text-[9px] uppercase text-fg-muted mb-0.5">Motivo</label><select value={r.motivo || ''} onChange={(e) => set(r.key, { motivo: (e.target.value || undefined) as RejectionReason })} className="w-full border border-border-strong rounded px-1 py-1 text-xs"><option value="">—</option>{REJEITO_MOTIVOS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select></div>}
                     </div>
                     {!ok && <p className="text-[10px] text-red-600 mt-1">Aceito + Rejeitado deve somar {r.receberAgora}.</p>}
                   </div>
@@ -216,40 +216,40 @@ export const SupplyReceivingModal: React.FC<Props> = ({ order, inventory, curren
             </div>
           ) : step === 'entrada' ? (
             <div className="space-y-2">
-              <p className="text-xs text-slate-600">Você está prestes a adicionar ao estoque:</p>
+              <p className="text-xs text-fg-secondary">Você está prestes a adicionar ao estoque:</p>
               {receberRows.filter((r) => r.vinculado && r.aceito > 0).map((r) => (
                 <div key={r.key} className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-                  <span className="text-xs font-bold text-slate-800">{r.descricao}</span>
+                  <span className="text-xs font-bold text-fg">{r.descricao}</span>
                   <span className="text-sm font-data-mono font-bold text-emerald-700">+{r.aceito}</span>
                 </div>
               ))}
               {receberRows.some((r) => !r.vinculado) && <p className="text-[11px] text-amber-700">Itens não vinculados serão registrados no recebimento, mas não entram no estoque agora.</p>}
-              <p className="text-[11px] text-slate-500 mt-1">Esta operação ficará registrada no histórico de estoque e é <b>idempotente</b> (não duplica).</p>
+              <p className="text-[11px] text-fg-secondary mt-1">Esta operação ficará registrada no histórico de estoque e é <b>idempotente</b> (não duplica).</p>
             </div>
           ) : (
             <div className="text-center py-4">
               <span className="material-symbols-outlined text-4xl text-emerald-500">check_circle</span>
-              <p className="mt-2 text-sm font-bold text-slate-800">Entrada concluída</p>
+              <p className="mt-2 text-sm font-bold text-fg">Entrada concluída</p>
               <div className="mt-3 text-left text-xs space-y-1 max-w-sm mx-auto">
                 {(results || []).map((res, i) => {
                   const r = receberRows[i];
-                  return <div key={res.itemId} className="flex items-center justify-between"><span className="text-slate-600">{r?.descricao || res.itemId}</span><span className={res.error ? 'text-red-600' : res.skipped ? 'text-slate-400' : res.alreadyPosted ? 'text-amber-600' : 'text-emerald-600'}>{res.error ? 'erro' : res.skipped ? 'sem vínculo' : res.alreadyPosted ? 'já lançado' : 'entrada ok'}</span></div>;
+                  return <div key={res.itemId} className="flex items-center justify-between"><span className="text-fg-secondary">{r?.descricao || res.itemId}</span><span className={res.error ? 'text-red-600' : res.skipped ? 'text-fg-muted' : res.alreadyPosted ? 'text-amber-600' : 'text-emerald-600'}>{res.error ? 'erro' : res.skipped ? 'sem vínculo' : res.alreadyPosted ? 'já lançado' : 'entrada ok'}</span></div>;
                 })}
               </div>
             </div>
           )}
         </div>
 
-        <div className="p-4 border-t border-slate-200 bg-slate-50 flex gap-2 shrink-0">
+        <div className="p-4 border-t border-border bg-surface-2 flex gap-2 shrink-0">
           {step === 'done' ? (
-            <button onClick={onClose} className="flex-1 bg-[#0B1E38] text-white py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider">Fechar</button>
+            <button onClick={onClose} className="flex-1 bg-navy-3 text-white py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider">Fechar</button>
           ) : (
             <>
-              <button onClick={step === 'receber' ? onClose : () => setStep(step === 'entrada' ? 'conferencia' : 'receber')} className="px-4 py-2.5 text-xs font-bold uppercase text-slate-500 hover:text-slate-800">{step === 'receber' ? 'Cancelar' : 'Voltar'}</button>
+              <button onClick={step === 'receber' ? onClose : () => setStep(step === 'entrada' ? 'conferencia' : 'receber')} className="px-4 py-2.5 text-xs font-bold uppercase text-fg-secondary hover:text-fg">{step === 'receber' ? 'Cancelar' : 'Voltar'}</button>
               <div className="flex-1" />
-              {step === 'receber' && <button disabled={receberRows.length === 0} onClick={avancarReceber} className="bg-[#0B1E38] disabled:opacity-40 text-white py-2.5 px-5 rounded-lg text-xs font-bold uppercase tracking-wider">Conferir ({receberRows.length})</button>}
-              {step === 'conferencia' && <button disabled={!conferenciaOk} onClick={() => setStep('entrada')} className="bg-[#0B1E38] disabled:opacity-40 text-white py-2.5 px-5 rounded-lg text-xs font-bold uppercase tracking-wider">Revisar entrada</button>}
-              {step === 'entrada' && <button disabled={busy || !online} onClick={confirmarEntrada} className="bg-[#E63946] hover:bg-[#a51515] disabled:opacity-40 text-white py-2.5 px-5 rounded-lg text-xs font-bold uppercase tracking-wider">{busy ? 'Processando…' : 'Confirmar entrada'}</button>}
+              {step === 'receber' && <button disabled={receberRows.length === 0} onClick={avancarReceber} className="bg-navy-3 disabled:opacity-40 text-white py-2.5 px-5 rounded-lg text-xs font-bold uppercase tracking-wider">Conferir ({receberRows.length})</button>}
+              {step === 'conferencia' && <button disabled={!conferenciaOk} onClick={() => setStep('entrada')} className="bg-navy-3 disabled:opacity-40 text-white py-2.5 px-5 rounded-lg text-xs font-bold uppercase tracking-wider">Revisar entrada</button>}
+              {step === 'entrada' && <button disabled={busy || !online} onClick={confirmarEntrada} className="bg-danger hover:bg-danger-hover disabled:opacity-40 text-white py-2.5 px-5 rounded-lg text-xs font-bold uppercase tracking-wider">{busy ? 'Processando…' : 'Confirmar entrada'}</button>}
             </>
           )}
         </div>

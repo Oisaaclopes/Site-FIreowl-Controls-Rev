@@ -75,7 +75,7 @@ const QUICK_EXECUTION = ['Testado', 'Ajustado', 'Reprogramado', 'Reconfigurado',
 const QuickCorrectiveActions = ({ sectionKey, values, onChange }: { sectionKey: string; values: FormValues; onChange: (key: string, value: unknown) => void }) => {
   if (sectionKey === 'diagnostico') {
     const selected = String(values.causa || '');
-    return <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50 p-3"><p className="text-xs font-bold text-[#1A1A72] uppercase">O que foi encontrado?</p><div className="mt-2 grid grid-cols-2 gap-2">{QUICK_DIAGNOSIS.map((item) => <button key={item} type="button" onClick={() => onChange('causa', item)} className={`min-h-12 rounded-lg border px-2 text-left text-[11px] font-semibold ${selected === item ? 'border-[#1A1A72] bg-[#1A1A72] text-white' : 'border-slate-200 bg-white text-slate-700'}`}>{item}</button>)}</div></div>;
+    return <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50 p-3"><p className="text-xs font-bold text-primary uppercase">O que foi encontrado?</p><div className="mt-2 grid grid-cols-2 gap-2">{QUICK_DIAGNOSIS.map((item) => <button key={item} type="button" onClick={() => onChange('causa', item)} className={`min-h-12 rounded-lg border px-2 text-left text-[11px] font-semibold ${selected === item ? 'border-primary bg-navy text-white' : 'border-border bg-surface text-fg-secondary'}`}>{item}</button>)}</div></div>;
   }
   if (sectionKey === 'servico_executado') {
     const cards = Array.isArray(values.intervencoes) ? values.intervencoes as RepeaterCard[] : [];
@@ -84,12 +84,12 @@ const QuickCorrectiveActions = ({ sectionKey, values, onChange }: { sectionKey: 
       const first = cards[0] || { quantidade: 1 };
       onChange('intervencoes', [{ ...first, acao_executada: item }, ...cards.slice(1)]);
     };
-    return <div className="mb-4 rounded-xl border border-emerald-100 bg-emerald-50 p-3"><p className="text-xs font-bold text-emerald-800 uppercase">O que foi feito?</p><div className="mt-2 grid grid-cols-2 gap-2">{QUICK_EXECUTION.map((item) => <button key={item} type="button" onClick={() => choose(item)} className={`min-h-12 rounded-lg border px-2 text-left text-[11px] font-semibold ${current === item ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-200 bg-white text-slate-700'}`}>{item}</button>)}</div></div>;
+    return <div className="mb-4 rounded-xl border border-emerald-100 bg-emerald-50 p-3"><p className="text-xs font-bold text-emerald-800 uppercase">O que foi feito?</p><div className="mt-2 grid grid-cols-2 gap-2">{QUICK_EXECUTION.map((item) => <button key={item} type="button" onClick={() => choose(item)} className={`min-h-12 rounded-lg border px-2 text-left text-[11px] font-semibold ${current === item ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-border bg-surface text-fg-secondary'}`}>{item}</button>)}</div></div>;
   }
   if (sectionKey === 'testes') {
     const current = String(values.sistema_operante || '');
     const choices = [['Sim', '✓ Resolvido', 'border-emerald-600 bg-emerald-600'], ['Sim, com ressalvas', '⚠ Parcialmente resolvido', 'border-amber-500 bg-amber-500'], ['Não', '✕ Não resolvido', 'border-red-600 bg-red-600']];
-    return <div className="mb-4"><p className="text-xs font-bold text-slate-800 uppercase">Qual foi o resultado?</p><div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">{choices.map(([value, label, color]) => <button key={value} type="button" onClick={() => onChange('sistema_operante', value)} className={`min-h-14 rounded-xl border-2 px-3 text-left text-xs font-bold ${current === value ? `${color} text-white` : 'border-slate-200 bg-white text-slate-700'}`}>{label}</button>)}</div></div>;
+    return <div className="mb-4"><p className="text-xs font-bold text-fg uppercase">Qual foi o resultado?</p><div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">{choices.map(([value, label, color]) => <button key={value} type="button" onClick={() => onChange('sistema_operante', value)} className={`min-h-14 rounded-xl border-2 px-3 text-left text-xs font-bold ${current === value ? `${color} text-white` : 'border-border bg-surface text-fg-secondary'}`}>{label}</button>)}</div></div>;
   }
   return null;
 };
@@ -807,10 +807,10 @@ export const ReportForm: React.FC<ReportFormProps> = ({
             <span className={`material-symbols-outlined text-6xl ${offlineSaved ? 'text-amber-500' : 'text-emerald-500'}`}>
               {offlineSaved ? 'cloud_off' : 'task_alt'}
             </span>
-            <h2 className="text-lg font-bold text-slate-900 mt-2">
+            <h2 className="text-lg font-bold text-fg mt-2">
               {offlineSaved ? 'Salvo no aparelho' : 'Relatório gravado'}
             </h2>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-fg-secondary mt-1">
               {savedInfo.count} pendência{savedInfo.count === 1 ? '' : 's'} aberta{savedInfo.count === 1 ? '' : 's'} · {cliente?.name || 'cliente'}
             </p>
             {offlineSaved ? (
@@ -818,9 +818,9 @@ export const ReportForm: React.FC<ReportFormProps> = ({
                 Sem conexão agora. O relatório fica guardado com segurança e é enviado automaticamente quando a internet voltar.
               </p>
             ) : (
-              <p className="font-data-mono text-[10px] text-slate-400 mt-1">enviado</p>
+              <p className="font-data-mono text-[10px] text-fg-muted mt-1">enviado</p>
             )}
-            <button onClick={onBack} className="mt-4 px-6 py-2.5 rounded-lg bg-[#1A1A72] text-white text-xs font-semibold uppercase tracking-wide">
+            <button onClick={onBack} className="mt-4 px-6 py-2.5 rounded-lg bg-navy text-white text-xs font-semibold uppercase tracking-wide">
               Voltar à lista
             </button>
           </div>
@@ -828,31 +828,31 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       )}
 
       {/* Topo fixo: contexto operacional, progresso e geolocalização. */}
-      <div className="sticky top-16 z-20 bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
-        <button onClick={onBack} title="Sair" className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 shrink-0">
+      <div className="sticky top-16 z-20 bg-surface border-b border-border px-4 py-3 flex items-center gap-3">
+        <button onClick={onBack} title="Sair" className="w-9 h-9 rounded-lg flex items-center justify-center text-fg-secondary hover:bg-surface-3 shrink-0">
           <span className="material-symbols-outlined">arrow_back</span>
         </button>
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] text-slate-500 uppercase tracking-wider truncate">{cliente?.name || ''} {contexto?.osId ? '· OS vinculada' : ''}</p>
-          <p className="text-sm font-bold text-slate-900 truncate">{attendanceTitle || tituloOperacional}</p>
+          <p className="text-[10px] text-fg-secondary uppercase tracking-wider truncate">{cliente?.name || ''} {contexto?.osId ? '· OS vinculada' : ''}</p>
+          <p className="text-sm font-bold text-fg truncate">{attendanceTitle || tituloOperacional}</p>
         </div>
-        {modoCampo === 'rapido' && <span className="font-data-mono text-xs font-bold text-[#1A1A72] shrink-0">{cronometro}</span>}
+        {modoCampo === 'rapido' && <span className="font-data-mono text-xs font-bold text-primary shrink-0">{cronometro}</span>}
         {modoCampo === 'rapido' && (
-          <button onClick={() => setPausado((v) => !v)} className={`min-h-9 px-2 rounded-lg text-[10px] font-bold uppercase shrink-0 ${pausado ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>
+          <button onClick={() => setPausado((v) => !v)} className={`min-h-9 px-2 rounded-lg text-[10px] font-bold uppercase shrink-0 ${pausado ? 'bg-amber-100 text-amber-800' : 'bg-surface-3 text-fg-secondary'}`}>
             {pausado ? 'Retomar' : 'Pausar'}
           </button>
         )}
         <span
           title={geoInicio ? `${geoInicio.lat?.toFixed(5)}, ${geoInicio.lng?.toFixed(5)} (±${Math.round(geoInicio.accuracy || 0)} m)` : 'GPS indisponível'}
-          className={`text-[10px] inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full font-semibold shrink-0 ${geoInicio ? 'text-[#1A1A72] bg-[#1A1A72]/5' : 'text-slate-400 bg-slate-100'}`}
+          className={`text-[10px] inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full font-semibold shrink-0 ${geoInicio ? 'text-primary bg-navy/5' : 'text-fg-muted bg-surface-3'}`}
         >
           <span className="material-symbols-outlined text-sm">{geoInicio ? 'location_on' : 'location_off'}</span>
           {geoInicio ? `±${Math.round(geoInicio.accuracy || 0)}` : '—'}
         </span>
-        <span className="text-[11px] font-data-mono text-slate-500 shrink-0">{idx + 1}/{visibleSections.length}</span>
+        <span className="text-[11px] font-data-mono text-fg-secondary shrink-0">{idx + 1}/{visibleSections.length}</span>
       </div>
-      <div className="h-1 bg-slate-100 sticky top-[calc(4rem+57px)] z-20">
-        <div className="h-full bg-[#1A1A72] transition-all" style={{ width: `${progresso}%` }} />
+      <div className="h-1 bg-surface-3 sticky top-[calc(4rem+57px)] z-20">
+        <div className="h-full bg-navy transition-all" style={{ width: `${progresso}%` }} />
       </div>
 
       {(pausado || rascunhoRestaurado) && (
@@ -862,29 +862,29 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       )}
 
       {template.tipo === 'CORRETIVA' && (
-        <div className="sticky top-[calc(4rem+61px)] z-20 bg-white border-b border-slate-100 px-4 py-2 flex items-center justify-between gap-3">
+        <div className="sticky top-[calc(4rem+61px)] z-20 bg-surface border-b border-border px-4 py-2 flex items-center justify-between gap-3">
           <div className="flex gap-1 overflow-x-auto text-[10px] font-bold uppercase whitespace-nowrap">
             {['Chamado', 'Diagnóstico', 'Execução', 'Resultado', 'Fotos', 'Finalizar'].map((etapa) => (
-              <span key={etapa} className={`px-2 py-1 rounded-full ${tituloOperacional === etapa ? 'bg-[#1A1A72] text-white' : 'bg-slate-100 text-slate-400'}`}>{etapa}</span>
+              <span key={etapa} className={`px-2 py-1 rounded-full ${tituloOperacional === etapa ? 'bg-navy text-white' : 'bg-surface-3 text-fg-muted'}`}>{etapa}</span>
             ))}
           </div>
-          <button onClick={() => setModoCampo((m) => m === 'rapido' ? 'completo' : 'rapido')} className="shrink-0 text-[10px] font-bold text-[#1A1A72] uppercase">
+          <button onClick={() => setModoCampo((m) => m === 'rapido' ? 'completo' : 'rapido')} className="shrink-0 text-[10px] font-bold text-primary uppercase">
             {modoCampo === 'rapido' ? 'Mais detalhes' : 'Modo rápido'}
           </button>
         </div>
       )}
 
       {template.tipo === 'PREVENTIVA' && modoCampo === 'rapido' && (
-        <div className="sticky top-[calc(4rem+61px)] z-20 bg-white border-b border-slate-100 px-4 py-2 flex items-center gap-3">
+        <div className="sticky top-[calc(4rem+61px)] z-20 bg-surface border-b border-border px-4 py-2 flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0"><span className="material-symbols-outlined">fact_check</span></div>
-          <div className="min-w-0 flex-1"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Progresso da preventiva</p><p className="text-sm font-bold text-slate-900">{dispositivosTestados} / {cardsDispositivos.length || devices?.length || 0} dispositivos testados</p></div>
+          <div className="min-w-0 flex-1"><p className="text-[10px] font-bold uppercase tracking-wide text-fg-secondary">Progresso da preventiva</p><p className="text-sm font-bold text-fg">{dispositivosTestados} / {cardsDispositivos.length || devices?.length || 0} dispositivos testados</p></div>
           <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full">Próximo recomendado</span>
         </div>
       )}
 
       {template.tipo === 'LEVANTAMENTO' && modoCampo === 'rapido' && (
-        <div className="sticky top-[calc(4rem+61px)] z-20 bg-white border-b border-slate-100 px-4 py-2 flex items-center gap-2 overflow-x-auto text-[10px] font-bold uppercase whitespace-nowrap">
-          {['Ambiente', 'Equipamento', 'Condição', 'Registro', 'Finalizar'].map((etapa) => <span key={etapa} className={`px-2 py-1 rounded-full ${tituloOperacional === etapa ? 'bg-[#1A1A72] text-white' : 'bg-slate-100 text-slate-400'}`}>{etapa}</span>)}
+        <div className="sticky top-[calc(4rem+61px)] z-20 bg-surface border-b border-border px-4 py-2 flex items-center gap-2 overflow-x-auto text-[10px] font-bold uppercase whitespace-nowrap">
+          {['Ambiente', 'Equipamento', 'Condição', 'Registro', 'Finalizar'].map((etapa) => <span key={etapa} className={`px-2 py-1 rounded-full ${tituloOperacional === etapa ? 'bg-navy text-white' : 'bg-surface-3 text-fg-muted'}`}>{etapa}</span>)}
         </div>
       )}
 
@@ -902,7 +902,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       <div className="flex-1 p-4 md:p-8 pb-28">
         {template.tipo === 'LEVANTAMENTO' && (
           <div className="mb-5 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[#1A1A72]">Modo do levantamento</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-primary">Modo do levantamento</p>
             <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
               {([
                 ['pontual', 'Pontual', 'Foto, constatação e observação'],
@@ -913,16 +913,16 @@ export const ReportForm: React.FC<ReportFormProps> = ({
                   key={mode}
                   type="button"
                   onClick={() => { handleChange(SURVEY_MODE_KEY, mode); setCurrentIdx(0); setIssues(null); }}
-                  className={`min-h-16 rounded-xl border p-3 text-left ${surveyMode === mode ? 'border-[#1A1A72] bg-[#1A1A72] text-white' : 'border-slate-200 bg-white text-slate-800'}`}
+                  className={`min-h-16 rounded-xl border p-3 text-left ${surveyMode === mode ? 'border-primary bg-navy text-white' : 'border-border bg-surface text-fg'}`}
                 >
                   <span className="block text-xs font-bold">{label}</span>
-                  <span className={`mt-0.5 block text-[10px] ${surveyMode === mode ? 'text-indigo-100' : 'text-slate-500'}`}>{description}</span>
+                  <span className={`mt-0.5 block text-[10px] ${surveyMode === mode ? 'text-indigo-100' : 'text-fg-secondary'}`}>{description}</span>
                 </button>
               ))}
             </div>
             {surveyMode === 'parcial' && (
               <div className="mt-4">
-                <p className="text-[10px] font-bold uppercase text-slate-600">Blocos a verificar</p>
+                <p className="text-[10px] font-bold uppercase text-fg-secondary">Blocos a verificar</p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {surveyBlockSections(template).map((section) => {
                     const active = selectedSurveyBlocks.includes(section.key);
@@ -937,7 +937,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
                           handleChange(SURVEY_BLOCKS_KEY, next);
                           setCurrentIdx(0);
                         }}
-                        className={`min-h-10 rounded-full border px-3 text-[11px] font-semibold ${active ? 'border-[#1A1A72] bg-[#1A1A72] text-white' : 'border-slate-300 bg-white text-slate-700'}`}
+                        className={`min-h-10 rounded-full border px-3 text-[11px] font-semibold ${active ? 'border-primary bg-navy text-white' : 'border-border-strong bg-surface text-fg-secondary'}`}
                       >
                         {active ? '✓ ' : ''}{section.titulo}
                       </button>
@@ -951,11 +951,11 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         )}
 
         {template.tipo === 'LEVANTAMENTO' && !surveyMode ? (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-xs text-slate-500">
+          <div className="rounded-xl border border-dashed border-border-strong bg-surface p-6 text-center text-xs text-fg-secondary">
             Escolha o modo acima para iniciar. Nenhum campo do levantamento completo será exigido antes disso.
           </div>
         ) : <>
-        {currentSection?.descricao && <p className="text-[11px] text-slate-500 mb-3">{currentSection.descricao}</p>}
+        {currentSection?.descricao && <p className="text-[11px] text-fg-secondary mb-3">{currentSection.descricao}</p>}
         {modoCampo === 'rapido' && template.tipo === 'CORRETIVA' && currentSection && (
           <QuickCorrectiveActions sectionKey={currentSection.key} values={values} onChange={handleChange} />
         )}
@@ -973,17 +973,17 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         />
 
         {template.tipo === 'LEVANTAMENTO' && isLast && (
-          <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Resumo antes de finalizar</p>
+          <div className="mt-5 rounded-xl border border-border bg-surface p-4">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-fg-secondary">Resumo antes de finalizar</p>
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
               {[
                 ['Evidências', surveySummary.evidencias], ['Constatações', surveySummary.constatacoes],
                 ['Pendências formais', surveySummary.pendencias], ['Materiais', surveySummary.materiais],
                 ['Serviços', surveySummary.servicos], ['Medições', surveySummary.medicoes],
                 ['Não verificado', surveySummary.naoVerificado],
-              ].map(([label, count]) => <div key={String(label)} className="rounded-lg bg-slate-50 p-2"><p className="text-lg font-bold text-slate-900">{count}</p><p className="text-[9px] uppercase text-slate-500">{label}</p></div>)}
+              ].map(([label, count]) => <div key={String(label)} className="rounded-lg bg-surface-2 p-2"><p className="text-lg font-bold text-fg">{count}</p><p className="text-[9px] uppercase text-fg-secondary">{label}</p></div>)}
             </div>
-            <p className="mt-3 text-[10px] text-slate-500">Uma constatação só vira pendência formal quando registrada em Apontamentos. “Não verificado” preserva a incerteza sem criar um diagnóstico.</p>
+            <p className="mt-3 text-[10px] text-fg-secondary">Uma constatação só vira pendência formal quando registrada em Apontamentos. “Não verificado” preserva a incerteza sem criar um diagnóstico.</p>
           </div>
         )}
 
@@ -1021,7 +1021,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       <button
         onClick={() => camInputRef.current?.click()}
         title="Captura rápida"
-        className="fixed bottom-24 right-4 z-40 w-14 h-14 rounded-full bg-[#E63946] hover:bg-[#a51515] text-white shadow-2xl flex items-center justify-center active:scale-95 border-2 border-white"
+        className="fixed bottom-24 right-4 z-40 w-14 h-14 rounded-full bg-danger hover:bg-danger-hover text-white shadow-2xl flex items-center justify-center active:scale-95 border-2 border-white"
       >
         <span className="material-symbols-outlined text-2xl">photo_camera</span>
       </button>
@@ -1030,23 +1030,23 @@ export const ReportForm: React.FC<ReportFormProps> = ({
           onClick={() => setIsTriagemOpen(true)}
           className="fixed bottom-[10.5rem] right-4 z-40 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 text-white text-xs font-bold shadow-lg animate-bounce"
         >
-          <span className="material-symbols-outlined text-sm text-[#E63946]">collections</span>
+          <span className="material-symbols-outlined text-sm text-danger">collections</span>
           {unclassifiedPhotos.length}
         </button>
       )}
 
       {/* Rodapé fixo — zona do polegar */}
-      {(template.tipo !== 'LEVANTAMENTO' || surveyMode) && <div className="sticky bottom-0 z-30 bg-white border-t border-slate-200 px-4 py-3 flex items-center gap-2">
+      {(template.tipo !== 'LEVANTAMENTO' || surveyMode) && <div className="sticky bottom-0 z-30 bg-surface border-t border-border px-4 py-3 flex items-center gap-2">
         <button
           onClick={goPrev}
           disabled={idx === 0}
-          className="px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wide text-slate-600 disabled:opacity-40 hover:bg-slate-100"
+          className="px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wide text-fg-secondary disabled:opacity-40 hover:bg-surface-3"
         >
           Anterior
         </button>
         <button
           onClick={() => setShowPend(true)}
-          className="relative px-3 py-2.5 rounded-lg text-xs font-semibold text-[#E63946] hover:bg-red-50 flex items-center gap-1"
+          className="relative px-3 py-2.5 rounded-lg text-xs font-semibold text-danger hover:bg-red-50 flex items-center gap-1"
           title="Pendências a abrir"
         >
           <span className="material-symbols-outlined text-base">assignment_late</span>
@@ -1056,7 +1056,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
           <button
             onClick={handleFinalize}
             disabled={saving}
-            className="flex-1 py-2.5 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] disabled:opacity-60 text-white text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2"
+            className="flex-1 py-2.5 rounded-lg bg-navy hover:bg-navy-3 disabled:opacity-60 text-white text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2"
           >
             {saving && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
             {saving ? 'Gravando…' : 'Finalizar e gravar'}
@@ -1064,7 +1064,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         ) : (
           <button
             onClick={goNext}
-            className="flex-1 py-2.5 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] text-white text-xs font-semibold uppercase tracking-wider"
+            className="flex-1 py-2.5 rounded-lg bg-navy hover:bg-navy-3 text-white text-xs font-semibold uppercase tracking-wider"
           >
             Próximo
           </button>
@@ -1074,23 +1074,23 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       {/* Bottom sheet: pendências a abrir */}
       {showPend && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 flex items-end sm:items-center justify-center" onClick={() => setShowPend(false)}>
-          <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl max-h-[70vh] overflow-y-auto p-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-surface w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl max-h-[70vh] overflow-y-auto p-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
-              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-base text-[#E63946]">assignment_late</span>
+              <h4 className="text-xs font-bold text-fg-secondary uppercase tracking-wider flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-base text-danger">assignment_late</span>
                 Pendências a abrir ({pendenciasPreview.length})
               </h4>
-              <button onClick={() => setShowPend(false)} className="text-slate-400 hover:text-slate-700 font-bold">✕</button>
+              <button onClick={() => setShowPend(false)} className="text-fg-muted hover:text-fg-secondary font-bold">✕</button>
             </div>
             {pendenciasPreview.length === 0 ? (
-              <p className="text-[11px] text-slate-400 italic">Nenhuma pendência detectada até agora.</p>
+              <p className="text-[11px] text-fg-muted italic">Nenhuma pendência detectada até agora.</p>
             ) : (
               <div className="space-y-2">
                 {pendenciasPreview.map((p, i) => (
                   <div key={i} className="border border-red-100 bg-red-50/50 rounded-lg p-2.5">
-                    {p.grupo && <p className="text-[10px] font-bold text-[#E63946] uppercase">{p.grupo}</p>}
-                    <p className="text-[11px] text-slate-700">{p.descricao}</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">{p.local ? `${p.local} · ` : ''}{p.origem}</p>
+                    {p.grupo && <p className="text-[10px] font-bold text-danger uppercase">{p.grupo}</p>}
+                    <p className="text-[11px] text-fg-secondary">{p.descricao}</p>
+                    <p className="text-[10px] text-fg-muted mt-0.5">{p.local ? `${p.local} · ` : ''}{p.origem}</p>
                   </div>
                 ))}
               </div>

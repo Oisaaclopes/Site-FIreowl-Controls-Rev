@@ -77,8 +77,8 @@ interface FormEngineProps {
 }
 
 const inputCls =
-  'w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20 focus:border-[#1A1A72]/40';
-const labelCls = 'block text-slate-600 mb-1 font-semibold uppercase text-[11px]';
+  'w-full border border-border rounded-lg p-2.5 text-fg bg-surface text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40';
+const labelCls = 'block text-fg-secondary mb-1 font-semibold uppercase text-[11px]';
 
 function catalogOptions(field: FieldSchema, catalog: CatalogSources, filtroValor?: string): string[] {
   switch (field.origem) {
@@ -141,7 +141,7 @@ const FieldControl: React.FC<{
   const negative = isNegativeAnswer(field, value as never);
 
   const negHint = negative ? (
-    <p className="mt-1 text-[10px] font-semibold text-[#E63946] flex items-center gap-1">
+    <p className="mt-1 text-[10px] font-semibold text-danger flex items-center gap-1">
       <span className="material-symbols-outlined text-[13px]">error</span> Gera pendência automaticamente
     </p>
   ) : null;
@@ -192,7 +192,7 @@ const FieldControl: React.FC<{
                 type="button"
                 onClick={() => toggle(o)}
                 className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors ${
-                  arr.includes(o) ? 'bg-[#1A1A72] text-white border-[#1A1A72]' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  arr.includes(o) ? 'bg-navy text-white border-primary' : 'bg-surface text-fg-secondary border-border hover:bg-surface-2'
                 }`}
               >
                 {o}
@@ -262,7 +262,7 @@ const FieldControl: React.FC<{
       return (
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer">
+            <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border bg-surface-2 text-[11px] font-semibold text-fg-secondary hover:bg-surface-3 cursor-pointer">
               <span className="material-symbols-outlined text-base">photo_camera</span>
               Adicionar foto
               <input
@@ -277,11 +277,11 @@ const FieldControl: React.FC<{
                 }}
               />
             </label>
-            <span className="text-[10px] text-slate-400">
+            <span className="text-[10px] text-fg-muted">
               {arr.length}/{labels.length} {labels[0] === 'foto' ? 'foto(s)' : labels.join(' + ')}
             </span>
             {arr.length > 0 && (
-              <button type="button" onClick={() => onValue([])} className="text-[10px] text-[#E63946] font-semibold hover:underline">
+              <button type="button" onClick={() => onValue([])} className="text-[10px] text-danger font-semibold hover:underline">
                 limpar
               </button>
             )}
@@ -297,15 +297,15 @@ const FieldControl: React.FC<{
                     type="button"
                     onClick={() => setMarkupId(pid)}
                     title="Marcar foto (destacar o problema)"
-                    className="relative w-12 h-12 rounded-md overflow-hidden border border-slate-200 bg-slate-100 group"
+                    className="relative w-12 h-12 rounded-md overflow-hidden border border-border bg-surface-3 group"
                   >
                     {preview ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={preview} alt="foto" className="w-full h-full object-cover" />
                     ) : (
-                      <span className="material-symbols-outlined text-slate-300 flex items-center justify-center w-full h-full">image</span>
+                      <span className="material-symbols-outlined text-fg-muted flex items-center justify-center w-full h-full">image</span>
                     )}
-                    <span className={`absolute bottom-0 right-0 material-symbols-outlined text-[13px] leading-none p-0.5 rounded-tl ${marcada ? 'bg-[#E63946] text-white' : 'bg-black/50 text-white opacity-0 group-hover:opacity-100'}`}>
+                    <span className={`absolute bottom-0 right-0 material-symbols-outlined text-[13px] leading-none p-0.5 rounded-tl ${marcada ? 'bg-danger text-white' : 'bg-black/50 text-white opacity-0 group-hover:opacity-100'}`}>
                       {marcada ? 'check' : 'edit'}
                     </span>
                   </button>
@@ -335,7 +335,7 @@ const FieldControl: React.FC<{
             type="button"
             onClick={() => setSigOpen(true)}
             className={`w-full py-2.5 rounded-lg text-[11px] font-semibold uppercase tracking-wide border-2 border-dashed transition-colors flex items-center justify-center gap-1.5 ${
-              assinada ? 'border-emerald-400 text-emerald-700 bg-emerald-50' : 'border-slate-300 text-slate-500 hover:bg-slate-50'
+              assinada ? 'border-emerald-400 text-emerald-700 bg-emerald-50' : 'border-border-strong text-fg-secondary hover:bg-surface-2'
             }`}
           >
             <span className="material-symbols-outlined text-base">{assinada ? 'task_alt' : 'draw'}</span>
@@ -470,14 +470,14 @@ const Repeater: React.FC<{
 
   return (
     <div className="space-y-3">
-      {cards.length === 0 && <p className="text-[11px] text-slate-400 italic">Nenhum item adicionado.</p>}
+      {cards.length === 0 && <p className="text-[11px] text-fg-muted italic">Nenhum item adicionado.</p>}
       {cards.map((card, idx) => (
-        <div key={idx} className="border border-slate-200 rounded-xl p-3 bg-slate-50/50">
+        <div key={idx} className="border border-border rounded-xl p-3 bg-surface-2/50">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            <span className="text-[10px] font-bold text-fg-muted uppercase tracking-wider">
               {field.label} #{idx + 1}
             </span>
-            <button type="button" onClick={() => removeCard(idx)} className="text-slate-400 hover:text-[#E63946]" title="Remover">
+            <button type="button" onClick={() => removeCard(idx)} className="text-fg-muted hover:text-danger" title="Remover">
               <span className="material-symbols-outlined text-lg">delete</span>
             </button>
           </div>
@@ -489,7 +489,7 @@ const Repeater: React.FC<{
               .map((f) => (
                 <div key={f.key} className={f.tipo === 'select_falha' || f.multilinha ? 'md:col-span-2' : ''}>
                   <label className={labelCls}>
-                    {f.label || f.key} {isFieldRequired(f, card as Record<string, unknown>) && <span className="text-[#E63946]">*</span>}
+                    {f.label || f.key} {isFieldRequired(f, card as Record<string, unknown>) && <span className="text-danger">*</span>}
                   </label>
                   {f.tipo === 'select_falha' ? (
                     <select
@@ -553,7 +553,7 @@ const Repeater: React.FC<{
               setSelectedDeviceIds(new Set());
               setPickerOpen(true);
             }}
-            className="flex-1 py-2 rounded-lg border border-[#E63946]/50 bg-[#E63946]/5 text-[11px] font-semibold text-[#E63946] hover:bg-[#E63946]/10 transition-colors flex items-center justify-center gap-1.5"
+            className="flex-1 py-2 rounded-lg border border-danger/50 bg-danger/5 text-[11px] font-semibold text-danger hover:bg-danger/10 transition-colors flex items-center justify-center gap-1.5"
           >
             <span className="material-symbols-outlined text-base">list_alt</span>
             Adicionar da lista padrão
@@ -562,7 +562,7 @@ const Repeater: React.FC<{
         <button
           type="button"
           onClick={addCard}
-          className="flex-1 py-2 rounded-lg border border-dashed border-[#1A1A72]/40 text-[11px] font-semibold text-[#1A1A72] hover:bg-[#1A1A72]/5 transition-colors"
+          className="flex-1 py-2 rounded-lg border border-dashed border-primary/40 text-[11px] font-semibold text-primary hover:bg-navy/5 transition-colors"
         >
           {field.botao_adicionar || '+ Adicionar'}
         </button>
@@ -571,16 +571,16 @@ const Repeater: React.FC<{
       {/* Seletor da lista pré-pronta (dispositivos por categoria) */}
       {pickerOpen && (
         <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl max-h-[90vh] flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-slate-100">
+          <div className="bg-surface w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl max-h-[90vh] flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-border">
               <div>
-                <h4 className="text-sm font-bold text-slate-900 uppercase">Selecionar dispositivos</h4>
-                <p className="text-[11px] text-slate-500">Filtre o estoque da área e adicione em lote ao checklist</p>
+                <h4 className="text-sm font-bold text-fg uppercase">Selecionar dispositivos</h4>
+                <p className="text-[11px] text-fg-secondary">Filtre o estoque da área e adicione em lote ao checklist</p>
               </div>
               <button
                 type="button"
                 onClick={() => setPickerOpen(false)}
-                className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none"
+                className="text-fg-muted hover:text-fg-secondary font-bold text-lg leading-none"
               >
                 ✕
               </button>
@@ -588,52 +588,52 @@ const Repeater: React.FC<{
             <div className="overflow-y-auto p-4 space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div className="relative sm:col-span-3">
-                  <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-base">search</span>
-                  <input value={pickerQuery} onChange={(e) => setPickerQuery(e.target.value)} placeholder="Buscar por nome, marca ou modelo…" className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20" />
+                  <span className="material-symbols-outlined absolute left-3 top-2.5 text-fg-muted text-base">search</span>
+                  <input value={pickerQuery} onChange={(e) => setPickerQuery(e.target.value)} placeholder="Buscar por nome, marca ou modelo…" className="w-full pl-9 pr-3 py-2 text-xs border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20" />
                 </div>
-                <select value={pickerSubcategory} onChange={(e) => setPickerSubcategory(e.target.value)} className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white">
+                <select value={pickerSubcategory} onChange={(e) => setPickerSubcategory(e.target.value)} className="w-full px-3 py-2 text-xs border border-border rounded-lg bg-surface">
                   <option value="">Todas as subcategorias</option>
                   {subcategories.map((value) => <option key={value} value={value}>{value}</option>)}
                 </select>
-                <select value={pickerBrand} onChange={(e) => setPickerBrand(e.target.value)} className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white">
+                <select value={pickerBrand} onChange={(e) => setPickerBrand(e.target.value)} className="w-full px-3 py-2 text-xs border border-border rounded-lg bg-surface">
                   <option value="">Todas as marcas</option>
                   {brands.map((value) => <option key={value} value={value}>{value}</option>)}
                 </select>
-                <label className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg cursor-pointer">
+                <label className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-fg-secondary border border-border rounded-lg cursor-pointer">
                   <input type="checkbox" checked={onlyAvailable} onChange={(e) => setOnlyAvailable(e.target.checked)} className="accent-[#1A1A72]" /> Em estoque
                 </label>
               </div>
-              <div className="flex items-center justify-between text-[11px] text-slate-500">
-                <span><strong className="text-slate-800">{filteredDevices.length}</strong> dispositivo(s) encontrado(s)</span>
-                {selectedDeviceIds.size > 0 && <button type="button" onClick={() => setSelectedDeviceIds(new Set())} className="font-semibold text-[#1A1A72] hover:underline">Limpar seleção</button>}
+              <div className="flex items-center justify-between text-[11px] text-fg-secondary">
+                <span><strong className="text-fg">{filteredDevices.length}</strong> dispositivo(s) encontrado(s)</span>
+                {selectedDeviceIds.size > 0 && <button type="button" onClick={() => setSelectedDeviceIds(new Set())} className="font-semibold text-primary hover:underline">Limpar seleção</button>}
               </div>
               <div className="flex flex-col gap-1.5">
                 {filteredDevices.map((item) => {
                   const alreadyAdded = existingDeviceIds.has(item.id) || existingLegacyDeviceNames.has(item.nome);
                   const selected = selectedDeviceIds.has(item.id);
                   return (
-                    <button key={item.id} type="button" disabled={alreadyAdded} onClick={() => toggleDevice(item.id)} className={`w-full flex items-center gap-3 text-left px-3 py-2.5 rounded-lg border transition-colors ${alreadyAdded ? 'bg-slate-50 border-slate-100 text-slate-400 cursor-not-allowed' : selected ? 'border-[#1A1A72] bg-[#1A1A72]/5' : 'border-slate-200 hover:border-[#1A1A72]/50 hover:bg-slate-50'}`}>
-                      <span className={`material-symbols-outlined text-lg ${selected ? 'text-[#1A1A72]' : 'text-slate-400'}`}>{alreadyAdded ? 'check_circle' : selected ? 'check_box' : 'check_box_outline_blank'}</span>
+                    <button key={item.id} type="button" disabled={alreadyAdded} onClick={() => toggleDevice(item.id)} className={`w-full flex items-center gap-3 text-left px-3 py-2.5 rounded-lg border transition-colors ${alreadyAdded ? 'bg-surface-2 border-border text-fg-muted cursor-not-allowed' : selected ? 'border-primary bg-navy/5' : 'border-border hover:border-primary/50 hover:bg-surface-2'}`}>
+                      <span className={`material-symbols-outlined text-lg ${selected ? 'text-primary' : 'text-fg-muted'}`}>{alreadyAdded ? 'check_circle' : selected ? 'check_box' : 'check_box_outline_blank'}</span>
                       <span className="min-w-0 flex-1">
-                        <span className="block text-xs font-semibold text-slate-700 truncate">{item.nome}</span>
-                        <span className="block text-[10px] text-slate-500 truncate">{[item.grupo, item.marca, item.modelo].filter(Boolean).join(' · ') || 'Sem detalhes de catálogo'}</span>
+                        <span className="block text-xs font-semibold text-fg-secondary truncate">{item.nome}</span>
+                        <span className="block text-[10px] text-fg-secondary truncate">{[item.grupo, item.marca, item.modelo].filter(Boolean).join(' · ') || 'Sem detalhes de catálogo'}</span>
                       </span>
                       <span className={`shrink-0 text-[10px] font-bold ${item.quantidade > 0 ? 'text-emerald-700' : 'text-amber-700'}`}>{alreadyAdded ? 'Já adicionado' : `${item.quantidade} ${item.unidade || 'un.'}`}</span>
                     </button>
                   );
                 })}
-                {filteredDevices.length === 0 && <p className="py-8 text-center text-xs text-slate-400">Nenhum dispositivo corresponde aos filtros.</p>}
+                {filteredDevices.length === 0 && <p className="py-8 text-center text-xs text-fg-muted">Nenhum dispositivo corresponde aos filtros.</p>}
               </div>
             </div>
-            <div className="flex items-center justify-between p-4 border-t border-slate-100">
-              <span className="text-[11px] text-slate-500">
-                <strong className="text-slate-800">{selectedDeviceIds.size}</strong> selecionado(s)
+            <div className="flex items-center justify-between p-4 border-t border-border">
+              <span className="text-[11px] text-fg-secondary">
+                <strong className="text-fg">{selectedDeviceIds.size}</strong> selecionado(s)
               </span>
               <button
                 type="button"
                 onClick={addSelectedDevices}
                 disabled={selectedDeviceIds.size === 0}
-                className="px-5 py-2 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold uppercase tracking-wide"
+                className="px-5 py-2 rounded-lg bg-navy hover:bg-navy-3 disabled:bg-surface-3 disabled:text-fg-muted text-white text-xs font-semibold uppercase tracking-wide"
               >
                 Adicionar selecionados
               </button>
@@ -658,10 +658,10 @@ const Section: React.FC<{
   if (!isSectionVisible(section, values)) return null;
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-      <div className="border-b border-slate-100 pb-3 mb-4">
-        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">{section.titulo}</h3>
-        {section.descricao && <p className="text-[11px] text-slate-500 mt-1">{section.descricao}</p>}
+    <div className="bg-surface rounded-xl border border-border shadow-sm p-5">
+      <div className="border-b border-border pb-3 mb-4">
+        <h3 className="text-sm font-bold text-fg uppercase tracking-wide">{section.titulo}</h3>
+        {section.descricao && <p className="text-[11px] text-fg-secondary mt-1">{section.descricao}</p>}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {section.campos
@@ -674,9 +674,9 @@ const Section: React.FC<{
             return (
               <div key={field.key} className={isWide ? 'md:col-span-2' : ''}>
                 <label className={labelCls}>
-                  {field.label || field.key} {required && <span className="text-[#E63946]">*</span>}
+                  {field.label || field.key} {required && <span className="text-danger">*</span>}
                 </label>
-                {field.help && <p className="text-[10px] text-slate-400 mb-1">{field.help}</p>}
+                {field.help && <p className="text-[10px] text-fg-muted mb-1">{field.help}</p>}
                 {isRepeater ? (
                   <Repeater
                     field={field}
@@ -757,7 +757,7 @@ export const FormEngine: React.FC<FormEngineProps & {
             onClick={onOpenTriagem}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 text-white text-xs font-bold shadow-lg border border-slate-700 animate-bounce"
           >
-            <span className="material-symbols-outlined text-sm text-[#E63946]">collections</span>
+            <span className="material-symbols-outlined text-sm text-danger">collections</span>
             {unclassifiedCount} foto(s) na triagem
           </button>
         )}
@@ -765,7 +765,7 @@ export const FormEngine: React.FC<FormEngineProps & {
         <button
           type="button"
           onClick={handleCameraClick}
-          className="w-14 h-14 rounded-full bg-[#E63946] hover:bg-[#a51515] text-white shadow-2xl flex items-center justify-center transition-all active:scale-95 border-2 border-white"
+          className="w-14 h-14 rounded-full bg-danger hover:bg-danger-hover text-white shadow-2xl flex items-center justify-center transition-all active:scale-95 border-2 border-white"
           title="Captura rápida por câmera (sem formulário)"
         >
           <span className="material-symbols-outlined text-2xl">photo_camera</span>

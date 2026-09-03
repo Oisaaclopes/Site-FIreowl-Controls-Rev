@@ -69,8 +69,8 @@ interface CommercialProposalModalProps {
 }
 
 const inputCls =
-  'w-full border border-slate-300 rounded-lg p-2.5 text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-[#0B1E38]/20 focus:border-[#0B1E38]/40';
-const labelCls = 'block text-slate-600 font-bold uppercase text-[11px] mb-1';
+  'w-full border border-border-strong rounded-lg p-2.5 text-fg text-xs focus:outline-none focus:ring-2 focus:ring-[#0B1E38]/20 focus:border-navy/40';
+const labelCls = 'block text-fg-secondary font-bold uppercase text-[11px] mb-1';
 
 /* ------------------------- componentes de módulo ------------------------- */
 
@@ -82,7 +82,7 @@ const FonteBadge: React.FC<{ fonte: 'padrao' | 'personalizado' }> = ({ fonte }) 
     className={`text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full shrink-0 ${
       fonte === 'personalizado'
         ? 'bg-amber-50 text-amber-700 border border-amber-200'
-        : 'bg-slate-100 text-slate-500 border border-slate-200'
+        : 'bg-surface-3 text-fg-secondary border border-border'
     }`}
   >
     {fonte === 'personalizado' ? 'Personalizado' : 'Padrão Fireowl'}
@@ -97,18 +97,18 @@ const Accordion: React.FC<{
   badge?: React.ReactNode;
   children: React.ReactNode;
 }> = ({ title, icon, open, onToggle, badge, children }) => (
-  <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+  <div className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
     <button
       type="button"
       onClick={onToggle}
-      className="w-full flex items-center gap-2.5 px-4 py-3.5 text-left hover:bg-slate-50 transition-colors"
+      className="w-full flex items-center gap-2.5 px-4 py-3.5 text-left hover:bg-surface-2 transition-colors"
     >
       {icon}
-      <span className="flex-1 font-bold text-[#0B1E38] uppercase text-sm">{title}</span>
+      <span className="flex-1 font-bold text-primary uppercase text-sm">{title}</span>
       {badge}
-      <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${open ? '' : '-rotate-90'}`} />
+      <ChevronDown className={`w-4 h-4 text-fg-muted shrink-0 transition-transform ${open ? '' : '-rotate-90'}`} />
     </button>
-    {open && <div className="px-4 pb-4 pt-1 border-t border-slate-100">{children}</div>}
+    {open && <div className="px-4 pb-4 pt-1 border-t border-border">{children}</div>}
   </div>
 );
 
@@ -122,15 +122,15 @@ const ListEditor: React.FC<{
   numbered?: boolean;
 }> = ({ items, onAdd, onUpdate, onRemove, addLabel, numbered }) => (
   <div className="space-y-2">
-    {items.length === 0 && <p className="text-[11px] text-slate-400 italic">Nenhum item adicionado.</p>}
+    {items.length === 0 && <p className="text-[11px] text-fg-muted italic">Nenhum item adicionado.</p>}
     {items.map((it, idx) => (
       <div key={idx} className="flex items-center gap-2">
-        {numbered && <span className="font-bold text-slate-400 font-data-mono text-xs w-5 shrink-0">{idx + 1}.</span>}
+        {numbered && <span className="font-bold text-fg-muted font-data-mono text-xs w-5 shrink-0">{idx + 1}.</span>}
         <input type="text" value={it} onChange={(e) => onUpdate(idx, e.target.value)} className={`flex-1 ${inputCls}`} />
         <button
           type="button"
           onClick={() => onRemove(idx)}
-          className="p-1.5 text-slate-400 hover:text-[#E63946] hover:bg-red-50 rounded-lg transition-colors shrink-0"
+          className="p-1.5 text-fg-muted hover:text-danger hover:bg-red-50 rounded-lg transition-colors shrink-0"
         >
           <Trash2 className="w-3.5 h-3.5" />
         </button>
@@ -139,7 +139,7 @@ const ListEditor: React.FC<{
     <button
       type="button"
       onClick={onAdd}
-      className="w-full py-2 rounded-lg border border-dashed border-[#0B1E38]/40 text-[11px] font-semibold text-[#0B1E38] hover:bg-[#0B1E38]/5 transition-colors flex items-center justify-center gap-1 uppercase"
+      className="w-full py-2 rounded-lg border border-dashed border-navy/40 text-[11px] font-semibold text-primary hover:bg-navy-3/5 transition-colors flex items-center justify-center gap-1 uppercase"
     >
       <Plus className="w-3.5 h-3.5" /> {addLabel}
     </button>
@@ -162,7 +162,7 @@ const BasicInfoRow: React.FC<{
       <button
         type="button"
         onClick={() => setAdding(true)}
-        className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg border border-dashed border-slate-300 text-slate-500 hover:border-[#0B1E38] hover:text-[#0B1E38] transition-colors"
+        className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg border border-dashed border-border-strong text-fg-secondary hover:border-navy hover:text-primary transition-colors"
       >
         <span className="text-[11px] font-bold uppercase">{label}</span>
         <Plus className="w-4 h-4" />
@@ -187,7 +187,7 @@ const BasicInfoRow: React.FC<{
           setAdding(false);
         }}
         title="Limpar / remover este campo"
-        className="mt-6 p-2 text-slate-400 hover:text-[#E63946] hover:bg-red-50 rounded-lg transition-colors shrink-0"
+        className="mt-6 p-2 text-fg-muted hover:text-danger hover:bg-red-50 rounded-lg transition-colors shrink-0"
       >
         <Trash2 className="w-4 h-4" />
       </button>
@@ -220,7 +220,7 @@ const TagSelect: React.FC<{ options: string[]; selected: string[]; onToggle: (v:
           type="button"
           onClick={() => onToggle(o)}
           className={`px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-colors flex items-center gap-1 ${
-            on ? 'bg-[#0B1E38] text-white border-[#0B1E38]' : 'bg-white text-slate-600 border-slate-300 hover:border-[#0B1E38]'
+            on ? 'bg-navy-3 text-white border-navy' : 'bg-surface text-fg-secondary border-border-strong hover:border-navy'
           }`}
         >
           {on && <Check className="w-3 h-3" />}
@@ -241,20 +241,20 @@ const ClauseRow: React.FC<{ label: string; hint?: string; checked: boolean; onCh
   <button
     type="button"
     onClick={() => onChange(!checked)}
-    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-left transition-colors"
+    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border hover:bg-surface-2 text-left transition-colors"
   >
     <span
       className={`w-5 h-5 rounded flex items-center justify-center shrink-0 border-2 ${
-        checked ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 text-transparent'
+        checked ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-border-strong text-transparent'
       }`}
     >
       <Check className="w-3.5 h-3.5" />
     </span>
     <span className="flex-1">
-      <span className="text-xs font-semibold text-slate-800 block">{label}</span>
-      {hint && <span className="text-[10px] text-slate-400">{hint}</span>}
+      <span className="text-xs font-semibold text-fg block">{label}</span>
+      {hint && <span className="text-[10px] text-fg-muted">{hint}</span>}
     </span>
-    <span className={`text-[10px] font-bold uppercase ${checked ? 'text-emerald-600' : 'text-slate-400'}`}>
+    <span className={`text-[10px] font-bold uppercase ${checked ? 'text-emerald-600' : 'text-fg-muted'}`}>
       {checked ? 'Incluído' : 'Omitido'}
     </span>
   </button>
@@ -435,10 +435,10 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     const leg: WarrantyLeg = isStructuredWarranty(warranty) ? warranty[key] : defaultWarranty()[key];
     const preview = legText(leg);
     return (
-      <div className="rounded-xl border border-slate-200 bg-white p-3">
+      <div className="rounded-xl border border-border bg-surface p-3">
         <label className="flex items-center gap-2 cursor-pointer select-none">
           <input type="checkbox" checked={leg.enabled} onChange={(e) => updWarrantyLeg(key, { enabled: e.target.checked })} className="w-4 h-4 accent-emerald-600" />
-          <span className="text-sm font-bold text-slate-800">{title}</span>
+          <span className="text-sm font-bold text-fg">{title}</span>
         </label>
         {leg.enabled && (
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
@@ -453,7 +453,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             )}
           </div>
         )}
-        <p className="text-[10px] text-slate-400 mt-1.5">{leg.enabled ? (preview ? `No PDF: “${preview}”` : 'Selecione um prazo ou texto — perna ativa sem condição não aparece.') : 'Sem garantia informada — não aparece no PDF.'}</p>
+        <p className="text-[10px] text-fg-muted mt-1.5">{leg.enabled ? (preview ? `No PDF: “${preview}”` : 'Selecione um prazo ou texto — perna ativa sem condição não aparece.') : 'Sem garantia informada — não aparece no PDF.'}</p>
       </div>
     );
   };
@@ -513,7 +513,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     return (
       <Accordion title={opts.titulo} icon={opts.icon} open={!!open[opts.openKey]} onToggle={() => toggle(opts.openKey)} badge={<FonteBadge fonte={fonte} />}>
         <div className="flex justify-end mb-2">
-          <button type="button" onClick={() => restaurarPadraoSecao(opts.campo)} className="text-[10px] font-bold uppercase text-slate-400 hover:text-[#1A1A72] inline-flex items-center gap-1">
+          <button type="button" onClick={() => restaurarPadraoSecao(opts.campo)} className="text-[10px] font-bold uppercase text-fg-muted hover:text-primary inline-flex items-center gap-1">
             <span className="material-symbols-outlined text-sm">restart_alt</span>Restaurar padrão
           </button>
         </div>
@@ -858,29 +858,29 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
 
   // Card de valores (renderizado logo após os itens).
   const valorCard = (
-    <div className="bg-[#0B1E38] text-white p-5 rounded-xl shadow-sm space-y-3">
+    <div className="bg-navy-3 text-white p-5 rounded-xl shadow-sm space-y-3">
       <div className="flex items-center justify-between gap-2">
         <span className="text-[10px] font-bold text-[#F2A900] uppercase tracking-widest">Valores da Proposta</span>
-        <span className="text-[10px] text-slate-300 text-right">Serviço puro: use só os itens. Fornecimento + instalação: clique em Sugerir 70/30.</span>
+        <span className="text-[10px] text-fg-muted text-right">Serviço puro: use só os itens. Fornecimento + instalação: clique em Sugerir 70/30.</span>
       </div>
       <div className="flex items-center justify-between text-sm">
-        <span className="text-slate-300">Subtotal dos itens</span>
+        <span className="text-fg-muted">Subtotal dos itens</span>
         <span className="font-data-mono font-bold">R$ {subtotalItens.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
       </div>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-slate-300 text-sm flex items-center gap-1.5">
+        <span className="text-fg-muted text-sm flex items-center gap-1.5">
           Mão de obra / Serviços adicionais
           <button
             type="button"
             onClick={sugerir7030}
             title="Preencher pela regra 70/30 (sobre o subtotal dos itens)"
-            className="text-[9px] font-bold uppercase text-[#0B1E38] bg-[#F2A900] hover:bg-amber-400 rounded px-1.5 py-0.5"
+            className="text-[9px] font-bold uppercase text-primary bg-[#F2A900] hover:bg-amber-400 rounded px-1.5 py-0.5"
           >
             Sugerir 70/30
           </button>
         </span>
         <div className="flex items-center gap-1">
-          <span className="text-slate-400 text-xs font-data-mono">R$</span>
+          <span className="text-fg-muted text-xs font-data-mono">R$</span>
           <input
             type="number"
             min={0}
@@ -898,7 +898,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               type="button"
               onClick={() => setManualValorTotal(null)}
               title="Voltar ao total calculado (itens + mão de obra)"
-              className="text-[9px] font-bold uppercase text-[#0B1E38] bg-[#F2A900] hover:bg-amber-400 rounded px-1.5 py-0.5"
+              className="text-[9px] font-bold uppercase text-primary bg-[#F2A900] hover:bg-amber-400 rounded px-1.5 py-0.5"
             >
               Auto
             </button>
@@ -914,22 +914,22 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
       </div>
       {/* §15 — Contrato recorrente (valor mensal) */}
       <div className="border-t border-slate-700 pt-3 space-y-2">
-        <label className="flex items-center gap-2 text-[10px] font-bold text-slate-300 uppercase tracking-widest cursor-pointer">
+        <label className="flex items-center gap-2 text-[10px] font-bold text-fg-muted uppercase tracking-widest cursor-pointer">
           <input type="checkbox" checked={recorrente} onChange={(e) => setRecorrente(e.target.checked)} className="accent-[#F2A900] w-3.5 h-3.5" />
           Contrato recorrente (mensal)
         </label>
         {recorrente && (
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <span className="block text-[9px] text-slate-400 uppercase mb-1">Valor mensal (R$)</span>
+              <span className="block text-[9px] text-fg-muted uppercase mb-1">Valor mensal (R$)</span>
               <input type="number" min={0} value={valorMensal} onChange={(e) => setValorMensal(e.target.value === '' ? 0 : Number(e.target.value))} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-right font-data-mono font-bold text-amber-300" />
             </div>
             <div>
-              <span className="block text-[9px] text-slate-400 uppercase mb-1">Vigência (meses)</span>
+              <span className="block text-[9px] text-fg-muted uppercase mb-1">Vigência (meses)</span>
               <input type="number" min={1} value={vigenciaMeses} onChange={(e) => setVigenciaMeses(e.target.value === '' ? 0 : Number(e.target.value))} className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-right font-data-mono font-bold text-slate-200" />
             </div>
             {valorMensal > 0 && (
-              <p className="col-span-2 text-[10px] text-slate-400 font-data-mono leading-relaxed">
+              <p className="col-span-2 text-[10px] text-fg-muted font-data-mono leading-relaxed">
                 Anual: R$ {(valorMensal * 12).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 {vigenciaMeses > 0 && <> · Total ({vigenciaMeses} meses): R$ {(valorMensal * vigenciaMeses).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</>}
               </p>
@@ -942,11 +942,11 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-      <div className="bg-slate-50 max-w-4xl w-full rounded-2xl border border-slate-200 shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
+      <div className="bg-surface-2 max-w-4xl w-full rounded-2xl border border-border shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
         {/* Cabeçalho */}
-        <div className="bg-[#0B1E38] text-white p-5 px-6 flex justify-between items-center shrink-0 border-b border-slate-800">
+        <div className="bg-navy-3 text-white p-5 px-6 flex justify-between items-center shrink-0 border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#E63946] text-white rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-danger text-white rounded-xl flex items-center justify-center">
               <FileText className="w-5 h-5" />
             </div>
             <div>
@@ -954,7 +954,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                 <span className="text-[10px] bg-[#F2A900] text-slate-950 font-black px-2 py-0.5 rounded uppercase">
                   Módulo CRM • Novo Pedido
                 </span>
-                <span className="text-xs font-data-mono text-slate-300 font-bold">{numeroPedido}</span>
+                <span className="text-xs font-data-mono text-fg-muted font-bold">{numeroPedido}</span>
               </div>
               <h2 className="text-xl font-bold font-display text-white tracking-wide mt-0.5">
                 Elaboração de Proposta Comercial
@@ -968,7 +968,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             >
               <Eye className="w-4 h-4" /> Pré-Visualizar PDF
             </button>
-            <button onClick={onClose} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
+            <button onClick={onClose} className="p-2 text-fg-muted hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -983,9 +983,9 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             </div>
           )}
           {/* ---- Informações do Pedido (sempre visível) ---- */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-            <h3 className="font-bold text-[#0B1E38] uppercase text-sm flex items-center gap-2 mb-4">
-              <Building2 className="w-4 h-4 text-[#E63946]" /> Informações do Pedido
+          <div className="bg-surface p-5 rounded-xl border border-border shadow-sm">
+            <h3 className="font-bold text-primary uppercase text-sm flex items-center gap-2 mb-4">
+              <Building2 className="w-4 h-4 text-danger" /> Informações do Pedido
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
@@ -997,7 +997,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                   placeholder="Ex.: PED-2026-249"
                   className={`${inputCls} font-data-mono font-bold`}
                 />
-                <p className="text-[11px] text-slate-400 mt-1">Sequencial automático — edite se quiser um número específico.</p>
+                <p className="text-[11px] text-fg-muted mt-1">Sequencial automático — edite se quiser um número específico.</p>
               </div>
               <div>
                 <label className={labelCls}>Referência / Nome do Projeto</label>
@@ -1017,7 +1017,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                     </option>
                   ))}
                 </select>
-                <p className="text-[11px] text-slate-400 mt-1">
+                <p className="text-[11px] text-fg-muted mt-1">
                   Define o documento gerado por padrão (configurável em Conta → PDF).
                 </p>
               </div>
@@ -1033,14 +1033,14 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                         key={a.id}
                         type="button"
                         onClick={() => toggleArea(a.id)}
-                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${on ? 'bg-[#0B1E38] text-white border-[#0B1E38]' : 'bg-white text-slate-600 border-slate-300 hover:border-[#0B1E38]'}`}
+                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${on ? 'bg-navy-3 text-white border-navy' : 'bg-surface text-fg-secondary border-border-strong hover:border-navy'}`}
                       >
                         {a.sigla}
                       </button>
                     );
                   })}
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">Selecione uma ou mais áreas. Compõe o título e a apresentação.</p>
+                <p className="text-[11px] text-fg-muted mt-1">Selecione uma ou mais áreas. Compõe o título e a apresentação.</p>
               </div>
               <div className="sm:col-span-2">
                 <div className="flex items-center justify-between">
@@ -1054,7 +1054,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                         setIncluirSeguranca(preset.seguranca);
                       }}
                       title="Ajusta o nível da proposta e a seção Segurança do Trabalho conforme o tipo (você pode alterar depois)"
-                      className="text-[10px] font-bold uppercase text-[#1A1A72] hover:text-[#E63946]"
+                      className="text-[10px] font-bold uppercase text-primary hover:text-danger"
                     >
                       Aplicar sugestão do tipo
                     </button>
@@ -1067,9 +1067,9 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                   ))}
                 </select>
                 {tituloDinamico && (
-                  <div className="mt-2 rounded-lg bg-[#0B1E38]/5 border border-[#0B1E38]/15 px-3 py-2">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-[#0B1E38]/60">Título gerado</p>
-                    <p className="text-xs font-bold text-[#0B1E38]">{tituloDinamico}</p>
+                  <div className="mt-2 rounded-lg bg-navy-3/5 border border-navy/15 px-3 py-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-primary/60">Título gerado</p>
+                    <p className="text-xs font-bold text-primary">{tituloDinamico}</p>
                   </div>
                 )}
               </div>
@@ -1087,15 +1087,15 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                         key={n.id}
                         type="button"
                         onClick={() => setNivelProposta(n.id)}
-                        className={`text-left rounded-lg border px-3 py-2 transition-colors ${on ? 'bg-[#0B1E38] text-white border-[#0B1E38]' : 'bg-white text-slate-600 border-slate-300 hover:border-[#0B1E38]'}`}
+                        className={`text-left rounded-lg border px-3 py-2 transition-colors ${on ? 'bg-navy-3 text-white border-navy' : 'bg-surface text-fg-secondary border-border-strong hover:border-navy'}`}
                       >
                         <p className="text-xs font-bold">{n.nome}</p>
-                        <p className={`text-[10px] ${on ? 'text-slate-300' : 'text-slate-400'}`}>{n.desc}</p>
+                        <p className={`text-[10px] ${on ? 'text-fg-muted' : 'text-fg-muted'}`}>{n.desc}</p>
                       </button>
                     );
                   })}
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">Na Simples, capa institucional (Áreas de Atuação) e Resumo Executivo não entram.</p>
+                <p className="text-[11px] text-fg-muted mt-1">Na Simples, capa institucional (Áreas de Atuação) e Resumo Executivo não entram.</p>
               </div>
               <div className="sm:col-span-2">
                 <label className={labelCls}>Página &ldquo;Experiência e Capacidade Técnica&rdquo;</label>
@@ -1111,35 +1111,35 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                         key={String(o.v)}
                         type="button"
                         onClick={() => setIncluirExperiencia(o.v)}
-                        className={`text-left rounded-lg border px-3 py-2 transition-colors ${on ? 'bg-[#0B1E38] text-white border-[#0B1E38]' : 'bg-white text-slate-600 border-slate-300 hover:border-[#0B1E38]'}`}
+                        className={`text-left rounded-lg border px-3 py-2 transition-colors ${on ? 'bg-navy-3 text-white border-navy' : 'bg-surface text-fg-secondary border-border-strong hover:border-navy'}`}
                       >
                         <p className="text-xs font-bold">{o.nome}</p>
-                        <p className={`text-[10px] ${on ? 'text-slate-300' : 'text-slate-400'}`}>{o.desc}</p>
+                        <p className={`text-[10px] ${on ? 'text-fg-muted' : 'text-fg-muted'}`}>{o.desc}</p>
                       </button>
                     );
                   })}
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">Mostra empresas atendidas e marcas relevantes ao serviço (cadastradas em Conta). Sem dados, a página não é gerada.</p>
+                <p className="text-[11px] text-fg-muted mt-1">Mostra empresas atendidas e marcas relevantes ao serviço (cadastradas em Conta). Sem dados, a página não é gerada.</p>
                 {incluirExperiencia !== false && (empresasAtendidas.length > 0 || marcasTecnologias.length > 0) && (
-                  <div className="mt-3 rounded-lg border border-slate-200 p-3 bg-slate-50/60">
+                  <div className="mt-3 rounded-lg border border-border p-3 bg-surface-2/60">
                     <div className="flex items-center gap-4 mb-2">
-                      <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 cursor-pointer">
+                      <label className="flex items-center gap-1.5 text-[11px] font-bold text-fg-secondary cursor-pointer">
                         <input type="radio" checked={experienciaAuto} onChange={() => setExperienciaAuto(true)} className="accent-[#0B1E38]" /> Seleção automática
                       </label>
-                      <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 cursor-pointer">
+                      <label className="flex items-center gap-1.5 text-[11px] font-bold text-fg-secondary cursor-pointer">
                         <input type="radio" checked={!experienciaAuto} onChange={() => setExperienciaAuto(false)} className="accent-[#0B1E38]" /> Selecionar manualmente
                       </label>
                     </div>
                     {experienciaAuto ? (
-                      <p className="text-[11px] text-slate-400">O sistema escolhe as empresas e marcas mais relevantes à área/tipo/segmento desta proposta.</p>
+                      <p className="text-[11px] text-fg-muted">O sistema escolhe as empresas e marcas mais relevantes à área/tipo/segmento desta proposta.</p>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
-                          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1">Empresas ({experienciaEmpresasIds.length})</p>
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-fg-secondary mb-1">Empresas ({experienciaEmpresasIds.length})</p>
                           <div className="max-h-40 overflow-y-auto space-y-0.5 pr-1">
-                            {empresasAtendidas.length === 0 && <p className="text-[11px] text-slate-400 italic">Nenhuma cadastrada.</p>}
+                            {empresasAtendidas.length === 0 && <p className="text-[11px] text-fg-muted italic">Nenhuma cadastrada.</p>}
                             {empresasAtendidas.map((e) => (
-                              <label key={e.id} className="flex items-center gap-2 text-[11px] text-slate-700 py-0.5 cursor-pointer">
+                              <label key={e.id} className="flex items-center gap-2 text-[11px] text-fg-secondary py-0.5 cursor-pointer">
                                 <input type="checkbox" checked={experienciaEmpresasIds.includes(e.id)} onChange={() => toggleSelId(experienciaEmpresasIds, setExperienciaEmpresasIds, e.id)} className="accent-[#0B1E38]" />
                                 <span className="truncate">{e.nomeFantasia || e.nome}</span>
                               </label>
@@ -1147,11 +1147,11 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                           </div>
                         </div>
                         <div>
-                          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1">Marcas ({experienciaMarcasIds.length})</p>
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-fg-secondary mb-1">Marcas ({experienciaMarcasIds.length})</p>
                           <div className="max-h-40 overflow-y-auto space-y-0.5 pr-1">
-                            {marcasTecnologias.length === 0 && <p className="text-[11px] text-slate-400 italic">Nenhuma cadastrada.</p>}
+                            {marcasTecnologias.length === 0 && <p className="text-[11px] text-fg-muted italic">Nenhuma cadastrada.</p>}
                             {marcasTecnologias.map((m) => (
-                              <label key={m.id} className="flex items-center gap-2 text-[11px] text-slate-700 py-0.5 cursor-pointer">
+                              <label key={m.id} className="flex items-center gap-2 text-[11px] text-fg-secondary py-0.5 cursor-pointer">
                                 <input type="checkbox" checked={experienciaMarcasIds.includes(m.id)} onChange={() => toggleSelId(experienciaMarcasIds, setExperienciaMarcasIds, m.id)} className="accent-[#0B1E38]" />
                                 <span className="truncate">{m.nome}</span>
                               </label>
@@ -1166,7 +1166,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
 
               <div className="sm:col-span-2">
                 <label className={labelCls}>
-                  Cliente / Contratante <span className="text-[#E63946]">*</span>
+                  Cliente / Contratante <span className="text-danger">*</span>
                 </label>
                 <div className="flex gap-2">
                   <select value={clienteId} onChange={(e) => setClienteId(e.target.value)} className={`${inputCls} font-bold`}>
@@ -1181,7 +1181,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                     type="button"
                     onClick={openNewClient}
                     title="Cadastrar novo cliente"
-                    className="shrink-0 px-3 rounded-lg bg-[#0B1E38] hover:bg-slate-800 text-white flex items-center gap-1.5 text-xs font-bold uppercase"
+                    className="shrink-0 px-3 rounded-lg bg-navy-3 hover:bg-slate-800 text-white flex items-center gap-1.5 text-xs font-bold uppercase"
                   >
                     <UserPlus className="w-4 h-4" /> Novo
                   </button>
@@ -1231,12 +1231,12 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           {/* ---- Lista de Materiais (puxa do Estoque) ---- */}
           <Accordion
             title="Lista de Materiais"
-            icon={<Wrench className="w-4 h-4 text-[#E63946]" />}
+            icon={<Wrench className="w-4 h-4 text-danger" />}
             open={!!open.materiais}
             onToggle={() => toggle('materiais')}
-            badge={<span className="text-[10px] font-bold bg-slate-100 text-slate-600 rounded-full px-2 py-0.5">{materiaisRows.length}</span>}
+            badge={<span className="text-[10px] font-bold bg-surface-3 text-fg-secondary rounded-full px-2 py-0.5">{materiaisRows.length}</span>}
           >
-            <p className="text-[11px] text-slate-500 mb-3">Vincule do Estoque (código, nome e preço vêm do produto) ou digite manualmente no card abaixo.</p>
+            <p className="text-[11px] text-fg-secondary mb-3">Vincule do Estoque (código, nome e preço vêm do produto) ou digite manualmente no card abaixo.</p>
             <ItensCardEditor
               tipo="material"
               accent="red"
@@ -1267,9 +1267,9 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />}
             open={!!open.servicos}
             onToggle={() => toggle('servicos')}
-            badge={<span className="text-[10px] font-bold bg-slate-100 text-slate-600 rounded-full px-2 py-0.5">{servicosRows.length}</span>}
+            badge={<span className="text-[10px] font-bold bg-surface-3 text-fg-secondary rounded-full px-2 py-0.5">{servicosRows.length}</span>}
           >
-            <p className="text-[11px] text-slate-500 mb-3">
+            <p className="text-[11px] text-fg-secondary mb-3">
               Digite o serviço (ex.: &ldquo;Integração SDAI do lojista&rdquo;) ou vincule ao catálogo da aba Serviços, no card abaixo.
             </p>
             <ItensCardEditor
@@ -1292,13 +1292,13 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           {valorCard}
 
           {/* ---- Accordions de conteúdo ---- */}
-          <Accordion title="Objetivo da Proposta" icon={<FileText className="w-4 h-4 text-[#E63946]" />} open={!!open.objetivo} onToggle={() => toggle('objetivo')}>
+          <Accordion title="Objetivo da Proposta" icon={<FileText className="w-4 h-4 text-danger" />} open={!!open.objetivo} onToggle={() => toggle('objetivo')}>
             <textarea rows={3} value={objetivo} onChange={(e) => setObjetivo(e.target.value)} placeholder="Objetivo geral da proposta..." className={inputCls} />
           </Accordion>
 
           <Accordion
             title="Carta de Apresentação"
-            icon={<FileText className="w-4 h-4 text-[#0B1E38]" />}
+            icon={<FileText className="w-4 h-4 text-primary" />}
             open={!!open.carta}
             onToggle={() => toggle('carta')}
             badge={<FonteBadge fonte={cartaApresentacao.split('\n').map((x) => x.trim()).filter(Boolean).join('\n') === CARTA_APRESENTACAO.join('\n') ? 'padrao' : 'personalizado'} />}
@@ -1307,7 +1307,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               <button
                 type="button"
                 onClick={async () => { if (await requestConfirm('Restaurar o texto padrão da Carta de Apresentação?')) { setCartaApresentacao(CARTA_APRESENTACAO.join('\n')); setTextosTouched(true); } }}
-                className="text-[10px] font-bold uppercase text-slate-400 hover:text-[#1A1A72] inline-flex items-center gap-1"
+                className="text-[10px] font-bold uppercase text-fg-muted hover:text-primary inline-flex items-center gap-1"
               >
                 <span className="material-symbols-outlined text-sm">restart_alt</span>Restaurar padrão
               </button>
@@ -1319,14 +1319,14 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               placeholder="Cada linha vira um parágrafo no PDF. Se ficar em branco, uma proposta histórica ainda usa o texto institucional; numa proposta nova o texto padrão já vem preenchido aqui."
               className={inputCls}
             />
-            <p className="text-[10px] text-slate-400 mt-1">Aparece na 2ª página do PDF, assinada pelo responsável comercial.</p>
+            <p className="text-[10px] text-fg-muted mt-1">Aparece na 2ª página do PDF, assinada pelo responsável comercial.</p>
           </Accordion>
 
           <Accordion title="Diretrizes Normativas" icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />} open={!!open.diretrizes} onToggle={() => toggle('diretrizes')}>
             <ListEditor items={diretrizes} numbered onAdd={() => addStr(setDiretrizes, 'ABNT NBR ')} onUpdate={(i, v) => updStr(setDiretrizes, i, v)} onRemove={(i) => rmStr(setDiretrizes, i)} addLabel="Adicionar norma" />
           </Accordion>
 
-          <Accordion title="Escopo Técnico dos Serviços" icon={<Wrench className="w-4 h-4 text-[#E63946]" />} open={!!open.escopo} onToggle={() => toggle('escopo')}>
+          <Accordion title="Escopo Técnico dos Serviços" icon={<Wrench className="w-4 h-4 text-danger" />} open={!!open.escopo} onToggle={() => toggle('escopo')}>
             <textarea rows={4} value={escopoServico} onChange={(e) => setEscopoServico(e.target.value)} className={inputCls} />
           </Accordion>
 
@@ -1334,7 +1334,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             <ListEditor items={entregaveis} onAdd={() => addStr(setEntregaveis, 'Documento de entregável')} onUpdate={(i, v) => updStr(setEntregaveis, i, v)} onRemove={(i) => rmStr(setEntregaveis, i)} addLabel="Adicionar entregável" />
           </Accordion>
 
-          <Accordion title="Premissas Adotadas" icon={<ShieldCheck className="w-4 h-4 text-[#0B1E38]" />} open={!!open.premissas} onToggle={() => toggle('premissas')}>
+          <Accordion title="Premissas Adotadas" icon={<ShieldCheck className="w-4 h-4 text-primary" />} open={!!open.premissas} onToggle={() => toggle('premissas')}>
             <ListEditor items={premissas} onAdd={() => addStr(setPremissas, 'Acesso livre e facilitado')} onUpdate={(i, v) => updStr(setPremissas, i, v)} onRemove={(i) => rmStr(setPremissas, i)} addLabel="Adicionar premissa" />
           </Accordion>
 
@@ -1351,8 +1351,8 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             </div>
           </Accordion>
 
-          <Accordion title="Indicadores & SLA (resumo executivo)" icon={<ShieldCheck className="w-4 h-4 text-[#0B1E38]" />} open={!!open.indicadores} onToggle={() => toggle('indicadores')}>
-            <p className="text-[11px] text-slate-500 mb-3">Opcional. Preenchido, gera a página de <b>Resumo Executivo</b> (cards) e o bloco de <b>SLA</b>. Em branco, nada aparece.</p>
+          <Accordion title="Indicadores & SLA (resumo executivo)" icon={<ShieldCheck className="w-4 h-4 text-primary" />} open={!!open.indicadores} onToggle={() => toggle('indicadores')}>
+            <p className="text-[11px] text-fg-secondary mb-3">Opcional. Preenchido, gera a página de <b>Resumo Executivo</b> (cards) e o bloco de <b>SLA</b>. Em branco, nada aparece.</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
               <div>
                 <label className={labelCls}>Unidades atendidas</label>
@@ -1373,10 +1373,10 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                 <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
                   <input type="text" value={r.situacao} onChange={(e) => updSla(i, 'situacao', e.target.value)} className={inputCls} placeholder="Situação (ex: Falha crítica)" />
                   <input type="text" value={r.prazo} onChange={(e) => updSla(i, 'prazo', e.target.value)} className={inputCls} placeholder="Prazo (ex: Até 48 horas)" />
-                  <button type="button" onClick={() => rmSla(i)} className="text-slate-400 hover:text-[#E63946] p-1" title="Remover linha">✕</button>
+                  <button type="button" onClick={() => rmSla(i)} className="text-fg-muted hover:text-danger p-1" title="Remover linha">✕</button>
                 </div>
               ))}
-              <button type="button" onClick={addSla} className="text-[11px] font-semibold text-[#1A1A72] hover:text-[#E63946] uppercase">+ Adicionar linha de SLA</button>
+              <button type="button" onClick={addSla} className="text-[11px] font-semibold text-primary hover:text-danger uppercase">+ Adicionar linha de SLA</button>
             </div>
           </Accordion>
 
@@ -1392,19 +1392,19 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               Todos ficam VISÍVEIS aqui e são a fonte de verdade do documento. */}
           <Accordion
             title="Descrição dos Serviços Ofertados"
-            icon={<Wrench className="w-4 h-4 text-[#E63946]" />}
+            icon={<Wrench className="w-4 h-4 text-danger" />}
             open={!!open.descServicos}
             onToggle={() => toggle('descServicos')}
             badge={<FonteBadge fonte={fonteServicos(servicosOfertados)} />}
           >
             <div className="flex justify-end mb-2">
-              <button type="button" onClick={restaurarServicos} className="text-[10px] font-bold uppercase text-slate-400 hover:text-[#1A1A72] inline-flex items-center gap-1">
+              <button type="button" onClick={restaurarServicos} className="text-[10px] font-bold uppercase text-fg-muted hover:text-primary inline-flex items-center gap-1">
                 <span className="material-symbols-outlined text-sm">restart_alt</span>Restaurar padrão
               </button>
             </div>
             <div className="space-y-3">
               {servicosOfertados.map((grupo, gi) => (
-                <div key={gi} className="rounded-lg border border-slate-200 p-3">
+                <div key={gi} className="rounded-lg border border-border p-3">
                   <div className="flex items-center gap-2 mb-2">
                     <input
                       type="text"
@@ -1413,7 +1413,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                       placeholder="Título do grupo (ex.: Instalação e Montagem)"
                       className={`flex-1 ${inputCls} font-semibold`}
                     />
-                    <button type="button" onClick={() => { setServicosOfertados((prev) => prev.filter((_, idx) => idx !== gi)); marcarServicosPersonalizado(); }} className="p-1.5 text-slate-400 hover:text-[#E63946] hover:bg-red-50 rounded-lg shrink-0"><Trash2 className="w-3.5 h-3.5" /></button>
+                    <button type="button" onClick={() => { setServicosOfertados((prev) => prev.filter((_, idx) => idx !== gi)); marcarServicosPersonalizado(); }} className="p-1.5 text-fg-muted hover:text-danger hover:bg-red-50 rounded-lg shrink-0"><Trash2 className="w-3.5 h-3.5" /></button>
                   </div>
                   <ListEditor
                     items={grupo.itens}
@@ -1424,31 +1424,31 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                   />
                 </div>
               ))}
-              <button type="button" onClick={() => { setServicosOfertados((prev) => [...prev, { titulo: 'Novo grupo de serviços', itens: [] }]); marcarServicosPersonalizado(); }} className="w-full py-2 rounded-lg border border-dashed border-[#0B1E38]/40 text-[11px] font-semibold text-[#0B1E38] hover:bg-[#0B1E38]/5 flex items-center justify-center gap-1 uppercase">
+              <button type="button" onClick={() => { setServicosOfertados((prev) => [...prev, { titulo: 'Novo grupo de serviços', itens: [] }]); marcarServicosPersonalizado(); }} className="w-full py-2 rounded-lg border border-dashed border-navy/40 text-[11px] font-semibold text-primary hover:bg-navy-3/5 flex items-center justify-center gap-1 uppercase">
                 <Plus className="w-3.5 h-3.5" /> Adicionar grupo
               </button>
             </div>
           </Accordion>
 
-          {secaoListaBlock({ openKey: 'secEmbalagem', fonteKey: 'embalagem', campo: 'embalagemTransporteTexto', titulo: 'Embalagem, Transporte e Armazenamento', icon: <FileText className="w-4 h-4 text-[#0B1E38]" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
+          {secaoListaBlock({ openKey: 'secEmbalagem', fonteKey: 'embalagem', campo: 'embalagemTransporteTexto', titulo: 'Embalagem, Transporte e Armazenamento', icon: <FileText className="w-4 h-4 text-primary" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
           {secaoListaBlock({ openKey: 'secSeguranca', fonteKey: 'seguranca', campo: 'segurancaTrabalhoTexto', titulo: 'Segurança do Trabalho', icon: <ShieldCheck className="w-4 h-4 text-emerald-600" />, addLabel: 'Adicionar item', seed: 'Nova condição de segurança' })}
           {secaoListaBlock({ openKey: 'secPrecos', fonteKey: 'precos', campo: 'precosObsTexto', titulo: 'Preços — Observações', icon: <DollarSign className="w-4 h-4 text-emerald-600" />, addLabel: 'Adicionar observação', seed: 'Nova observação de preço' })}
           {secaoListaBlock({ openKey: 'secImpostos', fonteKey: 'impostos', campo: 'impostosObsTexto', titulo: 'Impostos e Taxas — Observações', icon: <Scale className="w-4 h-4 text-blue-600" />, addLabel: 'Adicionar observação', seed: 'Nova observação de imposto' })}
-          {secaoListaBlock({ openKey: 'secMultas', fonteKey: 'multas', campo: 'multasAtrasoTexto', titulo: 'Multas por Atraso de Pagamento', icon: <Scale className="w-4 h-4 text-[#E63946]" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
-          {secaoListaBlock({ openKey: 'secLimitacao', fonteKey: 'limitacao', campo: 'limitacaoRespTexto', titulo: 'Limitação de Responsabilidade', icon: <Scale className="w-4 h-4 text-[#0B1E38]" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
-          {secaoListaBlock({ openKey: 'secConfid', fonteKey: 'confidencialidade', campo: 'confidencialidadeTexto', titulo: 'Confidencialidade', icon: <ShieldCheck className="w-4 h-4 text-[#0B1E38]" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
+          {secaoListaBlock({ openKey: 'secMultas', fonteKey: 'multas', campo: 'multasAtrasoTexto', titulo: 'Multas por Atraso de Pagamento', icon: <Scale className="w-4 h-4 text-danger" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
+          {secaoListaBlock({ openKey: 'secLimitacao', fonteKey: 'limitacao', campo: 'limitacaoRespTexto', titulo: 'Limitação de Responsabilidade', icon: <Scale className="w-4 h-4 text-primary" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
+          {secaoListaBlock({ openKey: 'secConfid', fonteKey: 'confidencialidade', campo: 'confidencialidadeTexto', titulo: 'Confidencialidade', icon: <ShieldCheck className="w-4 h-4 text-primary" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
           {secaoListaBlock({ openKey: 'secTermo', fonteKey: 'termoAceite', campo: 'termoAceiteTexto', titulo: 'Termo de Aceite da Proposta', icon: <CheckCircle className="w-4 h-4 text-emerald-600" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
-          {secaoListaBlock({ openKey: 'secCondGerais', fonteKey: 'condicoesGerais', campo: 'condicoesGeraisTexto', titulo: 'Condições Gerais', icon: <FileText className="w-4 h-4 text-slate-600" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
+          {secaoListaBlock({ openKey: 'secCondGerais', fonteKey: 'condicoesGerais', campo: 'condicoesGeraisTexto', titulo: 'Condições Gerais', icon: <FileText className="w-4 h-4 text-fg-secondary" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
 
-          <Accordion title="Conclusão" icon={<FileText className="w-4 h-4 text-[#0B1E38]" />} open={!!open.conclusao} onToggle={() => toggle('conclusao')}>
+          <Accordion title="Conclusão" icon={<FileText className="w-4 h-4 text-primary" />} open={!!open.conclusao} onToggle={() => toggle('conclusao')}>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[11px] text-slate-400">Texto de fechamento da proposta.</span>
+              <span className="text-[11px] text-fg-muted">Texto de fechamento da proposta.</span>
               {tipoServico && (
                 <button
                   type="button"
                   onClick={() => setConclusao(conclusaoPorTipo(tipoServico))}
                   title="Preenche com uma conclusão adequada ao tipo de serviço (você pode editar)"
-                  className="text-[10px] font-bold uppercase text-[#1A1A72] hover:text-[#E63946]"
+                  className="text-[10px] font-bold uppercase text-primary hover:text-danger"
                 >
                   Sugerir pelo tipo
                 </button>
@@ -1468,13 +1468,13 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                 <label className={labelCls}>Condições de Pagamento</label>
                 <TagSelect options={CONDICOES_PAGAMENTO} selected={condicoesPagamento} onToggle={(v) => toggleTag(setCondicoesPagamento, v)} />
               </div>
-              <p className="text-[10px] text-slate-400">Clique nas opções para marcar. O texto no PDF é montado automaticamente.</p>
+              <p className="text-[10px] text-fg-muted">Clique nas opções para marcar. O texto no PDF é montado automaticamente.</p>
             </div>
           </Accordion>
 
           {/* ---- Cláusulas Jurídicas (chaves de ativação) ---- */}
-          <Accordion title="Cláusulas Jurídicas" icon={<Scale className="w-4 h-4 text-[#E63946]" />} open={!!open.clausulas} onToggle={() => toggle('clausulas')}>
-            <p className="text-[11px] text-slate-500 mb-2">Marque os blocos que devem sair no PDF. Desmarcado = título e texto totalmente omitidos.</p>
+          <Accordion title="Cláusulas Jurídicas" icon={<Scale className="w-4 h-4 text-danger" />} open={!!open.clausulas} onToggle={() => toggle('clausulas')}>
+            <p className="text-[11px] text-fg-secondary mb-2">Marque os blocos que devem sair no PDF. Desmarcado = título e texto totalmente omitidos.</p>
             <div className="space-y-2">
               <ClauseRow label="Multas por atraso de pagamento" hint="Juros de mora e multa por inadimplência" checked={incluirMultas} onChange={setIncluirMultas} />
               <ClauseRow label="Limitação de responsabilidade" checked={incluirLimitacao} onChange={setIncluirLimitacao} />
@@ -1486,11 +1486,11 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           </Accordion>
 
           {/* ---- Estrutura da proposta (§10/§11/§12: prévia + ativar/desativar + reordenar) ---- */}
-          <Accordion title="Estrutura da proposta" icon={<FileText className="w-4 h-4 text-[#0B1E38]" />} open={!!open.estrutura} onToggle={() => toggle('estrutura')}>
+          <Accordion title="Estrutura da proposta" icon={<FileText className="w-4 h-4 text-primary" />} open={!!open.estrutura} onToggle={() => toggle('estrutura')}>
             <div className="flex items-center justify-between mb-2">
-              <p className="text-[11px] text-slate-500">Prévia do índice. Ative/desative as opcionais e use ↑↓ para reordenar — a numeração é recalculada sozinha.</p>
+              <p className="text-[11px] text-fg-secondary">Prévia do índice. Ative/desative as opcionais e use ↑↓ para reordenar — a numeração é recalculada sozinha.</p>
               {ordemSecoes.length > 0 && (
-                <button type="button" onClick={() => setOrdemSecoes([])} className="shrink-0 text-[10px] font-bold uppercase text-[#1A1A72] hover:text-[#E63946]">Ordem padrão</button>
+                <button type="button" onClick={() => setOrdemSecoes([])} className="shrink-0 text-[10px] font-bold uppercase text-primary hover:text-danger">Ordem padrão</button>
               )}
             </div>
             {(() => {
@@ -1529,21 +1529,21 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                     const mi = meioKeys.indexOf(s.key);
                     if (s.visible) n += 1;
                     return (
-                      <div key={s.key} className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 ${s.visible ? 'bg-white border-slate-200' : 'bg-slate-50 border-dashed border-slate-200'}`}>
+                      <div key={s.key} className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 ${s.visible ? 'bg-surface border-border' : 'bg-surface-2 border-dashed border-border'}`}>
                         {podeMover ? (
                           <div className="flex flex-col shrink-0 -my-1">
-                            <button type="button" onClick={() => mover(s.key, -1)} disabled={mi <= 0} className="text-slate-400 hover:text-[#0B1E38] disabled:opacity-25 leading-none text-[11px]" title="Subir">▲</button>
-                            <button type="button" onClick={() => mover(s.key, 1)} disabled={mi >= meioKeys.length - 1} className="text-slate-400 hover:text-[#0B1E38] disabled:opacity-25 leading-none text-[11px]" title="Descer">▼</button>
+                            <button type="button" onClick={() => mover(s.key, -1)} disabled={mi <= 0} className="text-fg-muted hover:text-primary disabled:opacity-25 leading-none text-[11px]" title="Subir">▲</button>
+                            <button type="button" onClick={() => mover(s.key, 1)} disabled={mi >= meioKeys.length - 1} className="text-fg-muted hover:text-primary disabled:opacity-25 leading-none text-[11px]" title="Descer">▼</button>
                           </div>
                         ) : (
                           <div className="w-3 shrink-0" />
                         )}
-                        <span className={`font-data-mono text-[11px] font-bold shrink-0 ${s.visible ? 'text-[#0B1E38]' : 'text-slate-300'}`}>{s.visible ? String(n).padStart(2, '0') : '--'}</span>
-                        <span className={`text-xs truncate flex-1 ${s.visible ? 'text-slate-700' : 'text-slate-400 line-through'}`}>{s.titulo}{fixa(s.key) && <span className="text-[9px] text-slate-400 ml-1">(fixa)</span>}</span>
+                        <span className={`font-data-mono text-[11px] font-bold shrink-0 ${s.visible ? 'text-primary' : 'text-fg-muted'}`}>{s.visible ? String(n).padStart(2, '0') : '--'}</span>
+                        <span className={`text-xs truncate flex-1 ${s.visible ? 'text-fg-secondary' : 'text-fg-muted line-through'}`}>{s.titulo}{fixa(s.key) && <span className="text-[9px] text-fg-muted ml-1">(fixa)</span>}</span>
                         {tg ? (
-                          <button type="button" onClick={() => tg.set(!tg.v)} className={`shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded ${tg.v ? 'text-emerald-700 bg-emerald-50' : 'text-slate-400 bg-slate-100'}`}>{tg.v ? 'Ativa' : 'Inativa'}</button>
+                          <button type="button" onClick={() => tg.set(!tg.v)} className={`shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded ${tg.v ? 'text-emerald-700 bg-emerald-50' : 'text-fg-muted bg-surface-3'}`}>{tg.v ? 'Ativa' : 'Inativa'}</button>
                         ) : s.opcional ? (
-                          <span className="text-[9px] text-slate-400 shrink-0">automática</span>
+                          <span className="text-[9px] text-fg-muted shrink-0">automática</span>
                         ) : null}
                       </div>
                     );
@@ -1570,7 +1570,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                   <textarea rows={2} value={(isStructuredWarranty(warranty) && warranty.observacoes) || ''} onChange={(e) => setWarrantyObs(e.target.value)} placeholder="Ex.: garantia condicionada à manutenção preventiva…" className={`${inputCls} resize-y`} />
                 </div>
                 {!renderWarranty(warranty).hasAny && (
-                  <p className="text-[11px] text-slate-500 italic">Nenhuma garantia informada — a seção “Garantia” não aparecerá no documento.</p>
+                  <p className="text-[11px] text-fg-secondary italic">Nenhuma garantia informada — a seção “Garantia” não aparecerá no documento.</p>
                 )}
               </div>
             )}
@@ -1599,25 +1599,25 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           {(templates.length > 0 || onSaveTemplate) && (
             <Accordion title="Modelos Reutilizáveis" icon={<Sparkles className="w-4 h-4 text-[#F2A900]" />} open={!!open.modelos} onToggle={() => toggle('modelos')}>
               {onSaveTemplate && (
-                <button type="button" onClick={handleSaveCurrentTemplate} className="mb-3 w-full sm:w-auto px-3 py-2 border border-[#1A1A72]/25 text-[#1A1A72] hover:bg-[#1A1A72]/5 rounded-lg text-xs font-bold uppercase flex items-center justify-center gap-1.5">
+                <button type="button" onClick={handleSaveCurrentTemplate} className="mb-3 w-full sm:w-auto px-3 py-2 border border-primary/25 text-primary hover:bg-navy/5 rounded-lg text-xs font-bold uppercase flex items-center justify-center gap-1.5">
                   <Save className="w-3.5 h-3.5" /> Salvar preenchimento como modelo{selectedClient ? ' deste cliente' : ''}
                 </button>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {templates.filter((tmpl) => !tmpl.clientId || tmpl.clientId === selectedClient?.id).map((tmpl) => (
-                  <div key={tmpl.id} className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-col justify-between gap-2">
+                  <div key={tmpl.id} className="bg-surface-2 p-3 rounded-xl border border-border flex flex-col justify-between gap-2">
                     <div>
-                      <h4 className="font-bold text-slate-900 text-xs uppercase">{tmpl.name}</h4>
-                      {tmpl.clientId && <p className="text-[10px] font-bold uppercase tracking-wide text-[#1A1A72] mt-1">Modelo do cliente</p>}
-                      <p className="text-[11px] text-slate-500 line-clamp-2 mt-1">{tmpl.objetivo}</p>
+                      <h4 className="font-bold text-fg text-xs uppercase">{tmpl.name}</h4>
+                      {tmpl.clientId && <p className="text-[10px] font-bold uppercase tracking-wide text-primary mt-1">Modelo do cliente</p>}
+                      <p className="text-[11px] text-fg-secondary line-clamp-2 mt-1">{tmpl.objetivo}</p>
                     </div>
-                    <button type="button" onClick={() => handleLoadTemplate(tmpl)} className="px-3 py-2 bg-[#0B1E38] hover:bg-slate-800 text-white rounded-lg text-xs font-bold uppercase flex items-center justify-center gap-1.5">
+                    <button type="button" onClick={() => handleLoadTemplate(tmpl)} className="px-3 py-2 bg-navy-3 hover:bg-slate-800 text-white rounded-lg text-xs font-bold uppercase flex items-center justify-center gap-1.5">
                       <Copy className="w-3.5 h-3.5 text-[#F2A900]" /> Aplicar modelo
                     </button>
                     {(onSaveTemplate || onDeleteTemplate) && (
                       <div className="flex justify-end gap-1">
-                        {onSaveTemplate && <button type="button" onClick={() => handleRenameTemplate(tmpl)} className="px-2 py-1 text-[10px] font-semibold text-slate-500 hover:text-[#1A1A72]">Renomear</button>}
-                        {onDeleteTemplate && <button type="button" onClick={async () => { if (await requestConfirm(`Excluir o modelo \"${tmpl.name}\"?`)) onDeleteTemplate(tmpl.id); }} className="p-1 text-slate-400 hover:text-red-600" title="Excluir modelo"><Trash2 className="w-3.5 h-3.5" /></button>}
+                        {onSaveTemplate && <button type="button" onClick={() => handleRenameTemplate(tmpl)} className="px-2 py-1 text-[10px] font-semibold text-fg-secondary hover:text-primary">Renomear</button>}
+                        {onDeleteTemplate && <button type="button" onClick={async () => { if (await requestConfirm(`Excluir o modelo \"${tmpl.name}\"?`)) onDeleteTemplate(tmpl.id); }} className="p-1 text-fg-muted hover:text-red-600" title="Excluir modelo"><Trash2 className="w-3.5 h-3.5" /></button>}
                       </div>
                     )}
                   </div>
@@ -1628,13 +1628,13 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         </div>
 
         {/* Rodapé */}
-        <div className="bg-white border-t border-slate-200 p-4 px-6 flex flex-wrap justify-between items-center gap-3 shrink-0">
+        <div className="bg-surface border-t border-border p-4 px-6 flex flex-wrap justify-between items-center gap-3 shrink-0">
           <button
             type="button"
             onClick={handleSaveDraft}
-            className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-xl text-xs transition-colors uppercase tracking-wide flex items-center gap-1.5"
+            className="px-4 py-2.5 bg-surface-3 hover:bg-border-strong text-fg font-bold rounded-xl text-xs transition-colors uppercase tracking-wide flex items-center gap-1.5"
           >
-            <Save className="w-4 h-4 text-slate-600" /> Salvar Rascunho
+            <Save className="w-4 h-4 text-fg-secondary" /> Salvar Rascunho
           </button>
           <div className="flex items-center gap-2">
             {status === 'rascunho' && (
@@ -1660,13 +1660,13 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
       {/* ============ Dialog: cadastro rápido de cliente ============ */}
       {newClientOpen && (
         <div className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-xl shadow-2xl border border-slate-200">
-            <div className="flex items-center justify-between p-4 border-b border-slate-100">
+          <div className="bg-surface w-full max-w-md rounded-xl shadow-2xl border border-border">
+            <div className="flex items-center justify-between p-4 border-b border-border">
               <div className="flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-[#0B1E38]" />
-                <h3 className="text-sm font-bold text-slate-900 uppercase">Novo Cliente</h3>
+                <UserPlus className="w-5 h-5 text-primary" />
+                <h3 className="text-sm font-bold text-fg uppercase">Novo Cliente</h3>
               </div>
-              <button onClick={() => setNewClientOpen(false)} className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none">✕</button>
+              <button onClick={() => setNewClientOpen(false)} className="text-fg-muted hover:text-fg-secondary font-bold text-lg leading-none">✕</button>
             </div>
             <div className="p-4 space-y-3">
               <div>
@@ -1691,19 +1691,19 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                   <input type="text" value={ncPhone} onChange={(e) => setNcPhone(e.target.value)} placeholder="(00) 00000-0000" className={inputCls} />
                 </div>
               </div>
-              <p className="text-[10px] text-slate-400 flex items-start gap-1 bg-slate-50 border border-slate-200 rounded-lg p-2">
-                <span className="material-symbols-outlined text-sm text-slate-400">info</span>
+              <p className="text-[10px] text-fg-muted flex items-start gap-1 bg-surface-2 border border-border rounded-lg p-2">
+                <span className="material-symbols-outlined text-sm text-fg-muted">info</span>
                 <span>Você não perde os dados da proposta. O cliente é criado e já selecionado aqui.</span>
               </p>
             </div>
-            <div className="flex items-center justify-between p-4 border-t border-slate-100">
-              <button onClick={() => setNewClientOpen(false)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 uppercase">
+            <div className="flex items-center justify-between p-4 border-t border-border">
+              <button onClick={() => setNewClientOpen(false)} className="px-4 py-2 text-xs font-semibold text-fg-secondary hover:text-fg uppercase">
                 Cancelar
               </button>
               <button
                 onClick={confirmNewClient}
                 disabled={!ncName.trim()}
-                className="px-5 py-2 rounded-lg bg-[#0B1E38] hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-bold uppercase tracking-wide"
+                className="px-5 py-2 rounded-lg bg-navy-3 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-bold uppercase tracking-wide"
               >
                 Salvar e selecionar
               </button>

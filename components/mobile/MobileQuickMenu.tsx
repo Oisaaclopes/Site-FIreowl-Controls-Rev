@@ -59,7 +59,7 @@ export const MobileQuickMenu: React.FC<Props> = ({ userName, cargo, userRole, us
         </div>
         <span
           className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
-            online ? (pend > 0 ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700') : 'border-slate-200 bg-slate-100 text-slate-500'
+            online ? (pend > 0 ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700') : 'border-border bg-surface-3 text-fg-secondary'
           }`}
           title={online ? (pend > 0 ? `${pend} registro(s) aguardando envio` : 'Tudo sincronizado') : 'Sem conexão — dados salvos no aparelho'}
         >

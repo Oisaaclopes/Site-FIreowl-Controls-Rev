@@ -177,36 +177,36 @@ export const PhotoSheetConfigModal: React.FC<Props> = ({ photos, comparisons, on
   if (!client.ok) {
     return (
       <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 p-4" onClick={onClose}>
-        <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl bg-white p-5 text-center shadow-2xl">
+        <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl bg-surface p-5 text-center shadow-2xl">
           <span className="material-symbols-outlined mb-2 text-4xl text-amber-500">group</span>
-          <h2 className="text-base font-bold text-slate-900">Clientes diferentes</h2>
-          <p className="mt-1 text-sm text-slate-600">{hasComparisons ? 'A Folha de Fotos deve conter comparações do mesmo cliente.' : 'A Folha de Fotos deve conter fotos do mesmo cliente.'} Ajuste a seleção e tente novamente.</p>
-          <button onClick={onClose} className="mt-4 min-h-11 w-full rounded-xl bg-[#1A1A72] text-xs font-bold uppercase text-white">Entendi</button>
+          <h2 className="text-base font-bold text-fg">Clientes diferentes</h2>
+          <p className="mt-1 text-sm text-fg-secondary">{hasComparisons ? 'A Folha de Fotos deve conter comparações do mesmo cliente.' : 'A Folha de Fotos deve conter fotos do mesmo cliente.'} Ajuste a seleção e tente novamente.</p>
+          <button onClick={onClose} className="mt-4 min-h-11 w-full rounded-xl bg-navy text-xs font-bold uppercase text-white">Entendi</button>
         </div>
       </div>
     );
   }
 
-  const field = 'mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm';
+  const field = 'mt-1 min-h-11 w-full rounded-xl border border-border-strong bg-surface px-3 text-sm';
   const count = mode === 'comparacoes' && hasComparisons ? comparisons!.length : ordered.length;
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/60 sm:items-center" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
-        <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+      <div onClick={(e) => e.stopPropagation()} className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-surface shadow-2xl sm:rounded-2xl">
+        <header className="flex items-center justify-between border-b border-border px-4 py-3">
           <div>
-            <p className="text-sm font-bold text-slate-900">Folha de Fotos</p>
-            <p className="text-[11px] text-slate-500">{count} {mode === 'comparacoes' ? 'comparação(ões)' : 'evidência(s)'} · {client.clientName}</p>
+            <p className="text-sm font-bold text-fg">Folha de Fotos</p>
+            <p className="text-[11px] text-fg-secondary">{count} {mode === 'comparacoes' ? 'comparação(ões)' : 'evidência(s)'} · {client.clientName}</p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><span className="material-symbols-outlined">close</span></button>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-fg-muted hover:bg-surface-3"><span className="material-symbols-outlined">close</span></button>
         </header>
 
         <div className="flex-1 space-y-3 overflow-y-auto p-4">
           {hasComparisons && (
             <div>
-              <p className="mb-1.5 text-xs font-bold uppercase text-slate-600">Modo de apresentação</p>
+              <p className="mb-1.5 text-xs font-bold uppercase text-fg-secondary">Modo de apresentação</p>
               <div className="flex gap-2">
-                <button onClick={() => setMode('comparacoes')} className={`min-h-10 flex-1 rounded-lg border px-3 text-xs font-bold uppercase ${mode === 'comparacoes' ? 'border-[#1A1A72] bg-[#1A1A72]/5 text-[#1A1A72]' : 'border-slate-300 bg-white text-slate-600'}`}>Antes × Depois</button>
-                <button onClick={() => setMode('individuais')} className={`min-h-10 flex-1 rounded-lg border px-3 text-xs font-bold uppercase ${mode === 'individuais' ? 'border-[#1A1A72] bg-[#1A1A72]/5 text-[#1A1A72]' : 'border-slate-300 bg-white text-slate-600'}`}>Evidências individuais</button>
+                <button onClick={() => setMode('comparacoes')} className={`min-h-10 flex-1 rounded-lg border px-3 text-xs font-bold uppercase ${mode === 'comparacoes' ? 'border-primary bg-navy/5 text-primary' : 'border-border-strong bg-surface text-fg-secondary'}`}>Antes × Depois</button>
+                <button onClick={() => setMode('individuais')} className={`min-h-10 flex-1 rounded-lg border px-3 text-xs font-bold uppercase ${mode === 'individuais' ? 'border-primary bg-navy/5 text-primary' : 'border-border-strong bg-surface text-fg-secondary'}`}>Evidências individuais</button>
               </div>
             </div>
           )}
@@ -217,29 +217,29 @@ export const PhotoSheetConfigModal: React.FC<Props> = ({ photos, comparisons, on
             </p>
           )}
 
-          <label className="block text-xs font-bold uppercase text-slate-600">Título do documento
+          <label className="block text-xs font-bold uppercase text-fg-secondary">Título do documento
             <input value={titulo} onChange={(e) => setTitulo(e.target.value)} className={field} />
           </label>
-          <label className="block text-xs font-bold uppercase text-slate-600">Subtítulo <span className="font-normal normal-case text-slate-400">(opcional)</span>
+          <label className="block text-xs font-bold uppercase text-fg-secondary">Subtítulo <span className="font-normal normal-case text-fg-muted">(opcional)</span>
             <input value={subtitulo} onChange={(e) => setSubtitulo(e.target.value)} className={field} />
           </label>
           <div className="grid grid-cols-2 gap-3">
-            <label className="block text-xs font-bold uppercase text-slate-600">Local / Setor
+            <label className="block text-xs font-bold uppercase text-fg-secondary">Local / Setor
               <input value={localSetor} onChange={(e) => setLocalSetor(e.target.value)} className={field} />
             </label>
-            <label className="block text-xs font-bold uppercase text-slate-600">Referência
+            <label className="block text-xs font-bold uppercase text-fg-secondary">Referência
               <input value={referencia} onChange={(e) => setReferencia(e.target.value)} placeholder="OS / Relatório / Vistoria" className={field} />
             </label>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <label className="block text-xs font-bold uppercase text-slate-600">Data de emissão
+            <label className="block text-xs font-bold uppercase text-fg-secondary">Data de emissão
               <input type="date" value={dataEmissao} onChange={(e) => setDataEmissao(e.target.value)} className={field} />
             </label>
-            <label className="block text-xs font-bold uppercase text-slate-600">Responsável técnico
+            <label className="block text-xs font-bold uppercase text-fg-secondary">Responsável técnico
               <input value={responsavel} onChange={(e) => setResponsavel(e.target.value)} className={field} />
             </label>
           </div>
-          <label className="block text-xs font-bold uppercase text-slate-600">Observação geral <span className="font-normal normal-case text-slate-400">(opcional)</span>
+          <label className="block text-xs font-bold uppercase text-fg-secondary">Observação geral <span className="font-normal normal-case text-fg-muted">(opcional)</span>
             <textarea value={observacao} onChange={(e) => setObservacao(e.target.value)} rows={2} className={`${field} py-2`} />
           </label>
 
@@ -247,23 +247,23 @@ export const PhotoSheetConfigModal: React.FC<Props> = ({ photos, comparisons, on
           {mode === 'individuais' && !hasComparisons && (
             <div>
               <div className="mb-1.5 flex items-center justify-between">
-                <p className="text-xs font-bold uppercase text-slate-600">Ordem das evidências</p>
-                <select value={order} onChange={(e) => setOrder(e.target.value as PhotoSheetOrder)} className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs">
+                <p className="text-xs font-bold uppercase text-fg-secondary">Ordem das evidências</p>
+                <select value={order} onChange={(e) => setOrder(e.target.value as PhotoSheetOrder)} className="rounded-lg border border-border-strong bg-surface px-2 py-1 text-xs">
                   <option value="selecao">Seleção</option>
                   <option value="antiga">Mais antiga</option>
                   <option value="recente">Mais recente</option>
                 </select>
               </div>
-              <div className="max-h-48 space-y-1.5 overflow-y-auto rounded-xl border border-slate-200 p-2">
+              <div className="max-h-48 space-y-1.5 overflow-y-auto rounded-xl border border-border p-2">
                 {ordered.map((p, i) => (
-                  <div key={p.clientUuid} className="flex items-center gap-2 rounded-lg bg-slate-50 px-2 py-1.5">
-                    <span className="w-6 shrink-0 text-center text-[11px] font-bold text-[#1A1A72]">{String(i + 1).padStart(2, '0')}</span>
+                  <div key={p.clientUuid} className="flex items-center gap-2 rounded-lg bg-surface-2 px-2 py-1.5">
+                    <span className="w-6 shrink-0 text-center text-[11px] font-bold text-primary">{String(i + 1).padStart(2, '0')}</span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-semibold text-slate-800">{p.localSetor || friendlyPhotoId(p.clientUuid)}</p>
-                      <p className="truncate text-[10px] text-slate-500">{new Date(p.capturadoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}{p.marcador ? ` · ${MARKER_LABEL[p.marcador]}` : ''}</p>
+                      <p className="truncate text-xs font-semibold text-fg">{p.localSetor || friendlyPhotoId(p.clientUuid)}</p>
+                      <p className="truncate text-[10px] text-fg-secondary">{new Date(p.capturadoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}{p.marcador ? ` · ${MARKER_LABEL[p.marcador]}` : ''}</p>
                     </div>
-                    <button onClick={() => move(i, -1)} disabled={i === 0} className="rounded p-1 text-slate-500 disabled:opacity-30"><span className="material-symbols-outlined text-base">arrow_upward</span></button>
-                    <button onClick={() => move(i, 1)} disabled={i === ordered.length - 1} className="rounded p-1 text-slate-500 disabled:opacity-30"><span className="material-symbols-outlined text-base">arrow_downward</span></button>
+                    <button onClick={() => move(i, -1)} disabled={i === 0} className="rounded p-1 text-fg-secondary disabled:opacity-30"><span className="material-symbols-outlined text-base">arrow_upward</span></button>
+                    <button onClick={() => move(i, 1)} disabled={i === ordered.length - 1} className="rounded p-1 text-fg-secondary disabled:opacity-30"><span className="material-symbols-outlined text-base">arrow_downward</span></button>
                   </div>
                 ))}
               </div>
@@ -271,9 +271,9 @@ export const PhotoSheetConfigModal: React.FC<Props> = ({ photos, comparisons, on
           )}
         </div>
 
-        <div className="flex gap-2 border-t border-slate-200 p-4">
-          <button onClick={onClose} className="min-h-12 flex-1 rounded-xl border border-slate-300 bg-white text-xs font-bold uppercase text-slate-600">Cancelar</button>
-          <button onClick={gerar} disabled={busy} className="min-h-12 flex-[2] rounded-xl bg-[#1A1A72] text-xs font-bold uppercase text-white disabled:opacity-70">
+        <div className="flex gap-2 border-t border-border p-4">
+          <button onClick={onClose} className="min-h-12 flex-1 rounded-xl border border-border-strong bg-surface text-xs font-bold uppercase text-fg-secondary">Cancelar</button>
+          <button onClick={gerar} disabled={busy} className="min-h-12 flex-[2] rounded-xl bg-navy text-xs font-bold uppercase text-white disabled:opacity-70">
             {busy ? 'Preparando…' : 'Visualizar PDF'}
           </button>
         </div>

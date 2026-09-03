@@ -26,8 +26,8 @@ const MATERIAIS_POLITICAS = [
   { v: 'mediante_aprovacao', l: 'Fornecimento mediante aprovação' },
 ];
 
-const _labelCls = 'block text-slate-600 mb-1 font-semibold uppercase text-[11px]';
-const _inputCls = 'w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#E63946]/20 focus:border-[#E63946]/40';
+const _labelCls = 'block text-fg-secondary mb-1 font-semibold uppercase text-[11px]';
+const _inputCls = 'w-full border border-border rounded-lg p-2.5 text-fg bg-surface focus:outline-none focus:ring-2 focus:ring-danger/20 focus:border-danger/40';
 
 /** Multi-select por chips. */
 const Chips: React.FC<{ options: string[]; selected: string[]; onToggle: (v: string) => void }> = ({ options, selected, onToggle }) => (
@@ -35,7 +35,7 @@ const Chips: React.FC<{ options: string[]; selected: string[]; onToggle: (v: str
     {options.map((o) => {
       const on = selected.includes(o);
       return (
-        <button key={o} type="button" onClick={() => onToggle(o)} className={`px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-colors ${on ? 'bg-[#0B1E38] text-white border-[#0B1E38]' : 'bg-white text-slate-600 border-slate-300 hover:border-[#0B1E38]'}`}>{o}</button>
+        <button key={o} type="button" onClick={() => onToggle(o)} className={`px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-colors ${on ? 'bg-navy-3 text-white border-navy' : 'bg-surface text-fg-secondary border-border-strong hover:border-navy'}`}>{o}</button>
       );
     })}
   </div>
@@ -47,17 +47,17 @@ const StrList: React.FC<{ items: string[]; onChange: (v: string[]) => void; addL
     {items.map((it, i) => (
       <div key={i} className="flex items-center gap-2">
         <input value={it} onChange={(e) => onChange(items.map((x, idx) => (idx === i ? e.target.value : x)))} placeholder={placeholder} className={`flex-1 ${_inputCls}`} />
-        <button type="button" onClick={() => onChange(items.filter((_, idx) => idx !== i))} className="p-1.5 text-slate-400 hover:text-[#E63946] hover:bg-red-50 rounded-lg shrink-0"><span className="material-symbols-outlined text-base">delete</span></button>
+        <button type="button" onClick={() => onChange(items.filter((_, idx) => idx !== i))} className="p-1.5 text-fg-muted hover:text-danger hover:bg-red-50 rounded-lg shrink-0"><span className="material-symbols-outlined text-base">delete</span></button>
       </div>
     ))}
-    <button type="button" onClick={() => onChange([...items, ''])} className="w-full py-2 rounded-lg border border-dashed border-[#0B1E38]/40 text-[11px] font-semibold text-[#0B1E38] hover:bg-[#0B1E38]/5 uppercase">+ {addLabel}</button>
+    <button type="button" onClick={() => onChange([...items, ''])} className="w-full py-2 rounded-lg border border-dashed border-navy/40 text-[11px] font-semibold text-primary hover:bg-navy-3/5 uppercase">+ {addLabel}</button>
   </div>
 );
 
 /** Seção colapsável do cadastro. */
 const FormSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <div className="rounded-xl border border-slate-200 p-4">
-    <p className="text-[11px] font-bold uppercase tracking-wider text-[#0B1E38] mb-3">{title}</p>
+  <div className="rounded-xl border border-border p-4">
+    <p className="text-[11px] font-bold uppercase tracking-wider text-primary mb-3">{title}</p>
     {children}
   </div>
 );
@@ -66,9 +66,9 @@ const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigi
 const contractStatusColor = (status: Contract['status']) =>
   status === 'ATIVO' ? 'emerald' : status === 'A VENCER' ? 'amber' : 'red';
 
-const labelCls = 'block text-slate-600 mb-1 font-semibold uppercase text-[11px]';
+const labelCls = 'block text-fg-secondary mb-1 font-semibold uppercase text-[11px]';
 const inputCls =
-  'w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#E63946]/20 focus:border-[#E63946]/40';
+  'w-full border border-border rounded-lg p-2.5 text-fg bg-surface focus:outline-none focus:ring-2 focus:ring-danger/20 focus:border-danger/40';
 
 /** Converte "2026-12-30" (input date) para "30 DEZ 2026" (padrão exibido no sistema). */
 const formatDateBR = (iso: string): string => {
@@ -294,18 +294,18 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
   return (
     <div className="flex flex-col w-full p-4 md:p-8 gap-5 md:gap-6">
       {/* Header */}
-      <div className="flex justify-between items-center border-b border-slate-200 pb-5">
+      <div className="flex justify-between items-center border-b border-border pb-5">
         <div>
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+          <span className="text-xs font-semibold text-fg-secondary uppercase tracking-wider">
             Módulo de Receita Recorrente (MRR)
           </span>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">
+          <h1 className="text-2xl font-bold text-fg tracking-tight mt-0.5">
             Gestão de Contratos de Manutenção
           </h1>
         </div>
         <button
           onClick={openCreate}
-          className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
+          className="bg-danger hover:bg-danger-hover text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
         >
           <span className="material-symbols-outlined text-base">add</span> Novo Contrato
         </button>
@@ -313,28 +313,28 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
 
       {/* Contract Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-          <p className="text-xs font-semibold text-slate-500 uppercase">Receita Mensal Recorrente (MRR)</p>
-          <h2 className="font-data-mono text-3xl font-bold text-slate-900 mt-2">
+        <div className="bg-surface p-5 rounded-xl border border-border shadow-sm">
+          <p className="text-xs font-semibold text-fg-secondary uppercase">Receita Mensal Recorrente (MRR)</p>
+          <h2 className="font-data-mono text-3xl font-bold text-fg mt-2">
             {maskMoney(brl(totalMonthlyRec))}
           </h2>
         </div>
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-          <p className="text-xs font-semibold text-slate-500 uppercase">Contratos Vigentes</p>
+        <div className="bg-surface p-5 rounded-xl border border-border shadow-sm">
+          <p className="text-xs font-semibold text-fg-secondary uppercase">Contratos Vigentes</p>
           <h2 className="font-data-mono text-3xl font-bold text-emerald-600 mt-2">{contracts.length}</h2>
         </div>
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-          <p className="text-xs font-semibold text-slate-500 uppercase">Índice de Reajuste Anual</p>
-          <h2 className="font-data-mono text-3xl font-bold text-[#E63946] mt-2">IPCA (+4.8%)</h2>
+        <div className="bg-surface p-5 rounded-xl border border-border shadow-sm">
+          <p className="text-xs font-semibold text-fg-secondary uppercase">Índice de Reajuste Anual</p>
+          <h2 className="font-data-mono text-3xl font-bold text-danger mt-2">IPCA (+4.8%)</h2>
         </div>
       </div>
 
       {/* Lista de contratos */}
       {contracts.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm py-16 text-center text-slate-400">
-          <span className="material-symbols-outlined text-4xl text-slate-300">description</span>
-          <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">Nenhum contrato cadastrado</p>
-          <p className="text-xs text-slate-400 mt-1">Clique em &quot;Novo Contrato&quot; para começar.</p>
+        <div className="bg-surface rounded-xl shadow-sm py-16 text-center text-fg-muted">
+          <span className="material-symbols-outlined text-4xl text-fg-muted">description</span>
+          <p className="mt-2 text-sm font-bold text-fg-secondary uppercase tracking-wider">Nenhum contrato cadastrado</p>
+          <p className="text-xs text-fg-muted mt-1">Clique em &quot;Novo Contrato&quot; para começar.</p>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -344,7 +344,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
               <DataListRow
                 key={ctr.id}
                 leading={
-                  <span className="w-10 h-10 rounded-lg bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0">
+                  <span className="w-10 h-10 rounded-lg bg-navy/10 text-primary flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-lg">description</span>
                   </span>
                 }
@@ -360,19 +360,19 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                 }
                 center={
                   <div className="w-40">
-                    <div className="flex items-center justify-between text-[10px] text-slate-400 uppercase tracking-wider">
+                    <div className="flex items-center justify-between text-[10px] text-fg-muted uppercase tracking-wider">
                       <span>Bolsa de horas</span>
                       <span className="font-data-mono">
                         {ctr.usedHours}/{ctr.contractedHours}h
                       </span>
                     </div>
-                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden mt-1">
+                    <div className="h-2 bg-surface-3 rounded-full overflow-hidden mt-1">
                       <div
-                        className="bg-[#1A1A72] h-full rounded-full"
+                        className="bg-navy h-full rounded-full"
                         style={{ width: `${Math.min(100, pct)}%` }}
                       />
                     </div>
-                    <p className="text-[10px] text-slate-500 mt-1 font-data-mono">
+                    <p className="text-[10px] text-fg-secondary mt-1 font-data-mono">
                       Renova: {ctr.renewalDate} · {ctr.readjustmentIndex}
                     </p>
                   </div>
@@ -383,7 +383,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                       <span className="font-data-mono font-bold text-emerald-600 text-base md:text-lg block">
                         {maskMoney(brl(ctr.monthlyValue))}
                       </span>
-                      <span className="text-[10px] text-slate-400 uppercase">por mês</span>
+                      <span className="text-[10px] text-fg-muted uppercase">por mês</span>
                     </div>
                     <Badge color={contractStatusColor(ctr.status)}>{ctr.status}</Badge>
                     <RowAction icon="event_repeat" label="Rotinas, agenda, bolsa de horas e documentos" onClick={() => setDetailContract(ctr)} />
@@ -400,25 +400,25 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
       {/* Modal Add Contract */}
       {showModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white max-w-2xl w-full rounded-xl border border-slate-200 shadow-2xl relative max-h-[92vh] flex flex-col">
-            <div className="flex items-start justify-between p-6 border-b border-slate-100">
+          <div className="bg-surface max-w-2xl w-full rounded-xl border border-border shadow-2xl relative max-h-[92vh] flex flex-col">
+            <div className="flex items-start justify-between p-6 border-b border-border">
               <div>
-                <h3 className="text-lg font-bold text-slate-900 uppercase">{editingId ? 'Editar Contrato' : 'Novo Contrato Recorrente'}</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Vincule o contrato a um cliente da base e defina as condições comerciais.</p>
+                <h3 className="text-lg font-bold text-fg uppercase">{editingId ? 'Editar Contrato' : 'Novo Contrato Recorrente'}</h3>
+                <p className="text-xs text-fg-secondary mt-0.5">Vincule o contrato a um cliente da base e defina as condições comerciais.</p>
               </div>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none">
+              <button onClick={() => setShowModal(false)} className="text-fg-muted hover:text-fg-secondary font-bold text-lg leading-none">
                 ✕
               </button>
             </div>
 
             {clients.length === 0 ? (
               <div className="p-8 text-center">
-                <span className="material-symbols-outlined text-4xl text-slate-300">group_off</span>
-                <p className="mt-2 text-sm font-bold text-slate-600 uppercase">Nenhum cliente cadastrado</p>
-                <p className="text-xs text-slate-400 mt-1">Cadastre um cliente na aba <strong>Clientes</strong> antes de criar um contrato.</p>
+                <span className="material-symbols-outlined text-4xl text-fg-muted">group_off</span>
+                <p className="mt-2 text-sm font-bold text-fg-secondary uppercase">Nenhum cliente cadastrado</p>
+                <p className="text-xs text-fg-muted mt-1">Cadastre um cliente na aba <strong>Clientes</strong> antes de criar um contrato.</p>
                 <button
                   onClick={() => setShowModal(false)}
-                  className="mt-4 px-4 py-2 border border-slate-200 text-slate-700 font-semibold rounded-lg text-xs uppercase hover:bg-slate-50"
+                  className="mt-4 px-4 py-2 border border-border text-fg-secondary font-semibold rounded-lg text-xs uppercase hover:bg-surface-2"
                 >
                   Fechar
                 </button>
@@ -439,22 +439,22 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
 
                 {/* Dados do cliente selecionado (somente leitura) */}
                 {selectedClient && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 border border-slate-200 rounded-lg p-3 text-[11px]">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-surface-2 border border-border rounded-lg p-3 text-[11px]">
                     <div>
-                      <p className="text-slate-400 uppercase tracking-wider">Código</p>
-                      <p className="font-data-mono text-slate-800 font-semibold">{selectedClient.code}</p>
+                      <p className="text-fg-muted uppercase tracking-wider">Código</p>
+                      <p className="font-data-mono text-fg font-semibold">{selectedClient.code}</p>
                     </div>
                     <div>
-                      <p className="text-slate-400 uppercase tracking-wider">Segmento</p>
-                      <p className="text-slate-800 font-semibold">{selectedClient.segment}</p>
+                      <p className="text-fg-muted uppercase tracking-wider">Segmento</p>
+                      <p className="text-fg font-semibold">{selectedClient.segment}</p>
                     </div>
                     <div>
-                      <p className="text-slate-400 uppercase tracking-wider">Status cadastral</p>
-                      <p className="text-slate-800 font-semibold">{selectedClient.contractStatus}</p>
+                      <p className="text-fg-muted uppercase tracking-wider">Status cadastral</p>
+                      <p className="text-fg font-semibold">{selectedClient.contractStatus}</p>
                     </div>
                     <div>
-                      <p className="text-slate-400 uppercase tracking-wider">Contato</p>
-                      <p className="text-slate-800 font-semibold truncate">{selectedClient.contacts?.[0]?.name || '—'}</p>
+                      <p className="text-fg-muted uppercase tracking-wider">Contato</p>
+                      <p className="text-fg font-semibold truncate">{selectedClient.contacts?.[0]?.name || '—'}</p>
                     </div>
                   </div>
                 )}
@@ -590,7 +590,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
 
                 <FormSection title="Vigência & reajuste">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-                    <label className="flex items-center gap-2 text-slate-700"><input type="checkbox" checked={fRenovAuto} onChange={(e) => setFRenovAuto(e.target.checked)} /> Renovação automática</label>
+                    <label className="flex items-center gap-2 text-fg-secondary"><input type="checkbox" checked={fRenovAuto} onChange={(e) => setFRenovAuto(e.target.checked)} /> Renovação automática</label>
                     <div><label className={_labelCls}>Aviso de renovação (dias)</label><input type="number" min={0} value={fAvisoDias} onChange={(e) => setFAvisoDias(e.target.value === '' ? '' : Number(e.target.value))} className={_inputCls} /></div>
                     <div><label className={_labelCls}>Reajuste a cada (meses)</label><input type="number" min={1} value={fReajustePeriodo} onChange={(e) => setFReajustePeriodo(e.target.value === '' ? '' : Number(e.target.value))} className={_inputCls} /></div>
                   </div>
@@ -617,10 +617,10 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                       <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
                         <input value={r.situacao} onChange={(e) => setFSla((p) => p.map((x, idx) => (idx === i ? { ...x, situacao: e.target.value } : x)))} placeholder="Situação (ex.: Falha crítica)" className={_inputCls} />
                         <input value={r.prazo} onChange={(e) => setFSla((p) => p.map((x, idx) => (idx === i ? { ...x, prazo: e.target.value } : x)))} placeholder="Prazo (ex.: Até 4h)" className={_inputCls} />
-                        <button type="button" onClick={() => setFSla((p) => p.filter((_, idx) => idx !== i))} className="text-slate-400 hover:text-[#E63946] p-1">✕</button>
+                        <button type="button" onClick={() => setFSla((p) => p.filter((_, idx) => idx !== i))} className="text-fg-muted hover:text-danger p-1">✕</button>
                       </div>
                     ))}
-                    <button type="button" onClick={() => setFSla((p) => [...p, { situacao: '', prazo: '' }])} className="text-[11px] font-semibold text-[#1A1A72] hover:text-[#E63946] uppercase">+ Adicionar SLA</button>
+                    <button type="button" onClick={() => setFSla((p) => [...p, { situacao: '', prazo: '' }])} className="text-[11px] font-semibold text-primary hover:text-danger uppercase">+ Adicionar SLA</button>
                   </div>
                 </FormSection>
 
@@ -649,7 +649,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
 
                 <button
                   type="submit"
-                  className="w-full bg-[#E63946] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
+                  className="w-full bg-danger hover:bg-danger-hover text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
                 >
                   {editingId ? 'Salvar alterações do contrato' : 'Salvar e Ativar Contrato'}
                 </button>
@@ -662,17 +662,17 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
       {/* Modal PDF Preview */}
       {selectedPdfContract && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white max-w-lg w-full rounded-xl border border-slate-200 p-6 shadow-2xl relative">
-            <button onClick={() => setSelectedPdfContract(null)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 font-bold">
+          <div className="bg-surface max-w-lg w-full rounded-xl border border-border p-6 shadow-2xl relative">
+            <button onClick={() => setSelectedPdfContract(null)} className="absolute top-4 right-4 text-fg-muted hover:text-fg-secondary font-bold">
               ✕
             </button>
-            <div className="border-b border-slate-200 pb-3 mb-4">
-              <span className="font-data-mono text-xs text-[#E63946] font-bold">{selectedPdfContract.id}</span>
-              <h3 className="text-xl font-bold text-slate-900 uppercase">{selectedPdfContract.clientName}</h3>
-              <p className="text-xs text-slate-500">Contrato de Manutenção de Sistemas SDAI &amp; Hidráulicos</p>
+            <div className="border-b border-border pb-3 mb-4">
+              <span className="font-data-mono text-xs text-danger font-bold">{selectedPdfContract.id}</span>
+              <h3 className="text-xl font-bold text-fg uppercase">{selectedPdfContract.clientName}</h3>
+              <p className="text-xs text-fg-secondary">Contrato de Manutenção de Sistemas SDAI &amp; Hidráulicos</p>
             </div>
 
-            <div className="bg-slate-50 p-4 rounded-lg space-y-2 text-xs font-data-mono border border-slate-200 mb-6">
+            <div className="bg-surface-2 p-4 rounded-lg space-y-2 text-xs font-data-mono border border-border mb-6">
               <div><strong>Valor Mensal:</strong> R$ {selectedPdfContract.monthlyValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
               <div><strong>Renovação Automática:</strong> {selectedPdfContract.renewalDate}</div>
               <div><strong>Reajuste Aplicável:</strong> {selectedPdfContract.readjustmentIndex}</div>
@@ -684,13 +684,13 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => void printContract(selectedPdfContract)}
-                className="bg-[#E63946] hover:bg-[#a51515] text-white font-semibold px-5 py-2 rounded-lg text-xs uppercase"
+                className="bg-danger hover:bg-danger-hover text-white font-semibold px-5 py-2 rounded-lg text-xs uppercase"
               >
                 Imprimir Documento
               </button>
               <button
                 onClick={() => setSelectedPdfContract(null)}
-                className="px-4 border border-slate-200 text-slate-700 font-semibold rounded-lg text-xs"
+                className="px-4 border border-border text-fg-secondary font-semibold rounded-lg text-xs"
               >
                 Fechar
               </button>

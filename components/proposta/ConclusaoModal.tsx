@@ -75,23 +75,23 @@ export const ConclusaoModal: React.FC<Props> = ({ pedido, onClose, onConfirm }) 
     }
   };
 
-  const inputCls = 'w-full border border-slate-200 rounded-lg p-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20';
-  const labelCls = 'text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1 block';
+  const inputCls = 'w-full border border-border rounded-lg p-2.5 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-emerald-500/20';
+  const labelCls = 'text-[11px] font-bold uppercase tracking-wider text-fg-secondary mb-1 block';
 
   return (
     <div className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white max-w-lg w-full rounded-xl border border-slate-200 shadow-2xl max-h-[92vh] flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
+      <div className="bg-surface max-w-lg w-full rounded-xl border border-border shadow-2xl max-h-[92vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
           <div className="flex items-center gap-2">
             <CheckCircle className="w-5 h-5 text-emerald-600" />
             <h3 className="font-display text-base font-bold text-emerald-700 uppercase tracking-wide">Concluir & Receber</h3>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="text-fg-muted hover:text-fg-secondary"><X className="w-5 h-5" /></button>
         </div>
 
         <div className="px-6 py-5 space-y-4 overflow-y-auto">
-          <p className="text-xs text-slate-500">
-            Proposta <span className="font-data-mono font-bold text-slate-700">{pedido.numeroPedido}</span> — {pedido.clienteNome}.
+          <p className="text-xs text-fg-secondary">
+            Proposta <span className="font-data-mono font-bold text-fg-secondary">{pedido.numeroPedido}</span> — {pedido.clienteNome}.
             O recebimento será lançado no Financeiro (Receitas).
           </p>
 
@@ -117,7 +117,7 @@ export const ConclusaoModal: React.FC<Props> = ({ pedido, onClose, onConfirm }) 
                   type="button"
                   onClick={() => setForma(f)}
                   className={`py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider border-2 transition-colors ${
-                    forma === f ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                    forma === f ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-border text-fg-secondary hover:border-border-strong'
                   }`}
                 >
                   {f === 'avista' ? 'À vista' : 'Parcelado'}
@@ -148,17 +148,17 @@ export const ConclusaoModal: React.FC<Props> = ({ pedido, onClose, onConfirm }) 
                 </div>
               </div>
 
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
-                <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+              <div className="bg-surface-2 border border-border rounded-lg p-3">
+                <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-fg-secondary mb-2">
                   <span>Parcelas ({numParcelas}x)</span>
                   <span>{entrada > 0 ? `Entrada ${brl(entrada)}` : 'Sem entrada'}</span>
                 </div>
                 <div className="space-y-1 max-h-40 overflow-y-auto">
                   {parcelas.map((p) => (
                     <div key={p.numero} className="flex items-center justify-between text-xs">
-                      <span className="text-slate-600 font-semibold">{p.numero}/{p.total}</span>
-                      <span className="font-data-mono text-slate-400">{p.vencimento}</span>
-                      <span className="font-data-mono font-bold text-slate-800">{brl(p.valor)}</span>
+                      <span className="text-fg-secondary font-semibold">{p.numero}/{p.total}</span>
+                      <span className="font-data-mono text-fg-muted">{p.vencimento}</span>
+                      <span className="font-data-mono font-bold text-fg">{brl(p.valor)}</span>
                     </div>
                   ))}
                 </div>
@@ -168,7 +168,7 @@ export const ConclusaoModal: React.FC<Props> = ({ pedido, onClose, onConfirm }) 
                   </p>
                 )}
               </div>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-fg-muted">
                 Cada parcela vira uma receita com vencimento no Financeiro. A entrada entra como recebida; as parcelas
                 ficam pendentes até você confirmar o pagamento de cada uma.
               </p>
@@ -176,8 +176,8 @@ export const ConclusaoModal: React.FC<Props> = ({ pedido, onClose, onConfirm }) 
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2 shrink-0">
-          <button onClick={onClose} className="px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-slate-600 hover:bg-slate-100">
+        <div className="px-6 py-4 border-t border-border flex justify-end gap-2 shrink-0">
+          <button onClick={onClose} className="px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-fg-secondary hover:bg-surface-3">
             Cancelar
           </button>
           <button

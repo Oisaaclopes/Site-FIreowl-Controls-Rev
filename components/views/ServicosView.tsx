@@ -40,16 +40,16 @@ export const ServicosView: React.FC<ServicosViewProps> = ({
   return (
     <div className="flex flex-col w-full p-4 md:p-8 gap-5 md:gap-6">
       {/* Header */}
-      <div className="flex justify-between items-center border-b border-slate-200 pb-5">
+      <div className="flex justify-between items-center border-b border-border pb-5">
         <div>
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+          <span className="text-xs font-semibold text-fg-secondary uppercase tracking-wider">
             Engenharia de Incêndio &amp; Operações de Campo SDAI
           </span>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">
+          <h1 className="text-2xl font-bold text-fg tracking-tight mt-0.5">
             Catálogo de Serviços &amp; Preços Normativos
           </h1>
         </div>
-        <span className="hidden md:flex items-center gap-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide">
+        <span className="hidden md:flex items-center gap-1.5 text-xs font-semibold text-fg-muted uppercase tracking-wide">
           <span className="material-symbols-outlined text-base">construction</span>
           {services.length} serviço(s)
         </span>
@@ -59,9 +59,9 @@ export const ServicosView: React.FC<ServicosViewProps> = ({
       {(
         <>
           {services.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm py-16 text-center text-slate-400">
-              <span className="material-symbols-outlined text-4xl text-slate-300">construction</span>
-              <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">
+            <div className="bg-surface rounded-xl shadow-sm py-16 text-center text-fg-muted">
+              <span className="material-symbols-outlined text-4xl text-fg-muted">construction</span>
+              <p className="mt-2 text-sm font-bold text-fg-secondary uppercase tracking-wider">
                 Nenhum serviço no catálogo
               </p>
             </div>
@@ -72,7 +72,7 @@ export const ServicosView: React.FC<ServicosViewProps> = ({
                   key={s.id}
                   title={
                     <div>
-                      <span className="font-data-mono text-[11px] font-bold text-[#1A1A72] block normal-case">
+                      <span className="font-data-mono text-[11px] font-bold text-primary block normal-case">
                         {s.code}
                       </span>
                       <span className="uppercase text-sm">{s.title}</span>
@@ -81,8 +81,8 @@ export const ServicosView: React.FC<ServicosViewProps> = ({
                   meta={<RowMeta label="Categoria" value={s.category} />}
                   center={
                     <div className="flex flex-col items-start md:items-center gap-1.5">
-                      <span className="flex items-center gap-1 text-slate-600 font-medium">
-                        <span className="material-symbols-outlined text-sm text-slate-400">schedule</span>
+                      <span className="flex items-center gap-1 text-fg-secondary font-medium">
+                        <span className="material-symbols-outlined text-sm text-fg-muted">schedule</span>
                         {s.estimatedHours} horas técnicas
                       </span>
                       <Badge color="blue">{s.nbrNormRef}</Badge>
@@ -114,80 +114,80 @@ export const ServicosView: React.FC<ServicosViewProps> = ({
       {/* Modal Editar Serviço */}
       {editService && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white max-w-md w-full rounded-xl border border-slate-200 p-6 shadow-2xl relative">
+          <div className="bg-surface max-w-md w-full rounded-xl border border-border p-6 shadow-2xl relative">
             <button
               onClick={() => setEditService(null)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 font-bold"
+              className="absolute top-4 right-4 text-fg-muted hover:text-fg-secondary font-bold"
             >
               ✕
             </button>
-            <h3 className="text-lg font-bold text-slate-900 uppercase mb-4">Editar Serviço</h3>
+            <h3 className="text-lg font-bold text-fg uppercase mb-4">Editar Serviço</h3>
             <form onSubmit={handleSaveEdit} className="space-y-4 text-xs font-medium">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-600 mb-1 font-semibold uppercase">Código</label>
+                  <label className="block text-fg-secondary mb-1 font-semibold uppercase">Código</label>
                   <input
                     type="text"
                     value={editService.code}
                     onChange={(e) => setEditService({ ...editService, code: e.target.value })}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                    className="w-full border border-border rounded-lg p-2.5 text-fg font-data-mono focus:outline-none focus:ring-2 focus:ring-danger/20"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-600 mb-1 font-semibold uppercase">Norma (NBR/IT)</label>
+                  <label className="block text-fg-secondary mb-1 font-semibold uppercase">Norma (NBR/IT)</label>
                   <input
                     type="text"
                     value={editService.nbrNormRef}
                     onChange={(e) => setEditService({ ...editService, nbrNormRef: e.target.value })}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                    className="w-full border border-border rounded-lg p-2.5 text-fg focus:outline-none focus:ring-2 focus:ring-danger/20"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-slate-600 mb-1 font-semibold uppercase">Título do Serviço</label>
+                <label className="block text-fg-secondary mb-1 font-semibold uppercase">Título do Serviço</label>
                 <input
                   type="text"
                   required
                   value={editService.title}
                   onChange={(e) => setEditService({ ...editService, title: e.target.value })}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                  className="w-full border border-border rounded-lg p-2.5 text-fg focus:outline-none focus:ring-2 focus:ring-danger/20"
                 />
               </div>
               <div>
-                <label className="block text-slate-600 mb-1 font-semibold uppercase">Categoria</label>
+                <label className="block text-fg-secondary mb-1 font-semibold uppercase">Categoria</label>
                 <input
                   type="text"
                   value={editService.category}
                   onChange={(e) => setEditService({ ...editService, category: e.target.value })}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                  className="w-full border border-border rounded-lg p-2.5 text-fg focus:outline-none focus:ring-2 focus:ring-danger/20"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-600 mb-1 font-semibold uppercase">Horas estimadas</label>
+                  <label className="block text-fg-secondary mb-1 font-semibold uppercase">Horas estimadas</label>
                   <input
                     type="number"
                     min={0}
                     value={editService.estimatedHours}
                     onChange={(e) => setEditService({ ...editService, estimatedHours: Number(e.target.value) })}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                    className="w-full border border-border rounded-lg p-2.5 text-fg font-data-mono focus:outline-none focus:ring-2 focus:ring-danger/20"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-600 mb-1 font-semibold uppercase">Valor padrão (R$)</label>
+                  <label className="block text-fg-secondary mb-1 font-semibold uppercase">Valor padrão (R$)</label>
                   <input
                     type="number"
                     min={0}
                     step="0.01"
                     value={editService.standardValue}
                     onChange={(e) => setEditService({ ...editService, standardValue: Number(e.target.value) })}
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 font-data-mono focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                    className="w-full border border-border rounded-lg p-2.5 text-fg font-data-mono focus:outline-none focus:ring-2 focus:ring-danger/20"
                   />
                 </div>
               </div>
               <button
                 type="submit"
-                className="w-full bg-[#E63946] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
+                className="w-full bg-danger hover:bg-danger-hover text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
               >
                 Salvar Alterações
               </button>

@@ -73,11 +73,11 @@ const ROLE_LABELS: Record<UserRole, string> = {
 };
 
 const inputCls =
-  'w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20 focus:border-[#1A1A72]/40';
-const labelCls = 'block text-slate-600 mb-1 font-semibold uppercase text-[11px]';
+  'w-full border border-border rounded-lg p-2.5 text-fg bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40';
+const labelCls = 'block text-fg-secondary mb-1 font-semibold uppercase text-[11px]';
 
 const SettingIcon: React.FC<{ icon: string }> = ({ icon }) => (
-  <span className="w-10 h-10 rounded-lg bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0">
+  <span className="w-10 h-10 rounded-lg bg-navy/10 text-primary flex items-center justify-center shrink-0">
     <span className="material-symbols-outlined text-lg">{icon}</span>
   </span>
 );
@@ -92,22 +92,22 @@ const ScheduleEditor: React.FC<{ value: WorkSchedule; onChange: (s: WorkSchedule
         <div key={i} className="flex items-center gap-2">
           <label className="flex items-center gap-1.5 w-20 shrink-0 cursor-pointer">
             <input type="checkbox" checked={d.works} onChange={(e) => setDay(i, { works: e.target.checked })} />
-            <span className="text-[11px] font-semibold text-slate-600">{WEEKDAY_SHORT[i]}</span>
+            <span className="text-[11px] font-semibold text-fg-secondary">{WEEKDAY_SHORT[i]}</span>
           </label>
           <input
             type="time"
             value={d.start}
             disabled={!d.works}
             onChange={(e) => setDay(i, { start: e.target.value })}
-            className={`${inputCls} font-data-mono py-1.5 disabled:bg-slate-100 disabled:text-slate-300`}
+            className={`${inputCls} font-data-mono py-1.5 disabled:bg-surface-3 disabled:text-fg-muted`}
           />
-          <span className="text-slate-400 text-[11px]">às</span>
+          <span className="text-fg-muted text-[11px]">às</span>
           <input
             type="time"
             value={d.end}
             disabled={!d.works}
             onChange={(e) => setDay(i, { end: e.target.value })}
-            className={`${inputCls} font-data-mono py-1.5 disabled:bg-slate-100 disabled:text-slate-300`}
+            className={`${inputCls} font-data-mono py-1.5 disabled:bg-surface-3 disabled:text-fg-muted`}
           />
           <div className="flex items-center gap-1 shrink-0">
             <input
@@ -116,9 +116,9 @@ const ScheduleEditor: React.FC<{ value: WorkSchedule; onChange: (s: WorkSchedule
               value={d.lunchMinutes}
               disabled={!d.works}
               onChange={(e) => setDay(i, { lunchMinutes: Number(e.target.value) })}
-              className={`${inputCls} font-data-mono py-1.5 w-16 text-center disabled:bg-slate-100 disabled:text-slate-300`}
+              className={`${inputCls} font-data-mono py-1.5 w-16 text-center disabled:bg-surface-3 disabled:text-fg-muted`}
             />
-            <span className="text-slate-400 text-[10px]">min almoço</span>
+            <span className="text-fg-muted text-[10px]">min almoço</span>
           </div>
         </div>
       ))}
@@ -677,22 +677,22 @@ export const ContaView: React.FC<ContaViewProps> = ({
   return (
     <div className="flex flex-col w-full p-4 md:p-8 gap-5 md:gap-6">
       {/* Header */}
-      <div className="border-b border-slate-200 pb-5">
-        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+      <div className="border-b border-border pb-5">
+        <span className="text-xs font-semibold text-fg-secondary uppercase tracking-wider">
           Configurações da Empresa &amp; Rastreabilidade Integrada
         </span>
-        <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">Configurações</h1>
+        <h1 className="text-2xl font-bold text-fg tracking-tight mt-0.5">Configurações</h1>
       </div>
 
       {/* Tabs centralizadas */}
       <div className="flex justify-center">
-        <div className="inline-flex bg-slate-100 rounded-lg p-1">
+        <div className="inline-flex bg-surface-3 rounded-lg p-1">
           {TABS.map((t) => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
               className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wide transition-colors ${
-                tab === t.key ? 'bg-white text-[#1A1A72] shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                tab === t.key ? 'bg-surface text-primary shadow-sm' : 'text-fg-secondary hover:text-fg-secondary'
               }`}
             >
               <span className="material-symbols-outlined text-base">{t.icon}</span>
@@ -706,14 +706,14 @@ export const ContaView: React.FC<ContaViewProps> = ({
       {tab === 'conta' && (
         <div className="flex flex-col gap-6">
           {/* Card: Dados da empresa */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <div className="bg-surface p-6 rounded-xl border border-border shadow-sm">
             <div className="flex items-center gap-2 mb-4">
               <SettingIcon icon="apartment" />
               <div>
-                <h3 className="font-display text-sm font-bold uppercase tracking-wide text-[#1A1A72]">
+                <h3 className="font-display text-sm font-bold uppercase tracking-wide text-primary">
                   Dados cadastrais da empresa
                 </h3>
-                <p className="text-[11px] text-slate-400">Usados na capa e nas propostas comerciais.</p>
+                <p className="text-[11px] text-fg-muted">Usados na capa e nas propostas comerciais.</p>
               </div>
             </div>
 
@@ -738,7 +738,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
                     placeholder="Ex.: Fireowl Controls"
                     className={`${inputCls} font-bold`}
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">Aparece no cabeçalho dos documentos.</p>
+                  <p className="text-[10px] text-fg-muted mt-1">Aparece no cabeçalho dos documentos.</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -803,9 +803,9 @@ export const ContaView: React.FC<ContaViewProps> = ({
               </div>
 
               {/* §8 — Biblioteca de textos institucionais (usados na página "Áreas de Atuação") */}
-              <div className="pt-3 border-t border-slate-200">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Textos institucionais das propostas</p>
-                <p className="text-[11px] text-slate-400 mb-3">Aparecem na página &ldquo;Áreas de Atuação&rdquo;. Em branco, o texto padrão do sistema é usado.</p>
+              <div className="pt-3 border-t border-border">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-fg-secondary mb-1">Textos institucionais das propostas</p>
+                <p className="text-[11px] text-fg-muted mb-3">Aparecem na página &ldquo;Áreas de Atuação&rdquo;. Em branco, o texto padrão do sistema é usado.</p>
                 <div className="mb-3">
                   <label className={labelCls}>Apresentação geral / multi-área</label>
                   <textarea
@@ -835,14 +835,14 @@ export const ContaView: React.FC<ContaViewProps> = ({
                         className={inputCls}
                       />
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[10px] uppercase tracking-wider text-slate-400">Capa:</span>
+                        <span className="text-[10px] uppercase tracking-wider text-fg-muted">Capa:</span>
                         {profile.capaAreas?.[id] ? (
                           <>
                             <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5"><span className="material-symbols-outlined text-[13px]">check_circle</span>definida</span>
-                            <button type="button" onClick={() => handleCapaAreaRemove(id)} className="text-[10px] font-bold uppercase text-slate-400 hover:text-[#E63946]">remover</button>
+                            <button type="button" onClick={() => handleCapaAreaRemove(id)} className="text-[10px] font-bold uppercase text-fg-muted hover:text-danger">remover</button>
                           </>
                         ) : (
-                          <label className="text-[10px] font-bold uppercase text-[#1A1A72] hover:text-[#E63946] cursor-pointer">
+                          <label className="text-[10px] font-bold uppercase text-primary hover:text-danger cursor-pointer">
                             {capaBusy === id ? 'enviando…' : 'enviar imagem'}
                             <input type="file" accept="image/*" className="hidden" disabled={capaBusy === id}
                               onChange={(e) => { const f = e.target.files?.[0]; if (f) handleCapaAreaUpload(id, f); e.target.value = ''; }} />
@@ -852,13 +852,13 @@ export const ContaView: React.FC<ContaViewProps> = ({
                     </div>
                   ))}
                 </div>
-                <p className="text-[10px] text-slate-400 mt-2">Capa por área: usada na proposta/orçamento quando o pedido não tem capa própria. Enviada ao salvar os dados da empresa.</p>
+                <p className="text-[10px] text-fg-muted mt-2">Capa por área: usada na proposta/orçamento quando o pedido não tem capa própria. Enviada ao salvar os dados da empresa.</p>
               </div>
 
               {/* §1 — Identidade visual (logos oficiais) */}
-              <div className="pt-3 border-t border-slate-200">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Identidade visual (logos)</p>
-                <p className="text-[11px] text-slate-400 mb-3">Prefira arquivos <b>SVG</b> para preservar a qualidade da marca em documentos impressos e PDFs (o sistema converte para PNG de alta resolução automaticamente).</p>
+              <div className="pt-3 border-t border-border">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-fg-secondary mb-1">Identidade visual (logos)</p>
+                <p className="text-[11px] text-fg-muted mb-3">Prefira arquivos <b>SVG</b> para preservar a qualidade da marca em documentos impressos e PDFs (o sistema converte para PNG de alta resolução automaticamente).</p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {([
                     ['logoPrincipalPath', 'Logo principal', 'principal'],
@@ -866,21 +866,21 @@ export const ContaView: React.FC<ContaViewProps> = ({
                     ['logoEscuroPath', 'Logo p/ fundo escuro', 'escuro'],
                     ['logoIconePath', 'Ícone / símbolo', 'icone'],
                   ] as const).map(([field, nome, slug]) => (
-                    <div key={field} className="rounded-lg border border-slate-200 p-2 flex flex-col items-center gap-1.5">
-                      <span className="text-[10px] font-semibold text-slate-500 text-center">{nome}</span>
-                      <div className={`w-full h-14 rounded flex items-center justify-center overflow-hidden ${slug === 'escuro' ? 'bg-[#0B1E38]' : 'bg-slate-50 border border-slate-100'}`}>
+                    <div key={field} className="rounded-lg border border-border p-2 flex flex-col items-center gap-1.5">
+                      <span className="text-[10px] font-semibold text-fg-secondary text-center">{nome}</span>
+                      <div className={`w-full h-14 rounded flex items-center justify-center overflow-hidden ${slug === 'escuro' ? 'bg-navy-3' : 'bg-surface-2 border border-border'}`}>
                         {logoPreview[field] ? (
                           <img src={logoPreview[field]} alt={nome} className="max-h-12 max-w-full object-contain" />
                         ) : profile[field] ? (
                           <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5"><span className="material-symbols-outlined text-[14px]">check_circle</span>definido</span>
                         ) : (
-                          <span className="material-symbols-outlined text-slate-300 text-xl">image</span>
+                          <span className="material-symbols-outlined text-fg-muted text-xl">image</span>
                         )}
                       </div>
                       {profile[field] ? (
-                        <button type="button" onClick={() => handleProfileLogoRemove(field)} className="text-[10px] font-bold uppercase text-slate-400 hover:text-[#E63946]">remover</button>
+                        <button type="button" onClick={() => handleProfileLogoRemove(field)} className="text-[10px] font-bold uppercase text-fg-muted hover:text-danger">remover</button>
                       ) : (
-                        <label className={`text-[10px] font-bold uppercase cursor-pointer ${logoBusy === field ? 'text-slate-400' : 'text-[#1A1A72] hover:text-[#E63946]'}`}>
+                        <label className={`text-[10px] font-bold uppercase cursor-pointer ${logoBusy === field ? 'text-fg-muted' : 'text-primary hover:text-danger'}`}>
                           {logoBusy === field ? 'enviando…' : 'enviar'}
                           <input type="file" accept="image/svg+xml,image/png,image/*" className="hidden" disabled={logoBusy === field}
                             onChange={(e) => { const f = e.target.files?.[0]; if (f) handleProfileLogoUpload(field, slug, f); e.target.value = ''; }} />
@@ -892,8 +892,8 @@ export const ContaView: React.FC<ContaViewProps> = ({
               </div>
 
               {/* §8 — Textos da página "Experiência e Capacidade Técnica" + limites */}
-              <div className="pt-3 border-t border-slate-200">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">Experiência e Capacidade Técnica</p>
+              <div className="pt-3 border-t border-border">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-fg-secondary mb-2">Experiência e Capacidade Técnica</p>
                 <div className="space-y-3">
                   <div>
                     <label className={labelCls}>Texto — Empresas Atendidas</label>
@@ -918,7 +918,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
 
               <button
                 type="submit"
-                className="bg-[#1A1A72] hover:bg-[#12124f] text-white font-semibold py-2.5 px-5 rounded-lg uppercase tracking-wider text-xs transition-colors shadow-sm flex items-center gap-1.5"
+                className="bg-navy hover:bg-navy-3 text-white font-semibold py-2.5 px-5 rounded-lg uppercase tracking-wider text-xs transition-colors shadow-sm flex items-center gap-1.5"
               >
                 <span className="material-symbols-outlined text-base">save</span> Salvar dados da empresa
               </button>
@@ -936,14 +936,14 @@ export const ContaView: React.FC<ContaViewProps> = ({
           />
 
           {/* Card: Permissões (RBAC) */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <div className="bg-surface p-6 rounded-xl border border-border shadow-sm">
             <div className="flex items-center gap-2 mb-4">
               <SettingIcon icon="admin_panel_settings" />
               <div>
-                <h3 className="font-display text-sm font-bold uppercase tracking-wide text-[#1A1A72]">
+                <h3 className="font-display text-sm font-bold uppercase tracking-wide text-primary">
                   Matriz de permissões (RBAC)
                 </h3>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-fg-muted">
                   {canSwitchRole
                     ? 'Simule um perfil para pré-visualizar o acesso (não altera o perfil real).'
                     : 'Seu perfil é definido pela autenticação e não pode ser alterado aqui.'}
@@ -962,9 +962,9 @@ export const ContaView: React.FC<ContaViewProps> = ({
                 <option value="FINANCEIRO">FINANCEIRO — Receitas, despesas &amp; DRE</option>
               </select>
             ) : (
-              <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
-                <span className="text-xs font-semibold text-slate-700">Perfil atual</span>
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[#1A1A72] bg-[#1A1A72]/5 px-2.5 py-1 rounded-full">
+              <div className="flex items-center justify-between bg-surface-2 border border-border rounded-lg px-3 py-2.5">
+                <span className="text-xs font-semibold text-fg-secondary">Perfil atual</span>
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-primary bg-navy/5 px-2.5 py-1 rounded-full">
                   <span className="material-symbols-outlined text-sm">verified_user</span>
                   {userRole}
                 </span>
@@ -974,7 +974,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
 
           {/* Log de auditoria */}
           <div>
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+            <h3 className="text-xs font-bold text-fg-secondary uppercase tracking-wider mb-3">
               Log geral de auditoria do sistema
             </h3>
             <div className="flex flex-col gap-3">
@@ -986,13 +986,13 @@ export const ContaView: React.FC<ContaViewProps> = ({
                   meta={
                     <>
                       <RowMeta label="Usuário" value={log.user} />
-                      <span className="text-slate-500 truncate max-w-[260px] inline-block align-bottom">{log.details}</span>
+                      <span className="text-fg-secondary truncate max-w-[260px] inline-block align-bottom">{log.details}</span>
                     </>
                   }
                   center={
                     <div className="text-left md:text-center">
-                      <p className="font-data-mono text-slate-700 font-semibold">{log.timestamp}</p>
-                      <p className="font-data-mono text-[10px] text-slate-400">{log.ip}</p>
+                      <p className="font-data-mono text-fg-secondary font-semibold">{log.timestamp}</p>
+                      <p className="font-data-mono text-[10px] text-fg-muted">{log.ip}</p>
                     </div>
                   }
                   right={<Badge color="slate">{log.module}</Badge>}
@@ -1063,18 +1063,18 @@ export const ContaView: React.FC<ContaViewProps> = ({
           </div>
 
           {/* Marcas parceiras */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <div className="bg-surface p-6 rounded-xl border border-border shadow-sm">
             <div className="flex items-center gap-2 mb-4">
               <SettingIcon icon="layers" />
               <div>
-                <h3 className="font-display text-sm font-bold uppercase tracking-wide text-[#1A1A72]">
+                <h3 className="font-display text-sm font-bold uppercase tracking-wide text-primary">
                   Biblioteca de marcas parceiras
                 </h3>
-                <p className="text-[11px] text-slate-400">Fabricantes homologados para o seletor de propostas.</p>
+                <p className="text-[11px] text-fg-muted">Fabricantes homologados para o seletor de propostas.</p>
               </div>
             </div>
 
-            <form onSubmit={handleCreateBrand} className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2 text-xs mb-4">
+            <form onSubmit={handleCreateBrand} className="bg-surface-2 p-3 rounded-lg border border-border space-y-2 text-xs mb-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                 <input
                   type="text"
@@ -1109,7 +1109,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
                 />
                 <button
                   type="submit"
-                  className="shrink-0 px-4 bg-[#E63946] hover:bg-[#a51515] text-white font-bold rounded-lg uppercase text-xs flex items-center gap-1"
+                  className="shrink-0 px-4 bg-danger hover:bg-danger-hover text-white font-bold rounded-lg uppercase text-xs flex items-center gap-1"
                 >
                   <span className="material-symbols-outlined text-base">add</span> Cadastrar
                 </button>
@@ -1124,9 +1124,9 @@ export const ContaView: React.FC<ContaViewProps> = ({
                     (() => {
                       const logo = pb.logoUrl && (/^https?:\/\//i.test(pb.logoUrl) ? pb.logoUrl : brandLogoUrls[pb.logoUrl]);
                       return logo ? (
-                        <img src={logo} alt={`Logo ${pb.name}`} className="w-10 h-10 rounded-lg border border-slate-100 bg-white object-contain p-1 shrink-0" />
+                        <img src={logo} alt={`Logo ${pb.name}`} className="w-10 h-10 rounded-lg border border-border bg-surface object-contain p-1 shrink-0" />
                       ) : (
-                        <span className="w-10 h-10 bg-[#1A1A72] text-[#FFD700] font-bold rounded-lg flex items-center justify-center text-xs shrink-0">
+                        <span className="w-10 h-10 bg-navy text-[#FFD700] font-bold rounded-lg flex items-center justify-center text-xs shrink-0">
                           {pb.name.slice(0, 2).toUpperCase()}
                         </span>
                       );
@@ -1159,11 +1159,11 @@ export const ContaView: React.FC<ContaViewProps> = ({
           </div>
 
           {/* Sub-tabs de Homologação */}
-          <div className="flex border-b border-slate-200 gap-4 font-semibold text-xs uppercase tracking-wider">
+          <div className="flex border-b border-border gap-4 font-semibold text-xs uppercase tracking-wider">
             <button
               onClick={() => setHomolSubTab('clientes')}
               className={`pb-2 border-b-2 transition-colors ${
-                homolSubTab === 'clientes' ? 'border-[#1A1A72] text-[#1A1A72]' : 'border-transparent text-slate-400 hover:text-slate-600'
+                homolSubTab === 'clientes' ? 'border-primary text-primary' : 'border-transparent text-fg-muted hover:text-fg-secondary'
               }`}
             >
               Clientes Provisórios
@@ -1171,7 +1171,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
             <button
               onClick={() => setHomolSubTab('marcas')}
               className={`pb-2 border-b-2 transition-colors ${
-                homolSubTab === 'marcas' ? 'border-[#1A1A72] text-[#1A1A72]' : 'border-transparent text-slate-400 hover:text-slate-600'
+                homolSubTab === 'marcas' ? 'border-primary text-primary' : 'border-transparent text-fg-muted hover:text-fg-secondary'
               }`}
             >
               Marcas de Campo
@@ -1179,7 +1179,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
             <button
               onClick={() => setHomolSubTab('itens')}
               className={`pb-2 border-b-2 transition-colors ${
-                homolSubTab === 'itens' ? 'border-[#1A1A72] text-[#1A1A72]' : 'border-transparent text-slate-400 hover:text-slate-600'
+                homolSubTab === 'itens' ? 'border-primary text-primary' : 'border-transparent text-fg-muted hover:text-fg-secondary'
               }`}
             >
               Itens a Precificar / Homologar
@@ -1188,26 +1188,26 @@ export const ContaView: React.FC<ContaViewProps> = ({
 
           {/* Conteúdo da Sub-tab Clientes */}
           {homolSubTab === 'clientes' && (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
+            <div className="bg-surface rounded-xl border border-border shadow-sm p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <h4 className="text-xs font-bold text-fg-secondary uppercase tracking-wider">
                   Clientes em Validação Comercial
                 </h4>
-                <span className="text-[10px] text-slate-400">{provClients.length} pendente(s)</span>
+                <span className="text-[10px] text-fg-muted">{provClients.length} pendente(s)</span>
               </div>
 
               {provClients.length === 0 ? (
-                <p className="text-[11px] text-slate-400 italic py-6 text-center">Nenhum cliente provisório aguardando homologação.</p>
+                <p className="text-[11px] text-fg-muted italic py-6 text-center">Nenhum cliente provisório aguardando homologação.</p>
               ) : (
                 <div className="space-y-2">
                   {provClients.map((c) => (
-                    <div key={c.id} className="border border-slate-200 rounded-lg p-3 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div key={c.id} className="border border-border rounded-lg p-3 bg-surface-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <div>
                         <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 uppercase">
                           PROVISÓRIO &middot; {c.createdByRole || 'CAMPO'}
                         </span>
-                        <p className="font-bold text-slate-900 text-xs mt-1">{c.name || 'Sem nome'}</p>
-                        <p className="text-[10px] text-slate-500 font-data-mono">
+                        <p className="font-bold text-fg text-xs mt-1">{c.name || 'Sem nome'}</p>
+                        <p className="text-[10px] text-fg-secondary font-data-mono">
                           {c.cnpj ? `CNPJ: ${c.cnpj}` : 'Sem CNPJ'}{c.segment ? ` · ${c.segment}` : ''}
                         </p>
                       </div>
@@ -1236,24 +1236,24 @@ export const ContaView: React.FC<ContaViewProps> = ({
 
           {/* Conteúdo da Sub-tab Marcas */}
           {homolSubTab === 'marcas' && (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
-              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            <div className="bg-surface rounded-xl border border-border shadow-sm p-4 space-y-3">
+              <h4 className="text-xs font-bold text-fg-secondary uppercase tracking-wider">
                 Marcas Detectadas em Campo
               </h4>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-fg-secondary">
                 Marcas encontradas em campo que não pertencem ao catálogo oficial de marcas parceiras homologadas.
               </p>
               {catMarcas.length === 0 ? (
-                <p className="text-[11px] text-slate-400 italic py-6 text-center">Nenhuma marca de campo pendente.</p>
+                <p className="text-[11px] text-fg-muted italic py-6 text-center">Nenhuma marca de campo pendente.</p>
               ) : (
                 catMarcas.map((m) => {
                   const nome = String(m.dados.nome || m.dados.name || 'Marca de campo');
                   const origem = String(m.dados.origem || m.dados.detectada_em || '');
                   return (
-                    <div key={m.id} className="border border-slate-200 rounded-lg p-3 bg-slate-50 flex items-center justify-between gap-2">
+                    <div key={m.id} className="border border-border rounded-lg p-3 bg-surface-2 flex items-center justify-between gap-2">
                       <div>
-                        <p className="font-bold text-slate-900 text-xs">{nome}</p>
-                        {origem && <p className="text-[10px] text-slate-500">Detectada em: {origem}</p>}
+                        <p className="font-bold text-fg text-xs">{nome}</p>
+                        {origem && <p className="text-[10px] text-fg-secondary">Detectada em: {origem}</p>}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <button
@@ -1273,15 +1273,15 @@ export const ContaView: React.FC<ContaViewProps> = ({
 
           {/* Conteúdo da Sub-tab Itens */}
           {homolSubTab === 'itens' && (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
-              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            <div className="bg-surface rounded-xl border border-border shadow-sm p-4 space-y-3">
+              <h4 className="text-xs font-bold text-fg-secondary uppercase tracking-wider">
                 Itens de Catálogo a Precificar
               </h4>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-fg-secondary">
                 Materiais informados em texto livre por técnicos. Definir preço e fornecedor para converter em produto do Estoque/Serviços.
               </p>
               {catItens.length === 0 ? (
-                <p className="text-[11px] text-slate-400 italic py-6 text-center">Nenhum item de campo pendente de precificação.</p>
+                <p className="text-[11px] text-fg-muted italic py-6 text-center">Nenhum item de campo pendente de precificação.</p>
               ) : (
                 catItens.map((it) => {
                   const nome = String(it.dados.nome || it.dados.descricao || it.dados.item || 'Item de campo');
@@ -1290,8 +1290,8 @@ export const ContaView: React.FC<ContaViewProps> = ({
                     <div key={it.id} className="border border-amber-100 bg-amber-50/50 rounded-lg p-3 flex items-center justify-between gap-2">
                       <div>
                         <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-200 text-amber-900 uppercase">Sem preço</span>
-                        <p className="font-bold text-slate-900 text-xs mt-1">{nome}</p>
-                        {obs && <p className="text-[10px] text-slate-500 font-data-mono">{obs}</p>}
+                        <p className="font-bold text-fg text-xs mt-1">{nome}</p>
+                        {obs && <p className="text-[10px] text-fg-secondary font-data-mono">{obs}</p>}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <button
@@ -1319,13 +1319,13 @@ export const ContaView: React.FC<ContaViewProps> = ({
           {/* Modal: mesclar cliente provisório com um oficial */}
           {mergeTarget && (
             <div className="fixed inset-0 z-[60] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-white w-full max-w-md rounded-xl shadow-2xl border border-slate-200 flex flex-col">
-                <div className="flex items-center justify-between p-4 border-b border-slate-100">
-                  <h3 className="text-sm font-bold text-slate-900 uppercase">Mesclar cliente provisório</h3>
-                  <button onClick={() => setMergeTarget(null)} className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none">✕</button>
+              <div className="bg-surface w-full max-w-md rounded-xl shadow-2xl border border-border flex flex-col">
+                <div className="flex items-center justify-between p-4 border-b border-border">
+                  <h3 className="text-sm font-bold text-fg uppercase">Mesclar cliente provisório</h3>
+                  <button onClick={() => setMergeTarget(null)} className="text-fg-muted hover:text-fg-secondary font-bold text-lg leading-none">✕</button>
                 </div>
                 <div className="p-4 space-y-3">
-                  <p className="text-[11px] text-slate-500">
+                  <p className="text-[11px] text-fg-secondary">
                     O provisório <strong>{mergeTarget.name}</strong> será unificado ao cliente oficial escolhido.
                     Relatórios, pendências, dispositivos, OS, ciclos, contratos e lançamentos são reatribuídos e o provisório é removido.
                   </p>
@@ -1341,12 +1341,12 @@ export const ContaView: React.FC<ContaViewProps> = ({
                     </select>
                   </div>
                 </div>
-                <div className="flex items-center justify-end gap-2 p-4 border-t border-slate-100">
-                  <button onClick={() => setMergeTarget(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg uppercase">Cancelar</button>
+                <div className="flex items-center justify-end gap-2 p-4 border-t border-border">
+                  <button onClick={() => setMergeTarget(null)} className="px-4 py-2 text-xs font-semibold text-fg-secondary hover:bg-surface-3 rounded-lg uppercase">Cancelar</button>
                   <button
                     onClick={confirmarMerge}
                     disabled={!mergeOficialId || homolBusy === mergeTarget.id}
-                    className="px-5 py-2 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] text-white text-xs font-semibold uppercase tracking-wide disabled:opacity-40"
+                    className="px-5 py-2 rounded-lg bg-navy hover:bg-navy-3 text-white text-xs font-semibold uppercase tracking-wide disabled:opacity-40"
                   >
                     {homolBusy === mergeTarget.id ? 'Mesclando…' : 'Confirmar mesclagem'}
                   </button>
@@ -1397,20 +1397,20 @@ export const ContaView: React.FC<ContaViewProps> = ({
               <Toggle checked={pdfPrefs.showBankData} onChange={(v) => onUpdatePdfPrefs({ ...pdfPrefs, showBankData: v })} />
             }
           />
-          <p className="text-[11px] text-slate-400 px-1 pt-1 flex items-center gap-1">
+          <p className="text-[11px] text-fg-muted px-1 pt-1 flex items-center gap-1">
             <span className="material-symbols-outlined text-sm">info</span>
             Preferências de geração de PDF (aplicadas às propostas comerciais).
           </p>
 
           {/* ===== Documentos padrão por tipo de pedido ===== */}
-          <div className="mt-4 pt-4 border-t border-slate-200">
+          <div className="mt-4 pt-4 border-t border-border">
             <div className="flex items-center gap-2 mb-1 px-1">
-              <span className="material-symbols-outlined text-[#1A1A72] text-lg">rule</span>
-              <h3 className="font-display text-sm font-bold uppercase tracking-wide text-[#1A1A72]">
+              <span className="material-symbols-outlined text-primary text-lg">rule</span>
+              <h3 className="font-display text-sm font-bold uppercase tracking-wide text-primary">
                 Documentos padrão por tipo de pedido
               </h3>
             </div>
-            <p className="text-[11px] text-slate-400 px-1 mb-3">
+            <p className="text-[11px] text-fg-muted px-1 mb-3">
               Defina o documento gerado automaticamente para cada tipo de pedido. Com um padrão definido, o PDF é
               gerado direto — sem o modal de escolha. Deixe em &ldquo;Sempre perguntar&rdquo; para escolher toda vez.
             </p>
@@ -1418,9 +1418,9 @@ export const ContaView: React.FC<ContaViewProps> = ({
               {PEDIDO_TIPO_ORDER.map((tipo: PedidoTipo) => (
                 <div
                   key={tipo}
-                  className="flex items-center justify-between gap-3 bg-white border border-slate-200 rounded-lg px-3 py-2.5"
+                  className="flex items-center justify-between gap-3 bg-surface border border-border rounded-lg px-3 py-2.5"
                 >
-                  <span className="text-sm font-semibold text-slate-700">{PEDIDO_TIPO_LABELS[tipo]}</span>
+                  <span className="text-sm font-semibold text-fg-secondary">{PEDIDO_TIPO_LABELS[tipo]}</span>
                   <select
                     value={documentosPadrao[tipo] ?? 'nenhum'}
                     onChange={(e) => {
@@ -1430,7 +1430,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
                       else next[tipo] = v;
                       onUpdateDocumentosPadrao(next);
                     }}
-                    className="text-xs font-semibold text-slate-700 border border-slate-200 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20 min-w-[190px]"
+                    className="text-xs font-semibold text-fg-secondary border border-border rounded-lg px-2.5 py-2 bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20 min-w-[190px]"
                   >
                     <option value="nenhum">Sempre perguntar (nenhum padrão)</option>
                     {DOCUMENT_TYPE_ORDER.map((doc: DocumentType) => (
@@ -1443,7 +1443,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
                 </div>
               ))}
             </div>
-            <p className="text-[11px] text-slate-400 px-1 pt-2 flex items-center gap-1">
+            <p className="text-[11px] text-fg-muted px-1 pt-2 flex items-center gap-1">
               <span className="material-symbols-outlined text-sm">info</span>
               Fase 1: só a Proposta comercial já gera de verdade; os demais documentos entram em breve.
             </p>
@@ -1455,14 +1455,14 @@ export const ContaView: React.FC<ContaViewProps> = ({
       {tab === 'usuarios' && canSwitchRole && (
         <div className="flex flex-col gap-6">
           {/* Novo usuário */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <div className="bg-surface p-6 rounded-xl border border-border shadow-sm">
             <div className="flex items-center gap-2 mb-4">
               <SettingIcon icon="person_add" />
               <div>
-                <h3 className="font-display text-sm font-bold uppercase tracking-wide text-[#1A1A72]">
+                <h3 className="font-display text-sm font-bold uppercase tracking-wide text-primary">
                   Novo usuário
                 </h3>
-                <p className="text-[11px] text-slate-400">Crie o acesso com uma senha temporária para entregar diretamente ao funcionário.</p>
+                <p className="text-[11px] text-fg-muted">Crie o acesso com uma senha temporária para entregar diretamente ao funcionário.</p>
               </div>
             </div>
 
@@ -1480,12 +1480,12 @@ export const ContaView: React.FC<ContaViewProps> = ({
                     <option value="FINANCEIRO">Financeiro — receitas e despesas</option>
                     <option value="TECNICO">Técnico — campo e ponto</option>
                   </select>
-                  <p className="text-[10px] text-slate-400 mt-1">Controla o acesso ao sistema (RLS). Não é o cargo.</p>
+                  <p className="text-[10px] text-fg-muted mt-1">Controla o acesso ao sistema (RLS). Não é o cargo.</p>
                 </div>
                 <div>
                   <label className={labelCls}>Cargo (função profissional)</label>
                   <input type="text" value={nuCargo} onChange={(e) => setNuCargo(e.target.value)} className={inputCls} placeholder="Ex.: Técnico de Campo, Analista Administrativo" />
-                  <p className="text-[10px] text-slate-400 mt-1">Descritivo; não altera permissões.</p>
+                  <p className="text-[10px] text-fg-muted mt-1">Descritivo; não altera permissões.</p>
                 </div>
                 <div>
                   <label className={labelCls}>Status inicial</label>
@@ -1494,9 +1494,9 @@ export const ContaView: React.FC<ContaViewProps> = ({
                     <option value="INATIVO">Inativo</option>
                   </select>
                 </div>
-                <label className="md:col-span-2 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 cursor-pointer">
+                <label className="md:col-span-2 flex items-start gap-3 rounded-xl border border-border bg-surface-2 p-3 cursor-pointer">
                   <input type="checkbox" checked={nuUsesTimeClock} onChange={(e) => setNuUsesTimeClock(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[#1A1A72]" />
-                  <span><strong className="block text-xs text-slate-800">Controle de ponto {nuUsesTimeClock ? 'ativado' : 'desativado'}</strong><span className="text-[10px] text-slate-500">Quando ativado, este funcionário participa do registro de jornada, ajustes e espelho de ponto.</span></span>
+                  <span><strong className="block text-xs text-fg">Controle de ponto {nuUsesTimeClock ? 'ativado' : 'desativado'}</strong><span className="text-[10px] text-fg-secondary">Quando ativado, este funcionário participa do registro de jornada, ajustes e espelho de ponto.</span></span>
                 </label>
                 <div>
                   <label className={labelCls}>E-mail (login)</label>
@@ -1508,13 +1508,13 @@ export const ContaView: React.FC<ContaViewProps> = ({
                     <div><label className={labelCls}>Senha temporária</label><div className="relative"><input type={showNuPassword ? 'text' : 'password'} value={nuTemporaryPassword} onChange={(e) => setNuTemporaryPassword(e.target.value)} className={`${inputCls} pr-11 font-data-mono`} autoComplete="new-password"/><button type="button" onClick={() => setShowNuPassword((v) => !v)} className="absolute right-1 top-1 min-h-9 min-w-9" aria-label={showNuPassword ? 'Ocultar senha' : 'Mostrar senha'}><span className="material-symbols-outlined text-lg">{showNuPassword ? 'visibility_off' : 'visibility'}</span></button></div></div>
                     <div><label className={labelCls}>Confirmar senha temporária</label><input type={showNuPassword ? 'text' : 'password'} value={nuTemporaryPasswordConfirm} onChange={(e) => setNuTemporaryPasswordConfirm(e.target.value)} className={`${inputCls} font-data-mono`} autoComplete="new-password"/></div>
                   </div>
-                  <button type="button" onClick={() => { const generated = generateStrongPassword(); setNuTemporaryPassword(generated); setNuTemporaryPasswordConfirm(generated); setShowNuPassword(true); }} className="mt-3 rounded-lg border border-amber-300 bg-white px-3 py-2 text-[11px] font-bold uppercase text-amber-900">Gerar senha</button>
+                  <button type="button" onClick={() => { const generated = generateStrongPassword(); setNuTemporaryPassword(generated); setNuTemporaryPasswordConfirm(generated); setShowNuPassword(true); }} className="mt-3 rounded-lg border border-amber-300 bg-surface px-3 py-2 text-[11px] font-bold uppercase text-amber-900">Gerar senha</button>
                 </div>
               </div>
 
               {/* Dados do funcionário */}
-              <div className="pt-2 border-t border-slate-100">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Dados do funcionário</p>
+              <div className="pt-2 border-t border-border">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-fg-muted mb-2">Dados do funcionário</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                     <label className={labelCls}>Nome completo</label>
@@ -1546,15 +1546,15 @@ export const ContaView: React.FC<ContaViewProps> = ({
               </div>
 
               {/* Escala de trabalho */}
-              <div className="pt-2 border-t border-slate-100">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+              <div className="pt-2 border-t border-border">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-fg-muted mb-2">
                   Escala de trabalho (usada nos alertas de ponto)
                 </p>
                 <ScheduleEditor value={nuSchedule} onChange={setNuSchedule} />
               </div>
 
               {createMsg && (
-                <p className={`text-[11px] font-semibold ${createMsg.startsWith('OK') ? 'text-emerald-700' : 'text-[#E63946]'}`}>
+                <p className={`text-[11px] font-semibold ${createMsg.startsWith('OK') ? 'text-emerald-700' : 'text-danger'}`}>
                   {createMsg.replace(/^OK: /, '')}
                 </p>
               )}
@@ -1562,7 +1562,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
               <button
                 type="submit"
                 disabled={creating}
-                className="bg-[#E63946] hover:bg-[#a51515] text-white font-semibold py-2.5 px-5 rounded-lg uppercase tracking-wider text-xs transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-70"
+                className="bg-danger hover:bg-danger-hover text-white font-semibold py-2.5 px-5 rounded-lg uppercase tracking-wider text-xs transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-70"
               >
                 <span className={`material-symbols-outlined text-base ${creating ? 'animate-spin' : ''}`}>
                   {creating ? 'progress_activity' : 'person_add'}
@@ -1574,17 +1574,17 @@ export const ContaView: React.FC<ContaViewProps> = ({
 
           {/* Lista de usuários */}
           <div>
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Usuários com acesso</h3>
+            <h3 className="text-xs font-bold text-fg-secondary uppercase tracking-wider mb-3">Usuários com acesso</h3>
             {usersLoading ? (
-              <div className="bg-white rounded-xl shadow-sm py-12 text-center text-slate-400">
+              <div className="bg-surface rounded-xl shadow-sm py-12 text-center text-fg-muted">
                 <span className="material-symbols-outlined text-3xl animate-spin inline-block">progress_activity</span>
               </div>
             ) : usersError ? (
-              <div className="bg-white rounded-xl shadow-sm py-10 text-center text-[#E63946] text-xs font-semibold">{usersError}</div>
+              <div className="bg-surface rounded-xl shadow-sm py-10 text-center text-danger text-xs font-semibold">{usersError}</div>
             ) : users.length === 0 ? (
-              <div className="bg-white rounded-xl shadow-sm py-12 text-center text-slate-400">
-                <span className="material-symbols-outlined text-4xl text-slate-300">group</span>
-                <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">Nenhum usuário</p>
+              <div className="bg-surface rounded-xl shadow-sm py-12 text-center text-fg-muted">
+                <span className="material-symbols-outlined text-4xl text-fg-muted">group</span>
+                <p className="mt-2 text-sm font-bold text-fg-secondary uppercase tracking-wider">Nenhum usuário</p>
               </div>
             ) : (
               <div className="flex flex-col gap-3">
@@ -1594,20 +1594,20 @@ export const ContaView: React.FC<ContaViewProps> = ({
                     <DataListRow
                       key={u.id}
                       leading={
-                        <span className="w-10 h-10 rounded-lg bg-[#1A1A72] text-white font-bold flex items-center justify-center text-xs shrink-0">
+                        <span className="w-10 h-10 rounded-lg bg-navy text-white font-bold flex items-center justify-center text-xs shrink-0">
                           {(u.name || u.email).slice(0, 2).toUpperCase()}
                         </span>
                       }
                       title={
                         <span>
                           {u.name || '—'}
-                          {isSelf && <span className="ml-2 text-[10px] text-slate-400 uppercase">(você)</span>}
+                          {isSelf && <span className="ml-2 text-[10px] text-fg-muted uppercase">(você)</span>}
                         </span>
                       }
                       meta={
                         <>
-                          <span className="font-data-mono text-slate-500">{u.email}</span>
-                          {u.cargo && <span className="text-slate-500">{u.cargo}</span>}
+                          <span className="font-data-mono text-fg-secondary">{u.email}</span>
+                          {u.cargo && <span className="text-fg-secondary">{u.cargo}</span>}
                           <Badge color={u.status === 'ATIVO' && u.firstAccessCompleted ? 'emerald' : u.status === 'ATIVO' ? 'amber' : u.status === 'INATIVO' ? 'amber' : 'slate'}>
                             {u.status === 'ATIVO' && !u.firstAccessCompleted ? 'Primeiro acesso pendente' : u.status === 'ATIVO' ? 'Ativo' : u.status === 'INATIVO' ? 'Inativo' : 'Desligado'}
                           </Badge>
@@ -1620,7 +1620,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
                             title="Perfil de acesso (permissões)"
                             value={u.role}
                             onChange={(e) => handleRoleChange(u, e.target.value as UserRole)}
-                            className="border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                            className="border border-border rounded-lg px-2 py-1.5 text-[11px] font-semibold text-fg-secondary bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20"
                           >
                             <option value="ADMINISTRATIVO">Administrativo</option>
                             <option value="GESTOR">Gestor</option>
@@ -1633,7 +1633,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
                             value={u.status}
                             disabled={isSelf || statusBusy === u.id}
                             onChange={(e) => handleStatusChange(u, e.target.value as UserStatus)}
-                            className="border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20 disabled:opacity-50"
+                            className="border border-border rounded-lg px-2 py-1.5 text-[11px] font-semibold text-fg-secondary bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
                           >
                             <option value="ATIVO">Ativo</option>
                             <option value="INATIVO">Inativo</option>
@@ -1653,7 +1653,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
                 })}
               </div>
             )}
-            <p className="text-[10px] text-slate-400 mt-3 flex items-center gap-1">
+            <p className="text-[10px] text-fg-muted mt-3 flex items-center gap-1">
               <span className="material-symbols-outlined text-sm">info</span>
               Use o status (Ativo/Inativo/Desligado) para o ciclo de vida — nada é excluído. &quot;Excluir&quot; é excepcional; a conta de login é removida no painel do Supabase.
             </p>
@@ -1663,13 +1663,13 @@ export const ContaView: React.FC<ContaViewProps> = ({
 
       {createdTemporaryPassword && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/50 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
             <span className="material-symbols-outlined text-5xl text-emerald-600">task_alt</span>
-            <h3 className="mt-2 text-lg font-bold text-slate-900">Funcionário criado com sucesso</h3>
-            <p className="mt-1 text-xs text-slate-600">Copie e entregue esta senha temporária agora. Depois de fechar, ela não ficará disponível novamente.</p>
-            <div className="mt-4 rounded-xl bg-slate-100 p-3 font-data-mono text-sm font-bold text-slate-900 break-all">{createdTemporaryPassword}</div>
-            <button type="button" onClick={async () => { await navigator.clipboard.writeText(createdTemporaryPassword); toast.success('Senha temporária copiada.'); }} className="mt-3 w-full rounded-lg border border-[#1A1A72] py-2.5 text-xs font-bold uppercase text-[#1A1A72]">Copiar senha temporária</button>
-            <button type="button" onClick={() => { setCreatedTemporaryPassword(null); setNuTemporaryPassword(''); setNuTemporaryPasswordConfirm(''); setShowNuPassword(false); }} className="mt-2 w-full rounded-lg bg-[#1A1A72] py-2.5 text-xs font-bold uppercase text-white">Fechar</button>
+            <h3 className="mt-2 text-lg font-bold text-fg">Funcionário criado com sucesso</h3>
+            <p className="mt-1 text-xs text-fg-secondary">Copie e entregue esta senha temporária agora. Depois de fechar, ela não ficará disponível novamente.</p>
+            <div className="mt-4 rounded-xl bg-surface-3 p-3 font-data-mono text-sm font-bold text-fg break-all">{createdTemporaryPassword}</div>
+            <button type="button" onClick={async () => { await navigator.clipboard.writeText(createdTemporaryPassword); toast.success('Senha temporária copiada.'); }} className="mt-3 w-full rounded-lg border border-primary py-2.5 text-xs font-bold uppercase text-primary">Copiar senha temporária</button>
+            <button type="button" onClick={() => { setCreatedTemporaryPassword(null); setNuTemporaryPassword(''); setNuTemporaryPasswordConfirm(''); setShowNuPassword(false); }} className="mt-2 w-full rounded-lg bg-navy py-2.5 text-xs font-bold uppercase text-white">Fechar</button>
           </div>
         </div>
       )}
@@ -1687,7 +1687,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
         onSave={handleSaveUserEdit}
         saving={savingEdit}
       >
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3 text-xs font-medium">
+        <div className="bg-surface rounded-xl border border-border shadow-sm p-5 space-y-3 text-xs font-medium">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Nome de exibição</label>
@@ -1705,7 +1705,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
                 <option value="FINANCEIRO">Financeiro</option>
                 <option value="TECNICO">Técnico</option>
               </select>
-              <p className="text-[10px] text-slate-400 mt-1">Permissões (RLS). Distinto do cargo.</p>
+              <p className="text-[10px] text-fg-muted mt-1">Permissões (RLS). Distinto do cargo.</p>
             </div>
             <div>
               <label className={labelCls}>Cargo (função profissional)</label>
@@ -1722,11 +1722,11 @@ export const ContaView: React.FC<ContaViewProps> = ({
                 <option value="INATIVO">Inativo</option>
                 <option value="DESLIGADO">Desligado</option>
               </select>
-              <p className="text-[10px] text-slate-400 mt-1">Só ATIVO acessa o sistema. Não exclui histórico.</p>
+              <p className="text-[10px] text-fg-muted mt-1">Só ATIVO acessa o sistema. Não exclui histórico.</p>
             </div>
-            <label className="md:col-span-2 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 cursor-pointer">
+            <label className="md:col-span-2 flex items-start gap-3 rounded-xl border border-border bg-surface-2 p-3 cursor-pointer">
               <input type="checkbox" checked={euForm.usesTimeClock} onChange={(e) => setEuForm({ ...euForm, usesTimeClock: e.target.checked })} className="mt-0.5 h-4 w-4 accent-[#1A1A72]" />
-              <span><strong className="block text-xs text-slate-800">Controle de ponto {euForm.usesTimeClock ? 'ativado' : 'desativado'}</strong><span className="text-[10px] text-slate-500">Quando ativado, este funcionário participa do registro de jornada, ajustes e espelho de ponto.</span></span>
+              <span><strong className="block text-xs text-fg">Controle de ponto {euForm.usesTimeClock ? 'ativado' : 'desativado'}</strong><span className="text-[10px] text-fg-secondary">Quando ativado, este funcionário participa do registro de jornada, ajustes e espelho de ponto.</span></span>
             </label>
             <div>
               <label className={labelCls}>Nome completo</label>
@@ -1735,7 +1735,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
             <div>
               <label className={labelCls}>
                 CPF
-                <span className="ml-1 text-[9px] font-normal text-slate-400 normal-case">(dado sensível — LGPD)</span>
+                <span className="ml-1 text-[9px] font-normal text-fg-muted normal-case">(dado sensível — LGPD)</span>
               </label>
               {revealCpf ? (
                 <input
@@ -1751,12 +1751,12 @@ export const ContaView: React.FC<ContaViewProps> = ({
                     value={euForm.cpf ? maskCpf(euForm.cpf) : ''}
                     readOnly
                     placeholder="Não informado"
-                    className={`${inputCls} font-data-mono bg-slate-50 text-slate-500 cursor-default`}
+                    className={`${inputCls} font-data-mono bg-surface-2 text-fg-secondary cursor-default`}
                   />
                   <button
                     type="button"
                     onClick={() => setRevealCpf(true)}
-                    className="shrink-0 inline-flex items-center gap-1 px-2.5 py-2 rounded-lg border border-slate-200 text-[11px] font-semibold text-[#1A1A72] hover:bg-slate-50"
+                    className="shrink-0 inline-flex items-center gap-1 px-2.5 py-2 rounded-lg border border-border text-[11px] font-semibold text-primary hover:bg-surface-2"
                   >
                     <span className="material-symbols-outlined text-sm">visibility</span>
                     {euForm.cpf ? 'Revelar' : 'Informar'}
@@ -1784,15 +1784,15 @@ export const ContaView: React.FC<ContaViewProps> = ({
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Escala de trabalho</p>
+        <div className="bg-surface rounded-xl border border-border shadow-sm p-5">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-fg-muted mb-2">Escala de trabalho</p>
           <ScheduleEditor value={euForm.schedule} onChange={(s) => setEuForm({ ...euForm, schedule: s })} />
         </div>
 
         {/* Documentos (Storage privado) */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+        <div className="bg-surface rounded-xl border border-border shadow-sm p-5">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-fg-muted">
               Documentos (diplomas, NRs, currículo)
             </p>
             <input ref={docFileRef} type="file" onChange={handleUploadDoc} className="hidden" />
@@ -1800,7 +1800,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
               type="button"
               onClick={() => docFileRef.current?.click()}
               disabled={uploading}
-              className="inline-flex items-center gap-1.5 bg-[#1A1A72] hover:bg-[#12124f] text-white text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-70"
+              className="inline-flex items-center gap-1.5 bg-navy hover:bg-navy-3 text-white text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-70"
             >
               <span className={`material-symbols-outlined text-base ${uploading ? 'animate-spin' : ''}`}>
                 {uploading ? 'progress_activity' : 'upload_file'}
@@ -1810,22 +1810,22 @@ export const ContaView: React.FC<ContaViewProps> = ({
           </div>
 
           {docsLoading ? (
-            <p className="text-xs text-slate-400">Carregando documentos...</p>
+            <p className="text-xs text-fg-muted">Carregando documentos...</p>
           ) : docs.length === 0 ? (
-            <p className="text-xs text-slate-400">Nenhum documento enviado.</p>
+            <p className="text-xs text-fg-muted">Nenhum documento enviado.</p>
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-border">
               {docs.map((d) => (
                 <li key={d.path} className="flex items-center justify-between py-2 text-xs">
                   <span className="flex items-center gap-2 min-w-0">
-                    <span className="material-symbols-outlined text-base text-slate-400">description</span>
-                    <span className="truncate text-slate-700">{d.name.replace(/^\d+_/, '')}</span>
+                    <span className="material-symbols-outlined text-base text-fg-muted">description</span>
+                    <span className="truncate text-fg-secondary">{d.name.replace(/^\d+_/, '')}</span>
                   </span>
                   <span className="flex items-center gap-1 shrink-0">
                     <button
                       type="button"
                       onClick={() => handleOpenDoc(d.path)}
-                      className="text-[#1A1A72] font-semibold hover:underline px-2"
+                      className="text-primary font-semibold hover:underline px-2"
                     >
                       abrir
                     </button>
@@ -1835,7 +1835,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
               ))}
             </ul>
           )}
-          <p className="text-[10px] text-slate-400 mt-2 flex items-center gap-1">
+          <p className="text-[10px] text-fg-muted mt-2 flex items-center gap-1">
             <span className="material-symbols-outlined text-sm">lock</span>
             Armazenamento privado — acesso só do próprio funcionário e do administrador, via link temporário.
           </p>

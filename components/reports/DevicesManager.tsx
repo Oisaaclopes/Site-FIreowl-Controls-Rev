@@ -22,7 +22,7 @@ interface DevicesManagerProps {
   onAddFabricante: (name: string) => void;
 }
 
-const inputCls = 'w-full border border-slate-200 rounded-lg p-2 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20';
+const inputCls = 'w-full border border-border rounded-lg p-2 text-fg bg-surface text-xs focus:outline-none focus:ring-2 focus:ring-primary/20';
 
 // Tipos de dispositivo SDAI. A CENTRAL é um dispositivo como os demais — por isso
 // encabeça a lista. (CFTV/Controle de Acesso/BMS terão seus próprios tipos depois.)
@@ -144,24 +144,24 @@ export const DevicesManager: React.FC<DevicesManagerProps> = ({ open, onClose, c
 
   return (
     <div className="fixed inset-0 z-[55] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl border border-slate-200 max-h-[92vh] flex flex-col">
-        <div className="flex items-center justify-between p-5 border-b border-slate-100">
+      <div className="bg-surface w-full max-w-2xl rounded-xl shadow-2xl border border-border max-h-[92vh] flex flex-col">
+        <div className="flex items-center justify-between p-5 border-b border-border">
           <div>
-            <h3 className="text-base font-bold text-slate-900 uppercase">Dispositivos (as-built)</h3>
-            <p className="text-[11px] text-slate-500 truncate">{clienteNome}</p>
+            <h3 className="text-base font-bold text-fg uppercase">Dispositivos (as-built)</h3>
+            <p className="text-[11px] text-fg-secondary truncate">{clienteNome}</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none">✕</button>
+          <button onClick={onClose} className="text-fg-muted hover:text-fg-secondary font-bold text-lg leading-none">✕</button>
         </div>
 
         <div className="p-5 overflow-y-auto space-y-4">
           {/* Formulário de cadastro */}
-          <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/50 space-y-2">
+          <div className="border border-border rounded-xl p-3 bg-surface-2/50 space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-[11px] font-semibold uppercase text-slate-600">Novo dispositivo</p>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#1A1A72] bg-[#1A1A72]/10 px-2 py-0.5 rounded">SDAI</span>
-              <span className="text-[10px] text-slate-400">CFTV, Controle de Acesso e BMS terão cadastro próprio (em breve).</span>
+              <p className="text-[11px] font-semibold uppercase text-fg-secondary">Novo dispositivo</p>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-navy/10 px-2 py-0.5 rounded">SDAI</span>
+              <span className="text-[10px] text-fg-muted">CFTV, Controle de Acesso e BMS terão cadastro próprio (em breve).</span>
             </div>
-            <p className="text-[10px] text-slate-500 leading-snug">
+            <p className="text-[10px] text-fg-secondary leading-snug">
               A <b>central é um dispositivo</b>: cadastre-a com Tipo “Central de alarme…” e um identificador em <b>Central</b> (ex.: “Central 01”). Os demais dispositivos apontam para ela por esse identificador (Central / Laço / Endereço = endereçamento).
             </p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -183,7 +183,7 @@ export const DevicesManager: React.FC<DevicesManagerProps> = ({ open, onClose, c
                     onChange={(e) => setNewFab(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); confirmarFab(); } }} />
                   <button type="button" onClick={confirmarFab} className="px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold">OK</button>
-                  <button type="button" onClick={() => { setAddingFab(false); setNewFab(''); }} className="px-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-600 text-[11px]">✕</button>
+                  <button type="button" onClick={() => { setAddingFab(false); setNewFab(''); }} className="px-2 rounded-lg bg-surface-3 hover:bg-border-strong text-fg-secondary text-[11px]">✕</button>
                 </div>
               ) : (
                 <select className={inputCls} value={form.fabricante || ''}
@@ -204,63 +204,63 @@ export const DevicesManager: React.FC<DevicesManagerProps> = ({ open, onClose, c
 
             {/* Interligação: quem fornece a marca escolhida e se há em estoque */}
             {marca && (
-              <div className="rounded-lg border border-slate-200 bg-white p-2.5 text-[11px] space-y-1.5">
+              <div className="rounded-lg border border-border bg-surface p-2.5 text-[11px] space-y-1.5">
                 <div className="flex items-start gap-1.5">
-                  <span className="material-symbols-outlined text-sm text-slate-400 mt-px">local_shipping</span>
+                  <span className="material-symbols-outlined text-sm text-fg-muted mt-px">local_shipping</span>
                   <span>
-                    <span className="font-semibold text-slate-600">Fornecedores de {marca}: </span>
+                    <span className="font-semibold text-fg-secondary">Fornecedores de {marca}: </span>
                     {fornecedoresDaMarca.length === 0 ? (
                       <span className="text-amber-600">nenhum fornecedor marcou esta marca — defina em Fornecedores.</span>
                     ) : (
-                      <span className="text-slate-700">
+                      <span className="text-fg-secondary">
                         {fornecedoresDaMarca.map((s) => `${s.name}${s.leadTimeDays ? ` (${s.leadTimeDays}d)` : ''}`).join(' · ')}
                       </span>
                     )}
                   </span>
                 </div>
                 <div className="flex items-start gap-1.5">
-                  <span className="material-symbols-outlined text-sm text-slate-400 mt-px">inventory_2</span>
+                  <span className="material-symbols-outlined text-sm text-fg-muted mt-px">inventory_2</span>
                   <span>
-                    <span className="font-semibold text-slate-600">Em estoque: </span>
+                    <span className="font-semibold text-fg-secondary">Em estoque: </span>
                     {qtdEstoque > 0 ? (
                       <span className="text-emerald-700 font-semibold">{qtdEstoque} un</span>
                     ) : (
-                      <span className="text-slate-400">sem itens desta marca no estoque</span>
+                      <span className="text-fg-muted">sem itens desta marca no estoque</span>
                     )}
                     {modelosEstoque.length > 0 && (
-                      <span className="text-slate-400"> · {modelosEstoque.join(', ')}</span>
+                      <span className="text-fg-muted"> · {modelosEstoque.join(', ')}</span>
                     )}
                   </span>
                 </div>
               </div>
             )}
 
-            {err && <p className="text-[11px] font-semibold text-[#E63946]">{err}</p>}
-            <button onClick={add} disabled={saving} className="px-4 py-2 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] disabled:opacity-60 text-white text-xs font-semibold uppercase tracking-wide">
+            {err && <p className="text-[11px] font-semibold text-danger">{err}</p>}
+            <button onClick={add} disabled={saving} className="px-4 py-2 rounded-lg bg-navy hover:bg-navy-3 disabled:opacity-60 text-white text-xs font-semibold uppercase tracking-wide">
               {saving ? 'Salvando…' : 'Adicionar dispositivo'}
             </button>
           </div>
 
           {/* Lista */}
           {loading ? (
-            <p className="text-xs text-slate-400 text-center py-6">Carregando…</p>
+            <p className="text-xs text-fg-muted text-center py-6">Carregando…</p>
           ) : devices.length === 0 ? (
-            <p className="text-[11px] text-slate-400 italic text-center py-6">Nenhum dispositivo cadastrado para este cliente.</p>
+            <p className="text-[11px] text-fg-muted italic text-center py-6">Nenhum dispositivo cadastrado para este cliente.</p>
           ) : (
             <div className="space-y-1.5">
-              <p className="text-[11px] font-semibold uppercase text-slate-600">{devices.length} dispositivo(s)</p>
+              <p className="text-[11px] font-semibold uppercase text-fg-secondary">{devices.length} dispositivo(s)</p>
               {devices.map((d) => (
-                <div key={d.id} className="flex items-center justify-between border border-slate-100 rounded-lg px-3 py-2">
+                <div key={d.id} className="flex items-center justify-between border border-border rounded-lg px-3 py-2">
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold text-slate-800 truncate">
+                    <p className="text-xs font-semibold text-fg truncate">
                       {d.tipoDispositivo || 'Dispositivo'} {d.modelo ? `· ${d.modelo}` : ''}
                     </p>
-                    <p className="text-[10px] text-slate-400 font-data-mono">
+                    <p className="text-[10px] text-fg-muted font-data-mono">
                       {d.sistema} · {[d.central, d.laco, d.endereco].filter(Boolean).join(' / ') || 'sem endereço'}
                       {d.localizacao ? ` · ${d.localizacao}` : ''}
                     </p>
                   </div>
-                  <button onClick={() => remove(d.id)} className="text-slate-400 hover:text-[#E63946] shrink-0" title="Remover">
+                  <button onClick={() => remove(d.id)} className="text-fg-muted hover:text-danger shrink-0" title="Remover">
                     <span className="material-symbols-outlined text-lg">delete</span>
                   </button>
                 </div>

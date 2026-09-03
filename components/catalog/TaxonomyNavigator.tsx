@@ -22,15 +22,15 @@ export function TaxonomyNavigator({ nodes, counts, onSelect }: {
             key={node.id}
             type="button"
             onClick={() => onSelect(node)}
-            className="group flex items-center justify-between gap-3 bg-white border border-slate-200 rounded-xl px-4 py-3.5 text-left hover:border-[#1A1A72] hover:shadow-sm transition-all active:scale-[0.99] min-h-[60px]"
+            className="group flex items-center justify-between gap-3 bg-surface border border-border rounded-xl px-4 py-3.5 text-left hover:border-primary hover:shadow-sm transition-all active:scale-[0.99] min-h-[60px]"
           >
             <div className="min-w-0">
               <p className="text-sm font-bold text-[#131c28] truncate">{node.name}</p>
-              <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
+              <p className="text-[11px] font-semibold text-fg-muted mt-0.5">
                 {count} {count === 1 ? 'produto' : 'produtos'}
               </p>
             </div>
-            <span className="material-symbols-outlined text-slate-300 group-hover:text-[#E63946] transition-colors shrink-0">chevron_right</span>
+            <span className="material-symbols-outlined text-fg-muted group-hover:text-danger transition-colors shrink-0">chevron_right</span>
           </button>
         );
       })}

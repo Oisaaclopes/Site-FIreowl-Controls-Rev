@@ -12,21 +12,21 @@ export function CatalogSearch({ value, onChange, placeholder = 'Buscar por model
 }) {
   return (
     <div className="relative flex items-center w-full">
-      <span className="material-symbols-outlined absolute left-3 text-slate-400 text-[20px] pointer-events-none">search</span>
+      <span className="material-symbols-outlined absolute left-3 text-fg-muted text-[20px] pointer-events-none">search</span>
       <input
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label="Buscar no catálogo"
-        className="w-full bg-white border border-slate-200 rounded-lg py-2.5 pl-10 pr-9 text-sm text-[#131c28] placeholder:text-slate-400 focus:outline-none focus:border-[#1A1A72] focus:ring-2 focus:ring-[#1A1A72]/10 transition-colors"
+        className="w-full bg-surface border border-border rounded-lg py-2.5 pl-10 pr-9 text-sm text-[#131c28] placeholder:text-fg-muted focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-colors"
       />
       {value && (
         <button
           type="button"
           onClick={() => onChange('')}
           aria-label="Limpar busca"
-          className="absolute right-1.5 h-8 w-8 flex items-center justify-center rounded-md text-slate-400 hover:text-[#E63946] hover:bg-slate-50"
+          className="absolute right-1.5 h-8 w-8 flex items-center justify-center rounded-md text-fg-muted hover:text-danger hover:bg-surface-2"
         >
           <span className="material-symbols-outlined text-[19px]">close</span>
         </button>

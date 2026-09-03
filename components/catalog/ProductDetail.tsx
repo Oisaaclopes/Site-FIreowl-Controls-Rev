@@ -8,8 +8,8 @@ import { normalizeUnitCode } from '@/lib/commercialUnits';
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-1.5 border-b border-slate-100 last:border-0">
-      <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</span>
+    <div className="flex items-center justify-between gap-3 py-1.5 border-b border-border last:border-0">
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-fg-muted">{label}</span>
       <span className="text-sm font-semibold text-[#131c28] text-right">{value}</span>
     </div>
   );
@@ -17,8 +17,8 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 
 function Section({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-3.5">
-      <p className="text-[11px] font-bold uppercase tracking-wider text-[#1A1A72] flex items-center gap-1.5 mb-1.5">
+    <div className="bg-surface border border-border rounded-xl p-3.5">
+      <p className="text-[11px] font-bold uppercase tracking-wider text-primary flex items-center gap-1.5 mb-1.5">
         <span className="material-symbols-outlined text-[15px]">{icon}</span>{title}
       </p>
       {children}
@@ -61,15 +61,15 @@ export function ProductDetail({ item, tree, canManage, canSeePrice, onClose, onE
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative w-full sm:max-w-md bg-slate-50 h-full overflow-y-auto shadow-2xl flex flex-col"
+      <div className="relative w-full sm:max-w-md bg-surface-2 h-full overflow-y-auto shadow-2xl flex flex-col"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         {/* Cabeçalho */}
-        <div className="sticky top-0 bg-white border-b border-slate-200 px-4 py-3 flex items-start justify-between gap-2 z-10">
+        <div className="sticky top-0 bg-surface border-b border-border px-4 py-3 flex items-start justify-between gap-2 z-10">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#1A1A72]/70">{item.brand || 'Sem fabricante'}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/70">{item.brand || 'Sem fabricante'}</p>
             <p className="text-base font-bold text-[#131c28] truncate">{item.model || item.code || item.name}</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Fechar" className="h-9 w-9 flex items-center justify-center rounded-md text-slate-400 hover:text-[#E63946] hover:bg-slate-50 shrink-0">
+          <button type="button" onClick={onClose} aria-label="Fechar" className="h-9 w-9 flex items-center justify-center rounded-md text-fg-muted hover:text-danger hover:bg-surface-2 shrink-0">
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
@@ -112,20 +112,20 @@ export function ProductDetail({ item, tree, canManage, canSeePrice, onClose, onE
               <div className="flex items-center gap-1.5 mb-2">
                 {(['entrada', 'saida'] as const).map((t) => (
                   <button key={t} type="button" onClick={() => setMovType(t)}
-                    className={`flex-1 text-xs font-bold uppercase py-1.5 rounded-md border transition-colors ${movType === t ? (t === 'entrada' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-[#E63946] text-white border-[#E63946]') : 'bg-white text-slate-500 border-slate-200'}`}>
+                    className={`flex-1 text-xs font-bold uppercase py-1.5 rounded-md border transition-colors ${movType === t ? (t === 'entrada' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-danger text-white border-danger') : 'bg-surface text-fg-secondary border-border'}`}>
                     {t === 'entrada' ? 'Entrada' : 'Saída'}
                   </button>
                 ))}
               </div>
               <div className="flex items-center gap-2">
                 <input type="number" min={1} value={movQty} onChange={(e) => setMovQty(Number(e.target.value))}
-                  className="w-20 border border-slate-300 rounded-md px-2 py-1.5 text-sm" aria-label="Quantidade" />
+                  className="w-20 border border-border-strong rounded-md px-2 py-1.5 text-sm" aria-label="Quantidade" />
                 <input type="text" value={movNote} onChange={(e) => setMovNote(e.target.value)} placeholder="Observação (opcional)"
-                  className="flex-1 border border-slate-300 rounded-md px-2 py-1.5 text-sm" aria-label="Observação" />
+                  className="flex-1 border border-border-strong rounded-md px-2 py-1.5 text-sm" aria-label="Observação" />
               </div>
-              <p className="text-[11px] text-slate-400 mt-1.5">Novo saldo: <b>{movType === 'entrada' ? item.quantity + Math.max(0, Math.floor(Number(movQty) || 0)) : Math.max(0, item.quantity - Math.max(0, Math.floor(Number(movQty) || 0)))}</b> {normalizeUnitCode(item.unit)}</p>
+              <p className="text-[11px] text-fg-muted mt-1.5">Novo saldo: <b>{movType === 'entrada' ? item.quantity + Math.max(0, Math.floor(Number(movQty) || 0)) : Math.max(0, item.quantity - Math.max(0, Math.floor(Number(movQty) || 0)))}</b> {normalizeUnitCode(item.unit)}</p>
               <button type="button" onClick={doMove} disabled={busy}
-                className="mt-2 w-full bg-[#1A1A72] text-white text-sm font-bold py-2 rounded-md disabled:opacity-60">
+                className="mt-2 w-full bg-navy text-white text-sm font-bold py-2 rounded-md disabled:opacity-60">
                 {busy ? 'Registrando…' : 'Confirmar movimentação'}
               </button>
             </Section>
@@ -134,11 +134,11 @@ export function ProductDetail({ item, tree, canManage, canSeePrice, onClose, onE
 
         {/* Ações */}
         {canManage && (
-          <div className="sticky bottom-0 bg-white border-t border-slate-200 px-4 py-3 flex items-center gap-2 mt-auto">
-            <button type="button" onClick={() => onEdit(item)} className="flex-1 bg-[#1A1A72] text-white text-sm font-bold py-2.5 rounded-lg flex items-center justify-center gap-1.5">
+          <div className="sticky bottom-0 bg-surface border-t border-border px-4 py-3 flex items-center gap-2 mt-auto">
+            <button type="button" onClick={() => onEdit(item)} className="flex-1 bg-navy text-white text-sm font-bold py-2.5 rounded-lg flex items-center justify-center gap-1.5">
               <span className="material-symbols-outlined text-[18px]">edit</span> Editar
             </button>
-            <button type="button" onClick={() => onDelete(item)} aria-label="Excluir" className="h-11 w-11 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-[#E63946] hover:border-[#E63946]">
+            <button type="button" onClick={() => onDelete(item)} aria-label="Excluir" className="h-11 w-11 flex items-center justify-center rounded-lg border border-border text-fg-muted hover:text-danger hover:border-danger">
               <span className="material-symbols-outlined">delete</span>
             </button>
           </div>

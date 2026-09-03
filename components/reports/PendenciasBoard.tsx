@@ -31,8 +31,8 @@ const STATUS_COLOR: Record<PendenciaStatus, string> = {
   aprovada: 'bg-blue-100 text-blue-800',
   em_execucao: 'bg-indigo-100 text-indigo-800',
   corrigida: 'bg-emerald-100 text-emerald-800',
-  cancelada: 'bg-slate-100 text-slate-600',
-  recusada_cliente: 'bg-slate-100 text-slate-600',
+  cancelada: 'bg-surface-3 text-fg-secondary',
+  recusada_cliente: 'bg-surface-3 text-fg-secondary',
 };
 const TERMINAIS: PendenciaStatus[] = ['corrigida', 'cancelada', 'recusada_cliente'];
 const OS_STATUS_LABEL: Record<OrdemServicoStatus, string> = {
@@ -168,7 +168,7 @@ export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, cl
     <div className="flex flex-col gap-4">
       {/* Barra de ação da seleção (gerar OS a partir de pendências aprovadas) */}
       {podeEditar && selecionadas.length > 0 && (
-        <div className="sticky top-2 z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-[#1A1A72] text-white p-3 rounded-xl shadow-lg">
+        <div className="sticky top-2 z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-navy text-white p-3 rounded-xl shadow-lg">
           <div className="text-xs">
             <strong>{selecionadas.length}</strong> selecionada(s)
             {clientesSelecionados.size > 1 && (
@@ -190,7 +190,7 @@ export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, cl
               title="Responsável técnico da OS"
               value={tecnicoSel}
               onChange={(e) => setTecnicoSel(e.target.value)}
-              className="px-2 py-1.5 rounded-lg text-[11px] font-semibold text-slate-700 bg-white border border-white/30 focus:outline-none max-w-[180px]"
+              className="px-2 py-1.5 rounded-lg text-[11px] font-semibold text-fg-secondary bg-surface border border-white/30 focus:outline-none max-w-[180px]"
             >
               <option value="">Não atribuído</option>
               {technicians.map((t) => (
@@ -200,7 +200,7 @@ export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, cl
             <button
               onClick={gerarOs}
               disabled={!podeGerarOs || gerandoOs}
-              className="px-4 py-1.5 rounded-lg text-[11px] font-bold uppercase bg-white text-[#1A1A72] hover:bg-slate-100 disabled:opacity-40"
+              className="px-4 py-1.5 rounded-lg text-[11px] font-bold uppercase bg-surface text-primary hover:bg-surface-3 disabled:opacity-40"
             >
               {gerandoOs ? 'Gerando…' : 'Gerar OS'}
             </button>
@@ -209,15 +209,15 @@ export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, cl
       )}
 
       {/* Filtros */}
-      <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+      <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center bg-surface p-3 rounded-xl border border-border shadow-sm">
         <div className="relative w-full sm:w-72">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-fg-muted text-lg">search</span>
           <input
             type="text"
             placeholder="Buscar por descrição, grupo ou cliente…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+            className="w-full pl-9 pr-3 py-2 text-xs border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>
         <div className="flex gap-1.5 overflow-x-auto">
@@ -226,7 +226,7 @@ export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, cl
               key={st}
               onClick={() => setFStatus(st)}
               className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold uppercase whitespace-nowrap transition-colors ${
-                fStatus === st ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                fStatus === st ? 'bg-slate-900 text-white' : 'bg-surface-3 text-fg-secondary hover:bg-surface-3'
               }`}
             >
               {st === 'TODOS' ? 'Todas' : STATUS_LABEL[st as PendenciaStatus]}
@@ -236,9 +236,9 @@ export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, cl
       </div>
 
       {filtered.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm py-16 text-center text-slate-400">
-          <span className="material-symbols-outlined text-4xl text-slate-300">assignment_turned_in</span>
-          <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">Nenhuma pendência</p>
+        <div className="bg-surface rounded-xl shadow-sm py-16 text-center text-fg-muted">
+          <span className="material-symbols-outlined text-4xl text-fg-muted">assignment_turned_in</span>
+          <p className="mt-2 text-sm font-bold text-fg-secondary uppercase tracking-wider">Nenhuma pendência</p>
         </div>
       ) : (
         <div className="flex flex-col gap-2">
@@ -255,7 +255,7 @@ export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, cl
                     : null;
 
             return (
-            <div key={p.id} className="bg-white rounded-xl border border-slate-100 shadow-sm p-3 flex flex-col md:flex-row md:items-center gap-3">
+            <div key={p.id} className="bg-surface rounded-xl border border-border shadow-sm p-3 flex flex-col md:flex-row md:items-center gap-3">
               {podeEditar && p.status === 'aprovada' && (
                 <input
                   type="checkbox"
@@ -267,16 +267,16 @@ export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, cl
               )}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  {p.grupo && <span className="text-[10px] font-bold text-[#E63946] uppercase">{p.grupo}</span>}
-                  <span className="text-xs font-semibold text-slate-900 uppercase">{clientName(p.clienteId)}</span>
+                  {p.grupo && <span className="text-[10px] font-bold text-danger uppercase">{p.grupo}</span>}
+                  <span className="text-xs font-semibold text-fg uppercase">{clientName(p.clienteId)}</span>
                   {podeEditar && p.criticidadeOperacional && (
                     <span className="text-[9px] font-bold bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded" title="Criticidade operacional (interno)">
                       C{p.criticidadeOperacional}
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-slate-700 truncate">{p.descricao}</p>
-                <p className="text-[10px] text-slate-400">
+                <p className="text-[11px] text-fg-secondary truncate">{p.descricao}</p>
+                <p className="text-[10px] text-fg-muted">
                   {p.local ? `${p.local} · ` : ''}
                   {p.acaoRecomendada ? `${p.acaoRecomendada} · ` : ''}
                   {p.quantidade ? `${p.quantidade} ${p.unidade || ''}` : ''}
@@ -295,13 +295,13 @@ export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, cl
                       <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-800">Execução registrada</span>
                     )}
                     {proximoPasso && (
-                      <span className="text-slate-400">{proximoPasso}</span>
+                      <span className="text-fg-muted">{proximoPasso}</span>
                     )}
                     {p.status === 'aberta' && !p.propostaId && onCreateProposal && podeEditar && (
                       <button
                         type="button"
                         onClick={onCreateProposal}
-                        className="rounded px-1.5 py-0.5 text-[#1A1A72] hover:bg-indigo-50"
+                        className="rounded px-1.5 py-0.5 text-primary hover:bg-indigo-50"
                       >
                         Criar proposta
                       </button>
@@ -318,7 +318,7 @@ export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, cl
                     value={p.status}
                     disabled={busyId === p.id}
                     onChange={(e) => changeStatus(p, e.target.value as PendenciaStatus)}
-                    className="text-[11px] border border-slate-200 rounded-lg px-2 py-1.5 bg-white disabled:opacity-50"
+                    className="text-[11px] border border-border rounded-lg px-2 py-1.5 bg-surface disabled:opacity-50"
                     title="Alterar status"
                   >
                     {STATUS_ORDER.map((s) => (
@@ -330,7 +330,7 @@ export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, cl
             </div>
             );
           })}
-          <p className="text-xs text-slate-500 px-1 pt-1">{filtered.length} pendência(s)</p>
+          <p className="text-xs text-fg-secondary px-1 pt-1">{filtered.length} pendência(s)</p>
         </div>
       )}
     </div>

@@ -80,37 +80,37 @@ export const SupplyPurchaseModal: React.FC<Props> = ({ order, inventory, onClose
     } catch (e: any) { setErro(e?.message || 'Não foi possível registrar a compra.'); } finally { setBusy(false); }
   };
 
-  const th = 'text-[10px] font-bold uppercase tracking-wide text-slate-400 px-2 py-1 text-center';
-  const td = 'px-2 py-1.5 text-xs text-slate-700 text-center font-data-mono';
-  const inp = 'w-16 border border-slate-300 rounded px-1.5 py-1 text-xs text-right font-data-mono';
+  const th = 'text-[10px] font-bold uppercase tracking-wide text-fg-muted px-2 py-1 text-center';
+  const td = 'px-2 py-1.5 text-xs text-fg-secondary text-center font-data-mono';
+  const inp = 'w-16 border border-border-strong rounded px-1.5 py-1 text-xs text-right font-data-mono';
 
   return (
     <div className="fixed inset-0 z-[60] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5">
-      <div className="bg-white w-full max-w-3xl rounded-2xl border border-slate-200 shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
-        <div className="bg-[#0B1E38] text-white p-4 px-5 flex items-center justify-between shrink-0">
-          <div><h3 className="text-sm font-bold uppercase tracking-wide">Registrar compra</h3><p className="text-[11px] text-slate-300">{order.id} · {order.clientName}</p></div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white p-1"><span className="material-symbols-outlined">close</span></button>
+      <div className="bg-surface w-full max-w-3xl rounded-2xl border border-border shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
+        <div className="bg-navy-3 text-white p-4 px-5 flex items-center justify-between shrink-0">
+          <div><h3 className="text-sm font-bold uppercase tracking-wide">Registrar compra</h3><p className="text-[11px] text-fg-muted">{order.id} · {order.clientName}</p></div>
+          <button onClick={onClose} className="text-fg-muted hover:text-white p-1"><span className="material-symbols-outlined">close</span></button>
         </div>
         <div className="p-5 overflow-y-auto">
           {erro && <div className="mb-3 text-xs bg-red-50 border border-red-200 text-red-700 rounded-lg p-2.5">{erro}</div>}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-            <div className="sm:col-span-1"><label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Fornecedor</label><input value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} placeholder="Nome" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" /></div>
-            <div><label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Data da compra</label><input type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" /></div>
-            <div><label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Previsão de entrega</label><input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" /></div>
+            <div className="sm:col-span-1"><label className="block text-[10px] font-bold uppercase text-fg-secondary mb-1">Fornecedor</label><input value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} placeholder="Nome" className="w-full border border-border-strong rounded-lg px-3 py-2 text-sm" /></div>
+            <div><label className="block text-[10px] font-bold uppercase text-fg-secondary mb-1">Data da compra</label><input type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} className="w-full border border-border-strong rounded-lg px-3 py-2 text-sm" /></div>
+            <div><label className="block text-[10px] font-bold uppercase text-fg-secondary mb-1">Previsão de entrega</label><input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className="w-full border border-border-strong rounded-lg px-3 py-2 text-sm" /></div>
           </div>
-          {purchases === null && online ? <p className="text-xs text-slate-400">Carregando…</p> : (
+          {purchases === null && online ? <p className="text-xs text-fg-muted">Carregando…</p> : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[560px]">
-                <thead><tr className="border-b border-slate-200"><th className={`${th} text-left`}>Produto</th><th className={th}>Pedido</th><th className={th}>Estoque</th><th className={th}>Já comprado</th><th className={th}>Comprar</th><th className={th}>Custo un.</th><th className={th}>Total</th></tr></thead>
+                <thead><tr className="border-b border-border"><th className={`${th} text-left`}>Produto</th><th className={th}>Pedido</th><th className={th}>Estoque</th><th className={th}>Já comprado</th><th className={th}>Comprar</th><th className={th}>Custo un.</th><th className={th}>Total</th></tr></thead>
                 <tbody>
                   {rows.map((r) => {
                     const excedente = r.estoque + r.jaComprado + r.comprar - r.pedido;
                     return (
-                      <tr key={r.key} className="border-b border-slate-100">
-                        <td className="px-2 py-1.5 text-xs text-left"><div className="font-semibold text-slate-800">{r.descricao}</div>{excedente > 0 && <span className="text-[10px] text-amber-600">{excedente} un. de excedente de estoque</span>}</td>
+                      <tr key={r.key} className="border-b border-border">
+                        <td className="px-2 py-1.5 text-xs text-left"><div className="font-semibold text-fg">{r.descricao}</div>{excedente > 0 && <span className="text-[10px] text-amber-600">{excedente} un. de excedente de estoque</span>}</td>
                         <td className={td}>{r.pedido}</td>
-                        <td className={`${td} text-slate-400`}>{r.estoque}</td>
-                        <td className={`${td} text-slate-400`}>{r.jaComprado}</td>
+                        <td className={`${td} text-fg-muted`}>{r.estoque}</td>
+                        <td className={`${td} text-fg-muted`}>{r.jaComprado}</td>
                         <td className={td}><input type="number" min={0} value={r.comprar} onChange={(e) => set(r.key, { comprar: Math.max(0, Number(e.target.value) || 0) })} className={inp} /></td>
                         <td className={td}><input type="number" min={0} step="0.01" value={r.custo ?? ''} onChange={(e) => set(r.key, { custo: e.target.value === '' ? undefined : Number(e.target.value) })} className={`${inp} w-20`} /></td>
                         <td className={`${td} font-bold`}>{money(r.comprar * (r.custo || 0))}</td>
@@ -121,13 +121,13 @@ export const SupplyPurchaseModal: React.FC<Props> = ({ order, inventory, onClose
               </table>
             </div>
           )}
-          <div><label className="block text-[10px] font-bold uppercase text-slate-500 mb-1 mt-3">Observação</label><input value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" /></div>
-          <p className="text-[11px] text-slate-500 mt-2">Sugestão de compra = pedido − estoque − já comprado. Você pode ajustar (§8/§17). A compra não altera o preço de venda.</p>
+          <div><label className="block text-[10px] font-bold uppercase text-fg-secondary mb-1 mt-3">Observação</label><input value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full border border-border-strong rounded-lg px-3 py-2 text-sm" /></div>
+          <p className="text-[11px] text-fg-secondary mt-2">Sugestão de compra = pedido − estoque − já comprado. Você pode ajustar (§8/§17). A compra não altera o preço de venda.</p>
         </div>
-        <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center gap-2 shrink-0">
-          <button onClick={onClose} className="px-4 py-2.5 text-xs font-bold uppercase text-slate-500 hover:text-slate-800">Cancelar</button>
-          <div className="flex-1 text-right"><span className="text-[10px] uppercase text-slate-400">Total da compra</span> <span className="font-data-mono font-bold text-emerald-700 ml-1">{money(total)}</span></div>
-          <button disabled={busy || !online || comprarRows.length === 0} onClick={salvar} className="bg-[#0B1E38] hover:bg-[#13315C] disabled:opacity-40 text-white py-2.5 px-5 rounded-lg text-xs font-bold uppercase tracking-wider">{busy ? 'Salvando…' : 'Registrar compra'}</button>
+        <div className="p-4 border-t border-border bg-surface-2 flex items-center gap-2 shrink-0">
+          <button onClick={onClose} className="px-4 py-2.5 text-xs font-bold uppercase text-fg-secondary hover:text-fg">Cancelar</button>
+          <div className="flex-1 text-right"><span className="text-[10px] uppercase text-fg-muted">Total da compra</span> <span className="font-data-mono font-bold text-emerald-700 ml-1">{money(total)}</span></div>
+          <button disabled={busy || !online || comprarRows.length === 0} onClick={salvar} className="bg-navy-3 hover:bg-[#13315C] disabled:opacity-40 text-white py-2.5 px-5 rounded-lg text-xs font-bold uppercase tracking-wider">{busy ? 'Salvando…' : 'Registrar compra'}</button>
         </div>
       </div>
     </div>

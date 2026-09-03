@@ -53,26 +53,26 @@ export const ComparisonsPanel: React.FC<Props> = ({ comparisons, photoById, thum
   return (
     <div>
       <div className="relative mb-4">
-        <span className="material-symbols-outlined pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-lg text-slate-400">search</span>
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por cliente, local, título ou descrição" className="min-h-11 w-full rounded-xl border border-slate-300 bg-white pl-9 pr-3 text-sm" />
+        <span className="material-symbols-outlined pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-lg text-fg-muted">search</span>
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por cliente, local, título ou descrição" className="min-h-11 w-full rounded-xl border border-border-strong bg-surface pl-9 pr-3 text-sm" />
       </div>
 
       {selected.size > 0 && (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#1A1A72]/20 bg-[#1A1A72]/5 p-2.5">
-          <span className="text-xs font-bold text-[#1A1A72]">{selected.size} comparação(ões) selecionada(s)</span>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/20 bg-navy/5 p-2.5">
+          <span className="text-xs font-bold text-primary">{selected.size} comparação(ões) selecionada(s)</span>
           <div className="flex gap-2">
-            <button onClick={gerar} className="min-h-9 rounded-lg bg-[#E63946] px-3 text-xs font-bold uppercase text-white">
+            <button onClick={gerar} className="min-h-9 rounded-lg bg-danger px-3 text-xs font-bold uppercase text-white">
               <span className="material-symbols-outlined align-middle text-sm">picture_as_pdf</span> Gerar Folha de Fotos
             </button>
-            <button onClick={() => setSelected(new Set())} className="min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold uppercase text-slate-600">Limpar</button>
+            <button onClick={() => setSelected(new Set())} className="min-h-9 rounded-lg border border-border-strong bg-surface px-3 text-xs font-bold uppercase text-fg-secondary">Limpar</button>
           </div>
         </div>
       )}
 
       {visible.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center text-slate-400">
-          <span className="material-symbols-outlined mb-2 text-5xl text-slate-300">compare</span>
-          <p className="font-semibold text-slate-600">Nenhuma comparação Antes × Depois.</p>
+        <div className="flex flex-col items-center justify-center py-20 text-center text-fg-muted">
+          <span className="material-symbols-outlined mb-2 text-5xl text-fg-muted">compare</span>
+          <p className="font-semibold text-fg-secondary">Nenhuma comparação Antes × Depois.</p>
           <p className="mt-1 max-w-xs text-xs">Selecione 2 fotos do mesmo cliente na aba Todas e use “Antes × Depois”.</p>
         </div>
       ) : (
@@ -101,7 +101,7 @@ const CardThumb = ({ photo, thumbs }: { photo: GalleryPhoto; thumbs: Record<stri
   <div className="aspect-[4/3] overflow-hidden rounded-lg bg-slate-900">
     {thumbs[photo.clientUuid]
       ? <img src={thumbs[photo.clientUuid]} alt="Evidência" className="h-full w-full object-contain" loading="lazy" />
-      : <div className="flex h-full items-center justify-center text-slate-500"><span className="material-symbols-outlined">image</span></div>}
+      : <div className="flex h-full items-center justify-center text-fg-secondary"><span className="material-symbols-outlined">image</span></div>}
   </div>
 );
 
@@ -109,8 +109,8 @@ const ComparisonCard: React.FC<{ r: ResolvedComparison; thumbs: Record<string, s
   const { comparison: c, before, after } = r;
   const localDiff = (before.localSetor || '') !== (after.localSetor || '');
   return (
-    <div className={`relative flex flex-col rounded-xl border bg-white p-3 shadow-sm transition-colors ${selected ? 'border-[#1A1A72] ring-2 ring-[#1A1A72]/20' : 'border-slate-200 hover:border-slate-300'}`}>
-      <button onClick={onToggle} className={`absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-lg shadow ${selected ? 'bg-[#1A1A72] text-white' : 'bg-white/90 text-slate-500 hover:bg-white'}`} aria-label="Selecionar">
+    <div className={`relative flex flex-col rounded-xl border bg-surface p-3 shadow-sm transition-colors ${selected ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-border-strong'}`}>
+      <button onClick={onToggle} className={`absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-lg shadow ${selected ? 'bg-navy text-white' : 'bg-white/90 text-fg-secondary hover:bg-surface'}`} aria-label="Selecionar">
         <span className="material-symbols-outlined text-base">{selected ? 'check' : 'check_box_outline_blank'}</span>
       </button>
       <button onClick={onOpen} className="text-left">
@@ -126,11 +126,11 @@ const ComparisonCard: React.FC<{ r: ResolvedComparison; thumbs: Record<string, s
         </div>
         <div className="mt-2.5">
           <div className="flex items-center justify-between gap-2">
-            <p className="truncate text-sm font-bold text-slate-900">{c.titulo || 'Comparação'}</p>
+            <p className="truncate text-sm font-bold text-fg">{c.titulo || 'Comparação'}</p>
             {c.resultado && <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${RESULT_TONE[c.resultado]}`}>{RESULT_LABEL[c.resultado]}</span>}
           </div>
-          <p className="truncate text-[11px] text-slate-500">{before.clientName || before.clientId}{localDiff ? ' · locais distintos' : before.localSetor ? ` · ${before.localSetor}` : ''}</p>
-          {c.descricao && <p className="mt-0.5 line-clamp-2 text-[11px] text-slate-600">{c.descricao}</p>}
+          <p className="truncate text-[11px] text-fg-secondary">{before.clientName || before.clientId}{localDiff ? ' · locais distintos' : before.localSetor ? ` · ${before.localSetor}` : ''}</p>
+          {c.descricao && <p className="mt-0.5 line-clamp-2 text-[11px] text-fg-secondary">{c.descricao}</p>}
         </div>
       </button>
     </div>
@@ -153,9 +153,9 @@ const BigPhoto = ({ photo, label, tone, thumbs }: { photo: GalleryPhoto; label: 
       <button onClick={open} className="block aspect-[4/3] w-full overflow-hidden rounded-xl bg-slate-900">
         {(full || thumbs[photo.clientUuid])
           ? <img src={full || thumbs[photo.clientUuid]} alt={label} className="h-full w-full object-contain" />
-          : <div className="flex h-full items-center justify-center text-slate-500"><span className="material-symbols-outlined">image</span></div>}
+          : <div className="flex h-full items-center justify-center text-fg-secondary"><span className="material-symbols-outlined">image</span></div>}
       </button>
-      <p className="mt-1 text-[10px] text-slate-500">{photo.localSetor || '—'} · {fmtDate(photo.capturadoEm)} {fmtTime(photo.capturadoEm)}{photo.tecnicoNome ? ` · ${photo.tecnicoNome}` : ''}</p>
+      <p className="mt-1 text-[10px] text-fg-secondary">{photo.localSetor || '—'} · {fmtDate(photo.capturadoEm)} {fmtTime(photo.capturadoEm)}{photo.tecnicoNome ? ` · ${photo.tecnicoNome}` : ''}</p>
     </div>
   );
 };
@@ -199,14 +199,14 @@ const ComparisonDetail: React.FC<{
   };
 
   const localDiff = (before.localSetor || '') !== (after.localSetor || '');
-  const field = 'mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm';
+  const field = 'mt-1 min-h-11 w-full rounded-xl border border-border-strong bg-surface px-3 text-sm';
 
   return (
     <div className="fixed inset-0 z-[85] flex items-stretch justify-end bg-slate-950/60" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="flex h-full w-full max-w-lg flex-col overflow-y-auto bg-white shadow-2xl">
-        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
-          <p className="truncate text-sm font-bold text-slate-900">{c.titulo || 'Comparação Antes × Depois'}</p>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><span className="material-symbols-outlined">close</span></button>
+      <div onClick={(e) => e.stopPropagation()} className="flex h-full w-full max-w-lg flex-col overflow-y-auto bg-surface shadow-2xl">
+        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-white/95 px-4 py-3 backdrop-blur">
+          <p className="truncate text-sm font-bold text-fg">{c.titulo || 'Comparação Antes × Depois'}</p>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-fg-muted hover:bg-surface-3"><span className="material-symbols-outlined">close</span></button>
         </header>
 
         <div className="space-y-4 p-4">
@@ -215,7 +215,7 @@ const ComparisonDetail: React.FC<{
             <BigPhoto photo={after} label="Depois" tone="text-emerald-700" thumbs={thumbs} />
           </div>
 
-          <div className="rounded-xl border border-slate-200 p-3 text-sm">
+          <div className="rounded-xl border border-border p-3 text-sm">
             <Row k="Cliente" v={before.clientName || before.clientId} />
             {localDiff
               ? (<><Row k="Local (Antes)" v={before.localSetor || '—'} /><Row k="Local (Depois)" v={after.localSetor || '—'} /></>)
@@ -231,26 +231,26 @@ const ComparisonDetail: React.FC<{
           </div>
 
           {edit ? (
-            <div className="space-y-3 rounded-xl border border-[#1A1A72]/20 bg-[#1A1A72]/5 p-3">
-              <label className="block text-xs font-bold uppercase text-slate-600">Título<input value={titulo} onChange={(e) => setTitulo(e.target.value)} className={field} /></label>
-              <label className="block text-xs font-bold uppercase text-slate-600">Descrição<textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={2} className={`${field} py-2`} /></label>
-              <label className="block text-xs font-bold uppercase text-slate-600">Resultado
+            <div className="space-y-3 rounded-xl border border-primary/20 bg-navy/5 p-3">
+              <label className="block text-xs font-bold uppercase text-fg-secondary">Título<input value={titulo} onChange={(e) => setTitulo(e.target.value)} className={field} /></label>
+              <label className="block text-xs font-bold uppercase text-fg-secondary">Descrição<textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={2} className={`${field} py-2`} /></label>
+              <label className="block text-xs font-bold uppercase text-fg-secondary">Resultado
                 <select value={resultado} onChange={(e) => setResultado(e.target.value as ComparisonResult | '')} className={`${field} normal-case`}>
                   <option value="">—</option>
                   {(Object.keys(RESULT_LABEL) as ComparisonResult[]).map((k) => <option key={k} value={k}>{RESULT_LABEL[k]}</option>)}
                 </select>
               </label>
               <div className="flex gap-2">
-                <button onClick={inverter} disabled={busy} className="min-h-10 flex-1 rounded-lg border border-slate-300 bg-white text-xs font-bold uppercase text-slate-700">Inverter A/D</button>
-                <button onClick={() => setEdit(false)} disabled={busy} className="min-h-10 flex-1 rounded-lg border border-slate-300 bg-white text-xs font-bold uppercase text-slate-600">Cancelar</button>
-                <button onClick={salvar} disabled={busy} className="min-h-10 flex-1 rounded-lg bg-[#1A1A72] text-xs font-bold uppercase text-white">Salvar</button>
+                <button onClick={inverter} disabled={busy} className="min-h-10 flex-1 rounded-lg border border-border-strong bg-surface text-xs font-bold uppercase text-fg-secondary">Inverter A/D</button>
+                <button onClick={() => setEdit(false)} disabled={busy} className="min-h-10 flex-1 rounded-lg border border-border-strong bg-surface text-xs font-bold uppercase text-fg-secondary">Cancelar</button>
+                <button onClick={salvar} disabled={busy} className="min-h-10 flex-1 rounded-lg bg-navy text-xs font-bold uppercase text-white">Salvar</button>
               </div>
             </div>
           ) : (
             <>
-              {c.descricao && <div><p className="text-[10px] font-bold uppercase text-slate-400">Descrição</p><p className="text-sm text-slate-700">{c.descricao}</p></div>}
+              {c.descricao && <div><p className="text-[10px] font-bold uppercase text-fg-muted">Descrição</p><p className="text-sm text-fg-secondary">{c.descricao}</p></div>}
               <div className="flex gap-2">
-                <button onClick={() => setEdit(true)} className="min-h-11 flex-1 rounded-xl bg-[#1A1A72] text-xs font-bold uppercase text-white">Editar</button>
+                <button onClick={() => setEdit(true)} className="min-h-11 flex-1 rounded-xl bg-navy text-xs font-bold uppercase text-white">Editar</button>
                 <button onClick={remover} disabled={busy} className="min-h-11 flex-1 rounded-xl border border-red-300 bg-red-50 text-xs font-bold uppercase text-red-700">Remover</button>
               </div>
             </>
@@ -262,8 +262,8 @@ const ComparisonDetail: React.FC<{
 };
 
 const Row = ({ k, v }: { k: string; v: string }) => (
-  <div className="flex justify-between gap-3 border-b border-slate-100 py-1.5 last:border-0">
-    <span className="text-[11px] font-bold uppercase text-slate-400">{k}</span>
-    <span className="text-right text-sm text-slate-800">{v}</span>
+  <div className="flex justify-between gap-3 border-b border-border py-1.5 last:border-0">
+    <span className="text-[11px] font-bold uppercase text-fg-muted">{k}</span>
+    <span className="text-right text-sm text-fg">{v}</span>
   </div>
 );

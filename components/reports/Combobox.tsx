@@ -18,7 +18,7 @@ interface ComboboxProps {
 }
 
 const inputCls =
-  'w-full border border-slate-300 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20 focus:border-[#1A1A72]/40';
+  'w-full border border-border-strong rounded-lg p-2.5 text-fg bg-surface text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40';
 
 export const Combobox: React.FC<ComboboxProps> = ({ value, onChange, options, placeholder, createLabel, onCreate }) => {
   const [open, setOpen] = useState(false);
@@ -82,7 +82,7 @@ export const Combobox: React.FC<ComboboxProps> = ({ value, onChange, options, pl
       />
 
       {open && (
-        <div className="absolute left-0 right-0 top-full -mt-px z-50 bg-white border border-gray-300 rounded-b-md shadow-lg max-h-60 overflow-y-auto">
+        <div className="absolute left-0 right-0 top-full -mt-px z-50 bg-surface border border-gray-300 rounded-b-md shadow-lg max-h-60 overflow-y-auto">
           {/* Ação fixa no topo */}
           {createLabel && (
             <button
@@ -99,7 +99,7 @@ export const Combobox: React.FC<ComboboxProps> = ({ value, onChange, options, pl
           )}
           {/* Resultados */}
           {filtered.length === 0 ? (
-            <p className="px-3 py-2 text-[11px] text-slate-400 italic">Nenhum resultado.</p>
+            <p className="px-3 py-2 text-[11px] text-fg-muted italic">Nenhum resultado.</p>
           ) : (
             filtered.map((o) => {
               const sel = o === value;
@@ -112,7 +112,7 @@ export const Combobox: React.FC<ComboboxProps> = ({ value, onChange, options, pl
                     pick(o);
                   }}
                   className={`w-full text-left px-3 py-2 text-xs ${
-                    sel ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-gray-100'
+                    sel ? 'bg-blue-600 text-white' : 'text-fg-secondary hover:bg-gray-100'
                   }`}
                 >
                   {o}
@@ -130,10 +130,10 @@ export const Combobox: React.FC<ComboboxProps> = ({ value, onChange, options, pl
           onMouseDown={() => setModalOpen(false)}
         >
           <div
-            className="bg-white w-full max-w-xs rounded-xl shadow-2xl border border-slate-200 p-4"
+            className="bg-surface w-full max-w-xs rounded-xl shadow-2xl border border-border p-4"
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <p className="text-sm font-bold text-slate-900 uppercase mb-2">{createLabel || 'Cadastrar'}</p>
+            <p className="text-sm font-bold text-fg uppercase mb-2">{createLabel || 'Cadastrar'}</p>
             <input
               autoFocus
               className={inputCls}
@@ -151,7 +151,7 @@ export const Combobox: React.FC<ComboboxProps> = ({ value, onChange, options, pl
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg uppercase"
+                className="px-3 py-1.5 text-xs font-semibold text-fg-secondary hover:bg-surface-3 rounded-lg uppercase"
               >
                 Cancelar
               </button>
@@ -159,7 +159,7 @@ export const Combobox: React.FC<ComboboxProps> = ({ value, onChange, options, pl
                 type="button"
                 onClick={confirmarCadastro}
                 disabled={!novoNome.trim()}
-                className="px-4 py-1.5 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] text-white text-xs font-bold uppercase disabled:opacity-40"
+                className="px-4 py-1.5 rounded-lg bg-navy hover:bg-navy-3 text-white text-xs font-bold uppercase disabled:opacity-40"
               >
                 Cadastrar
               </button>

@@ -90,11 +90,11 @@ export const TriagemFotos: React.FC<TriagemFotosProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-150">
+      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-border animate-in fade-in zoom-in duration-150">
         {/* Topo fixo */}
         <div className="bg-slate-900 text-white p-4 px-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#E63946] flex items-center justify-center text-white font-bold">
+            <div className="w-10 h-10 rounded-xl bg-danger flex items-center justify-center text-white font-bold">
               <span className="material-symbols-outlined text-xl">collections</span>
             </div>
             <div>
@@ -104,14 +104,14 @@ export const TriagemFotos: React.FC<TriagemFotosProps> = ({
                   {photos.length} foto{photos.length === 1 ? '' : 's'} não classificada{photos.length === 1 ? '' : 's'}
                 </span>
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-fg-muted">
                 Captura rápida em campo. As fotos não classificadas entrarão no PDF no &quot;Registro Fotográfico Geral&quot;.
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-colors"
+            className="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 text-fg-muted flex items-center justify-center transition-colors"
           >
             <span className="material-symbols-outlined text-lg">close</span>
           </button>
@@ -120,28 +120,28 @@ export const TriagemFotos: React.FC<TriagemFotosProps> = ({
         {/* Conteúdo Principal */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {photos.length === 0 ? (
-            <div className="text-center py-16 flex flex-col items-center justify-center text-slate-400">
-              <span className="material-symbols-outlined text-5xl text-slate-300 mb-3">no_photography</span>
-              <p className="font-semibold text-slate-600">Todas as fotos foram classificadas!</p>
-              <p className="text-xs max-w-md mt-1 text-slate-400">
+            <div className="text-center py-16 flex flex-col items-center justify-center text-fg-muted">
+              <span className="material-symbols-outlined text-5xl text-fg-muted mb-3">no_photography</span>
+              <p className="font-semibold text-fg-secondary">Todas as fotos foram classificadas!</p>
+              <p className="text-xs max-w-md mt-1 text-fg-muted">
                 Use o botão flutuante de câmera em campo para capturar fotos rapidamente sem bloquear a inspeção.
               </p>
             </div>
           ) : (
             <>
               {/* Barra de ações em lote */}
-              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-xl p-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-surface-2 border border-border rounded-xl p-3.5">
                 <div className="flex items-center gap-3">
                   <button
                     onClick={handleSelectAll}
-                    className="text-xs font-semibold text-slate-700 hover:text-slate-900 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 shadow-sm"
+                    className="text-xs font-semibold text-fg-secondary hover:text-fg flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface border border-border shadow-sm"
                   >
                     <span className="material-symbols-outlined text-base">
                       {selectedIds.length === photos.length ? 'check_box' : 'check_box_outline_blank'}
                     </span>
                     {selectedIds.length === photos.length ? 'Desmarcar todas' : 'Selecionar todas'}
                   </button>
-                  <span className="text-xs font-data-mono text-slate-500">
+                  <span className="text-xs font-data-mono text-fg-secondary">
                     {selectedIds.length} selecionada{selectedIds.length === 1 ? '' : 's'}
                   </span>
                 </div>
@@ -151,7 +151,7 @@ export const TriagemFotos: React.FC<TriagemFotosProps> = ({
                     <select
                       value={targetGrupo}
                       onChange={(e) => setTargetGrupo(e.target.value)}
-                      className="text-xs bg-white border border-slate-200 rounded-lg p-2 font-body-md"
+                      className="text-xs bg-surface border border-border rounded-lg p-2 font-body-md"
                     >
                       <option value="">-- Grupo (opcional) --</option>
                       {categoriasGrupos.map((g) => (
@@ -166,12 +166,12 @@ export const TriagemFotos: React.FC<TriagemFotosProps> = ({
                       placeholder="Local (ex: 2º Pavimento - Central)"
                       value={targetLocal}
                       onChange={(e) => setTargetLocal(e.target.value)}
-                      className="text-xs bg-white border border-slate-200 rounded-lg p-2 w-48 font-body-md"
+                      className="text-xs bg-surface border border-border rounded-lg p-2 w-48 font-body-md"
                     />
 
                     <button
                       onClick={handleCreateApontamentoEmLote}
-                      className="text-xs font-semibold bg-[#E63946] hover:bg-[#a51515] text-white px-3 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-sm"
+                      className="text-xs font-semibold bg-danger hover:bg-danger-hover text-white px-3 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-sm"
                     >
                       <span className="material-symbols-outlined text-base">add_task</span>
                       Criar Apontamento com {selectedIds.length} Foto{selectedIds.length === 1 ? '' : 's'}
@@ -187,10 +187,10 @@ export const TriagemFotos: React.FC<TriagemFotosProps> = ({
                   return (
                     <div
                       key={photo.id}
-                      className={`relative group bg-white rounded-xl border transition-all overflow-hidden flex flex-col ${
+                      className={`relative group bg-surface rounded-xl border transition-all overflow-hidden flex flex-col ${
                         isSelected
-                          ? 'border-[#E63946] ring-2 ring-[#E63946]/20 shadow-md'
-                          : 'border-slate-200 hover:border-slate-300'
+                          ? 'border-danger ring-2 ring-danger/20 shadow-md'
+                          : 'border-border hover:border-border-strong'
                       }`}
                     >
                       {/* Checkbox de seleção */}
@@ -203,7 +203,7 @@ export const TriagemFotos: React.FC<TriagemFotosProps> = ({
                         <button
                           onClick={() => toggleSelect(photo.id)}
                           className={`absolute top-2 left-2 w-7 h-7 rounded-lg flex items-center justify-center shadow-md transition-colors ${
-                            isSelected ? 'bg-[#E63946] text-white' : 'bg-black/40 text-white/80 hover:bg-black/60'
+                            isSelected ? 'bg-danger text-white' : 'bg-black/40 text-white/80 hover:bg-black/60'
                           }`}
                         >
                           <span className="material-symbols-outlined text-base">
@@ -225,14 +225,14 @@ export const TriagemFotos: React.FC<TriagemFotosProps> = ({
                       </div>
 
                       {/* Nota rápida / Ditado por voz */}
-                      <div className="p-3 flex flex-col gap-2 flex-1 bg-slate-50/50">
+                      <div className="p-3 flex flex-col gap-2 flex-1 bg-surface-2/50">
                         <div className="flex items-center gap-1">
                           <input
                             type="text"
                             placeholder="Nota rápida de campo..."
                             value={photo.notaRapida || ''}
                             onChange={(e) => onUpdatePhotoNota(photo.id, e.target.value)}
-                            className="flex-1 bg-white border border-slate-200 rounded p-1.5 text-xs font-body-md text-slate-800 focus:outline-none focus:border-[#1A1A72]"
+                            className="flex-1 bg-surface border border-border rounded p-1.5 text-xs font-body-md text-fg focus:outline-none focus:border-primary"
                           />
                           <button
                             type="button"
@@ -240,7 +240,7 @@ export const TriagemFotos: React.FC<TriagemFotosProps> = ({
                             className={`p-1.5 rounded border transition-colors ${
                               isListening === photo.id
                                 ? 'bg-red-600 border-red-600 text-white animate-pulse'
-                                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                                : 'bg-surface border-border text-fg-secondary hover:bg-surface-3'
                             }`}
                             title="Ditado por voz"
                           >
@@ -248,15 +248,15 @@ export const TriagemFotos: React.FC<TriagemFotosProps> = ({
                           </button>
                         </div>
 
-                        <div className="flex items-center justify-between text-[10px] text-slate-500 mt-1">
-                          <span className="font-semibold text-slate-700">
+                        <div className="flex items-center justify-between text-[10px] text-fg-secondary mt-1">
+                          <span className="font-semibold text-fg-secondary">
                             {photo.grupo ? `Grupo: ${photo.grupo}` : 'Sem grupo'}
                           </span>
                           <button
                             onClick={() => {
                               setSelectedIds([photo.id]);
                             }}
-                            className="text-[#E63946] hover:underline font-semibold"
+                            className="text-danger hover:underline font-semibold"
                           >
                             Criar Apontamento →
                           </button>
@@ -271,13 +271,13 @@ export const TriagemFotos: React.FC<TriagemFotosProps> = ({
         </div>
 
         {/* Rodapé fixo */}
-        <div className="bg-slate-50 border-t border-slate-200 p-4 px-6 flex items-center justify-between">
-          <p className="text-xs text-slate-500 font-data-mono">
+        <div className="bg-surface-2 border-t border-border p-4 px-6 flex items-center justify-between">
+          <p className="text-xs text-fg-secondary font-data-mono">
             {photos.length} foto(s) na bandeja &middot; Salvas em rascunho
           </p>
           <button
             onClick={onClose}
-            className="px-5 py-2.5 rounded-xl bg-[#1A1A72] hover:bg-[#12124f] text-white text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
+            className="px-5 py-2.5 rounded-xl bg-navy hover:bg-navy-3 text-white text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
           >
             Concluir Triagem
           </button>

@@ -65,9 +65,9 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
   }, [catalogo, catalogoFilter]);
 
   const isServico = tipo === 'servico';
-  const accentText = accent === 'emerald' ? 'text-emerald-700' : 'text-[#E63946]';
-  const accentBg = accent === 'emerald' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-[#E63946] hover:bg-[#a51515]';
-  const accentRing = accent === 'emerald' ? 'focus:ring-emerald-500/25' : 'focus:ring-[#E63946]/20';
+  const accentText = accent === 'emerald' ? 'text-emerald-700' : 'text-danger';
+  const accentBg = accent === 'emerald' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-danger hover:bg-danger-hover';
+  const accentRing = accent === 'emerald' ? 'focus:ring-emerald-500/25' : 'focus:ring-danger/20';
 
   const total = itens.reduce((a, x) => a + lineTotal(x.it), 0);
 
@@ -131,8 +131,8 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
   const stepQtd = (idx: number, it: PedidoEquipmentItem, delta: number) =>
     onUpdate(idx, { quantidade: normalizeQuantity((it.quantidade || 1) + delta, it.unidade) });
 
-  const inputCls = `w-full border border-slate-300 rounded-lg p-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 ${accentRing}`;
-  const miniLabel = 'block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1';
+  const inputCls = `w-full border border-border-strong rounded-lg p-2.5 text-sm text-fg focus:outline-none focus:ring-2 ${accentRing}`;
+  const miniLabel = 'block text-[10px] font-bold uppercase tracking-wider text-fg-muted mb-1';
 
   return (
     <div className="space-y-3">
@@ -140,15 +140,15 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
       {itens.length > 0 ? (
         <div className="space-y-2">
           {itens.map(({ it, idx }, pos) => (
-            <div key={idx} className={`relative rounded-xl border bg-white p-3 ${editingIdx === idx ? (accent === 'emerald' ? 'border-emerald-400 ring-1 ring-emerald-200' : 'border-[#E63946]/50 ring-1 ring-[#E63946]/15') : 'border-slate-200'}`}>
+            <div key={idx} className={`relative rounded-xl border bg-surface p-3 ${editingIdx === idx ? (accent === 'emerald' ? 'border-emerald-400 ring-1 ring-emerald-200' : 'border-danger/50 ring-1 ring-danger/15') : 'border-border'}`}>
               <div className="flex items-start gap-2">
                 <span className={`mt-0.5 font-data-mono font-bold text-xs ${accentText}`}>{pos + 1}</span>
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-slate-800 text-sm leading-snug break-words">{it.descricao || <span className="text-slate-400 italic">Sem descrição</span>}</p>
-                  {it.descricaoDetalhada && <p className="text-[11px] text-slate-500 leading-snug mt-0.5 break-words">{it.descricaoDetalhada}</p>}
-                  <p className="text-[11px] text-slate-500 font-data-mono mt-1">
+                  <p className="font-semibold text-fg text-sm leading-snug break-words">{it.descricao || <span className="text-fg-muted italic">Sem descrição</span>}</p>
+                  {it.descricaoDetalhada && <p className="text-[11px] text-fg-secondary leading-snug mt-0.5 break-words">{it.descricaoDetalhada}</p>}
+                  <p className="text-[11px] text-fg-secondary font-data-mono mt-1">
                     {normalizeUnitCode(it.unidade)} · {fmtQtd(it.quantidade)}× {brl(it.precoUnitario || 0)}
-                    {it.desconto ? <span className="text-[#E63946]"> · desc {brl(it.desconto)}</span> : null}
+                    {it.desconto ? <span className="text-danger"> · desc {brl(it.desconto)}</span> : null}
                   </p>
                   {(it.sourceOrigins?.length || it.stockSnapshot !== undefined) ? (
                     <div className="mt-1.5 flex flex-wrap gap-1">
@@ -162,29 +162,29 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
                 </div>
                 {/* Menu de opções */}
                 <div className="relative shrink-0">
-                  <button type="button" onClick={() => setOpenMenu(openMenu === idx ? null : idx)} className="p-1 text-slate-400 hover:text-slate-700 rounded" title="Opções">
+                  <button type="button" onClick={() => setOpenMenu(openMenu === idx ? null : idx)} className="p-1 text-fg-muted hover:text-fg-secondary rounded" title="Opções">
                     <span className="material-symbols-outlined text-lg leading-none">more_vert</span>
                   </button>
                   {openMenu === idx && (
-                    <div className="absolute right-0 top-7 z-10 w-36 bg-white border border-slate-200 rounded-lg shadow-lg py-1 text-xs">
-                      <button type="button" onClick={() => startEdit(idx, it)} className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700"><Pencil className="w-3.5 h-3.5" /> Editar</button>
-                      <button type="button" onClick={() => { setOpenMenu(null); onMove(idx, -1); }} disabled={pos === 0} className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 disabled:opacity-40"><ChevronUp className="w-3.5 h-3.5" /> Mover p/ cima</button>
-                      <button type="button" onClick={() => { setOpenMenu(null); onMove(idx, 1); }} disabled={pos === itens.length - 1} className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 disabled:opacity-40"><ChevronDown className="w-3.5 h-3.5" /> Mover p/ baixo</button>
-                      <button type="button" onClick={() => { setOpenMenu(null); onRemove(idx); }} className="w-full text-left px-3 py-2 hover:bg-red-50 flex items-center gap-2 text-[#E63946]"><Trash2 className="w-3.5 h-3.5" /> Remover</button>
+                    <div className="absolute right-0 top-7 z-10 w-36 bg-surface border border-border rounded-lg shadow-lg py-1 text-xs">
+                      <button type="button" onClick={() => startEdit(idx, it)} className="w-full text-left px-3 py-2 hover:bg-surface-2 flex items-center gap-2 text-fg-secondary"><Pencil className="w-3.5 h-3.5" /> Editar</button>
+                      <button type="button" onClick={() => { setOpenMenu(null); onMove(idx, -1); }} disabled={pos === 0} className="w-full text-left px-3 py-2 hover:bg-surface-2 flex items-center gap-2 text-fg-secondary disabled:opacity-40"><ChevronUp className="w-3.5 h-3.5" /> Mover p/ cima</button>
+                      <button type="button" onClick={() => { setOpenMenu(null); onMove(idx, 1); }} disabled={pos === itens.length - 1} className="w-full text-left px-3 py-2 hover:bg-surface-2 flex items-center gap-2 text-fg-secondary disabled:opacity-40"><ChevronDown className="w-3.5 h-3.5" /> Mover p/ baixo</button>
+                      <button type="button" onClick={() => { setOpenMenu(null); onRemove(idx); }} className="w-full text-left px-3 py-2 hover:bg-red-50 flex items-center gap-2 text-danger"><Trash2 className="w-3.5 h-3.5" /> Remover</button>
                     </div>
                   )}
                 </div>
               </div>
-              <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100">
+              <div className="flex items-center justify-between mt-2 pt-2 border-t border-border">
                 {/* Stepper de quantidade */}
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => stepQtd(idx, it, -1)} className="w-7 h-7 rounded-full border border-slate-300 text-slate-500 hover:bg-slate-50 flex items-center justify-center"><Minus className="w-3.5 h-3.5" /></button>
+                  <button type="button" onClick={() => stepQtd(idx, it, -1)} className="w-7 h-7 rounded-full border border-border-strong text-fg-secondary hover:bg-surface-2 flex items-center justify-center"><Minus className="w-3.5 h-3.5" /></button>
                   <input
                     type="number" min={0} step={unitAllowsDecimals(it.unidade) ? 'any' : 1} value={it.quantidade}
                     onChange={(e) => onUpdate(idx, { quantidade: normalizeQuantity(Number(e.target.value) || 0, it.unidade) })}
-                    className="w-16 text-center font-data-mono font-bold text-slate-800 border border-slate-200 rounded-lg p-1.5"
+                    className="w-16 text-center font-data-mono font-bold text-fg border border-border rounded-lg p-1.5"
                   />
-                  <button type="button" onClick={() => stepQtd(idx, it, 1)} className={`w-7 h-7 rounded-full border flex items-center justify-center ${accent === 'emerald' ? 'border-emerald-300 text-emerald-600 hover:bg-emerald-50' : 'border-[#E63946]/40 text-[#E63946] hover:bg-red-50'}`}><Plus className="w-3.5 h-3.5" /></button>
+                  <button type="button" onClick={() => stepQtd(idx, it, 1)} className={`w-7 h-7 rounded-full border flex items-center justify-center ${accent === 'emerald' ? 'border-emerald-300 text-emerald-600 hover:bg-emerald-50' : 'border-danger/40 text-danger hover:bg-red-50'}`}><Plus className="w-3.5 h-3.5" /></button>
                 </div>
                 <span className={`font-data-mono font-bold text-sm ${accentText}`}>{brl(lineTotal(it))}</span>
               </div>
@@ -192,29 +192,29 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
           ))}
 
           {/* Total */}
-          <div className="flex items-center justify-between bg-slate-100 rounded-xl px-4 py-3">
+          <div className="flex items-center justify-between bg-surface-3 rounded-xl px-4 py-3">
             <div>
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Quantidade</span>
-              <span className="text-sm font-bold text-slate-700">{fmtQtd(itens.reduce((a, x) => a + (x.it.quantidade || 0), 0))}</span>
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-fg-muted">Quantidade</span>
+              <span className="text-sm font-bold text-fg-secondary">{fmtQtd(itens.reduce((a, x) => a + (x.it.quantidade || 0), 0))}</span>
             </div>
             <div className="text-right">
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Valor total ({isServico ? 'serviços' : 'materiais'})</span>
-              <span className="text-base font-bold text-slate-900 font-data-mono">{brl(total)}</span>
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-fg-muted">Valor total ({isServico ? 'serviços' : 'materiais'})</span>
+              <span className="text-base font-bold text-fg font-data-mono">{brl(total)}</span>
             </div>
           </div>
         </div>
       ) : (
-        <p className="text-[11px] text-slate-400 italic px-1">Nenhum {isServico ? 'serviço' : 'material'} adicionado. Use o card abaixo.</p>
+        <p className="text-[11px] text-fg-muted italic px-1">Nenhum {isServico ? 'serviço' : 'material'} adicionado. Use o card abaixo.</p>
       )}
 
       {/* ---- Card grande para adicionar / editar ---- */}
-      <div className={`rounded-xl border-2 border-dashed p-4 ${accent === 'emerald' ? 'border-emerald-200 bg-emerald-50/40' : 'border-[#E63946]/25 bg-red-50/30'}`}>
+      <div className={`rounded-xl border-2 border-dashed p-4 ${accent === 'emerald' ? 'border-emerald-200 bg-emerald-50/40' : 'border-danger/25 bg-red-50/30'}`}>
         <div className="flex items-center justify-between mb-3">
           <span className={`text-xs font-bold uppercase tracking-wider ${accentText}`}>
             {editingIdx !== null ? `Editando ${isServico ? 'serviço' : 'material'}` : `Adicionar ${isServico ? 'serviço' : 'material'}`}
           </span>
           {editingIdx !== null && (
-            <button type="button" onClick={resetDraft} className="text-[11px] text-slate-500 hover:text-slate-700 flex items-center gap-1"><X className="w-3.5 h-3.5" /> Cancelar edição</button>
+            <button type="button" onClick={resetDraft} className="text-[11px] text-fg-secondary hover:text-fg-secondary flex items-center gap-1"><X className="w-3.5 h-3.5" /> Cancelar edição</button>
           )}
         </div>
 
@@ -226,7 +226,7 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
                 <button
                   type="button"
                   onClick={() => setCatalogoFilter('')}
-                  className="text-[10px] text-slate-400 hover:text-slate-600 underline font-medium"
+                  className="text-[10px] text-fg-muted hover:text-fg-secondary underline font-medium"
                 >
                   Limpar busca ({filteredCatalogo.length} itens)
                 </button>
@@ -237,9 +237,9 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
               value={catalogoFilter}
               onChange={(e) => setCatalogoFilter(e.target.value)}
               placeholder={`🔍 Filtrar ${isServico ? 'serviços' : 'materiais do estoque'} por código, nome ou marca...`}
-              className={`${inputCls} bg-white text-xs mb-1.5`}
+              className={`${inputCls} bg-surface text-xs mb-1.5`}
             />
-            <select value={draft.vinculoId} onChange={(e) => pickCatalogo(e.target.value)} className={`${inputCls} bg-white text-xs`}>
+            <select value={draft.vinculoId} onChange={(e) => pickCatalogo(e.target.value)} className={`${inputCls} bg-surface text-xs`}>
               <option value="">Digitar manualmente… ({filteredCatalogo.length} disponíveis)</option>
               {filteredCatalogo.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -275,9 +275,9 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
           <div>
             <label className={miniLabel}>Quantidade{unitAllowsDecimals(draft.unidade) ? '' : ' (inteiro)'}</label>
             <div className="flex items-center gap-1.5">
-              <button type="button" onClick={() => set('quantidade', normalizeQuantity((draft.quantidade || 1) - 1, draft.unidade))} className="w-9 h-[42px] rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50 flex items-center justify-center shrink-0"><Minus className="w-4 h-4" /></button>
+              <button type="button" onClick={() => set('quantidade', normalizeQuantity((draft.quantidade || 1) - 1, draft.unidade))} className="w-9 h-[42px] rounded-lg border border-border-strong text-fg-secondary hover:bg-surface-2 flex items-center justify-center shrink-0"><Minus className="w-4 h-4" /></button>
               <input type="number" min={0} step={unitAllowsDecimals(draft.unidade) ? 'any' : 1} value={draft.quantidade} onChange={(e) => { const next = Number(e.target.value); set('quantidade', next); setUnitError(quantityUnitError(next, draft.unidade) || ''); }} className={`${inputCls} text-center font-data-mono font-bold`} />
-              <button type="button" onClick={() => set('quantidade', normalizeQuantity((draft.quantidade || 1) + 1, draft.unidade))} className="w-9 h-[42px] rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50 flex items-center justify-center shrink-0"><Plus className="w-4 h-4" /></button>
+              <button type="button" onClick={() => set('quantidade', normalizeQuantity((draft.quantidade || 1) + 1, draft.unidade))} className="w-9 h-[42px] rounded-lg border border-border-strong text-fg-secondary hover:bg-surface-2 flex items-center justify-center shrink-0"><Plus className="w-4 h-4" /></button>
             </div>
           </div>
           <div>
@@ -290,10 +290,10 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
           </div>
         </div>
 
-        {unitError && <p role="alert" className="mb-3 text-xs font-semibold text-[#E63946]">{unitError} Corrija a quantidade para continuar.</p>}
+        {unitError && <p role="alert" className="mb-3 text-xs font-semibold text-danger">{unitError} Corrija a quantidade para continuar.</p>}
 
         <div className="flex items-center justify-between">
-          <span className="text-[11px] text-slate-500 font-data-mono">Total do item: <b className="text-slate-800">{brl(lineTotal({ precoUnitario: draft.precoUnitario, quantidade: draft.quantidade, desconto: draft.desconto }))}</b></span>
+          <span className="text-[11px] text-fg-secondary font-data-mono">Total do item: <b className="text-fg">{brl(lineTotal({ precoUnitario: draft.precoUnitario, quantidade: draft.quantidade, desconto: draft.desconto }))}</b></span>
           <button type="button" onClick={commit} disabled={!draft.descricao.trim()} className={`${accentBg} disabled:opacity-50 text-white px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors shadow-sm flex items-center gap-1.5`}>
             {editingIdx !== null ? <><Check className="w-4 h-4" /> Salvar</> : <><Plus className="w-4 h-4" /> Adicionar</>}
           </button>

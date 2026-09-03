@@ -9,7 +9,7 @@ import { normalizeUnitCode } from '@/lib/commercialUnits';
 const STATUS_STYLE: Record<ClassificationStatus, { label: string; cls: string; icon: string }> = {
   CLASSIFICADO: { label: 'Classificado', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: 'check_circle' },
   REVISAR: { label: 'Revisar', cls: 'bg-amber-50 text-amber-700 border-amber-200', icon: 'error' },
-  NAO_CLASSIFICADO: { label: 'Não classificado', cls: 'bg-slate-100 text-slate-500 border-slate-200', icon: 'help' },
+  NAO_CLASSIFICADO: { label: 'Não classificado', cls: 'bg-surface-3 text-fg-secondary border-border', icon: 'help' },
 };
 
 function StatusBadge({ status }: { status?: string }) {
@@ -30,37 +30,37 @@ function ProductCard({ item, tree, canSeePrice, dense, onOpen }: { item: Invento
     <button
       type="button"
       onClick={() => onOpen?.(item)}
-      className={`text-left bg-white border border-slate-200 rounded-xl ${dense ? 'px-3.5 py-2.5' : 'px-4 py-3.5'} flex flex-col gap-1.5 hover:border-[#1A1A72] hover:shadow-sm transition-all active:scale-[0.997]`}
+      className={`text-left bg-surface border border-border rounded-xl ${dense ? 'px-3.5 py-2.5' : 'px-4 py-3.5'} flex flex-col gap-1.5 hover:border-primary hover:shadow-sm transition-all active:scale-[0.997]`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-[#1A1A72]/70">{item.brand || 'Sem fabricante'}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/70">{item.brand || 'Sem fabricante'}</p>
           <p className="text-sm font-bold text-[#131c28] truncate">{item.model || item.code || item.name}</p>
         </div>
         <StatusBadge status={item.classificationStatus} />
       </div>
-      {item.description && <p className="text-[12px] text-slate-500 line-clamp-1">{item.description}</p>}
+      {item.description && <p className="text-[12px] text-fg-secondary line-clamp-1">{item.description}</p>}
       {path ? (
-        <p className="text-[11px] text-slate-400 flex items-center gap-1 truncate">
-          <span className="material-symbols-outlined text-[13px] text-slate-300">account_tree</span>
+        <p className="text-[11px] text-fg-muted flex items-center gap-1 truncate">
+          <span className="material-symbols-outlined text-[13px] text-fg-muted">account_tree</span>
           <span className="truncate">{path.join(' › ')}</span>
         </p>
       ) : (
-        <p className="text-[11px] text-slate-400 italic">Sem classificação canônica{item.subcategory ? ` · legado: ${item.subcategory}` : ''}</p>
+        <p className="text-[11px] text-fg-muted italic">Sem classificação canônica{item.subcategory ? ` · legado: ${item.subcategory}` : ''}</p>
       )}
       <div className="flex items-center gap-3 pt-0.5 flex-wrap">
         {catalogOnly ? (
-          <span className="text-[11px] font-semibold text-slate-500 inline-flex items-center gap-1">
-            <span className="material-symbols-outlined text-[14px] text-slate-400">menu_book</span>Somente catálogo
+          <span className="text-[11px] font-semibold text-fg-secondary inline-flex items-center gap-1">
+            <span className="material-symbols-outlined text-[14px] text-fg-muted">menu_book</span>Somente catálogo
           </span>
         ) : controlled && (
-          <span className="text-[11px] font-semibold text-slate-600 inline-flex items-center gap-1">
-            <span className="material-symbols-outlined text-[14px] text-slate-400">inventory_2</span>
+          <span className="text-[11px] font-semibold text-fg-secondary inline-flex items-center gap-1">
+            <span className="material-symbols-outlined text-[14px] text-fg-muted">inventory_2</span>
             {item.quantity} {normalizeUnitCode(item.unit)}
           </span>
         )}
         {canSeePrice && price != null && <span className="text-[11px] font-bold text-emerald-700">Venda: {moneyOrDash(price)}</span>}
-        {canSeePrice && margin != null && <span className="text-[11px] font-semibold text-slate-500">Margem: {percentOrDash(margin)}</span>}
+        {canSeePrice && margin != null && <span className="text-[11px] font-semibold text-fg-secondary">Margem: {percentOrDash(margin)}</span>}
       </div>
     </button>
   );

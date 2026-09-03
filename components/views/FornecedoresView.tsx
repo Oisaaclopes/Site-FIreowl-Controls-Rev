@@ -26,8 +26,8 @@ interface FornecedoresViewProps {
 let fornSeq = 10;
 
 const inputCls =
-  'w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#E63946]/20 focus:border-[#E63946]/40';
-const labelCls = 'block text-slate-600 mb-1 font-semibold uppercase text-[11px]';
+  'w-full border border-border rounded-lg p-2.5 text-fg bg-surface focus:outline-none focus:ring-2 focus:ring-danger/20 focus:border-danger/40';
+const labelCls = 'block text-fg-secondary mb-1 font-semibold uppercase text-[11px]';
 
 export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
   suppliers,
@@ -263,19 +263,19 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
   return (
     <div className="flex flex-col w-full p-4 md:p-8 gap-5 md:gap-6">
       {/* Header */}
-      <div className="flex justify-between items-center border-b border-slate-200 pb-5">
+      <div className="flex justify-between items-center border-b border-border pb-5">
         <div>
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+          <span className="text-xs font-semibold text-fg-secondary uppercase tracking-wider">
             Gestão de Cadeia de Suprimentos &amp; Homologação
           </span>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">
+          <h1 className="text-2xl font-bold text-fg tracking-tight mt-0.5">
             Fornecedores &amp; Parceiros Homologados
           </h1>
         </div>
 
         <button
           onClick={openPanel}
-          className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
+          className="bg-danger hover:bg-danger-hover text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
         >
           <span className="material-symbols-outlined text-base">add</span> Novo Fornecedor
         </button>
@@ -283,17 +283,17 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
 
       {/* Lista de fornecedores */}
       {suppliers.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm py-16 text-center text-slate-400">
-          <span className="material-symbols-outlined text-4xl text-slate-300">local_shipping</span>
-          <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">Nenhum fornecedor cadastrado</p>
-          <p className="text-xs text-slate-400 mt-1">Clique em &quot;Novo Fornecedor&quot; para homologar o primeiro.</p>
+        <div className="bg-surface rounded-xl shadow-sm py-16 text-center text-fg-muted">
+          <span className="material-symbols-outlined text-4xl text-fg-muted">local_shipping</span>
+          <p className="mt-2 text-sm font-bold text-fg-secondary uppercase tracking-wider">Nenhum fornecedor cadastrado</p>
+          <p className="text-xs text-fg-muted mt-1">Clique em &quot;Novo Fornecedor&quot; para homologar o primeiro.</p>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
           {suppliers.map((s) => (
             <DataListRow
               key={s.id}
-              leading={s.logoPath && logoUrls[s.logoPath] ? <span className="w-10 h-10 bg-white border border-slate-200 rounded-lg p-1 shrink-0"><img src={logoUrls[s.logoPath]} alt={`Logo ${s.tradeName || s.name}`} className="w-full h-full object-contain" /></span> : <span className="w-10 h-10 bg-[#1A1A72] text-white font-bold rounded-lg flex items-center justify-center text-xs shrink-0">{(s.tradeName || s.name).slice(0, 2).toUpperCase()}</span>}
+              leading={s.logoPath && logoUrls[s.logoPath] ? <span className="w-10 h-10 bg-surface border border-border rounded-lg p-1 shrink-0"><img src={logoUrls[s.logoPath]} alt={`Logo ${s.tradeName || s.name}`} className="w-full h-full object-contain" /></span> : <span className="w-10 h-10 bg-navy text-white font-bold rounded-lg flex items-center justify-center text-xs shrink-0">{(s.tradeName || s.name).slice(0, 2).toUpperCase()}</span>}
               title={<span className="uppercase">{s.tradeName || s.name}</span>}
               meta={
                 <>
@@ -307,8 +307,8 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
               }
               center={
                 <div className="text-left md:text-center">
-                  <p className="text-slate-700 font-semibold">{s.contactName}</p>
-                  <p className="text-[10px] text-slate-500 font-data-mono">{s.phone}</p>
+                  <p className="text-fg-secondary font-semibold">{s.contactName}</p>
+                  <p className="text-[10px] text-fg-secondary font-data-mono">{s.phone}</p>
                   <p className="text-[10px] text-amber-600 font-bold mt-0.5">
                     ★ {s.rating.toFixed(1)} · {s.leadTimeDays}d
                   </p>
@@ -375,7 +375,7 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
                     onChange={(e) => setCNPJ(e.target.value)}
                     placeholder={isPJ ? '00.000.000/0001-00' : '000.000.000-00'}
                     className={`${inputCls} font-data-mono`}
-                  /><button type="button" onClick={() => void consultCnpj()} disabled={consultingCnpj || cnpj.replace(/\D/g, '').length !== 14} className="px-2 rounded-lg border border-[#1A1A72] text-[#1A1A72] text-[10px] font-bold disabled:opacity-40">{consultingCnpj ? '...' : 'Consultar'}</button></div>
+                  /><button type="button" onClick={() => void consultCnpj()} disabled={consultingCnpj || cnpj.replace(/\D/g, '').length !== 14} className="px-2 rounded-lg border border-primary text-primary text-[10px] font-bold disabled:opacity-40">{consultingCnpj ? '...' : 'Consultar'}</button></div>
                 </div>
                 <div>
                   <label className={labelCls}>Categoria</label>
@@ -396,12 +396,12 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
           </FormSection>
 
           <FormSection icon="category" title="Áreas de fornecimento">
-            <p className="text-[11px] text-slate-500 mb-2">As opções são derivadas das categorias já existentes no catálogo técnico.</p>
-            <div className="flex flex-wrap gap-1.5">{availableAreas.length ? availableAreas.map((area) => <button key={area} type="button" onClick={() => setAreas((current) => current.includes(area) ? current.filter((value) => value !== area) : [...current, area])} className={`px-2.5 py-1 rounded-full border text-[11px] font-semibold ${areas.includes(area) ? 'bg-[#1A1A72] text-white border-[#1A1A72]' : 'bg-white text-slate-600 border-slate-200'}`}>{areas.includes(area) ? '✓ ' : ''}{area}</button>) : <span className="text-[11px] text-slate-400">Cadastre categorias no catálogo para disponibilizá-las aqui.</span>}</div>
+            <p className="text-[11px] text-fg-secondary mb-2">As opções são derivadas das categorias já existentes no catálogo técnico.</p>
+            <div className="flex flex-wrap gap-1.5">{availableAreas.length ? availableAreas.map((area) => <button key={area} type="button" onClick={() => setAreas((current) => current.includes(area) ? current.filter((value) => value !== area) : [...current, area])} className={`px-2.5 py-1 rounded-full border text-[11px] font-semibold ${areas.includes(area) ? 'bg-navy text-white border-primary' : 'bg-surface text-fg-secondary border-border'}`}>{areas.includes(area) ? '✓ ' : ''}{area}</button>) : <span className="text-[11px] text-fg-muted">Cadastre categorias no catálogo para disponibilizá-las aqui.</span>}</div>
           </FormSection>
 
           <FormSection icon="image" title="Logo">
-            <div className="flex items-center gap-3"><span className="w-14 h-14 rounded-lg border border-slate-200 flex items-center justify-center overflow-hidden">{logoPath && logoUrls[logoPath] ? <img src={logoUrls[logoPath]} alt="Logo" className="w-full h-full object-contain" /> : <span className="font-bold text-[#1A1A72]">{(tradeName || name || 'FO').slice(0, 2).toUpperCase()}</span>}</span><label className="px-3 py-2 rounded-lg border border-[#1A1A72] text-[#1A1A72] text-[11px] font-bold cursor-pointer">Enviar / substituir<input type="file" accept="image/*,.svg" className="hidden" onChange={(e) => void uploadLogo(e.target.files?.[0])} /></label>{logoPath && <button type="button" onClick={() => { void removeInstitucionalLogo(logoPath).catch(() => {}); setLogoPath(''); }} className="text-[11px] font-semibold text-red-600">Remover</button>}</div>
+            <div className="flex items-center gap-3"><span className="w-14 h-14 rounded-lg border border-border flex items-center justify-center overflow-hidden">{logoPath && logoUrls[logoPath] ? <img src={logoUrls[logoPath]} alt="Logo" className="w-full h-full object-contain" /> : <span className="font-bold text-primary">{(tradeName || name || 'FO').slice(0, 2).toUpperCase()}</span>}</span><label className="px-3 py-2 rounded-lg border border-primary text-primary text-[11px] font-bold cursor-pointer">Enviar / substituir<input type="file" accept="image/*,.svg" className="hidden" onChange={(e) => void uploadLogo(e.target.files?.[0])} /></label>{logoPath && <button type="button" onClick={() => { void removeInstitucionalLogo(logoPath).catch(() => {}); setLogoPath(''); }} className="text-[11px] font-semibold text-red-600">Remover</button>}</div>
           </FormSection>
 
           <FormSection icon="location_on" title="Endereço">
@@ -411,7 +411,7 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
           </FormSection>
 
           <FormSection icon="group" title="Contatos adicionais">
-            <div className="space-y-2">{contacts.map((contact, index) => <div key={index} className="grid grid-cols-2 gap-2 border border-slate-200 rounded-lg p-2"><input value={contact.name} onChange={(e) => setContacts((list) => list.map((item, i) => i === index ? { ...item, name: e.target.value } : item))} placeholder="Nome" className={inputCls} /><input value={contact.role || ''} onChange={(e) => setContacts((list) => list.map((item, i) => i === index ? { ...item, role: e.target.value } : item))} placeholder="Função" className={inputCls} /><input value={contact.phone || ''} onChange={(e) => setContacts((list) => list.map((item, i) => i === index ? { ...item, phone: e.target.value } : item))} placeholder="Telefone" className={inputCls} /><input value={contact.email || ''} onChange={(e) => setContacts((list) => list.map((item, i) => i === index ? { ...item, email: e.target.value } : item))} placeholder="E-mail" className={inputCls} /><button type="button" onClick={() => setContacts((list) => list.map((item, i) => ({ ...item, primary: i === index })))} className={`text-[10px] font-bold ${contact.primary ? 'text-emerald-700' : 'text-slate-400'}`}>{contact.primary ? 'Principal' : 'Definir principal'}</button><button type="button" onClick={() => setContacts((list) => list.filter((_, i) => i !== index))} className="text-[10px] font-bold text-red-600">Remover</button></div>)}</div><button type="button" onClick={() => setContacts((list) => [...list, { name: '', role: 'Comercial' }])} className="mt-2 text-[11px] font-bold text-[#1A1A72]">+ Adicionar contato</button>
+            <div className="space-y-2">{contacts.map((contact, index) => <div key={index} className="grid grid-cols-2 gap-2 border border-border rounded-lg p-2"><input value={contact.name} onChange={(e) => setContacts((list) => list.map((item, i) => i === index ? { ...item, name: e.target.value } : item))} placeholder="Nome" className={inputCls} /><input value={contact.role || ''} onChange={(e) => setContacts((list) => list.map((item, i) => i === index ? { ...item, role: e.target.value } : item))} placeholder="Função" className={inputCls} /><input value={contact.phone || ''} onChange={(e) => setContacts((list) => list.map((item, i) => i === index ? { ...item, phone: e.target.value } : item))} placeholder="Telefone" className={inputCls} /><input value={contact.email || ''} onChange={(e) => setContacts((list) => list.map((item, i) => i === index ? { ...item, email: e.target.value } : item))} placeholder="E-mail" className={inputCls} /><button type="button" onClick={() => setContacts((list) => list.map((item, i) => ({ ...item, primary: i === index })))} className={`text-[10px] font-bold ${contact.primary ? 'text-emerald-700' : 'text-fg-muted'}`}>{contact.primary ? 'Principal' : 'Definir principal'}</button><button type="button" onClick={() => setContacts((list) => list.filter((_, i) => i !== index))} className="text-[10px] font-bold text-red-600">Remover</button></div>)}</div><button type="button" onClick={() => setContacts((list) => [...list, { name: '', role: 'Comercial' }])} className="mt-2 text-[11px] font-bold text-primary">+ Adicionar contato</button>
           </FormSection>
 
           {/* Bloco: Contatos */}
@@ -492,7 +492,7 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
           </FormSection>
 
           <FormSection icon="sell" title="Marcas que trabalha">
-            <p className="text-[11px] text-slate-500 mb-2">
+            <p className="text-[11px] text-fg-secondary mb-2">
               Selecione fabricantes já cadastrados. O cadastro de um novo fabricante é uma ação separada, com confirmação e proteção contra variações de grafia.
             </p>
             {/* Digitar nova marca */}
@@ -511,18 +511,18 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
                 type="button"
                 onClick={adicionarMarcaExistente}
                 disabled={!novaMarca.trim()}
-                className="shrink-0 px-3 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] text-white text-[11px] font-bold uppercase disabled:opacity-40"
+                className="shrink-0 px-3 rounded-lg bg-navy hover:bg-navy-3 text-white text-[11px] font-bold uppercase disabled:opacity-40"
               >
                 Selecionar
               </button>
-              <button type="button" onClick={cadastrarNovoFabricante} disabled={!novaMarca.trim() || !onAddBrand} className="shrink-0 px-3 rounded-lg border border-[#1A1A72] text-[#1A1A72] hover:bg-[#1A1A72]/5 text-[11px] font-bold uppercase disabled:opacity-40">Cadastrar novo fabricante</button>
+              <button type="button" onClick={cadastrarNovoFabricante} disabled={!novaMarca.trim() || !onAddBrand} className="shrink-0 px-3 rounded-lg border border-primary text-primary hover:bg-navy/5 text-[11px] font-bold uppercase disabled:opacity-40">Cadastrar novo fabricante</button>
             </div>
             {brandHint && <p className="text-[11px] text-amber-700 mb-2">{brandHint}</p>}
             {/* Chips: união das marcas do catálogo + as já selecionadas (mostra a recém-digitada na hora) */}
             {(() => {
               const todas = Array.from(new Set([...partnerBrands.map((b) => b.name), ...brands]));
               if (todas.length === 0) {
-                return <p className="text-[11px] text-slate-400 italic">Nenhuma marca cadastrada. Use o botão específico acima para cadastrar a primeira.</p>;
+                return <p className="text-[11px] text-fg-muted italic">Nenhuma marca cadastrada. Use o botão específico acima para cadastrar a primeira.</p>;
               }
               return (
                 <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
@@ -535,8 +535,8 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
                         onClick={() => toggleBrand(nome)}
                         className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors ${
                           on
-                            ? 'bg-[#1A1A72] text-white border-[#1A1A72]'
-                            : 'bg-white text-slate-600 border-slate-200 hover:border-[#1A1A72]'
+                            ? 'bg-navy text-white border-primary'
+                            : 'bg-surface text-fg-secondary border-border hover:border-primary'
                         }`}
                       >
                         {on ? '✓ ' : ''}{nome}
@@ -546,15 +546,15 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
                 </div>
               );
             })()}
-            {brands.length > 0 && <p className="text-[10px] text-slate-400 mt-2">{brands.length} marca(s) selecionada(s).</p>}
+            {brands.length > 0 && <p className="text-[10px] text-fg-muted mt-2">{brands.length} marca(s) selecionada(s).</p>}
           </FormSection>
 
           {editing && <FormSection icon="inventory_2" title="Produtos fornecidos">
-            <p className="text-[11px] text-slate-500 mb-2">Vincule somente itens já cadastrados no catálogo. Isto não altera preço, custo ou saldo do estoque mestre.</p>
+            <p className="text-[11px] text-fg-secondary mb-2">Vincule somente itens já cadastrados no catálogo. Isto não altera preço, custo ou saldo do estoque mestre.</p>
             <input value={productQuery} onChange={(e) => { setProductQuery(e.target.value); setSelectedProductId(''); }} placeholder="Buscar por código, produto, marca ou modelo" className={inputCls} />
-            {productQuery.trim() && !selectedProductId && <div className="mt-1 max-h-32 overflow-y-auto border border-slate-200 rounded-lg">{inventory.filter((item) => normalizeSearch(`${item.code} ${item.name} ${item.brand || ''} ${item.model || ''}`).includes(normalizeSearch(productQuery))).slice(0, 8).map((item) => <button key={item.id} type="button" onClick={() => { setSelectedProductId(item.id); setProductQuery(`${item.code} — ${item.name}`); }} className="w-full text-left px-3 py-2 hover:bg-slate-50 border-b border-slate-100 last:border-0"><span className="font-data-mono text-[10px] text-[#1A1A72]">{item.code}</span> <span className="text-[11px]">{item.name}</span></button>)}</div>}
-            {selectedProductId && <div className="grid grid-cols-3 gap-2 mt-2"><input value={productCost} onChange={(e) => setProductCost(e.target.value)} type="number" min="0" placeholder="Custo R$" className={inputCls} /><input value={productLeadTime} onChange={(e) => setProductLeadTime(e.target.value)} type="number" min="0" placeholder="Prazo dias" className={inputCls} /><input value={productMinimumQty} onChange={(e) => setProductMinimumQty(e.target.value)} type="number" min="0" placeholder="Qtd mínima" className={inputCls} /><button type="button" onClick={() => void saveSupplierProduct()} className="col-span-3 px-3 py-2 rounded-lg bg-[#1A1A72] text-white text-[11px] font-bold">Vincular produto</button></div>}
-            <div className="mt-3 space-y-1.5">{supplierProducts.length === 0 ? <p className="text-[11px] text-slate-400">Nenhum produto vinculado.</p> : supplierProducts.map((link) => { const item = inventory.find((current) => current.id === link.inventoryItemId); return <div key={link.id} className="flex items-center justify-between gap-2 border border-slate-200 rounded-lg p-2"><div className="min-w-0"><p className={`text-[11px] font-semibold truncate ${link.active ? 'text-slate-700' : 'text-slate-400 line-through'}`}>{item?.name || link.supplierDescription || link.inventoryItemId}</p><p className="text-[10px] text-slate-500">{link.supplierCode || item?.code || 'Sem código'} · {link.cost != null ? `R$ ${link.cost.toFixed(2)}` : 'Custo não informado'} · {link.leadTimeDays ?? '—'} dias</p></div>{link.active && <button type="button" onClick={() => void deactivateProduct(link)} className="text-[10px] font-bold text-red-600">Desativar</button>}</div>; })}</div>
+            {productQuery.trim() && !selectedProductId && <div className="mt-1 max-h-32 overflow-y-auto border border-border rounded-lg">{inventory.filter((item) => normalizeSearch(`${item.code} ${item.name} ${item.brand || ''} ${item.model || ''}`).includes(normalizeSearch(productQuery))).slice(0, 8).map((item) => <button key={item.id} type="button" onClick={() => { setSelectedProductId(item.id); setProductQuery(`${item.code} — ${item.name}`); }} className="w-full text-left px-3 py-2 hover:bg-surface-2 border-b border-border last:border-0"><span className="font-data-mono text-[10px] text-primary">{item.code}</span> <span className="text-[11px]">{item.name}</span></button>)}</div>}
+            {selectedProductId && <div className="grid grid-cols-3 gap-2 mt-2"><input value={productCost} onChange={(e) => setProductCost(e.target.value)} type="number" min="0" placeholder="Custo R$" className={inputCls} /><input value={productLeadTime} onChange={(e) => setProductLeadTime(e.target.value)} type="number" min="0" placeholder="Prazo dias" className={inputCls} /><input value={productMinimumQty} onChange={(e) => setProductMinimumQty(e.target.value)} type="number" min="0" placeholder="Qtd mínima" className={inputCls} /><button type="button" onClick={() => void saveSupplierProduct()} className="col-span-3 px-3 py-2 rounded-lg bg-navy text-white text-[11px] font-bold">Vincular produto</button></div>}
+            <div className="mt-3 space-y-1.5">{supplierProducts.length === 0 ? <p className="text-[11px] text-fg-muted">Nenhum produto vinculado.</p> : supplierProducts.map((link) => { const item = inventory.find((current) => current.id === link.inventoryItemId); return <div key={link.id} className="flex items-center justify-between gap-2 border border-border rounded-lg p-2"><div className="min-w-0"><p className={`text-[11px] font-semibold truncate ${link.active ? 'text-fg-secondary' : 'text-fg-muted line-through'}`}>{item?.name || link.supplierDescription || link.inventoryItemId}</p><p className="text-[10px] text-fg-secondary">{link.supplierCode || item?.code || 'Sem código'} · {link.cost != null ? `R$ ${link.cost.toFixed(2)}` : 'Custo não informado'} · {link.leadTimeDays ?? '—'} dias</p></div>{link.active && <button type="button" onClick={() => void deactivateProduct(link)} className="text-[10px] font-bold text-red-600">Desativar</button>}</div>; })}</div>
           </FormSection>}
 
           {/* submit oculto: permite salvar com Enter */}

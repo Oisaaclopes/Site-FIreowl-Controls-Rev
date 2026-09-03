@@ -175,20 +175,20 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole, technicia
       {/* Cabeçalho + tabs */}
       <div className="mb-4 flex flex-col gap-3">
         <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined rounded-xl bg-[#1A1A72] p-2 text-white">photo_library</span>
+          <span className="material-symbols-outlined rounded-xl bg-navy p-2 text-white">photo_library</span>
           <div>
-            <h1 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">{selectedGroup ? selectedGroup.clientName : 'Fotos de Campo'}</h1>
-            <p className="text-xs text-slate-500">{selectedGroup ? `${selectedGroup.photoCount} evidência(s) deste cliente` : 'Selecione um cliente para abrir a galeria.'}</p>
+            <h1 className="text-lg font-bold tracking-tight text-fg sm:text-xl">{selectedGroup ? selectedGroup.clientName : 'Fotos de Campo'}</h1>
+            <p className="text-xs text-fg-secondary">{selectedGroup ? `${selectedGroup.photoCount} evidência(s) deste cliente` : 'Selecione um cliente para abrir a galeria.'}</p>
           </div>
-          {selectedClientId&&<button onClick={()=>{setSelectedClientId(null);setTab('todas');setSelection(new Set())}} className="ml-auto min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold uppercase text-slate-600">← Clientes</button>}
+          {selectedClientId&&<button onClick={()=>{setSelectedClientId(null);setTab('todas');setSelection(new Set())}} className="ml-auto min-h-10 rounded-lg border border-border-strong bg-surface px-3 text-xs font-bold uppercase text-fg-secondary">← Clientes</button>}
         </div>
         {selectedClientId&&(
-        <div className="flex items-center gap-1 rounded-xl bg-slate-100 p-1 text-xs font-bold">
-          <button onClick={() => setTab('todas')} className={`min-h-9 flex-1 rounded-lg px-3 uppercase tracking-wide transition-colors ${tab === 'todas' ? 'bg-white text-[#1A1A72] shadow-sm' : 'text-slate-500'}`}>Todas</button>
-          <button onClick={() => setTab('pendentes')} className={`min-h-9 flex-1 rounded-lg px-3 uppercase tracking-wide transition-colors ${tab === 'pendentes' ? 'bg-white text-[#1A1A72] shadow-sm' : 'text-slate-500'}`}>
+        <div className="flex items-center gap-1 rounded-xl bg-surface-3 p-1 text-xs font-bold">
+          <button onClick={() => setTab('todas')} className={`min-h-9 flex-1 rounded-lg px-3 uppercase tracking-wide transition-colors ${tab === 'todas' ? 'bg-surface text-primary shadow-sm' : 'text-fg-secondary'}`}>Todas</button>
+          <button onClick={() => setTab('pendentes')} className={`min-h-9 flex-1 rounded-lg px-3 uppercase tracking-wide transition-colors ${tab === 'pendentes' ? 'bg-surface text-primary shadow-sm' : 'text-fg-secondary'}`}>
             Pendentes{selectedGroup?.pendingCount ? ` · ${selectedGroup.pendingCount}` : ''}
           </button>
-          <button onClick={() => setTab('comparacoes')} className={`min-h-9 flex-1 rounded-lg px-3 uppercase tracking-wide transition-colors ${tab === 'comparacoes' ? 'bg-white text-[#1A1A72] shadow-sm' : 'text-slate-500'}`}>
+          <button onClick={() => setTab('comparacoes')} className={`min-h-9 flex-1 rounded-lg px-3 uppercase tracking-wide transition-colors ${tab === 'comparacoes' ? 'bg-surface text-primary shadow-sm' : 'text-fg-secondary'}`}>
             Antes × Depois{clientComparisons.length > 0 ? ` · ${clientComparisons.length}` : ''}
           </button>
         </div>
@@ -199,23 +199,23 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole, technicia
       {selectedClientId && tab !== 'comparacoes' && (
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="relative min-w-0 flex-1">
-          <span className="material-symbols-outlined pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-lg text-slate-400">search</span>
+          <span className="material-symbols-outlined pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-lg text-fg-muted">search</span>
           <input
             value={filters.search || ''}
             onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
             placeholder="Buscar por cliente, local ou nota"
-            className="min-h-11 w-full rounded-xl border border-slate-300 bg-white pl-9 pr-3 text-sm"
+            className="min-h-11 w-full rounded-xl border border-border-strong bg-surface pl-9 pr-3 text-sm"
           />
         </div>
-        <button onClick={() => setShowFilters(true)} className="relative min-h-11 rounded-xl border border-slate-300 bg-white px-3 text-xs font-bold uppercase text-slate-700">
+        <button onClick={() => setShowFilters(true)} className="relative min-h-11 rounded-xl border border-border-strong bg-surface px-3 text-xs font-bold uppercase text-fg-secondary">
           <span className="material-symbols-outlined align-middle text-base">tune</span>
           <span className="ml-1 hidden sm:inline">Filtros</span>
-          {activeFilterCount > 0 && <span className="ml-1 rounded-full bg-[#1A1A72] px-1.5 text-[10px] text-white">{activeFilterCount}</span>}
+          {activeFilterCount > 0 && <span className="ml-1 rounded-full bg-navy px-1.5 text-[10px] text-white">{activeFilterCount}</span>}
         </button>
-        <button onClick={() => setGroupByDay((v) => !v)} title="Agrupar por dia" className={`min-h-11 rounded-xl border px-3 text-xs font-bold uppercase ${groupByDay ? 'border-[#1A1A72] bg-[#1A1A72]/5 text-[#1A1A72]' : 'border-slate-300 bg-white text-slate-700'}`}>
+        <button onClick={() => setGroupByDay((v) => !v)} title="Agrupar por dia" className={`min-h-11 rounded-xl border px-3 text-xs font-bold uppercase ${groupByDay ? 'border-primary bg-navy/5 text-primary' : 'border-border-strong bg-surface text-fg-secondary'}`}>
           <span className="material-symbols-outlined align-middle text-base">calendar_view_day</span>
         </button>
-        <button onClick={() => retry()} title="Sincronizar pendências" className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 text-xs font-bold uppercase text-slate-700">
+        <button onClick={() => retry()} title="Sincronizar pendências" className="min-h-11 rounded-xl border border-border-strong bg-surface px-3 text-xs font-bold uppercase text-fg-secondary">
           <span className="material-symbols-outlined align-middle text-base">sync</span>
         </button>
       </div>
@@ -223,42 +223,42 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole, technicia
 
       {/* Barra de seleção em lote */}
       {selectedClientId && tab !== 'comparacoes' && selection.size > 0 && (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#1A1A72]/20 bg-[#1A1A72]/5 p-2.5">
-          <span className="text-xs font-bold text-[#1A1A72]">{selection.size} selecionada(s)</span>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/20 bg-navy/5 p-2.5">
+          <span className="text-xs font-bold text-primary">{selection.size} selecionada(s)</span>
           <div className="flex flex-wrap gap-2">
-            <button onClick={() => setSheetPhotos(selectedPhotos)} className="min-h-9 rounded-lg bg-[#E63946] px-3 text-xs font-bold uppercase text-white">
+            <button onClick={() => setSheetPhotos(selectedPhotos)} className="min-h-9 rounded-lg bg-danger px-3 text-xs font-bold uppercase text-white">
               <span className="material-symbols-outlined align-middle text-sm">picture_as_pdf</span> Folha de Fotos
             </button>
-            <button onClick={startCompare} className="min-h-9 rounded-lg border border-[#1A1A72] bg-white px-3 text-xs font-bold uppercase text-[#1A1A72]">
+            <button onClick={startCompare} className="min-h-9 rounded-lg border border-primary bg-surface px-3 text-xs font-bold uppercase text-primary">
               <span className="material-symbols-outlined align-middle text-sm">compare</span> Antes × Depois
             </button>
-            <button onClick={() => setLinkTarget({ photos: selectedPhotos })} className="min-h-9 rounded-lg bg-[#1A1A72] px-3 text-xs font-bold uppercase text-white">Vincular</button>
-            <button onClick={clearSelection} className="min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold uppercase text-slate-600">Limpar</button>
+            <button onClick={() => setLinkTarget({ photos: selectedPhotos })} className="min-h-9 rounded-lg bg-navy px-3 text-xs font-bold uppercase text-white">Vincular</button>
+            <button onClick={clearSelection} className="min-h-9 rounded-lg border border-border-strong bg-surface px-3 text-xs font-bold uppercase text-fg-secondary">Limpar</button>
           </div>
         </div>
       )}
 
       {/* Conteúdo */}
       {!selectedClientId ? (
-        loading ? <div className="py-20 text-center text-sm text-slate-400">Carregando clientes…</div> : clientGroups.length===0 ? <div className="py-20 text-center text-sm text-slate-400">Nenhum cliente possui fotos de campo.</div> :
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{clientGroups.map(group=>{const cover=group.photos[0];return <button key={group.clientId} onClick={()=>setSelectedClientId(group.clientId)} className="flex min-h-24 items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm hover:border-[#1A1A72]/40">
-          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-slate-100">{thumbs[cover.clientUuid]?<img src={thumbs[cover.clientUuid]} alt="Última evidência" className="h-full w-full object-cover"/>:<span className="material-symbols-outlined flex h-full items-center justify-center text-slate-300">photo_library</span>}</div>
-          <div className="min-w-0"><p className="truncate text-sm font-bold text-slate-900">{group.clientName}</p><p className="mt-1 text-[11px] text-slate-500">{group.photoCount} foto(s) · última {fmtDate(group.lastEvidenceAt)}</p><div className="mt-2 flex flex-wrap gap-1">{group.pendingCount>0&&<span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">{group.pendingCount} pendente(s)</span>}{group.comparisonCount>0&&<span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">{group.comparisonCount} Antes×Depois</span>}</div></div>
+        loading ? <div className="py-20 text-center text-sm text-fg-muted">Carregando clientes…</div> : clientGroups.length===0 ? <div className="py-20 text-center text-sm text-fg-muted">Nenhum cliente possui fotos de campo.</div> :
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{clientGroups.map(group=>{const cover=group.photos[0];return <button key={group.clientId} onClick={()=>setSelectedClientId(group.clientId)} className="flex min-h-24 items-center gap-3 rounded-xl border border-border bg-surface p-3 text-left shadow-sm hover:border-primary/40">
+          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-surface-3">{thumbs[cover.clientUuid]?<img src={thumbs[cover.clientUuid]} alt="Última evidência" className="h-full w-full object-cover"/>:<span className="material-symbols-outlined flex h-full items-center justify-center text-fg-muted">photo_library</span>}</div>
+          <div className="min-w-0"><p className="truncate text-sm font-bold text-fg">{group.clientName}</p><p className="mt-1 text-[11px] text-fg-secondary">{group.photoCount} foto(s) · última {fmtDate(group.lastEvidenceAt)}</p><div className="mt-2 flex flex-wrap gap-1">{group.pendingCount>0&&<span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">{group.pendingCount} pendente(s)</span>}{group.comparisonCount>0&&<span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">{group.comparisonCount} Antes×Depois</span>}</div></div>
         </button>})}</div>
       ) : tab === 'comparacoes' ? (
         <ComparisonsPanel comparisons={clientComparisons} photoById={photoById} thumbs={thumbs} onReload={reloadComparisons} onGenerateSheet={(items) => setSheetComparisons(items)} />
       ) : loading ? (
-        <div className="py-20 text-center text-sm text-slate-400">Carregando fotos…</div>
+        <div className="py-20 text-center text-sm text-fg-muted">Carregando fotos…</div>
       ) : visible.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center text-slate-400">
-          <span className="material-symbols-outlined mb-2 text-5xl text-slate-300">{tab === 'pendentes' ? 'task_alt' : 'no_photography'}</span>
-          <p className="font-semibold text-slate-600">{tab === 'pendentes' ? 'Nenhuma foto pendente para este cliente.' : 'Nenhuma foto de campo registrada.'}</p>
+        <div className="flex flex-col items-center justify-center py-20 text-center text-fg-muted">
+          <span className="material-symbols-outlined mb-2 text-5xl text-fg-muted">{tab === 'pendentes' ? 'task_alt' : 'no_photography'}</span>
+          <p className="font-semibold text-fg-secondary">{tab === 'pendentes' ? 'Nenhuma foto pendente para este cliente.' : 'Nenhuma foto de campo registrada.'}</p>
         </div>
       ) : (
         <div className="space-y-6">
           {groups.map((g) => (
             <div key={g.key || 'all'}>
-              {groupByDay && g.key && <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">{fmtDate(g.key)}</p>}
+              {groupByDay && g.key && <p className="mb-2 text-xs font-bold uppercase tracking-wide text-fg-secondary">{fmtDate(g.key)}</p>}
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                 {g.items.map((p) => (
                   <PhotoCard
@@ -338,17 +338,17 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole, technicia
 const LinkBadges: React.FC<{ p: FieldPhotoLinks }> = ({ p }) => {
   const items = [p.reportId && 'Atend.', p.osId && 'OS', p.pendenciaId && 'Pend.'].filter(Boolean) as string[];
   if (items.length === 0) return <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">Não classificada</span>;
-  return <>{items.map((i) => <span key={i} className="rounded-full bg-[#1A1A72]/10 px-2 py-0.5 text-[10px] font-bold text-[#1A1A72]">{i}</span>)}</>;
+  return <>{items.map((i) => <span key={i} className="rounded-full bg-navy/10 px-2 py-0.5 text-[10px] font-bold text-primary">{i}</span>)}</>;
 };
 
 const PhotoCard: React.FC<{ photo: GalleryPhoto; thumb?: string; selected: boolean; onToggleSelect: () => void; onOpen: () => void }> = ({ photo, thumb, selected, onToggleSelect, onOpen }) => {
   const marker = photo.marcador ? MARKER_META[photo.marcador] : null;
   const sync = SYNC_META[photo.syncStatus];
   return (
-    <div className={`group relative flex flex-col overflow-hidden rounded-xl border bg-white transition-all ${selected ? 'border-[#1A1A72] ring-2 ring-[#1A1A72]/20' : 'border-slate-200 hover:border-slate-300'}`}>
+    <div className={`group relative flex flex-col overflow-hidden rounded-xl border bg-surface transition-all ${selected ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-border-strong'}`}>
       <div className="relative aspect-square bg-slate-900">
-        {thumb ? <img src={thumb} alt="Evidência de campo" className="h-full w-full object-cover" loading="lazy" /> : <div className="flex h-full items-center justify-center text-slate-500"><span className="material-symbols-outlined text-3xl">image</span></div>}
-        <button onClick={onToggleSelect} className={`absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg shadow ${selected ? 'bg-[#1A1A72] text-white' : 'bg-black/40 text-white/80 hover:bg-black/60'}`} aria-label="Selecionar">
+        {thumb ? <img src={thumb} alt="Evidência de campo" className="h-full w-full object-cover" loading="lazy" /> : <div className="flex h-full items-center justify-center text-fg-secondary"><span className="material-symbols-outlined text-3xl">image</span></div>}
+        <button onClick={onToggleSelect} className={`absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg shadow ${selected ? 'bg-navy text-white' : 'bg-black/40 text-white/80 hover:bg-black/60'}`} aria-label="Selecionar">
           <span className="material-symbols-outlined text-base">{selected ? 'check' : 'check_box_outline_blank'}</span>
         </button>
         <span className={`absolute right-2 top-2 rounded-full border px-2 py-0.5 text-[10px] font-bold ${sync.tone}`}>{sync.label}</span>
@@ -359,8 +359,8 @@ const PhotoCard: React.FC<{ photo: GalleryPhoto; thumb?: string; selected: boole
         </div>
       </div>
       <button onClick={onOpen} className="flex flex-1 flex-col gap-0.5 p-2 text-left">
-        <p className="truncate text-[11px] font-semibold text-slate-600">{photo.localSetor || 'Sem local'}</p>
-        <p className="text-[10px] text-slate-400">{fmtDate(photo.capturadoEm)} · {fmtTime(photo.capturadoEm)}</p>
+        <p className="truncate text-[11px] font-semibold text-fg-secondary">{photo.localSetor || 'Sem local'}</p>
+        <p className="text-[10px] text-fg-muted">{fmtDate(photo.capturadoEm)} · {fmtTime(photo.capturadoEm)}</p>
       </button>
     </div>
   );
@@ -373,42 +373,42 @@ const FiltersSheet: React.FC<{ filters: FieldPhotoFilters; onChange: (f: FieldPh
   const markers: FieldPhotoMarker[] = ['antes', 'depois', 'falha', 'corrigido', 'pendente'];
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/50 sm:items-center" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl">
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-t-2xl bg-surface p-5 shadow-2xl sm:rounded-2xl">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-bold text-slate-900">Filtros</h2>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><span className="material-symbols-outlined">close</span></button>
+          <h2 className="text-base font-bold text-fg">Filtros</h2>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-fg-muted hover:bg-surface-3"><span className="material-symbols-outlined">close</span></button>
         </div>
         <div className="space-y-3">
-          <label className="block text-xs font-bold uppercase text-slate-600">Cliente
-            <select value={filters.clientId || ''} onChange={(e) => set({ clientId: e.target.value || undefined })} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal normal-case text-slate-800">
+          <label className="block text-xs font-bold uppercase text-fg-secondary">Cliente
+            <select value={filters.clientId || ''} onChange={(e) => set({ clientId: e.target.value || undefined })} className="mt-1 min-h-11 w-full rounded-xl border border-border-strong bg-surface px-3 text-sm font-normal normal-case text-fg">
               <option value="">Todos</option>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </label>
           {showTechFilter && (
-            <label className="block text-xs font-bold uppercase text-slate-600">Técnico
-              <select value={filters.tecnicoId || ''} onChange={(e) => set({ tecnicoId: e.target.value || undefined })} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal normal-case text-slate-800">
+            <label className="block text-xs font-bold uppercase text-fg-secondary">Técnico
+              <select value={filters.tecnicoId || ''} onChange={(e) => set({ tecnicoId: e.target.value || undefined })} className="mt-1 min-h-11 w-full rounded-xl border border-border-strong bg-surface px-3 text-sm font-normal normal-case text-fg">
                 <option value="">Todos</option>
                 {techs.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </label>
           )}
           <div className="grid grid-cols-2 gap-3">
-            <label className="block text-xs font-bold uppercase text-slate-600">De
-              <input type="date" value={filters.from || ''} onChange={(e) => set({ from: e.target.value || undefined })} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal text-slate-800" />
+            <label className="block text-xs font-bold uppercase text-fg-secondary">De
+              <input type="date" value={filters.from || ''} onChange={(e) => set({ from: e.target.value || undefined })} className="mt-1 min-h-11 w-full rounded-xl border border-border-strong bg-surface px-3 text-sm font-normal text-fg" />
             </label>
-            <label className="block text-xs font-bold uppercase text-slate-600">Até
-              <input type="date" value={filters.to || ''} onChange={(e) => set({ to: e.target.value || undefined })} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal text-slate-800" />
+            <label className="block text-xs font-bold uppercase text-fg-secondary">Até
+              <input type="date" value={filters.to || ''} onChange={(e) => set({ to: e.target.value || undefined })} className="mt-1 min-h-11 w-full rounded-xl border border-border-strong bg-surface px-3 text-sm font-normal text-fg" />
             </label>
           </div>
-          <label className="block text-xs font-bold uppercase text-slate-600">Marcador
-            <select value={filters.marcador || ''} onChange={(e) => set({ marcador: (e.target.value || undefined) as FieldPhotoMarker | undefined })} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal normal-case text-slate-800">
+          <label className="block text-xs font-bold uppercase text-fg-secondary">Marcador
+            <select value={filters.marcador || ''} onChange={(e) => set({ marcador: (e.target.value || undefined) as FieldPhotoMarker | undefined })} className="mt-1 min-h-11 w-full rounded-xl border border-border-strong bg-surface px-3 text-sm font-normal normal-case text-fg">
               <option value="">Todos</option>
               {markers.map((m) => <option key={m} value={m}>{MARKER_META[m].label}</option>)}
             </select>
           </label>
-          <label className="block text-xs font-bold uppercase text-slate-600">Sincronização
-            <select value={filters.syncStatus || ''} onChange={(e) => set({ syncStatus: (e.target.value || undefined) as GalleryPhoto['syncStatus'] | undefined })} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal normal-case text-slate-800">
+          <label className="block text-xs font-bold uppercase text-fg-secondary">Sincronização
+            <select value={filters.syncStatus || ''} onChange={(e) => set({ syncStatus: (e.target.value || undefined) as GalleryPhoto['syncStatus'] | undefined })} className="mt-1 min-h-11 w-full rounded-xl border border-border-strong bg-surface px-3 text-sm font-normal normal-case text-fg">
               <option value="">Todas</option>
               <option value="sincronizado">Sincronizado</option>
               <option value="pendente">Pendente</option>
@@ -417,8 +417,8 @@ const FiltersSheet: React.FC<{ filters: FieldPhotoFilters; onChange: (f: FieldPh
           </label>
         </div>
         <div className="mt-5 flex gap-2">
-          <button onClick={() => onChange({ search: filters.search })} className="min-h-11 flex-1 rounded-xl border border-slate-300 bg-white text-xs font-bold uppercase text-slate-600">Limpar</button>
-          <button onClick={onClose} className="min-h-11 flex-1 rounded-xl bg-[#1A1A72] text-xs font-bold uppercase text-white">Aplicar</button>
+          <button onClick={() => onChange({ search: filters.search })} className="min-h-11 flex-1 rounded-xl border border-border-strong bg-surface text-xs font-bold uppercase text-fg-secondary">Limpar</button>
+          <button onClick={onClose} className="min-h-11 flex-1 rounded-xl bg-navy text-xs font-bold uppercase text-white">Aplicar</button>
         </div>
       </div>
     </div>
@@ -463,38 +463,38 @@ const PhotoDetail: React.FC<{ photo: GalleryPhoto; clients: Client[]; onClose: (
 
   return (
     <div className="fixed inset-0 z-[85] flex items-stretch justify-end bg-slate-950/60" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="flex h-full w-full max-w-lg flex-col overflow-y-auto bg-white shadow-2xl">
-        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
-          <p className="text-sm font-bold text-slate-900">{friendlyPhotoId(photo.clientUuid)}</p>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><span className="material-symbols-outlined">close</span></button>
+      <div onClick={(e) => e.stopPropagation()} className="flex h-full w-full max-w-lg flex-col overflow-y-auto bg-surface shadow-2xl">
+        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-white/95 px-4 py-3 backdrop-blur">
+          <p className="text-sm font-bold text-fg">{friendlyPhotoId(photo.clientUuid)}</p>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-fg-muted hover:bg-surface-3"><span className="material-symbols-outlined">close</span></button>
         </header>
         <div className="p-4">
-          <div className="mb-2 flex gap-1 rounded-lg bg-slate-100 p-1 text-[11px] font-bold">
-            <button onClick={() => setView('evidence')} className={`flex-1 rounded px-2 py-1.5 uppercase ${view === 'evidence' ? 'bg-white text-[#1A1A72] shadow-sm' : 'text-slate-500'}`}>Evidência</button>
-            <button onClick={() => setView('original')} className={`flex-1 rounded px-2 py-1.5 uppercase ${view === 'original' ? 'bg-white text-[#1A1A72] shadow-sm' : 'text-slate-500'}`}>Original</button>
-            {hasMarkup && <button onClick={() => setView('markup')} className={`flex-1 rounded px-2 py-1.5 uppercase ${view === 'markup' ? 'bg-white text-[#1A1A72] shadow-sm' : 'text-slate-500'}`}>Markup</button>}
+          <div className="mb-2 flex gap-1 rounded-lg bg-surface-3 p-1 text-[11px] font-bold">
+            <button onClick={() => setView('evidence')} className={`flex-1 rounded px-2 py-1.5 uppercase ${view === 'evidence' ? 'bg-surface text-primary shadow-sm' : 'text-fg-secondary'}`}>Evidência</button>
+            <button onClick={() => setView('original')} className={`flex-1 rounded px-2 py-1.5 uppercase ${view === 'original' ? 'bg-surface text-primary shadow-sm' : 'text-fg-secondary'}`}>Original</button>
+            {hasMarkup && <button onClick={() => setView('markup')} className={`flex-1 rounded px-2 py-1.5 uppercase ${view === 'markup' ? 'bg-surface text-primary shadow-sm' : 'text-fg-secondary'}`}>Markup</button>}
           </div>
           <div className="flex min-h-56 items-center justify-center overflow-hidden rounded-xl bg-slate-900">
-            {url ? <img src={url} alt="Foto de campo" className="max-h-[52vh] w-full object-contain" /> : <span className="p-10 text-xs text-slate-400">Imagem indisponível offline.</span>}
+            {url ? <img src={url} alt="Foto de campo" className="max-h-[52vh] w-full object-contain" /> : <span className="p-10 text-xs text-fg-muted">Imagem indisponível offline.</span>}
           </div>
 
           <dl className="mt-4 grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
             {meta.filter(([, v]) => v).map(([k, v]) => (
-              <div key={k} className="min-w-0"><dt className="text-[10px] font-bold uppercase text-slate-400">{k}</dt><dd className="truncate text-sm text-slate-800">{v}</dd></div>
+              <div key={k} className="min-w-0"><dt className="text-[10px] font-bold uppercase text-fg-muted">{k}</dt><dd className="truncate text-sm text-fg">{v}</dd></div>
             ))}
           </dl>
-          {photo.notaRapida && <div className="mt-3"><p className="text-[10px] font-bold uppercase text-slate-400">Nota</p><p className="text-sm text-slate-700">{photo.notaRapida}</p></div>}
-          {view==='evidence'&&<button onClick={share} className="mt-3 min-h-11 w-full rounded-xl border border-[#1A1A72] bg-white text-xs font-bold uppercase text-[#1A1A72]">Compartilhar evidência</button>}
-          {hasComparison?<p className="mt-3 rounded-xl bg-emerald-50 p-3 text-xs font-bold text-emerald-700">✓ Correção registrada</p>:photo.source==='remote'&&<button onClick={onRegisterAfter} className="mt-3 min-h-12 w-full rounded-xl bg-[#E63946] text-xs font-bold uppercase text-white">Registrar Depois</button>}
+          {photo.notaRapida && <div className="mt-3"><p className="text-[10px] font-bold uppercase text-fg-muted">Nota</p><p className="text-sm text-fg-secondary">{photo.notaRapida}</p></div>}
+          {view==='evidence'&&<button onClick={share} className="mt-3 min-h-11 w-full rounded-xl border border-primary bg-surface text-xs font-bold uppercase text-primary">Compartilhar evidência</button>}
+          {hasComparison?<p className="mt-3 rounded-xl bg-emerald-50 p-3 text-xs font-bold text-emerald-700">✓ Correção registrada</p>:photo.source==='remote'&&<button onClick={onRegisterAfter} className="mt-3 min-h-12 w-full rounded-xl bg-danger text-xs font-bold uppercase text-white">Registrar Depois</button>}
 
-          <div className="mt-4 rounded-xl border border-slate-200 p-3">
+          <div className="mt-4 rounded-xl border border-border p-3">
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-[10px] font-bold uppercase text-slate-400">Vínculos</p>
+              <p className="text-[10px] font-bold uppercase text-fg-muted">Vínculos</p>
               <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${SYNC_META[photo.syncStatus].tone}`}>{SYNC_META[photo.syncStatus].label}</span>
             </div>
             <div className="flex flex-wrap gap-1.5"><LinkBadges p={photo} /></div>
             {photo.source === 'remote'
-              ? <button onClick={onLink} className="mt-3 min-h-10 w-full rounded-lg bg-[#1A1A72] text-xs font-bold uppercase text-white">Vincular</button>
+              ? <button onClick={onLink} className="mt-3 min-h-10 w-full rounded-lg bg-navy text-xs font-bold uppercase text-white">Vincular</button>
               : <p className="mt-3 text-[11px] text-amber-700">Sincronize a foto antes de vincular.</p>}
             {photo.source === 'local' && photo.syncStatus === 'erro' && (
               <>
@@ -504,7 +504,7 @@ const PhotoDetail: React.FC<{ photo: GalleryPhoto; clients: Client[]; onClose: (
             )}
           </div>
           {!canLink && photo.source === 'local' && photo.syncStatus === 'pendente' && (
-            <button onClick={onRetry} className="mt-3 min-h-10 w-full rounded-lg border border-slate-300 bg-white text-xs font-bold uppercase text-slate-700">Sincronizar agora</button>
+            <button onClick={onRetry} className="mt-3 min-h-10 w-full rounded-lg border border-border-strong bg-surface text-xs font-bold uppercase text-fg-secondary">Sincronizar agora</button>
           )}
         </div>
       </div>
@@ -566,25 +566,25 @@ const LinkDialog: React.FC<{
 
   return (
     <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/60 sm:items-center" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
-        <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+      <div onClick={(e) => e.stopPropagation()} className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-surface shadow-2xl sm:rounded-2xl">
+        <header className="flex items-center justify-between border-b border-border px-4 py-3">
           <div>
-            <p className="text-sm font-bold text-slate-900">Vincular {photos.length > 1 ? `${remotePhotos.length} fotos` : 'foto'}</p>
-            <p className="text-[11px] text-slate-500">Não duplica arquivos — apenas o relacionamento.</p>
+            <p className="text-sm font-bold text-fg">Vincular {photos.length > 1 ? `${remotePhotos.length} fotos` : 'foto'}</p>
+            <p className="text-[11px] text-fg-secondary">Não duplica arquivos — apenas o relacionamento.</p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><span className="material-symbols-outlined">close</span></button>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-fg-muted hover:bg-surface-3"><span className="material-symbols-outlined">close</span></button>
         </header>
 
         {skipped > 0 && <p className="bg-amber-50 px-4 py-2 text-[11px] text-amber-700">{skipped} foto(s) local(is) serão ignoradas — sincronize antes de vincular.</p>}
 
-        <div className="flex gap-1 border-b border-slate-200 px-4 py-2 text-[11px] font-bold">
+        <div className="flex gap-1 border-b border-border px-4 py-2 text-[11px] font-bold">
           {([['os', 'OS'], ['report', 'Atendimento'], ['pendencia', 'Pendência']] as [LinkKind, string][]).map(([k, label]) => (
-            <button key={k} onClick={() => setKind(k)} className={`flex-1 rounded-lg px-2 py-1.5 uppercase ${kind === k ? 'bg-[#1A1A72] text-white' : 'bg-slate-100 text-slate-500'}`}>{label}</button>
+            <button key={k} onClick={() => setKind(k)} className={`flex-1 rounded-lg px-2 py-1.5 uppercase ${kind === k ? 'bg-navy text-white' : 'bg-surface-3 text-fg-secondary'}`}>{label}</button>
           ))}
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
-          {loading ? <p className="py-10 text-center text-sm text-slate-400">Carregando…</p> : (
+          {loading ? <p className="py-10 text-center text-sm text-fg-muted">Carregando…</p> : (
             <>
               {kind === 'os' && (
                 <LinkList
@@ -625,19 +625,19 @@ const LinkDialog: React.FC<{
 };
 
 const LinkList: React.FC<{ items: { id: string; title: string; subtitle?: string }[]; current?: string; onPick: (id: string) => void; onRemove?: () => void; emptyLabel: string; busy: boolean }> = ({ items, current, onPick, onRemove, emptyLabel, busy }) => {
-  if (items.length === 0) return <p className="py-8 text-center text-sm text-slate-400">{emptyLabel}</p>;
+  if (items.length === 0) return <p className="py-8 text-center text-sm text-fg-muted">{emptyLabel}</p>;
   return (
     <div className="space-y-1.5">
       {onRemove && <button disabled={busy} onClick={onRemove} className="mb-2 min-h-10 w-full rounded-lg border border-red-200 bg-red-50 text-xs font-bold uppercase text-red-700">Remover vínculo atual</button>}
       {items.map((it) => {
         const isCurrent = current === it.id;
         return (
-          <button key={it.id} disabled={busy || isCurrent} onClick={() => onPick(it.id)} className={`flex w-full items-center justify-between gap-2 rounded-xl border p-2.5 text-left ${isCurrent ? 'border-[#1A1A72] bg-[#1A1A72]/5' : 'border-slate-200 hover:border-slate-300'}`}>
+          <button key={it.id} disabled={busy || isCurrent} onClick={() => onPick(it.id)} className={`flex w-full items-center justify-between gap-2 rounded-xl border p-2.5 text-left ${isCurrent ? 'border-primary bg-navy/5' : 'border-border hover:border-border-strong'}`}>
             <div className="min-w-0">
-              <p className="truncate text-sm font-bold text-slate-900">{it.title}</p>
-              {it.subtitle && <p className="truncate text-[11px] text-slate-500">{it.subtitle}</p>}
+              <p className="truncate text-sm font-bold text-fg">{it.title}</p>
+              {it.subtitle && <p className="truncate text-[11px] text-fg-secondary">{it.subtitle}</p>}
             </div>
-            {isCurrent ? <span className="shrink-0 rounded-full bg-[#1A1A72] px-2 py-0.5 text-[10px] font-bold text-white">Atual</span> : <span className="material-symbols-outlined shrink-0 text-slate-400">link</span>}
+            {isCurrent ? <span className="shrink-0 rounded-full bg-navy px-2 py-0.5 text-[10px] font-bold text-white">Atual</span> : <span className="material-symbols-outlined shrink-0 text-fg-muted">link</span>}
           </button>
         );
       })}
