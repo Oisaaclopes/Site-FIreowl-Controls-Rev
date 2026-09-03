@@ -3,7 +3,7 @@ import { showToast } from '@/components/ui/Feedback';
 
 import React, { useState } from 'react';
 import QRCode from 'qrcode';
-import { Contract, Client } from '@/lib/types';
+import { Contract, Client, UserRole } from '@/lib/types';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
 import { usePrivacy } from '@/lib/privacy';
 import { publishDocumentVerification, verificationUrl } from '@/lib/documentVerification';
@@ -13,6 +13,7 @@ interface ContratosViewProps {
   contracts: Contract[];
   clients: Client[];
   onAddContract: (contract: Contract) => void;
+  userRole?: UserRole;
 }
 
 /** Áreas/sistemas cobertos (multi-select) e tipos de atendimento. */
@@ -83,6 +84,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
   contracts,
   clients,
   onAddContract,
+  userRole,
 }) => {
   const { maskMoney } = usePrivacy();
   const [showModal, setShowModal] = useState(false);
@@ -700,7 +702,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
       )}
 
       {detailContract && (
-        <ContractDetailPanel contract={detailContract} onClose={() => setDetailContract(null)} />
+        <ContractDetailPanel contract={detailContract} onClose={() => setDetailContract(null)} userRole={userRole} />
       )}
     </div>
   );

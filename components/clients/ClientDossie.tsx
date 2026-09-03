@@ -14,8 +14,6 @@ import {
   Pendencia,
   ClientEvent,
   Device,
-  FieldOperation,
-  FieldOperationAssignment,
   TabPath,
 } from '@/lib/types';
 import { Badge } from '@/components/DataListRow';
@@ -28,7 +26,7 @@ import { fetchPendencias } from '@/lib/pendencias';
 import { fetchDevices } from '@/lib/devices';
 import { fetchClientEvents, insertClientEvent } from '@/lib/clientEvents';
 import { fetchAssignableTechnicians, ManagedUser } from '@/lib/users';
-import { fetchFieldOperations, fetchFieldOperationAssignments } from '@/lib/fieldOperationsDomain';
+import { FieldOperationsManager } from '@/components/operacoes/FieldOperationsManager';
 import { OS_STATUS_ATIVOS } from '@/lib/ordensServico';
 import {
   GalleryPhoto,
@@ -187,8 +185,6 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
   const [pendencias, setPendencias] = useState<Pendencia[] | null>(null);
   const [devices, setDevices] = useState<Device[] | null>(null);
   const [events, setEvents] = useState<ClientEvent[] | null>(null);
-  const [operations, setOperations] = useState<FieldOperation[] | null>(null);
-  const [opAssignments, setOpAssignments] = useState<FieldOperationAssignment[]>([]);
   const [photos, setPhotos] = useState<GalleryPhoto[] | null>(null);
   const [photosLoading, setPhotosLoading] = useState(false);
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
@@ -199,7 +195,7 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
   // queries filtradas por cliente no servidor (baratas) e alimentam a Visão Geral.
   useEffect(() => {
     if (!isSupabaseConfigured()) {
-      setReports([]); setPendencias([]); setDevices([]); setEvents([]); setOperations([]);
+      setReports([]); setPendencias([]); setDevices([]); setEvents([]);
       return;
     }
     let alive = true;
@@ -208,17 +204,9 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
       fetchPendencias(userRole, { clienteId: client.id }).catch(() => [] as Pendencia[]),
       fetchDevices(client.id).catch(() => [] as Device[]),
       fetchClientEvents(client.id).catch(() => [] as ClientEvent[]),
-      fetchFieldOperations({ clientId: client.id }).catch(() => [] as FieldOperation[]),
-    ]).then(([r, p, d, e, o]) => {
+    ]).then(([r, p, d, e]) => {
       if (!alive) return;
-      setReports(r); setPendencias(p); setDevices(d); setEvents(e); setOperations(o);
-      // Alocações das operações do cliente (para exibir técnicos alocados).
-      const ids = o.map((op) => op.id);
-      if (ids.length > 0) {
-        fetchFieldOperationAssignments({ status: 'ATIVO' })
-          .then((all) => { if (alive) setOpAssignments(all.filter((a) => ids.includes(a.operationId))); })
-          .catch(() => {});
-      }
+      setReports(r); setPendencias(p); setDevices(d); setEvents(e);
     });
     return () => { alive = false; };
   }, [client.id, userRole]);
@@ -602,36 +590,15 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
 
         {tab === 'contratos' && (
           <>
-          {/* Operações de campo (ETAPA 3A): atividade recorrente do cliente, não OS.
-              Ex.: Auditoria SDAI com técnico(s) alocado(s). Só dados reais. */}
-          {operations && operations.length > 0 && (
-            <SectionWrap title={`Operações de campo (${operations.length})`}>
-              <div className="flex flex-col gap-2">
-                {operations.map((op) => {
-                  const techs = opAssignments.filter((a) => a.operationId === op.id).map((a) => techName(a.technicianId));
-                  return (
-                    <div key={op.id} className="rounded-xl border border-border bg-surface px-4 py-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="truncate text-sm font-semibold text-fg">{op.name}</span>
-                            <Badge color={op.status === 'ATIVA' ? 'emerald' : op.status === 'PAUSADA' ? 'amber' : op.status === 'ENCERRADA' ? 'red' : 'slate'}>{op.status}</Badge>
-                          </div>
-                          <p className="mt-0.5 text-[11px] text-fg-secondary">
-                            {op.operationType.replace('_', ' ')}
-                            {op.startDate ? ` · desde ${fmtDate(op.startDate)}` : ''}
-                          </p>
-                          {techs.length > 0 && (
-                            <p className="mt-0.5 text-[11px] font-medium text-fg-secondary">{techs.join(', ')}</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </SectionWrap>
-          )}
+          {/* Operações de campo (ETAPA 3A.9): atividade recorrente do cliente (não OS).
+              Gestão inline reaproveita o mesmo componente do Contrato. */}
+          <SectionWrap title="Operações de campo">
+            <FieldOperationsManager
+              clientId={client.id}
+              contextLabel={client.name}
+              canManage={userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR'}
+            />
+          </SectionWrap>
           <SectionWrap
             title={`Contratos (${clientContracts.length})`}
             actionLabel="Abrir módulo de Contratos"

@@ -2,8 +2,9 @@
 import { requestConfirm } from '@/components/ui/Feedback';
 
 import React, { useEffect, useState } from 'react';
-import { Contract, ContractRoutine, ContractRoutineExecution, ContractHourEntry, ContractAttachment, ContractExecutionStatus } from '@/lib/types';
+import { Contract, ContractRoutine, ContractRoutineExecution, ContractHourEntry, ContractAttachment, ContractExecutionStatus, UserRole } from '@/lib/types';
 import { isSupabaseConfigured } from '@/lib/inventory';
+import { FieldOperationsManager } from '@/components/operacoes/FieldOperationsManager';
 import {
   fetchContractRoutines, upsertContractRoutine, deleteContractRoutine,
   fetchRoutineExecutions, ensureRoutineExecution, updateExecutionStatus,
@@ -21,9 +22,10 @@ const EXEC_LABEL: Record<ContractExecutionStatus, string> = {
 };
 const EXEC_ORDER: ContractExecutionStatus[] = ['previsto', 'agendado', 'os_gerada', 'executado', 'relatorio_emitido'];
 
-export const ContractDetailPanel: React.FC<{ contract: Contract; onClose: () => void }> = ({ contract, onClose }) => {
+export const ContractDetailPanel: React.FC<{ contract: Contract; onClose: () => void; userRole?: UserRole }> = ({ contract, onClose, userRole }) => {
   const online = isSupabaseConfigured();
-  const [tab, setTab] = useState<'rotinas' | 'horas' | 'docs'>('rotinas');
+  const canManageOps = userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR';
+  const [tab, setTab] = useState<'rotinas' | 'operacoes' | 'horas' | 'docs'>('rotinas');
   const [routines, setRoutines] = useState<ContractRoutine[]>([]);
   const [execs, setExecs] = useState<ContractRoutineExecution[]>([]);
   const [hours, setHours] = useState<ContractHourEntry[]>([]);
@@ -132,9 +134,9 @@ export const ContractDetailPanel: React.FC<{ contract: Contract; onClose: () => 
         ) : (
           <>
             <div className="flex gap-1 p-2 bg-surface-3 m-4 rounded-lg w-fit">
-              {(['rotinas', 'horas', 'docs'] as const).map((t) => (
+              {(['rotinas', 'operacoes', 'horas', 'docs'] as const).map((t) => (
                 <button key={t} onClick={() => setTab(t)} className={`px-3 py-1.5 rounded-md text-xs font-semibold uppercase ${tab === t ? 'bg-slate-900 text-white' : 'text-fg-secondary'}`}>
-                  {t === 'rotinas' ? 'Rotinas & Agenda' : t === 'horas' ? 'Bolsa de horas' : 'Documentos'}
+                  {t === 'rotinas' ? 'Rotinas & Agenda' : t === 'operacoes' ? 'Operações de campo' : t === 'horas' ? 'Bolsa de horas' : 'Documentos'}
                 </button>
               ))}
             </div>
@@ -199,6 +201,18 @@ export const ContractDetailPanel: React.FC<{ contract: Contract; onClose: () => 
                     );
                   })}
                   <p className="text-[10px] text-fg-muted">A rotina define a recorrência; a agenda materializa apenas a próxima competência, sem duplicar nem criar OS antecipadamente. A geração de OS a partir de uma competência entra na etapa de Agenda.</p>
+                </>
+              )}
+
+              {tab === 'operacoes' && (
+                <>
+                  <FieldOperationsManager
+                    contractId={contract.id}
+                    clientId={contract.clientId}
+                    contextLabel={contract.clientName}
+                    canManage={canManageOps}
+                  />
+                  <p className="text-[10px] text-fg-muted">Operação de campo é atividade recorrente (ex.: Auditoria SDAI) — não gera OS por dia. Um técnico alocado, com jornada aberta, aparece como <b>EM OPERAÇÃO</b> no painel.</p>
                 </>
               )}
 

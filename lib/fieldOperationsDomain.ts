@@ -18,6 +18,40 @@ const ASSIGNMENTS_TABLE = 'field_operation_assignments';
 /** Status de operação considerados "em andamento" para o painel. */
 export const FIELD_OPERATION_ACTIVE: FieldOperationStatus[] = ['ATIVA'];
 
+/** Plano puro de reconciliação de alocações (testável, sem I/O). Compara as
+ *  alocações ATIVAS atuais com o conjunto desejado de técnicos e devolve quem
+ *  adicionar e quais alocações encerrar (preservando histórico). §3/§8. */
+export interface AssignmentReconcilePlan {
+  toAssign: string[];
+  toEnd: FieldOperationAssignment[];
+}
+export function planAssignmentReconcile(
+  current: FieldOperationAssignment[],
+  desiredTechIds: string[]
+): AssignmentReconcilePlan {
+  const active = current.filter((a) => a.status === 'ATIVO');
+  const activeIds = active.map((a) => a.technicianId);
+  const desired = Array.from(new Set(desiredTechIds)); // nunca duplica o mesmo técnico
+  return {
+    toAssign: desired.filter((id) => !activeIds.includes(id)),
+    toEnd: active.filter((a) => !desired.includes(a.technicianId)),
+  };
+}
+
+/** Aplica uma transição de status a uma operação (puro). Ao ENCERRAR, garante
+ *  end_date (§7); nas demais, preserva a data existente. */
+export function applyOperationStatus(
+  op: FieldOperation,
+  status: FieldOperationStatus,
+  today = new Date().toISOString().slice(0, 10)
+): FieldOperation {
+  return {
+    ...op,
+    status,
+    endDate: status === 'ENCERRADA' ? (op.endDate || today) : op.endDate,
+  };
+}
+
 function rowToOperation(r: any): FieldOperation {
   return {
     id: String(r.id),
@@ -129,7 +163,8 @@ export async function assignTechnicianToOperation(
       {
         operation_id: operationId,
         technician_id: technicianId,
-        start_date: startDate ?? null,
+        start_date: startDate ?? new Date().toISOString().slice(0, 10),
+        end_date: null,
         status: 'ATIVO',
         updated_at: new Date().toISOString(),
       },
@@ -141,6 +176,28 @@ export async function assignTechnicianToOperation(
   return rowToAssignment(data);
 }
 
+/** Encerra a alocação PRESERVANDO o histórico (§8): status ENCERRADO + end_date.
+ *  Não deleta o registro — o período de atuação do técnico fica registrado. */
+export async function endFieldOperationAssignment(
+  assignmentId: string,
+  endDate?: string
+): Promise<FieldOperationAssignment> {
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase
+    .from(ASSIGNMENTS_TABLE)
+    .update({
+      status: 'ENCERRADO',
+      end_date: endDate ?? new Date().toISOString().slice(0, 10),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', assignmentId)
+    .select()
+    .single();
+  if (error) throw error;
+  return rowToAssignment(data);
+}
+
+/** Exclusão dura de uma alocação (uso administrativo raro; prefira encerrar). */
 export async function unassignTechnicianFromOperation(assignmentId: string): Promise<void> {
   const supabase = getSupabaseClient() as any;
   const { error } = await supabase.from(ASSIGNMENTS_TABLE).delete().eq('id', assignmentId);

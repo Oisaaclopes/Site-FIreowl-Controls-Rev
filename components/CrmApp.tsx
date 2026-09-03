@@ -1279,7 +1279,7 @@ export function CrmApp({
           )}
 
           {currentTab === 'contratos' && (
-            <ContratosView contracts={contracts} clients={clients} onAddContract={handleAddContract} />
+            <ContratosView contracts={contracts} clients={clients} onAddContract={handleAddContract} userRole={userRole} />
           )}
 
           {currentTab === 'receitas' && (
