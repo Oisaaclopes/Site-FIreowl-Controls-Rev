@@ -40,6 +40,7 @@ import { uploadInstitucionalLogo, removeInstitucionalLogo, resolveLogoDataUrls }
 import { canResetUserPassword } from '@/lib/rbac';
 import { ResetPasswordModal } from '@/components/users/ResetPasswordModal';
 import { checkPassword, generateStrongPassword, PASSWORD_MIN } from '@/lib/password';
+import { useTheme, ThemeMode } from '@/lib/theme';
 
 interface ContaViewProps {
   logs: SystemAuditLog[];
@@ -149,6 +150,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
 }) => {
   const [tab, setTab] = useState<'conta' | 'homologacao' | 'preferencias' | 'pdf' | 'usuarios'>('conta');
   const [homolSubTab, setHomolSubTab] = useState<'clientes' | 'marcas' | 'itens'>('clientes');
+  const { theme, setTheme } = useTheme();
 
   // ---- Homologação (dados reais) ----
   const [provClients, setProvClients] = useState<Client[]>([]);
@@ -1004,6 +1006,41 @@ export const ContaView: React.FC<ContaViewProps> = ({
       {/* ===== TAB: PREFERÊNCIAS ===== */}
       {tab === 'preferencias' && (
         <div className="flex flex-col gap-6">
+          {/* Aparência / Tema */}
+          <div className="bg-surface p-6 rounded-xl border border-border shadow-soft">
+            <div className="flex items-center gap-2 mb-4">
+              <SettingIcon icon="palette" />
+              <div>
+                <h3 className="font-display text-sm font-bold uppercase tracking-wide text-primary">
+                  Aparência
+                </h3>
+                <p className="text-[11px] text-fg-muted">Escolha o tema da interface. A preferência é salva neste aparelho.</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 max-w-md">
+              {([
+                { key: 'light', label: 'Claro', icon: 'light_mode' },
+                { key: 'dark', label: 'Escuro', icon: 'dark_mode' },
+                { key: 'system', label: 'Sistema', icon: 'contrast' },
+              ] as { key: ThemeMode; label: string; icon: string }[]).map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => setTheme(opt.key)}
+                  aria-pressed={theme === opt.key}
+                  className={`flex flex-col items-center gap-1.5 rounded-xl border px-3 py-3.5 text-[11px] font-semibold uppercase tracking-wide transition-colors ${
+                    theme === opt.key
+                      ? 'border-primary bg-primary-soft text-primary'
+                      : 'border-border bg-surface-2 text-fg-secondary hover:border-border-strong'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-xl">{opt.icon}</span>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="flex flex-col gap-3">
             <DataListRow
               leading={<SettingIcon icon="notifications_active" />}
