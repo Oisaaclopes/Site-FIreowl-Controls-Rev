@@ -52,9 +52,9 @@ interface CrmViewProps {
 }
 
 const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-const labelCls = 'block text-slate-600 mb-1 font-semibold uppercase text-[11px]';
+const labelCls = 'block text-fg-secondary mb-1 font-semibold uppercase text-[11px]';
 const inputCls =
-  'w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#E63946]/20 focus:border-[#E63946]/40';
+  'w-full border border-border rounded-lg p-2.5 text-fg bg-surface focus:outline-none focus:ring-2 focus:ring-danger/20 focus:border-danger/40';
 
 const norm = (s: string) => (s || '').trim().toLowerCase();
 const razaoSocialCliente = (name: string) => name.replace(/\s*\([^)]*\)\s*$/, '').trim();
@@ -406,12 +406,12 @@ export const CrmView: React.FC<CrmViewProps> = ({
   return (
     <div className="flex flex-col w-full min-h-screen relative p-4 md:p-8 gap-6">
       {/* Header & Search */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 pb-5">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-border pb-5">
         <div>
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+          <span className="text-xs font-semibold text-fg-secondary uppercase tracking-wider">
             Gestão Estrutural de Clientes &amp; Manutenção
           </span>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">
+          <h1 className="text-2xl font-bold text-fg tracking-tight mt-0.5">
             Diretório de Clientes &amp; Operações
           </h1>
         </div>
@@ -419,33 +419,33 @@ export const CrmView: React.FC<CrmViewProps> = ({
         {/* Busca e filtros */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full lg:w-auto">
         <div className="relative sm:col-span-3 lg:w-96">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-fg-muted text-lg">
             search
           </span>
           <input
-            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#E63946]/20 focus:border-[#E63946] transition-all placeholder:text-slate-400 uppercase"
+            className="w-full pl-9 pr-4 py-2 bg-surface border border-border rounded-lg text-xs font-medium text-fg focus:outline-none focus:ring-2 focus:ring-danger/20 focus:border-danger transition-all placeholder:text-fg-muted uppercase"
             placeholder="Buscar por cliente, ID ou CNPJ..."
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-          <select value={filterContractStatus} onChange={(e) => setFilterContractStatus(e.target.value as Client['contractStatus'] | '')} className="px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white">
+          <select value={filterContractStatus} onChange={(e) => setFilterContractStatus(e.target.value as Client['contractStatus'] | '')} className="px-3 py-2 text-xs border border-border rounded-lg bg-surface">
             <option value="">Todas as situações</option><option value="EM DIA">Em dia</option><option value="PENDENTE">Pendente</option><option value="ATRASADO">Atrasado</option>
           </select>
-          <select value={filterSegment} onChange={(e) => setFilterSegment(e.target.value)} className="px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white">
+          <select value={filterSegment} onChange={(e) => setFilterSegment(e.target.value)} className="px-3 py-2 text-xs border border-border rounded-lg bg-surface">
             <option value="">Todos os segmentos</option>{clientSegments.map((segment) => <option key={segment} value={segment}>{segment}</option>)}
           </select>
-          {(searchTerm || filterContractStatus || filterSegment) && <button type="button" onClick={() => { setSearchTerm(''); setFilterContractStatus(''); setFilterSegment(''); }} className="text-xs font-semibold text-[#1A1A72] hover:underline">Limpar</button>}
+          {(searchTerm || filterContractStatus || filterSegment) && <button type="button" onClick={() => { setSearchTerm(''); setFilterContractStatus(''); setFilterSegment(''); }} className="text-xs font-semibold text-primary hover:underline">Limpar</button>}
         </div>
       </div>
 
       {/* Ação do módulo (sem sub-abas que clonam o menu lateral) */}
-      <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-2">
-        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Base de clientes</p>
+      <div className="flex items-center justify-between gap-3 border-b border-border pb-2">
+        <p className="text-xs font-bold uppercase tracking-wider text-fg-secondary">Base de clientes</p>
         <button
           onClick={() => setShowAddClientModal(true)}
-          className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
+          className="bg-danger hover:bg-danger-hover text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
         >
           <span className="material-symbols-outlined text-base">add</span> Novo Cliente
         </button>
@@ -456,33 +456,33 @@ export const CrmView: React.FC<CrmViewProps> = ({
         <div className="flex flex-col gap-6">
           {/* Bento Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-            <div className="bg-white p-6 rounded-xl shadow-sm">
-              <p className="text-xs font-semibold text-slate-500 uppercase">Total Ativos</p>
-              <h3 className="text-3xl font-bold text-slate-900 mt-2">{clients.length}</h3>
+            <div className="bg-surface p-6 rounded-xl shadow-sm">
+              <p className="text-xs font-semibold text-fg-secondary uppercase">Total Ativos</p>
+              <h3 className="text-3xl font-bold text-fg mt-2">{clients.length}</h3>
               <p className="text-xs text-emerald-600 mt-2 font-medium">100% monitorados</p>
             </div>
 
-            <div className="bg-white p-6 rounded-xl shadow-sm">
-              <p className="text-xs font-semibold text-slate-500 uppercase">Contratos Ativos</p>
-              <h3 className="text-3xl font-bold text-slate-900 mt-2">
+            <div className="bg-surface p-6 rounded-xl shadow-sm">
+              <p className="text-xs font-semibold text-fg-secondary uppercase">Contratos Ativos</p>
+              <h3 className="text-3xl font-bold text-fg mt-2">
                 {contracts.filter((c) => c.status === 'ATIVO').length}
               </h3>
-              <p className="text-xs text-slate-500 mt-2 font-medium">de {contracts.length} no total</p>
+              <p className="text-xs text-fg-secondary mt-2 font-medium">de {contracts.length} no total</p>
             </div>
 
-            <div className="md:col-span-2 bg-white p-6 rounded-xl shadow-sm flex justify-between items-center gap-4">
+            <div className="md:col-span-2 bg-surface p-6 rounded-xl shadow-sm flex justify-between items-center gap-4">
               <div>
                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full uppercase">
                   Receita Recorrente (MRR)
                 </span>
-                <h3 className="font-data-mono text-2xl font-bold text-slate-900 mt-2">
+                <h3 className="font-data-mono text-2xl font-bold text-fg mt-2">
                   {maskMoney(brl(contracts.reduce((acc, c) => acc + c.monthlyValue, 0)))}
                 </h3>
-                <p className="text-xs text-slate-500 mt-1">Somatório dos contratos vigentes</p>
+                <p className="text-xs text-fg-secondary mt-1">Somatório dos contratos vigentes</p>
               </div>
               <button
                 onClick={() => onNavigateToTab?.('contratos')}
-                className="shrink-0 border border-[#1A1A72] text-[#1A1A72] hover:bg-[#1A1A72] hover:text-white font-semibold text-xs px-4 py-2 rounded-lg transition-colors"
+                className="shrink-0 border border-primary text-primary hover:bg-navy hover:text-white font-semibold text-xs px-4 py-2 rounded-lg transition-colors"
               >
                 Ver Contratos
               </button>
@@ -517,14 +517,14 @@ export const CrmView: React.FC<CrmViewProps> = ({
                     key={client.id}
                     onClick={() => openClientDossie(client)}
                     leading={client.logoPath && clientLogoUrls[client.logoPath] ? (
-                      <span className="w-14 h-14 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 p-1.5 overflow-hidden">
+                      <span className="w-14 h-14 rounded-xl bg-surface border border-border flex items-center justify-center shrink-0 p-1.5 overflow-hidden">
                         {/* eslint-disable-next-line @next/next/no-img-element */}<img src={clientLogoUrls[client.logoPath]} alt={`Logo ${nomeFantasiaCliente(client.name)}`} className="w-full h-full object-contain" />
                       </span>
-                    ) : <span className="w-14 h-14 rounded-xl bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0"><span className="material-symbols-outlined text-xl">domain</span></span>}
+                    ) : <span className="w-14 h-14 rounded-xl bg-navy/10 text-primary flex items-center justify-center shrink-0"><span className="material-symbols-outlined text-xl">domain</span></span>}
                     title={<span className="uppercase">{nomeFantasiaCliente(client.name)}</span>}
                     meta={
                       <>
-                        {nomeFantasiaCliente(client.name) !== razaoSocialCliente(client.name) && <span className="text-slate-400 truncate">{razaoSocialCliente(client.name)}</span>}
+                        {nomeFantasiaCliente(client.name) !== razaoSocialCliente(client.name) && <span className="text-fg-muted truncate">{razaoSocialCliente(client.name)}</span>}
                         <RowMeta label="CNPJ" value={<span className="font-data-mono">{client.cnpj}</span>} />
                         <RowMeta label="Código" value={<span className="font-data-mono">{client.code}</span>} />
                         <RowMeta label="Segmento" value={client.segment} />
@@ -533,16 +533,16 @@ export const CrmView: React.FC<CrmViewProps> = ({
                     center={
                       <div className="flex items-center gap-4 md:gap-3 text-center">
                         <div>
-                          <p className="font-data-mono text-slate-900 font-bold text-sm">{nContracts}</p>
-                          <p className="text-[10px] text-slate-400 uppercase tracking-wider">Contratos</p>
+                          <p className="font-data-mono text-fg font-bold text-sm">{nContracts}</p>
+                          <p className="text-[10px] text-fg-muted uppercase tracking-wider">Contratos</p>
                         </div>
                         <div>
-                          <p className="font-data-mono text-slate-900 font-bold text-sm">{nProposals}</p>
-                          <p className="text-[10px] text-slate-400 uppercase tracking-wider">Propostas</p>
+                          <p className="font-data-mono text-fg font-bold text-sm">{nProposals}</p>
+                          <p className="text-[10px] text-fg-muted uppercase tracking-wider">Propostas</p>
                         </div>
                         <div>
-                          <p className="font-data-mono text-slate-900 font-bold text-sm">{nOS}</p>
-                          <p className="text-[10px] text-slate-400 uppercase tracking-wider">OS</p>
+                          <p className="font-data-mono text-fg font-bold text-sm">{nOS}</p>
+                          <p className="text-[10px] text-fg-muted uppercase tracking-wider">OS</p>
                         </div>
                       </div>
                     }
@@ -571,7 +571,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
                   />
                 );
               })}
-              <p className="text-xs text-slate-500 px-1 pt-1">
+              <p className="text-xs text-fg-secondary px-1 pt-1">
                 Mostrando {filteredClients.length} de {clients.length} clientes cadastrados
               </p>
             </div>
@@ -581,8 +581,8 @@ export const CrmView: React.FC<CrmViewProps> = ({
 
       {/* Subtab Content: PEDIDOS & OS */}
       {crmSubTab === 'pedidos_os' && (
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <h3 className="text-base font-bold text-slate-900 uppercase tracking-wide mb-4 border-b border-slate-100 pb-3">
+        <div className="bg-surface rounded-xl border border-border p-6 shadow-sm">
+          <h3 className="text-base font-bold text-fg uppercase tracking-wide mb-4 border-b border-border pb-3">
             Ordens de Serviço Ativas &amp; Manutenções
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -592,16 +592,16 @@ export const CrmView: React.FC<CrmViewProps> = ({
                 const ui = OS_STATUS_UI[os.status];
                 const clienteNome = clients.find((c) => c.id === os.clienteId)?.name || os.clienteId || '—';
                 return (
-                  <div key={os.id} className="border border-slate-200 rounded-lg p-4 bg-slate-50/50 flex flex-col justify-between gap-3">
+                  <div key={os.id} className="border border-border rounded-lg p-4 bg-surface-2/50 flex flex-col justify-between gap-3">
                     <div className="flex justify-between items-start">
                       <div className="min-w-0">
-                        <span className="font-data-mono text-xs font-bold text-[#E63946]">{os.numero || os.id}</span>
-                        <h4 className="font-bold text-slate-900 text-sm uppercase truncate">{os.titulo || 'Ordem de serviço'}</h4>
-                        <p className="text-xs text-slate-500 mt-0.5">{nomeFantasiaCliente(clienteNome)}</p>
+                        <span className="font-data-mono text-xs font-bold text-danger">{os.numero || os.id}</span>
+                        <h4 className="font-bold text-fg text-sm uppercase truncate">{os.titulo || 'Ordem de serviço'}</h4>
+                        <p className="text-xs text-fg-secondary mt-0.5">{nomeFantasiaCliente(clienteNome)}</p>
                       </div>
                       <span className="shrink-0"><Badge color={ui.color}>{ui.label}</Badge></span>
                     </div>
-                    <div className="flex justify-between items-center font-data-mono text-xs text-slate-500 pt-3 border-t border-slate-200">
+                    <div className="flex justify-between items-center font-data-mono text-xs text-fg-secondary pt-3 border-t border-border">
                       <span className="uppercase">{os.tipo}</span>
                       <span>{os.dataPrevista ? `Previsto ${os.dataPrevista}` : os.dataAbertura || ''}</span>
                     </div>
@@ -609,7 +609,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
                 );
               })}
             {ordensServico.filter((os) => OS_STATUS_ATIVOS.includes(os.status)).length === 0 && (
-              <p className="text-sm text-slate-400 col-span-full py-6 text-center">Nenhuma ordem de serviço ativa.</p>
+              <p className="text-sm text-fg-muted col-span-full py-6 text-center">Nenhuma ordem de serviço ativa.</p>
             )}
           </div>
         </div>
@@ -617,14 +617,14 @@ export const CrmView: React.FC<CrmViewProps> = ({
 
       {/* Subtab Content: ESTOQUE */}
       {crmSubTab === 'estoque' && (
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <h3 className="text-base font-bold text-slate-900 uppercase tracking-wide mb-4 border-b border-slate-100 pb-3">
+        <div className="bg-surface rounded-xl border border-border p-6 shadow-sm">
+          <h3 className="text-base font-bold text-fg uppercase tracking-wide mb-4 border-b border-border pb-3">
             Estoque de Componentes &amp; Rastreabilidade Série BP
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-200">
+                <tr className="bg-surface-2 text-fg-secondary font-semibold uppercase tracking-wider border-b border-border">
                   <th className="py-3 px-4">Código / Série BP</th>
                   <th className="py-3 px-4">Descrição da Peça</th>
                   <th className="py-3 px-4">Categoria</th>
@@ -632,21 +632,21 @@ export const CrmView: React.FC<CrmViewProps> = ({
                   <th className="py-3 px-4 text-right">Preço Unitário</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+              <tbody className="divide-y divide-border font-medium text-fg-secondary">
                 {inventory.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50/80">
-                    <td className="py-3 px-4 font-data-mono font-bold text-[#E63946]">
+                  <tr key={item.id} className="hover:bg-surface-2/80">
+                    <td className="py-3 px-4 font-data-mono font-bold text-danger">
                       {item.code} <br />
-                      <span className="text-[10px] text-slate-400 font-normal">{item.serialBP}</span>
+                      <span className="text-[10px] text-fg-muted font-normal">{item.serialBP}</span>
                     </td>
-                    <td className="py-3 px-4 font-bold text-slate-900 uppercase">{item.name}</td>
-                    <td className="py-3 px-4 text-slate-500">{item.category}</td>
+                    <td className="py-3 px-4 font-bold text-fg uppercase">{item.name}</td>
+                    <td className="py-3 px-4 text-fg-secondary">{item.category}</td>
                     <td className="py-3 px-4 text-center font-data-mono font-bold">
-                      <span className={item.quantity <= item.minQuantity ? 'text-[#E63946]' : 'text-emerald-700'}>
+                      <span className={item.quantity <= item.minQuantity ? 'text-danger' : 'text-emerald-700'}>
                         {item.quantity} un
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-right font-data-mono text-slate-900">R$ {item.unitPrice.toFixed(2)}</td>
+                    <td className="py-3 px-4 text-right font-data-mono text-fg">R$ {item.unitPrice.toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -657,42 +657,42 @@ export const CrmView: React.FC<CrmViewProps> = ({
 
       {/* Subtab Content: SERVIÇOS (catálogo real) */}
       {crmSubTab === 'servicos' && (
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
-            <h3 className="text-base font-bold text-slate-900 uppercase tracking-wide">
+        <div className="bg-surface rounded-xl border border-border p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4 border-b border-border pb-3">
+            <h3 className="text-base font-bold text-fg uppercase tracking-wide">
               Catálogo de Serviços Especializados SDAI
             </h3>
             <button
               onClick={() => onNavigateToTab?.('servicos')}
-              className="text-[11px] font-semibold text-[#1A1A72] hover:text-[#E63946] uppercase tracking-wider"
+              className="text-[11px] font-semibold text-primary hover:text-danger uppercase tracking-wider"
             >
               Gerenciar catálogo →
             </button>
           </div>
 
           {services.length === 0 ? (
-            <div className="py-12 text-center text-slate-400">
-              <span className="material-symbols-outlined text-4xl text-slate-300">handyman</span>
-              <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">Catálogo vazio</p>
-              <p className="text-xs text-slate-400 mt-1">Cadastre serviços na aba <strong>Serviços</strong>.</p>
+            <div className="py-12 text-center text-fg-muted">
+              <span className="material-symbols-outlined text-4xl text-fg-muted">handyman</span>
+              <p className="mt-2 text-sm font-bold text-fg-secondary uppercase tracking-wider">Catálogo vazio</p>
+              <p className="text-xs text-fg-muted mt-1">Cadastre serviços na aba <strong>Serviços</strong>.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {services.map((svc) => (
-                <div key={svc.id} className="border border-slate-200 rounded-lg p-5 bg-slate-50/50 flex flex-col justify-between">
+                <div key={svc.id} className="border border-border rounded-lg p-5 bg-surface-2/50 flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-data-mono text-[10px] font-bold text-[#E63946]">{svc.code}</span>
+                      <span className="font-data-mono text-[10px] font-bold text-danger">{svc.code}</span>
                       <Badge color={svc.active ? 'emerald' : 'slate'}>{svc.active ? 'ATIVO' : 'INATIVO'}</Badge>
                     </div>
-                    <h4 className="font-bold uppercase text-slate-900 text-sm mt-1.5">{svc.title}</h4>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-500">
+                    <h4 className="font-bold uppercase text-fg text-sm mt-1.5">{svc.title}</h4>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-fg-secondary">
                       <RowMeta label="Categoria" value={svc.category} />
                       <RowMeta label="Norma" value={<span className="font-data-mono">{svc.nbrNormRef}</span>} />
                       <RowMeta label="Horas" value={`${svc.estimatedHours}h`} />
                     </div>
                   </div>
-                  <p className="font-data-mono text-sm font-bold text-[#E63946] mt-4">
+                  <p className="font-data-mono text-sm font-bold text-danger mt-4">
                     {maskMoney(brl(svc.standardValue))}
                   </p>
                 </div>
@@ -708,28 +708,28 @@ export const CrmView: React.FC<CrmViewProps> = ({
           {/* Backdrop */}
           <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setShowAddClientModal(false)} aria-hidden="true" />
           {/* Drawer (desliza da direita) */}
-          <div className="relative bg-slate-50 w-full max-w-lg h-full shadow-2xl border-l border-slate-200 flex flex-col animate-[slideIn_.25s_ease-out]">
+          <div className="relative bg-surface-2 w-full max-w-lg h-full shadow-2xl border-l border-border flex flex-col animate-[slideIn_.25s_ease-out]">
             <style>{`@keyframes slideIn{from{transform:translateX(24px);opacity:.6}to{transform:translateX(0);opacity:1}}`}</style>
-            <div className="flex items-start justify-between p-5 border-b border-slate-200 bg-white">
+            <div className="flex items-start justify-between p-5 border-b border-border bg-surface">
               <div>
-                <h3 className="text-base font-bold text-slate-900 uppercase">
+                <h3 className="text-base font-bold text-fg uppercase">
                   {editingClient ? 'Editar cliente' : 'Novo cliente'}
                 </h3>
-                <p className="text-[11px] text-slate-500 mt-0.5">Vinculado a contratos, pedidos e OS.</p>
+                <p className="text-[11px] text-fg-secondary mt-0.5">Vinculado a contratos, pedidos e OS.</p>
               </div>
-              <button onClick={() => setShowAddClientModal(false)} className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none">✕</button>
+              <button onClick={() => setShowAddClientModal(false)} className="text-fg-muted hover:text-fg-secondary font-bold text-lg leading-none">✕</button>
             </div>
 
             <form id="novoClienteForm" onSubmit={handleCreateClientSubmit} className="flex-1 overflow-y-auto p-4 space-y-3 text-xs font-medium">
               {/* Toggle PF / PJ */}
-              <div className="flex items-center gap-1 bg-slate-200/70 p-1 rounded-lg w-full">
+              <div className="flex items-center gap-1 bg-surface-3/70 p-1 rounded-lg w-full">
                 {(['PJ', 'PF'] as const).map((t) => (
                   <button
                     key={t}
                     type="button"
                     onClick={() => setNTipoPessoa(t)}
                     className={`flex-1 py-1.5 rounded-md text-[11px] font-bold uppercase tracking-wide transition-colors ${
-                      nTipoPessoa === t ? 'bg-white text-[#1A1A72] shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                      nTipoPessoa === t ? 'bg-surface text-primary shadow-sm' : 'text-fg-secondary hover:text-fg-secondary'
                     }`}
                   >
                     {t === 'PJ' ? 'Pessoa Jurídica' : 'Pessoa Física'}
@@ -738,9 +738,9 @@ export const CrmView: React.FC<CrmViewProps> = ({
               </div>
 
               {/* Card: Identificação */}
-              <section className="rounded-xl border border-slate-200 bg-white p-3.5 space-y-3">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-sm text-[#1A1A72]">badge</span> Identificação
+              <section className="rounded-xl border border-border bg-surface p-3.5 space-y-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-fg-secondary flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-sm text-primary">badge</span> Identificação
                 </p>
                 <div>
                   <label className={labelCls}>{nTipoPessoa === 'PJ' ? 'Razão Social *' : 'Nome completo *'}</label>
@@ -755,7 +755,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
                           type="button"
                           onClick={() => handleSearchCnpj()}
                           disabled={isSearchingCnpj || !nCNPJ.trim()}
-                          className="text-[10px] font-bold text-[#1A1A72] hover:text-[#E63946] disabled:opacity-40 flex items-center gap-1 uppercase transition-colors"
+                          className="text-[10px] font-bold text-primary hover:text-danger disabled:opacity-40 flex items-center gap-1 uppercase transition-colors"
                           title="Consultar dados na Receita Federal"
                         >
                           {isSearchingCnpj ? (
@@ -829,9 +829,9 @@ export const CrmView: React.FC<CrmViewProps> = ({
               </section>
 
               {/* Card: Endereço */}
-              <section className="rounded-xl border border-slate-200 bg-white p-3.5 space-y-3">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-sm text-[#1A1A72]">location_on</span> Endereço
+              <section className="rounded-xl border border-border bg-surface p-3.5 space-y-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-fg-secondary flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-sm text-primary">location_on</span> Endereço
                 </p>
                 <div>
                   <label className={labelCls}>Logradouro, nº, bairro</label>
@@ -844,9 +844,9 @@ export const CrmView: React.FC<CrmViewProps> = ({
               </section>
 
               {/* Card: Dados comerciais */}
-              <section className="rounded-xl border border-slate-200 bg-white p-3.5 space-y-3">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-sm text-[#1A1A72]">payments</span> Dados comerciais
+              <section className="rounded-xl border border-border bg-surface p-3.5 space-y-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-fg-secondary flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-sm text-primary">payments</span> Dados comerciais
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
@@ -865,18 +865,18 @@ export const CrmView: React.FC<CrmViewProps> = ({
               </section>
 
               {/* Card: Foto da fachada (capa padrão das propostas do cliente) */}
-              <section className="rounded-xl border border-slate-200 bg-white p-3.5 space-y-2">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-sm text-[#1A1A72]">storefront</span> Foto da fachada
+              <section className="rounded-xl border border-border bg-surface p-3.5 space-y-2">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-fg-secondary flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-sm text-primary">storefront</span> Foto da fachada
                 </p>
-                <p className="text-[11px] text-slate-400">Usada como capa padrão nas propostas e orçamentos deste cliente (dispensa subir por documento).</p>
+                <p className="text-[11px] text-fg-muted">Usada como capa padrão nas propostas e orçamentos deste cliente (dispensa subir por documento).</p>
                 {nFachada ? (
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-emerald-600 flex items-center gap-1"><span className="material-symbols-outlined text-[16px]">check_circle</span>Foto definida</span>
-                    <button type="button" onClick={handleFachadaRemove} className="text-[11px] font-bold uppercase text-slate-400 hover:text-[#E63946]">Remover</button>
+                    <button type="button" onClick={handleFachadaRemove} className="text-[11px] font-bold uppercase text-fg-muted hover:text-danger">Remover</button>
                   </div>
                 ) : (
-                  <label className={`inline-flex items-center gap-1.5 text-xs font-semibold cursor-pointer ${fachadaBusy ? 'text-slate-400' : 'text-[#1A1A72] hover:text-[#E63946]'}`}>
+                  <label className={`inline-flex items-center gap-1.5 text-xs font-semibold cursor-pointer ${fachadaBusy ? 'text-fg-muted' : 'text-primary hover:text-danger'}`}>
                     <span className="material-symbols-outlined text-[16px]">{fachadaBusy ? 'progress_activity' : 'add_a_photo'}</span>
                     {fachadaBusy ? 'Enviando…' : 'Enviar foto da fachada'}
                     <input type="file" accept="image/*" className="hidden" disabled={fachadaBusy}
@@ -886,18 +886,18 @@ export const CrmView: React.FC<CrmViewProps> = ({
               </section>
 
               {/* Logo corporativa do cliente: distinta da fachada e usada no PDF técnico. */}
-              <section className="rounded-xl border border-slate-200 bg-white p-3.5 space-y-2">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-sm text-[#1A1A72]">branding_watermark</span> Logo do cliente
+              <section className="rounded-xl border border-border bg-surface p-3.5 space-y-2">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-fg-secondary flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-sm text-primary">branding_watermark</span> Logo do cliente
                 </p>
-                <p className="text-[11px] text-slate-400">Aceita SVG ou PNG. A imagem é preservada em PNG transparente para uso seguro no PDF.</p>
+                <p className="text-[11px] text-fg-muted">Aceita SVG ou PNG. A imagem é preservada em PNG transparente para uso seguro no PDF.</p>
                 {nLogo ? (
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-emerald-600 flex items-center gap-1"><span className="material-symbols-outlined text-[16px]">check_circle</span>Logo definida</span>
-                    <button type="button" onClick={handleLogoRemove} className="text-[11px] font-bold uppercase text-slate-400 hover:text-[#E63946]">Remover</button>
+                    <button type="button" onClick={handleLogoRemove} className="text-[11px] font-bold uppercase text-fg-muted hover:text-danger">Remover</button>
                   </div>
                 ) : (
-                  <label className={`inline-flex items-center gap-1.5 text-xs font-semibold cursor-pointer ${logoBusy ? 'text-slate-400' : 'text-[#1A1A72] hover:text-[#E63946]'}`}>
+                  <label className={`inline-flex items-center gap-1.5 text-xs font-semibold cursor-pointer ${logoBusy ? 'text-fg-muted' : 'text-primary hover:text-danger'}`}>
                     <span className={`material-symbols-outlined text-[16px] ${logoBusy ? 'animate-spin' : ''}`}>{logoBusy ? 'progress_activity' : 'upload_file'}</span>
                     {logoBusy ? 'Enviando…' : 'Enviar logo'}
                     <input type="file" accept="image/png,image/svg+xml" className="hidden" disabled={logoBusy}
@@ -907,24 +907,24 @@ export const CrmView: React.FC<CrmViewProps> = ({
               </section>
 
               {/* Card: Contatos */}
-              <section className="rounded-xl border border-slate-200 bg-white p-3.5 space-y-3">
+              <section className="rounded-xl border border-border bg-surface p-3.5 space-y-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-sm text-[#1A1A72]">contacts</span> Contatos
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-fg-secondary flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-sm text-primary">contacts</span> Contatos
                   </p>
-                  <button type="button" onClick={addContactRow} className="text-[11px] font-semibold text-[#1A1A72] hover:text-[#E63946] flex items-center gap-1 uppercase">
+                  <button type="button" onClick={addContactRow} className="text-[11px] font-semibold text-primary hover:text-danger flex items-center gap-1 uppercase">
                     <span className="material-symbols-outlined text-sm">add</span> Adicionar
                   </button>
                 </div>
                 <div className="space-y-2">
                   {nContacts.map((c, idx) => (
-                    <div key={idx} className="grid grid-cols-2 gap-2 bg-slate-50 border border-slate-200 rounded-lg p-2 relative">
+                    <div key={idx} className="grid grid-cols-2 gap-2 bg-surface-2 border border-border rounded-lg p-2 relative">
                       <input type="text" value={c.name} onChange={(e) => updateContact(idx, 'name', e.target.value)} className={inputCls} placeholder="Nome" />
                       <input type="text" value={c.role} onChange={(e) => updateContact(idx, 'role', e.target.value)} className={inputCls} placeholder="Cargo/Função" />
                       <input type="tel" inputMode="tel" value={c.phone} onChange={(e) => updateContact(idx, 'phone', e.target.value)} className={`${inputCls} font-data-mono`} placeholder="(43) 90000-0000" />
                       <input type="email" inputMode="email" value={c.email} onChange={(e) => updateContact(idx, 'email', e.target.value)} className={inputCls} placeholder="email@cliente.com" />
                       {nContacts.length > 1 && (
-                        <button type="button" onClick={() => removeContactRow(idx)} className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 hover:text-[#E63946]" title="Remover contato">
+                        <button type="button" onClick={() => removeContactRow(idx)} className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-surface border border-border shadow-sm flex items-center justify-center text-fg-muted hover:text-danger" title="Remover contato">
                           <span className="material-symbols-outlined text-sm">close</span>
                         </button>
                       )}
@@ -935,11 +935,11 @@ export const CrmView: React.FC<CrmViewProps> = ({
             </form>
 
             {/* Rodapé fixo */}
-            <div className="p-4 border-t border-slate-200 bg-white">
+            <div className="p-4 border-t border-border bg-surface">
               <button
                 type="submit"
                 form="novoClienteForm"
-                className="w-full bg-[#E63946] hover:bg-[#a51515] text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
+                className="w-full bg-danger hover:bg-danger-hover text-white py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm"
               >
                 {editingClient ? 'Salvar alterações' : `Cadastrar ${nTipoPessoa === 'PJ' ? 'empresa' : 'pessoa'}`}
               </button>

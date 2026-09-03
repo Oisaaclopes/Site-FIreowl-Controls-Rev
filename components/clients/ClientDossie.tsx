@@ -275,7 +275,7 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
   // Timeline consolidada (histórico) — eventos reais já existentes.
   const timeline = useMemo(() => {
     const entries: { id: string; date?: string; type: string; icon: string; title: string; detail: string; tone: string }[] = [
-      ...clientPedidos.map((p) => ({ id: `ped-${p.id}`, date: p.dataEmissao, type: 'Proposta', icon: 'description', title: p.numeroPedido, detail: `${p.referencia || 'Proposta'} · ${p.status}`, tone: 'text-[#1A1A72] bg-[#1A1A72]/10' })),
+      ...clientPedidos.map((p) => ({ id: `ped-${p.id}`, date: p.dataEmissao, type: 'Proposta', icon: 'description', title: p.numeroPedido, detail: `${p.referencia || 'Proposta'} · ${p.status}`, tone: 'text-primary bg-navy/10' })),
       ...clientContracts.map((c) => ({ id: `contract-${c.id}`, date: c.startDate || c.renewalDate, type: 'Contrato', icon: 'handshake', title: c.contractType || c.id, detail: `${c.status} · renovação ${c.renewalDate || 'não informada'}`, tone: 'text-emerald-700 bg-emerald-50' })),
       ...clientOS.map((o) => ({ id: `os-${o.id}`, date: o.dataConclusao || o.dataPrevista || o.dataAbertura, type: 'OS', icon: 'engineering', title: o.numero || o.titulo || o.id, detail: `${OS_STATUS_UI[o.status].label}${o.titulo ? ` · ${o.titulo}` : ''}`, tone: 'text-amber-700 bg-amber-50' })),
       ...(reports || []).map((r) => ({ id: `report-${r.id}`, date: r.finalizadoEm || r.iniciadoEm, type: 'Relatório', icon: 'assignment', title: r.numero || r.titulo || r.tipo, detail: `${r.tipo} · ${r.status}`, tone: 'text-violet-700 bg-violet-50' })),
@@ -323,27 +323,27 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
     // padding). Nada de fixed/100vw/margin-left aqui: largura = 100% do container,
     // min-w-0 permite o conteúdo encolher junto com a abertura/recolhimento da
     // sidebar sem estourar o viewport.
-    <div className="flex min-h-[calc(100vh-56px)] w-full min-w-0 flex-col bg-slate-50">
+    <div className="flex min-h-[calc(100vh-56px)] w-full min-w-0 flex-col bg-surface-2">
       {/* ============================ Cabeçalho do cliente ============================ */}
       {/* Sticky logo abaixo do header fixo do app. O top casa com a altura do
           .fireowl-header (3.5rem + safe-area em telas com notch). z abaixo da
           sidebar (z-50) e do header (z-40) para nunca sobrepô-los. */}
-      <header className="sticky z-30 border-b border-slate-200 bg-white" style={{ top: 'calc(3.5rem + env(safe-area-inset-top))' }}>
+      <header className="sticky z-30 border-b border-border bg-surface" style={{ top: 'calc(3.5rem + env(safe-area-inset-top))' }}>
         <div className="flex flex-wrap items-start gap-x-3 gap-y-3 px-4 py-3 md:px-8 md:py-4">
           <button
             onClick={onClose}
-            className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+            className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-fg-secondary hover:bg-surface-3 hover:text-fg"
             title="Voltar ao diretório de clientes"
             aria-label="Voltar"
           >
             <span className="material-symbols-outlined">arrow_back</span>
           </button>
           <div className="min-w-0 flex-1 basis-64">
-            <span className="font-data-mono text-xs font-bold text-[#E63946]">{client.code}</span>
-            <h1 className="mt-0.5 truncate text-lg font-bold uppercase tracking-tight text-slate-900 md:text-2xl">
+            <span className="font-data-mono text-xs font-bold text-danger">{client.code}</span>
+            <h1 className="mt-0.5 truncate text-lg font-bold uppercase tracking-tight text-fg md:text-2xl">
               {nomeFantasiaCliente(client.name)}
             </h1>
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500 md:text-xs">
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-fg-secondary md:text-xs">
               {razaoSocialCliente(client.name) !== nomeFantasiaCliente(client.name) && (
                 <span className="truncate">{razaoSocialCliente(client.name)}</span>
               )}
@@ -353,12 +353,12 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
               <span className={`font-semibold ${statusTone}`}>· {client.contractStatus}</span>
             </div>
             {client.contacts && client.contacts.length > 0 && (
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-500">
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-fg-secondary">
                 {client.contacts.slice(0, 2).map((ct, i) => (
                   <span key={i} className="flex items-center gap-1">
-                    <span className="material-symbols-outlined text-sm text-slate-400">person</span>
-                    <span className="font-semibold text-slate-700">{ct.name}</span>
-                    {ct.role && <span className="text-slate-400">· {ct.role}</span>}
+                    <span className="material-symbols-outlined text-sm text-fg-muted">person</span>
+                    <span className="font-semibold text-fg-secondary">{ct.name}</span>
+                    {ct.role && <span className="text-fg-muted">· {ct.role}</span>}
                     {ct.phone && <span className="font-data-mono">· {ct.phone}</span>}
                   </span>
                 ))}
@@ -376,7 +376,7 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
             {onEditClient && (
               <button
                 onClick={() => onEditClient(client)}
-                className="flex items-center gap-1 rounded-lg bg-[#1A1A72]/10 px-3 py-1.5 text-xs font-bold text-[#1A1A72] transition-colors hover:bg-[#1A1A72] hover:text-white"
+                className="flex items-center gap-1 rounded-lg bg-navy/10 px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-navy hover:text-white"
               >
                 <span className="material-symbols-outlined text-sm">edit</span> Editar dados
               </button>
@@ -384,7 +384,7 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
             {(userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR') && (
               <button
                 onClick={() => void handleDelete()}
-                className="flex items-center gap-1 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-[#E63946] transition-colors hover:bg-[#E63946] hover:text-white"
+                className="flex items-center gap-1 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-danger transition-colors hover:bg-danger hover:text-white"
                 title={hasLinkedHistory ? 'Clientes com histórico não podem ser excluídos' : 'Excluir cliente sem vínculos'}
               >
                 <span className="material-symbols-outlined text-sm">delete</span> Excluir
@@ -402,14 +402,14 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
                 key={t.id}
                 onClick={() => goTab(t.id)}
                 className={`flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-semibold transition-colors ${
-                  active ? 'border-[#E63946] text-[#1A1A72]' : 'border-transparent text-slate-500 hover:text-slate-800'
+                  active ? 'border-danger text-primary' : 'border-transparent text-fg-secondary hover:text-fg'
                 }`}
                 aria-current={active ? 'page' : undefined}
               >
                 <span className="material-symbols-outlined text-base">{t.icon}</span>
                 {t.label}
                 {t.badge ? (
-                  <span className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${active ? 'bg-[#E63946] text-white' : 'bg-slate-200 text-slate-600'}`}>
+                  <span className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${active ? 'bg-danger text-white' : 'bg-surface-3 text-fg-secondary'}`}>
                     {t.badge}
                   </span>
                 ) : null}
@@ -474,14 +474,14 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
             ) : (
               <div className="flex flex-col gap-2">
                 {[...clientOS].sort((a, b) => toTime(b.dataAbertura) - toTime(a.dataAbertura)).map((o) => (
-                  <div key={o.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+                  <div key={o.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-data-mono text-xs font-bold text-slate-900">{o.numero || o.id}</span>
+                        <span className="font-data-mono text-xs font-bold text-fg">{o.numero || o.id}</span>
                         <Badge color={OS_STATUS_UI[o.status].color === 'blue' ? 'slate' : OS_STATUS_UI[o.status].color}>{OS_STATUS_UI[o.status].label}</Badge>
                       </div>
-                      <p className="mt-0.5 truncate text-sm font-semibold text-slate-800">{o.titulo || OS_TIPO_LABEL[o.tipo]}</p>
-                      <p className="mt-0.5 flex flex-wrap gap-x-3 text-[11px] text-slate-500">
+                      <p className="mt-0.5 truncate text-sm font-semibold text-fg">{o.titulo || OS_TIPO_LABEL[o.tipo]}</p>
+                      <p className="mt-0.5 flex flex-wrap gap-x-3 text-[11px] text-fg-secondary">
                         <span>{OS_TIPO_LABEL[o.tipo]}</span>
                         <span>Abertura: {fmtDate(o.dataAbertura)}</span>
                         {o.dataPrevista && <span>Prevista: {fmtDate(o.dataPrevista)}</span>}
@@ -491,7 +491,7 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
                     </div>
                     <button
                       onClick={() => onNavigateToTab('pedidos')}
-                      className="shrink-0 rounded-lg border border-[#1A1A72] px-3 py-1.5 text-xs font-bold text-[#1A1A72] transition-colors hover:bg-[#1A1A72] hover:text-white"
+                      className="shrink-0 rounded-lg border border-primary px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-navy hover:text-white"
                     >
                       Abrir
                     </button>
@@ -515,14 +515,14 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
                 {[...reports].sort((a, b) => toTime(b.finalizadoEm || b.iniciadoEm) - toTime(a.finalizadoEm || a.iniciadoEm)).map((r) => {
                   const pendVinc = (pendencias || []).filter((p) => p.reportOrigemId === r.id || p.reportExecucaoId === r.id).length;
                   return (
-                    <div key={r.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+                    <div key={r.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-data-mono text-xs font-bold text-slate-900">{r.numero || r.id}</span>
+                          <span className="font-data-mono text-xs font-bold text-fg">{r.numero || r.id}</span>
                           <Badge color={REPORT_STATUS_COLOR[String(r.status)] || 'slate'}>{r.status}</Badge>
                         </div>
-                        <p className="mt-0.5 truncate text-sm font-semibold text-slate-800">{r.titulo || r.tipo}</p>
-                        <p className="mt-0.5 flex flex-wrap gap-x-3 text-[11px] text-slate-500">
+                        <p className="mt-0.5 truncate text-sm font-semibold text-fg">{r.titulo || r.tipo}</p>
+                        <p className="mt-0.5 flex flex-wrap gap-x-3 text-[11px] text-fg-secondary">
                           <span>{r.tipo}</span>
                           {r.local && <span>Área: {r.local}</span>}
                           <span>{fmtDate(r.finalizadoEm || r.iniciadoEm)}</span>
@@ -532,7 +532,7 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
                       </div>
                       <button
                         onClick={() => onNavigateToTab('relatorios')}
-                        className="shrink-0 rounded-lg border border-[#1A1A72] px-3 py-1.5 text-xs font-bold text-[#1A1A72] transition-colors hover:bg-[#1A1A72] hover:text-white"
+                        className="shrink-0 rounded-lg border border-primary px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-navy hover:text-white"
                       >
                         Abrir
                       </button>
@@ -598,24 +598,24 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
             ) : (
               <div className="flex flex-col gap-2">
                 {clientContracts.map((c) => (
-                  <div key={c.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+                  <div key={c.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-data-mono text-xs font-bold text-slate-900">{c.id}</span>
+                        <span className="font-data-mono text-xs font-bold text-fg">{c.id}</span>
                         <Badge color={c.status === 'ATIVO' ? 'emerald' : c.status === 'A VENCER' ? 'amber' : 'red'}>{c.status}</Badge>
                       </div>
-                      <p className="mt-0.5 truncate text-sm font-semibold text-slate-800">{c.contractType || c.unit || 'Contrato'}</p>
-                      <p className="mt-0.5 flex flex-wrap gap-x-3 text-[11px] text-slate-500">
+                      <p className="mt-0.5 truncate text-sm font-semibold text-fg">{c.contractType || c.unit || 'Contrato'}</p>
+                      <p className="mt-0.5 flex flex-wrap gap-x-3 text-[11px] text-fg-secondary">
                         {(c.startDate || c.renewalDate) && <span>Vigência: {fmtDate(c.startDate)} → {c.renewalDate ? fmtDate(c.renewalDate) : '—'}</span>}
                         {Array.isArray(c.tiposAtendimento) && c.tiposAtendimento.length > 0 && <span>{c.tiposAtendimento.join(', ')}</span>}
                         {typeof c.contractedHours === 'number' && c.contractedHours > 0 && <span>{c.contractedHours}h contratadas</span>}
                       </p>
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className="font-data-mono text-sm font-bold text-emerald-600">{brlM(c.monthlyValue || 0)}<span className="text-[10px] text-slate-400">/mês</span></p>
+                      <p className="font-data-mono text-sm font-bold text-emerald-600">{brlM(c.monthlyValue || 0)}<span className="text-[10px] text-fg-muted">/mês</span></p>
                       <button
                         onClick={() => onNavigateToTab('contratos')}
-                        className="mt-1 rounded-lg border border-[#1A1A72] px-3 py-1 text-xs font-bold text-[#1A1A72] transition-colors hover:bg-[#1A1A72] hover:text-white"
+                        className="mt-1 rounded-lg border border-primary px-3 py-1 text-xs font-bold text-primary transition-colors hover:bg-navy hover:text-white"
                       >
                         Abrir
                       </button>
@@ -632,18 +632,18 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
             {timeline.length === 0 ? (
               <EmptyState variant="generico" title="Sem histórico" description="Ainda não há eventos vinculados a este cliente." />
             ) : (
-              <div className="relative ml-2 space-y-3 border-l border-slate-200 pl-5">
+              <div className="relative ml-2 space-y-3 border-l border-border pl-5">
                 {timeline.map((ev) => (
                   <div key={ev.id} className="relative min-w-0">
                     <span className={`absolute -left-[1.85rem] top-0.5 flex h-6 w-6 items-center justify-center rounded-full ${ev.tone}`}>
                       <span className="material-symbols-outlined text-[14px]">{ev.icon}</span>
                     </span>
                     <div className="flex items-baseline justify-between gap-3">
-                      <p className="truncate text-sm font-semibold text-slate-800">{ev.title}</p>
-                      <span className="shrink-0 font-data-mono text-[10px] text-slate-400">{fmtDate(ev.date)}</span>
+                      <p className="truncate text-sm font-semibold text-fg">{ev.title}</p>
+                      <span className="shrink-0 font-data-mono text-[10px] text-fg-muted">{fmtDate(ev.date)}</span>
                     </div>
-                    <p className="mt-0.5 text-[10px] uppercase tracking-wide text-slate-400">{ev.type}</p>
-                    <p className="truncate text-[11px] text-slate-500">{ev.detail}</p>
+                    <p className="mt-0.5 text-[10px] uppercase tracking-wide text-fg-muted">{ev.type}</p>
+                    <p className="truncate text-[11px] text-fg-secondary">{ev.detail}</p>
                   </div>
                 ))}
               </div>
@@ -674,34 +674,34 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
 /* ============================ Subcomponentes ============================ */
 
 const TONE_TEXT: Record<string, string> = {
-  brand: 'text-[#1A1A72]', emerald: 'text-emerald-600', amber: 'text-amber-600',
-  rose: 'text-rose-600', violet: 'text-violet-600', sky: 'text-sky-600', blue: 'text-blue-600', slate: 'text-slate-700',
+  brand: 'text-primary', emerald: 'text-emerald-600', amber: 'text-amber-600',
+  rose: 'text-rose-600', violet: 'text-violet-600', sky: 'text-sky-600', blue: 'text-blue-600', slate: 'text-fg-secondary',
 };
 
 const OverviewCard: React.FC<{ icon: string; label: string; value: number | string; tone: string; onClick: () => void }> = ({ icon, label, value, tone, onClick }) => (
   <button
     onClick={onClick}
-    className="group flex flex-col items-start rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#1A1A72]/40 hover:shadow-md"
+    className="group flex flex-col items-start rounded-xl border border-border bg-surface p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
   >
-    <span className={`material-symbols-outlined text-2xl ${TONE_TEXT[tone] || 'text-slate-500'}`}>{icon}</span>
-    <span className={`mt-2 font-data-mono text-2xl font-bold ${TONE_TEXT[tone] || 'text-slate-900'}`}>{value}</span>
-    <span className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</span>
+    <span className={`material-symbols-outlined text-2xl ${TONE_TEXT[tone] || 'text-fg-secondary'}`}>{icon}</span>
+    <span className={`mt-2 font-data-mono text-2xl font-bold ${TONE_TEXT[tone] || 'text-fg'}`}>{value}</span>
+    <span className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-fg-secondary">{label}</span>
   </button>
 );
 
 const MoneyTile: React.FC<{ label: string; value: string; tone: string }> = ({ label, value, tone }) => (
-  <div className="rounded-xl border border-slate-200 bg-white p-4">
-    <p className="text-[10px] uppercase tracking-wider text-slate-400">{label}</p>
-    <p className={`mt-1 font-data-mono text-base font-bold ${TONE_TEXT[tone] || 'text-slate-900'}`}>{value}</p>
+  <div className="rounded-xl border border-border bg-surface p-4">
+    <p className="text-[10px] uppercase tracking-wider text-fg-muted">{label}</p>
+    <p className={`mt-1 font-data-mono text-base font-bold ${TONE_TEXT[tone] || 'text-fg'}`}>{value}</p>
   </div>
 );
 
 const SectionWrap: React.FC<{ title: string; children: React.ReactNode; actionLabel?: string; onAction?: () => void }> = ({ title, children, actionLabel, onAction }) => (
   <div className="mx-auto flex w-full min-w-0 max-w-[1600px] flex-col gap-4">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">{title}</h2>
+      <h2 className="text-sm font-bold uppercase tracking-wider text-fg-secondary">{title}</h2>
       {actionLabel && onAction && (
-        <button onClick={onAction} className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-[#1A1A72] transition-colors hover:border-[#1A1A72] hover:bg-[#1A1A72] hover:text-white">
+        <button onClick={onAction} className="shrink-0 rounded-lg border border-border-strong px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:border-primary hover:bg-navy hover:text-white">
           {actionLabel} →
         </button>
       )}
@@ -711,13 +711,13 @@ const SectionWrap: React.FC<{ title: string; children: React.ReactNode; actionLa
 );
 
 const PanelCard: React.FC<{ title: string; icon: string; children: React.ReactNode; actionLabel?: string; onAction?: () => void }> = ({ title, icon, children, actionLabel, onAction }) => (
-  <div className="rounded-xl border border-slate-200 bg-white p-4">
+  <div className="rounded-xl border border-border bg-surface p-4">
     <div className="mb-3 flex items-center justify-between">
-      <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-700">
-        <span className="material-symbols-outlined text-base text-slate-400">{icon}</span>{title}
+      <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-fg-secondary">
+        <span className="material-symbols-outlined text-base text-fg-muted">{icon}</span>{title}
       </h3>
       {actionLabel && onAction && (
-        <button onClick={onAction} className="text-[10px] font-semibold uppercase tracking-wider text-[#1A1A72] hover:text-[#E63946]">{actionLabel} →</button>
+        <button onClick={onAction} className="text-[10px] font-semibold uppercase tracking-wider text-primary hover:text-danger">{actionLabel} →</button>
       )}
     </div>
     <div className="flex flex-col gap-2">{children}</div>
@@ -725,31 +725,31 @@ const PanelCard: React.FC<{ title: string; icon: string; children: React.ReactNo
 );
 
 const RowLine: React.FC<{ title: string; subtitle: string; badge?: React.ReactNode }> = ({ title, subtitle, badge }) => (
-  <div className="flex items-center justify-between gap-3 border-b border-slate-50 pb-2 last:border-0 last:pb-0">
+  <div className="flex items-center justify-between gap-3 border-b border-border pb-2 last:border-0 last:pb-0">
     <div className="min-w-0">
-      <p className="truncate text-sm font-semibold text-slate-800">{title}</p>
-      <p className="truncate text-[11px] text-slate-500">{subtitle}</p>
+      <p className="truncate text-sm font-semibold text-fg">{title}</p>
+      <p className="truncate text-[11px] text-fg-secondary">{subtitle}</p>
     </div>
     {badge}
   </div>
 );
 
 const EmptyLine: React.FC<{ text: string }> = ({ text }) => (
-  <p className="px-1 py-2 text-[11px] italic text-slate-400">{text}</p>
+  <p className="px-1 py-2 text-[11px] italic text-fg-muted">{text}</p>
 );
 
 const PendenciaGroup: React.FC<{ title: string; list: Pendencia[]; onNavigateToTab: (t: TabPath) => void; muted?: boolean }> = ({ title, list, onNavigateToTab, muted }) => {
   if (list.length === 0) return null;
   return (
     <div>
-      <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">{title} · {list.length}</p>
+      <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-fg-muted">{title} · {list.length}</p>
       <div className="flex flex-col gap-2">
         {list.map((p) => (
-          <div key={p.id} className={`rounded-xl border px-4 py-3 ${muted ? 'border-slate-100 bg-slate-50' : 'border-slate-200 bg-white'}`}>
+          <div key={p.id} className={`rounded-xl border px-4 py-3 ${muted ? 'border-border bg-surface-2' : 'border-border bg-surface'}`}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-slate-800">{p.descricao || p.grupo || 'Pendência técnica'}</p>
-                <p className="mt-0.5 flex flex-wrap gap-x-3 text-[11px] text-slate-500">
+                <p className="truncate text-sm font-semibold text-fg">{p.descricao || p.grupo || 'Pendência técnica'}</p>
+                <p className="mt-0.5 flex flex-wrap gap-x-3 text-[11px] text-fg-secondary">
                   {p.local && <span>Local: {p.local}</span>}
                   {p.acaoRecomendada && <span>{p.acaoRecomendada}</span>}
                   {p.quantidade ? <span>{p.quantidade} {p.unidade || 'un'}</span> : null}
@@ -772,7 +772,7 @@ const PendenciaGroup: React.FC<{ title: string; list: Pendencia[]; onNavigateToT
 };
 
 const LinkChip: React.FC<{ icon: string; label: string; onClick: () => void }> = ({ icon, label, onClick }) => (
-  <button onClick={onClick} className="flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-600 transition-colors hover:bg-[#1A1A72] hover:text-white">
+  <button onClick={onClick} className="flex items-center gap-1 rounded-full bg-surface-3 px-2.5 py-1 text-[10px] font-semibold text-fg-secondary transition-colors hover:bg-navy hover:text-white">
     <span className="material-symbols-outlined text-[13px]">{icon}</span>{label}
   </button>
 );
@@ -803,18 +803,18 @@ const PhotosTab: React.FC<{
   return (
     <div className="flex flex-col gap-4">
       {/* Filtros úteis */}
-      <div className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-3">
-        <label className="flex flex-col text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+      <div className="flex flex-wrap items-end gap-2 rounded-xl border border-border bg-surface p-3">
+        <label className="flex flex-col text-[10px] font-semibold uppercase tracking-wide text-fg-secondary">
           De
-          <input type="date" value={filters.from || ''} onChange={(e) => set({ from: e.target.value || undefined })} className="mt-1 rounded-lg border border-slate-300 px-2 py-1.5 text-xs normal-case text-slate-800" />
+          <input type="date" value={filters.from || ''} onChange={(e) => set({ from: e.target.value || undefined })} className="mt-1 rounded-lg border border-border-strong px-2 py-1.5 text-xs normal-case text-fg" />
         </label>
-        <label className="flex flex-col text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+        <label className="flex flex-col text-[10px] font-semibold uppercase tracking-wide text-fg-secondary">
           Até
-          <input type="date" value={filters.to || ''} onChange={(e) => set({ to: e.target.value || undefined })} className="mt-1 rounded-lg border border-slate-300 px-2 py-1.5 text-xs normal-case text-slate-800" />
+          <input type="date" value={filters.to || ''} onChange={(e) => set({ to: e.target.value || undefined })} className="mt-1 rounded-lg border border-border-strong px-2 py-1.5 text-xs normal-case text-fg" />
         </label>
-        <label className="flex flex-col text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+        <label className="flex flex-col text-[10px] font-semibold uppercase tracking-wide text-fg-secondary">
           Categoria
-          <select value={filters.marcador || ''} onChange={(e) => set({ marcador: (e.target.value || undefined) as FieldPhotoFilters['marcador'] })} className="mt-1 rounded-lg border border-slate-300 px-2 py-1.5 text-xs normal-case text-slate-800">
+          <select value={filters.marcador || ''} onChange={(e) => set({ marcador: (e.target.value || undefined) as FieldPhotoFilters['marcador'] })} className="mt-1 rounded-lg border border-border-strong px-2 py-1.5 text-xs normal-case text-fg">
             <option value="">Todas</option>
             <option value="pendente">Pendência</option>
             <option value="falha">Falha</option>
@@ -823,32 +823,32 @@ const PhotosTab: React.FC<{
             <option value="depois">Depois</option>
           </select>
         </label>
-        <label className="flex min-w-[10rem] flex-1 flex-col text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+        <label className="flex min-w-[10rem] flex-1 flex-col text-[10px] font-semibold uppercase tracking-wide text-fg-secondary">
           Buscar (local, nota, técnico)
-          <input value={filters.search || ''} onChange={(e) => set({ search: e.target.value || undefined })} placeholder="Ex.: subsolo, sirene…" className="mt-1 rounded-lg border border-slate-300 px-2 py-1.5 text-xs normal-case text-slate-800" />
+          <input value={filters.search || ''} onChange={(e) => set({ search: e.target.value || undefined })} placeholder="Ex.: subsolo, sirene…" className="mt-1 rounded-lg border border-border-strong px-2 py-1.5 text-xs normal-case text-fg" />
         </label>
         {(filters.from || filters.to || filters.marcador || filters.search) && (
-          <button onClick={() => setFilters({})} className="rounded-lg px-2 py-1.5 text-xs font-semibold text-[#1A1A72] hover:underline">Limpar</button>
+          <button onClick={() => setFilters({})} className="rounded-lg px-2 py-1.5 text-xs font-semibold text-primary hover:underline">Limpar</button>
         )}
       </div>
 
       {filtered.length === 0 ? <EmptyLine text="Nenhuma foto para os filtros selecionados." /> : (
         <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(9rem,1fr))]">
           {filtered.map((p) => (
-            <div key={p.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-              <div className="aspect-square bg-slate-100">
+            <div key={p.id} className="overflow-hidden rounded-xl border border-border bg-surface">
+              <div className="aspect-square bg-surface-3">
                 {thumbs[p.id] ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={thumbs[p.id]} alt={p.notaRapida || 'Evidência de campo'} className="h-full w-full object-cover" loading="lazy" />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-slate-300"><span className="material-symbols-outlined text-3xl">image</span></div>
+                  <div className="flex h-full items-center justify-center text-fg-muted"><span className="material-symbols-outlined text-3xl">image</span></div>
                 )}
               </div>
               <div className="p-2">
-                <p className="truncate text-[11px] font-semibold text-slate-700">{p.localSetor || p.notaRapida || 'Foto de campo'}</p>
-                <p className="mt-0.5 font-data-mono text-[10px] text-slate-400">{fmtDate(p.capturadoEm)}</p>
+                <p className="truncate text-[11px] font-semibold text-fg-secondary">{p.localSetor || p.notaRapida || 'Foto de campo'}</p>
+                <p className="mt-0.5 font-data-mono text-[10px] text-fg-muted">{fmtDate(p.capturadoEm)}</p>
                 <div className="mt-1 flex flex-wrap gap-1">
-                  {p.marcador && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-slate-500">{p.marcador}</span>}
+                  {p.marcador && <span className="rounded bg-surface-3 px-1.5 py-0.5 text-[9px] font-bold uppercase text-fg-secondary">{p.marcador}</span>}
                   {reportById(p.reportId) && <span className="rounded bg-violet-50 px-1.5 py-0.5 text-[9px] font-bold uppercase text-violet-600">{reportById(p.reportId)}</span>}
                   {osById(p.osId) && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-600">{osById(p.osId)}</span>}
                 </div>
@@ -891,19 +891,19 @@ const DevicesTab: React.FC<{ devices: Device[] | null; inventory: InventoryItem[
     <div className="flex flex-col gap-5">
       {Array.from(bySistema.entries()).map(([sistema, list]) => (
         <div key={sistema}>
-          <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">{sistema} · {list.length} dispositivo(s)</p>
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-fg-muted">{sistema} · {list.length} dispositivo(s)</p>
           <div className="grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(20rem,1fr))]">
             {list.map((d) => {
               const cat = catalogById(d.itemCatalogoId);
               const identificado = !!cat || !!(d.fabricante || d.modelo);
               return (
-                <div key={d.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                <div key={d.id} className="rounded-xl border border-border bg-surface p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-800">
+                      <p className="truncate text-sm font-semibold text-fg">
                         {d.tipoDispositivo || cat?.category || 'Dispositivo'}
                       </p>
-                      <p className="truncate text-[11px] text-slate-500">
+                      <p className="truncate text-[11px] text-fg-secondary">
                         {cat ? `${cat.brand || d.fabricante || ''} ${cat.model || d.modelo || ''}`.trim() : `${d.fabricante || ''} ${d.modelo || ''}`.trim() || 'Produto não identificado'}
                       </p>
                     </div>
@@ -913,9 +913,9 @@ const DevicesTab: React.FC<{ devices: Device[] | null; inventory: InventoryItem[
                   {/* Atributos do produto canônico (catálogo) */}
                   {cat && (
                     <div className="mt-2 flex flex-wrap gap-1">
-                      {cat.productLine && <span className="rounded bg-[#1A1A72]/5 px-1.5 py-0.5 text-[9px] font-semibold text-[#1A1A72]">{cat.productLine}</span>}
-                      {cat.productType && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-500">{cat.productType}</span>}
-                      {(cat.technologies || []).slice(0, 2).map((t) => <span key={t} className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-500">{t}</span>)}
+                      {cat.productLine && <span className="rounded bg-navy/5 px-1.5 py-0.5 text-[9px] font-semibold text-primary">{cat.productLine}</span>}
+                      {cat.productType && <span className="rounded bg-surface-3 px-1.5 py-0.5 text-[9px] font-semibold text-fg-secondary">{cat.productType}</span>}
+                      {(cat.technologies || []).slice(0, 2).map((t) => <span key={t} className="rounded bg-surface-3 px-1.5 py-0.5 text-[9px] font-semibold text-fg-secondary">{t}</span>)}
                     </div>
                   )}
                   {!identificado && (
@@ -925,7 +925,7 @@ const DevicesTab: React.FC<{ devices: Device[] | null; inventory: InventoryItem[
                   )}
 
                   {/* Atributos físicos da unidade instalada */}
-                  <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 font-data-mono text-[10px] text-slate-500">
+                  <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 font-data-mono text-[10px] text-fg-secondary">
                     {d.central && <span>Central: {d.central}</span>}
                     {d.laco && <span>Laço: {d.laco}</span>}
                     {d.endereco && <span>Endereço: {d.endereco}</span>}

@@ -43,8 +43,8 @@ type PunchType = TimePunch['type'];
 const NEXT_INFO: Record<PunchType, { label: string; icon: string; classes: string }> = {
   ENTRADA: { label: 'Registrar Entrada', icon: 'login', classes: 'bg-emerald-600 hover:bg-emerald-700' },
   PAUSA: { label: 'Registrar Saída para Almoço', icon: 'restaurant', classes: 'bg-amber-500 hover:bg-amber-600' },
-  RETORNO: { label: 'Registrar Retorno', icon: 'login', classes: 'bg-[#1A1A72] hover:bg-[#12124f]' },
-  SAIDA: { label: 'Registrar Saída', icon: 'logout', classes: 'bg-[#E63946] hover:bg-[#a51515]' },
+  RETORNO: { label: 'Registrar Retorno', icon: 'login', classes: 'bg-navy hover:bg-navy-3' },
+  SAIDA: { label: 'Registrar Saída', icon: 'logout', classes: 'bg-danger hover:bg-danger-hover' },
 };
 
 const FEEDBACK_LABEL: Record<PunchType, string> = {
@@ -63,8 +63,8 @@ const fmtDuration = (ms: number) => {
   return `${pad2(Math.floor(totalMin / 60))}h${pad2(totalMin % 60)}min`;
 };
 const inputCls =
-  'w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20 focus:border-[#1A1A72]/40';
-const labelCls = 'block text-slate-600 mb-1 font-semibold uppercase text-[11px]';
+  'w-full border border-border rounded-lg p-2.5 text-fg bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40';
+const labelCls = 'block text-fg-secondary mb-1 font-semibold uppercase text-[11px]';
 
 const friendlyDate = (d: Date) =>
   d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
@@ -101,31 +101,31 @@ const MiniCalendar: React.FC<{
     .sort((a, b) => a.day - b.day);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-5">
+    <div className="bg-surface rounded-xl shadow-sm p-5">
       <div className="flex items-center justify-between mb-3">
-        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Calendário</h4>
+        <h4 className="text-xs font-bold text-fg-secondary uppercase tracking-wider">Calendário</h4>
         <div className="flex items-center gap-0.5">
           <button
             onClick={() => setRef(new Date(y, m - 1, 1))}
             aria-label="Mês anterior"
-            className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className="w-6 h-6 rounded flex items-center justify-center text-fg-muted hover:bg-surface-3 hover:text-fg-secondary"
           >
             <span className="material-symbols-outlined text-[18px]">chevron_left</span>
           </button>
-          <span className="text-[11px] font-bold text-slate-700 min-w-[92px] text-center">
+          <span className="text-[11px] font-bold text-fg-secondary min-w-[92px] text-center">
             {MONTH_NAMES_PT[m]} {y}
           </span>
           <button
             onClick={() => setRef(new Date(y, m + 1, 1))}
             aria-label="Próximo mês"
-            className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className="w-6 h-6 rounded flex items-center justify-center text-fg-muted hover:bg-surface-3 hover:text-fg-secondary"
           >
             <span className="material-symbols-outlined text-[18px]">chevron_right</span>
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 text-center text-[9px] font-bold text-slate-400 mb-1">
+      <div className="grid grid-cols-7 gap-1 text-center text-[9px] font-bold text-fg-muted mb-1">
         {WEEKDAY_SHORT.map((d, i) => (
           <div key={i}>{d.slice(0, 3)}</div>
         ))}
@@ -143,9 +143,9 @@ const MiniCalendar: React.FC<{
               title={holiday ? `Feriado: ${holiday.name}` : undefined}
               className={`h-7 rounded-md flex items-center justify-center text-[11px] font-data-mono relative ${
                 holiday
-                  ? 'bg-red-100 text-[#E63946] font-bold ring-1 ring-[#E63946]/40'
-                  : 'text-slate-600'
-              } ${todayFlag ? 'ring-2 ring-[#1A1A72] font-bold text-[#1A1A72]' : ''}`}
+                  ? 'bg-red-100 text-danger font-bold ring-1 ring-danger/40'
+                  : 'text-fg-secondary'
+              } ${todayFlag ? 'ring-2 ring-primary font-bold text-primary' : ''}`}
             >
               {pad2(d)}
               {punched && !holiday && (
@@ -156,12 +156,12 @@ const MiniCalendar: React.FC<{
         })}
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[9px] text-slate-500">
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[9px] text-fg-secondary">
         <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded bg-red-100 ring-1 ring-[#E63946]/40" /> Feriado
+          <span className="w-2.5 h-2.5 rounded bg-red-100 ring-1 ring-danger/40" /> Feriado
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded ring-2 ring-[#1A1A72]" /> Hoje
+          <span className="w-2.5 h-2.5 rounded ring-2 ring-primary" /> Hoje
         </span>
         <span className="flex items-center gap-1">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Batida
@@ -169,9 +169,9 @@ const MiniCalendar: React.FC<{
       </div>
 
       {monthHolidays.length > 0 && (
-        <div className="mt-2 space-y-1 border-t border-slate-100 pt-2">
+        <div className="mt-2 space-y-1 border-t border-border pt-2">
           {monthHolidays.map((h) => (
-            <div key={h.day} className="flex items-center gap-1.5 text-[10px] text-[#E63946] font-semibold">
+            <div key={h.day} className="flex items-center gap-1.5 text-[10px] text-danger font-semibold">
               <span className="material-symbols-outlined text-[13px]">flag</span>
               <span className="font-data-mono">{pad2(h.day)}</span>
               <span className="truncate">{h.name}</span>
@@ -186,10 +186,10 @@ const MiniCalendar: React.FC<{
 export const PontoView: React.FC<PontoViewProps> = (props) => {
   const isManager = props.userRole === 'ADMINISTRATIVO' || props.userRole === 'GESTOR';
   if (props.usesTimeClock === false && !isManager) return (
-    <div className="p-6"><div className="rounded-xl border border-slate-200 bg-white p-6 text-center">
-      <span className="material-symbols-outlined text-3xl text-slate-400">event_busy</span>
-      <h2 className="mt-2 text-sm font-bold text-slate-800">Controle de ponto desativado</h2>
-      <p className="mt-1 text-xs text-slate-500">Seu usuário não participa do registro de jornada nem do espelho de ponto.</p>
+    <div className="p-6"><div className="rounded-xl border border-border bg-surface p-6 text-center">
+      <span className="material-symbols-outlined text-3xl text-fg-muted">event_busy</span>
+      <h2 className="mt-2 text-sm font-bold text-fg">Controle de ponto desativado</h2>
+      <p className="mt-1 text-xs text-fg-secondary">Seu usuário não participa do registro de jornada nem do espelho de ponto.</p>
     </div></div>
   );
   return <PontoViewCore {...props} />;
@@ -942,21 +942,21 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
   return (
     <div className="flex flex-col w-full p-3 md:p-6 gap-3 md:gap-4">
       {/* Header */}
-      <div className="flex flex-wrap justify-between items-center gap-3 border-b border-slate-200 pb-3">
+      <div className="flex flex-wrap justify-between items-center gap-3 border-b border-border pb-3">
         <div className="min-w-0">
-          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+          <span className="text-[10px] font-semibold text-fg-secondary uppercase tracking-wider">
             Portaria MTP 671/2021
           </span>
-          <h1 className="text-lg md:text-2xl font-bold text-slate-900 tracking-tight truncate">
+          <h1 className="text-lg md:text-2xl font-bold text-fg tracking-tight truncate">
             Ponto Eletrônico &amp; Frequência
           </h1>
         </div>
 
         {/* Relógio grande + sincronização */}
         <div className="text-right">
-          <p className="font-data-mono text-2xl md:text-3xl font-bold text-slate-900 tabular-nums leading-none">{fmtClock(now)}</p>
+          <p className="font-data-mono text-2xl md:text-3xl font-bold text-fg tabular-nums leading-none">{fmtClock(now)}</p>
           <div className="flex items-center justify-end gap-3 mt-1.5">
-            <span className="text-[10px] uppercase tracking-wider text-slate-400">Horário oficial</span>
+            <span className="text-[10px] uppercase tracking-wider text-fg-muted">Horário oficial</span>
             <span
               className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase ${
                 online ? 'text-emerald-600' : 'text-amber-600'
@@ -987,7 +987,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
           <button
             key={s.id}
             onClick={() => shortcut(s.id)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-[#1A1A72] hover:text-[#1A1A72] text-xs font-semibold transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-surface text-fg-secondary hover:border-primary hover:text-primary text-xs font-semibold transition-colors"
           >
             <span className="material-symbols-outlined text-base">{s.icon}</span>
             {s.label}
@@ -1001,11 +1001,11 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
             value={myMonth}
             onChange={(e) => setMyMonth(e.target.value || myMonth)}
             title="Período do espelho de ponto"
-            className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+            className="border border-border rounded-lg px-2 py-1.5 text-xs text-fg-secondary bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
           <button
             onClick={openMyTimecard}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1A1A72] text-white hover:bg-[#12124f] text-xs font-semibold transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-navy text-white hover:bg-navy-3 text-xs font-semibold transition-colors"
           >
             <span className="material-symbols-outlined text-base">description</span>
             Meu Espelho
@@ -1031,7 +1031,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
             </div>
           )}
           {exitDue && (
-            <div className="flex items-center gap-2 bg-[#1A1A72]/5 border border-[#1A1A72]/20 text-[#1A1A72] rounded-xl px-4 py-3 text-xs font-semibold">
+            <div className="flex items-center gap-2 bg-navy/5 border border-primary/20 text-primary rounded-xl px-4 py-3 text-xs font-semibold">
               <span className="material-symbols-outlined text-base">notifications_active</span>
               {nowMin < exitMin
                 ? `Faltam ${exitMin - nowMin} min para o horário de saída (${todayCfg.end}).`
@@ -1039,14 +1039,14 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
             </div>
           )}
           {missingDay && (
-            <div className="flex items-center justify-between gap-2 bg-red-50 border border-[#E63946]/30 text-[#E63946] rounded-xl px-4 py-3 text-xs font-semibold">
+            <div className="flex items-center justify-between gap-2 bg-red-50 border border-danger/30 text-danger rounded-xl px-4 py-3 text-xs font-semibold">
               <span className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-base">error</span>
                 Você não registrou a saída de {missingDay.toLocaleDateString('pt-BR')}.
               </span>
               <button
                 onClick={() => openAdj(missingDay || undefined)}
-                className="shrink-0 bg-[#E63946] hover:bg-[#a51515] text-white px-3 py-1.5 rounded-lg text-[11px] uppercase tracking-wide"
+                className="shrink-0 bg-danger hover:bg-danger-hover text-white px-3 py-1.5 rounded-lg text-[11px] uppercase tracking-wide"
               >
                 Solicitar ajuste
               </button>
@@ -1057,25 +1057,25 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* ===== Card da Jornada + Botão inteligente ===== */}
-        <div id="card-jornada" className="lg:col-span-2 bg-white rounded-xl shadow-sm p-6 relative overflow-hidden">
+        <div id="card-jornada" className="lg:col-span-2 bg-surface rounded-xl shadow-sm p-6 relative overflow-hidden">
           {/* Feedback pós-batida */}
           {feedback && (
             <div className="absolute inset-0 z-20 bg-white/95 flex flex-col items-center justify-center gap-2 animate-[fadeIn_0.15s_ease-out]">
               <span className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
                 <span className="material-symbols-outlined text-4xl">check</span>
               </span>
-              <p className="font-bold text-slate-900">{feedback.label}</p>
-              <p className="font-data-mono text-lg text-slate-700">{feedback.time}</p>
+              <p className="font-bold text-fg">{feedback.label}</p>
+              <p className="font-data-mono text-lg text-fg-secondary">{feedback.time}</p>
               <p className="text-xs text-emerald-600 font-semibold">Bom trabalho!</p>
             </div>
           )}
 
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-lg font-bold text-slate-900">
-                {greeting}, <span className="text-[#1A1A72]">{currentUser}</span> 👋
+              <p className="text-lg font-bold text-fg">
+                {greeting}, <span className="text-primary">{currentUser}</span> 👋
               </p>
-              <p className="text-xs text-slate-500 capitalize mt-0.5">{friendlyDate(now)}</p>
+              <p className="text-xs text-fg-secondary capitalize mt-0.5">{friendlyDate(now)}</p>
             </div>
             <Badge color={status.badge}>
               <span className={`w-1.5 h-1.5 rounded-full ${status.dot} inline-block mr-1`} />
@@ -1091,9 +1091,9 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
               { label: 'Retorno', p: retorno },
               { label: 'Saída', p: saida },
             ].map((slot) => (
-              <div key={slot.label} className="bg-slate-50 border border-slate-100 rounded-lg p-3 text-center">
-                <p className="text-[10px] uppercase tracking-wider text-slate-400">{slot.label}</p>
-                <p className={`font-data-mono text-lg font-bold mt-0.5 ${slot.p ? 'text-slate-900' : 'text-slate-300'}`}>
+              <div key={slot.label} className="bg-surface-2 border border-border rounded-lg p-3 text-center">
+                <p className="text-[10px] uppercase tracking-wider text-fg-muted">{slot.label}</p>
+                <p className={`font-data-mono text-lg font-bold mt-0.5 ${slot.p ? 'text-fg' : 'text-fg-muted'}`}>
                   {punchTime(slot.p)}
                 </p>
               </div>
@@ -1102,14 +1102,14 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
 
           {/* Previsto x trabalhado */}
           <div className="flex flex-wrap items-center justify-between gap-3 mt-4 text-xs">
-            <span className="text-slate-500">
+            <span className="text-fg-secondary">
               Jornada prevista:{' '}
-              <strong className="text-slate-800 font-data-mono">
+              <strong className="text-fg font-data-mono">
                 {todayCfg.works ? `${todayCfg.start} às ${todayCfg.end}` : 'Folga hoje'}
               </strong>
             </span>
-            <span className="text-slate-500">
-              Horas trabalhadas: <strong className="text-[#1A1A72] font-data-mono">{fmtDuration(workedMs)}</strong>
+            <span className="text-fg-secondary">
+              Horas trabalhadas: <strong className="text-primary font-data-mono">{fmtDuration(workedMs)}</strong>
             </span>
           </div>
 
@@ -1133,7 +1133,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
               : 'Jornada encerrada'}
           </button>
 
-          <p className="text-[10px] text-slate-400 mt-3 text-center flex items-center justify-center gap-1">
+          <p className="text-[10px] text-fg-muted mt-3 text-center flex items-center justify-center gap-1">
             <span className="material-symbols-outlined text-sm">location_on</span>
             A localização é solicitada apenas ao registrar o ponto · MTP 671/2021
           </p>
@@ -1145,13 +1145,13 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
           <MiniCalendar holidays={holidays} punchDays={punchDaySet} today={now} />
 
           {/* Escala */}
-          <div className="bg-white rounded-xl shadow-sm p-5">
-            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Sua escala</h4>
+          <div className="bg-surface rounded-xl shadow-sm p-5">
+            <h4 className="text-xs font-bold text-fg-secondary uppercase tracking-wider mb-3">Sua escala</h4>
             <div className="space-y-1.5 text-xs">
               {sched.map((d, i) => (
                 <div
                   key={i}
-                  className={`flex items-center justify-between ${i === now.getDay() ? 'font-bold text-[#1A1A72]' : 'text-slate-500'}`}
+                  className={`flex items-center justify-between ${i === now.getDay() ? 'font-bold text-primary' : 'text-fg-secondary'}`}
                 >
                   <span>{WEEKDAY_SHORT[i]}</span>
                   <span className="font-data-mono">
@@ -1163,28 +1163,28 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
           </div>
 
           {/* Resumo da semana */}
-          <div className="bg-white rounded-xl shadow-sm p-5">
-            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Esta semana</h4>
+          <div className="bg-surface rounded-xl shadow-sm p-5">
+            <h4 className="text-xs font-bold text-fg-secondary uppercase tracking-wider mb-3">Esta semana</h4>
             <div className="space-y-2 text-xs">
               {[
-                { k: 'Horas previstas', v: week.previstas, c: 'text-slate-900' },
-                { k: 'Horas realizadas', v: week.realizadas, c: 'text-[#1A1A72]' },
+                { k: 'Horas previstas', v: week.previstas, c: 'text-fg' },
+                { k: 'Horas realizadas', v: week.realizadas, c: 'text-primary' },
                 { k: 'Horas extras', v: week.extras, c: 'text-emerald-600' },
-                { k: 'Atrasos', v: String(week.atrasos), c: 'text-slate-900' },
+                { k: 'Atrasos', v: String(week.atrasos), c: 'text-fg' },
               ].map((r) => (
                 <div key={r.k} className="flex items-center justify-between">
-                  <span className="text-slate-500">{r.k}</span>
+                  <span className="text-fg-secondary">{r.k}</span>
                   <span className={`font-data-mono font-bold ${r.c}`}>{r.v}</span>
                 </div>
               ))}
             </div>
-            <p className="text-[9px] text-slate-400 mt-2">
+            <p className="text-[9px] text-fg-muted mt-2">
               Calculado das batidas × escala (feriados e atestados abatidos do previsto).
             </p>
           </div>
 
           {/* Banco de horas */}
-          <div id="card-banco" className="bg-[#1A1A72] text-white rounded-xl shadow-sm p-5">
+          <div id="card-banco" className="bg-navy text-white rounded-xl shadow-sm p-5">
             <h4 className="text-[10px] font-bold text-white/60 uppercase tracking-wider">Banco de horas</h4>
             <p className={`font-data-mono text-3xl font-bold mt-1 ${hoursStats.bankMs >= 0 ? 'text-emerald-300' : 'text-amber-300'}`}>
               {week.banco}
@@ -1195,19 +1195,19 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
       </div>
 
       {/* ===== Timeline de hoje ===== */}
-      <div id="card-timeline" className="bg-white rounded-xl shadow-sm p-6">
-        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Hoje</h3>
+      <div id="card-timeline" className="bg-surface rounded-xl shadow-sm p-6">
+        <h3 className="text-xs font-bold text-fg-secondary uppercase tracking-wider mb-4">Hoje</h3>
         {todays.length === 0 ? (
-          <p className="text-xs text-slate-400">Nenhuma batida registrada hoje.</p>
+          <p className="text-xs text-fg-muted">Nenhuma batida registrada hoje.</p>
         ) : (
-          <ol className="relative border-l-2 border-slate-100 ml-2 space-y-4">
+          <ol className="relative border-l-2 border-border ml-2 space-y-4">
             {todays.map((p) => (
               <li key={p.id} className="ml-4 relative">
-                <span className="absolute -left-[1.42rem] top-1 w-3 h-3 rounded-full bg-[#1A1A72] ring-4 ring-white" />
+                <span className="absolute -left-[1.42rem] top-1 w-3 h-3 rounded-full bg-navy ring-4 ring-white" />
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-data-mono font-bold text-slate-900">{p.at ? fmtHM(new Date(p.at)) : '--'}</p>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="font-data-mono font-bold text-fg">{p.at ? fmtHM(new Date(p.at)) : '--'}</p>
+                    <p className="text-[11px] text-fg-secondary">
                       {p.type === 'ENTRADA'
                         ? 'Entrada'
                         : p.type === 'PAUSA'
@@ -1222,7 +1222,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
                       href={mapsUrl(p)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[10px] text-[#1A1A72] font-semibold hover:underline flex items-center gap-0.5"
+                      className="text-[10px] text-primary font-semibold hover:underline flex items-center gap-0.5"
                     >
                       <span className="material-symbols-outlined text-sm">map</span> ver no mapa
                     </a>
@@ -1236,26 +1236,26 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
 
       {/* ===== Exportar folha de ponto (admin/gestor) ===== */}
       {isManager && (
-        <div className="bg-white rounded-xl shadow-sm p-6">
+        <div className="bg-surface rounded-xl shadow-sm p-6">
           <div className="flex items-center gap-2 mb-4">
-            <span className="w-8 h-8 rounded-lg bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center">
+            <span className="w-8 h-8 rounded-lg bg-navy/10 text-primary flex items-center justify-center">
               <span className="material-symbols-outlined text-lg">download</span>
             </span>
             <div>
-              <h3 className="font-display text-sm font-bold uppercase tracking-wide text-[#1A1A72]">
+              <h3 className="font-display text-sm font-bold uppercase tracking-wide text-primary">
                 Folha de ponto mensal
               </h3>
-              <p className="text-[11px] text-slate-400">Exporte os registros por funcionário e mês.</p>
+              <p className="text-[11px] text-fg-muted">Exporte os registros por funcionário e mês.</p>
             </div>
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-end gap-3">
             <div className="flex-1">
-              <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Funcionário</label>
+              <label className="block text-fg-secondary mb-1 font-semibold uppercase text-[11px]">Funcionário</label>
               <select
                 value={expEmployee}
                 onChange={(e) => setExpEmployee(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg p-2.5 text-xs text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                className="w-full border border-border rounded-lg p-2.5 text-xs text-fg bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20"
               >
                 <option value="">Todos os funcionários</option>
                 {employees.map((n) => (
@@ -1266,12 +1266,12 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
               </select>
             </div>
             <div>
-              <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Mês</label>
+              <label className="block text-fg-secondary mb-1 font-semibold uppercase text-[11px]">Mês</label>
               <input
                 type="month"
                 value={expMonth}
                 onChange={(e) => setExpMonth(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg p-2.5 text-xs text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                className="w-full border border-border rounded-lg p-2.5 text-xs text-fg bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
             </div>
             <div className="flex gap-2">
@@ -1285,63 +1285,63 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
               <button
                 type="button"
                 onClick={openAdminTimecard}
-                className="flex items-center gap-1.5 bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 bg-danger hover:bg-danger-hover text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors"
               >
                 <span className="material-symbols-outlined text-base">picture_as_pdf</span> PDF
               </button>
             </div>
           </div>
-          <p className="text-[11px] text-slate-500 mt-2">
+          <p className="text-[11px] text-fg-secondary mt-2">
             {monthPunches.length} registro(s) no período selecionado.
           </p>
         </div>
       )}
 
       {/* ===== Ocorrências do dia (observação / atestado / feriado) ===== */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
+      <div className="bg-surface rounded-xl shadow-sm p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <span className="w-8 h-8 rounded-lg bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center">
+            <span className="w-8 h-8 rounded-lg bg-navy/10 text-primary flex items-center justify-center">
               <span className="material-symbols-outlined text-lg">event_note</span>
             </span>
             <div>
-              <h3 className="font-display text-sm font-bold uppercase tracking-wide text-[#1A1A72]">
+              <h3 className="font-display text-sm font-bold uppercase tracking-wide text-primary">
                 Ocorrências do dia
               </h3>
-              <p className="text-[11px] text-slate-400">Observação, atestado (com anexo) ou feriado.</p>
+              <p className="text-[11px] text-fg-muted">Observação, atestado (com anexo) ou feriado.</p>
             </div>
           </div>
           <button
             onClick={() => openDayModal()}
-            className="inline-flex items-center gap-1.5 bg-[#1A1A72] hover:bg-[#12124f] text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
+            className="inline-flex items-center gap-1.5 bg-navy hover:bg-navy-3 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
           >
             <span className="material-symbols-outlined text-base">add</span> Registrar
           </button>
         </div>
 
         {dayEntries.length === 0 ? (
-          <p className="text-xs text-slate-400">Nenhuma ocorrência registrada.</p>
+          <p className="text-xs text-fg-muted">Nenhuma ocorrência registrada.</p>
         ) : (
           <div className="flex flex-col gap-2">
             {dayEntries.map((d) => (
               <div
                 key={d.id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border border-slate-100 rounded-lg p-3 text-xs"
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border border-border rounded-lg p-3 text-xs"
               >
                 <div className="min-w-0">
-                  <p className="font-semibold text-slate-800">
-                    {isManager && <span className="text-slate-500">{d.employeeName} · </span>}
+                  <p className="font-semibold text-fg">
+                    {isManager && <span className="text-fg-secondary">{d.employeeName} · </span>}
                     {d.refDate.split('-').reverse().join('/')}
-                    {d.authorName ? <span className="text-slate-400"> · por {d.authorName}</span> : null}
+                    {d.authorName ? <span className="text-fg-muted"> · por {d.authorName}</span> : null}
                   </p>
-                  {d.note && <p className="text-slate-500 truncate">{d.note}</p>}
+                  {d.note && <p className="text-fg-secondary truncate">{d.note}</p>}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <Badge color={dayKindColor(d.kind)}>{dayKindLabel(d.kind)}</Badge>
                   {d.certificatePath && (
                     <button
                       onClick={() => openCertificate(d.certificatePath!)}
-                      className="text-[#1A1A72] font-semibold hover:underline"
+                      className="text-primary font-semibold hover:underline"
                     >
                       ver atestado
                     </button>
@@ -1349,7 +1349,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
                   <button
                     onClick={() => removeDayEntry(d.id)}
                     title="Remover"
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-[#E63946] hover:bg-red-50 transition-colors"
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-fg-muted hover:text-danger hover:bg-red-50 transition-colors"
                   >
                     <span className="material-symbols-outlined text-base">delete</span>
                   </button>
@@ -1361,56 +1361,56 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
       </div>
 
       {/* ===== Solicitações de ajuste ===== */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
+      <div className="bg-surface rounded-xl shadow-sm p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <span className="w-8 h-8 rounded-lg bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center">
+            <span className="w-8 h-8 rounded-lg bg-navy/10 text-primary flex items-center justify-center">
               <span className="material-symbols-outlined text-lg">edit_calendar</span>
             </span>
             <div>
-              <h3 className="font-display text-sm font-bold uppercase tracking-wide text-[#1A1A72]">
+              <h3 className="font-display text-sm font-bold uppercase tracking-wide text-primary">
                 Solicitações de ajuste
               </h3>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-fg-muted">
                 {isManager ? 'Aprove ou rejeite ajustes da equipe.' : 'Peça correção de uma batida.'}
               </p>
             </div>
           </div>
           <button
             onClick={() => openAdj()}
-            className="inline-flex items-center gap-1.5 bg-[#1A1A72] hover:bg-[#12124f] text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
+            className="inline-flex items-center gap-1.5 bg-navy hover:bg-navy-3 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
           >
             <span className="material-symbols-outlined text-base">add</span> Nova solicitação
           </button>
         </div>
 
         {adjustments.length === 0 ? (
-          <p className="text-xs text-slate-400">Nenhuma solicitação registrada.</p>
+          <p className="text-xs text-fg-muted">Nenhuma solicitação registrada.</p>
         ) : (
           <div className="flex flex-col gap-2">
             {adjustments.map((a) => (
               <div
                 key={a.id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border border-slate-100 rounded-lg p-3 text-xs"
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border border-border rounded-lg p-3 text-xs"
               >
                 <div className="min-w-0">
-                  <p className="font-semibold text-slate-800">
-                    {isManager && <span className="text-slate-500">{a.employeeName} · </span>}
+                  <p className="font-semibold text-fg">
+                    {isManager && <span className="text-fg-secondary">{a.employeeName} · </span>}
                     {a.type} em {a.refDate.split('-').reverse().join('/')}
                   </p>
                   {(() => {
                     const orig = originalPunchTimeFor(a.employeeName, a.refDate, a.type);
                     return (
-                      <p className="text-[11px] text-slate-500 mt-0.5">
+                      <p className="text-[11px] text-fg-secondary mt-0.5">
                         {orig && <>Original: <span className="font-data-mono font-semibold">{orig}</span> · </>}
                         Solicitado:{' '}
                         {a.requestedTime
-                          ? <span className="font-data-mono font-semibold text-[#1A1A72]">{a.requestedTime}</span>
-                          : <span className="text-[#E63946] font-semibold">não informado</span>}
+                          ? <span className="font-data-mono font-semibold text-primary">{a.requestedTime}</span>
+                          : <span className="text-danger font-semibold">não informado</span>}
                       </p>
                     );
                   })()}
-                  <p className="text-slate-500 truncate">{a.reason || '—'}</p>
+                  <p className="text-fg-secondary truncate">{a.reason || '—'}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <Badge color={adjStatusColor(a.status)}>{a.status}</Badge>
@@ -1427,7 +1427,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
                       <button
                         onClick={() => reviewAdj(a, 'REJEITADO')}
                         disabled={adjBusy === a.id}
-                        className="px-2.5 py-1 rounded-lg bg-[#E63946] hover:bg-[#a51515] text-white text-[11px] font-semibold disabled:opacity-60"
+                        className="px-2.5 py-1 rounded-lg bg-danger hover:bg-danger-hover text-white text-[11px] font-semibold disabled:opacity-60"
                       >
                         Rejeitar
                       </button>
@@ -1443,17 +1443,17 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
       {/* ===== Registros recentes ===== */}
       <div id="card-registros">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 mb-3">
-          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Registros recentes de frequência</h3>
+          <h3 className="text-xs font-bold text-fg-secondary uppercase tracking-wider">Registros recentes de frequência</h3>
           <div className="grid grid-cols-3 gap-2 w-full sm:w-auto">
-            <input aria-label="Mês dos registros" type="month" value={recordPeriod} onChange={(e) => setRecordPeriod(e.target.value)} className="min-w-0 border border-slate-200 rounded-lg px-2 py-2 text-[11px]" />
-            <select aria-label="Tipo de batida" value={recordType} onChange={(e) => setRecordType(e.target.value as 'TODOS' | PunchType)} className="min-w-0 border border-slate-200 rounded-lg px-2 py-2 text-[11px]"><option value="TODOS">Tipos</option><option value="ENTRADA">Entrada</option><option value="PAUSA">Almoço</option><option value="RETORNO">Retorno</option><option value="SAIDA">Saída</option></select>
-            <select aria-label="Situação da localização" value={recordGps} onChange={(e) => setRecordGps(e.target.value as 'TODOS' | 'COM_GPS' | 'SEM_GPS')} className="min-w-0 border border-slate-200 rounded-lg px-2 py-2 text-[11px]"><option value="TODOS">Localização</option><option value="COM_GPS">Com GPS</option><option value="SEM_GPS">Sem GPS</option></select>
+            <input aria-label="Mês dos registros" type="month" value={recordPeriod} onChange={(e) => setRecordPeriod(e.target.value)} className="min-w-0 border border-border rounded-lg px-2 py-2 text-[11px]" />
+            <select aria-label="Tipo de batida" value={recordType} onChange={(e) => setRecordType(e.target.value as 'TODOS' | PunchType)} className="min-w-0 border border-border rounded-lg px-2 py-2 text-[11px]"><option value="TODOS">Tipos</option><option value="ENTRADA">Entrada</option><option value="PAUSA">Almoço</option><option value="RETORNO">Retorno</option><option value="SAIDA">Saída</option></select>
+            <select aria-label="Situação da localização" value={recordGps} onChange={(e) => setRecordGps(e.target.value as 'TODOS' | 'COM_GPS' | 'SEM_GPS')} className="min-w-0 border border-border rounded-lg px-2 py-2 text-[11px]"><option value="TODOS">Localização</option><option value="COM_GPS">Com GPS</option><option value="SEM_GPS">Sem GPS</option></select>
           </div>
         </div>
         {filteredRecentPunches.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm py-16 text-center text-slate-400">
-            <span className="material-symbols-outlined text-4xl text-slate-300">schedule</span>
-            <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">Nenhuma batida registrada</p>
+          <div className="bg-surface rounded-xl shadow-sm py-16 text-center text-fg-muted">
+            <span className="material-symbols-outlined text-4xl text-fg-muted">schedule</span>
+            <p className="mt-2 text-sm font-bold text-fg-secondary uppercase tracking-wider">Nenhuma batida registrada</p>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
@@ -1462,7 +1462,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
                 key={p.id}
                 onClick={p.effectiveSource === 'adjusted' && p.originalAt != null ? () => setSelectedAdjustedPunch(p) : undefined}
                 leading={
-                  <span className="w-10 h-10 rounded-full bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0">
+                  <span className="w-10 h-10 rounded-full bg-navy/10 text-primary flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-lg">person</span>
                   </span>
                 }
@@ -1473,7 +1473,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
                       className="flex min-w-0 max-w-full items-start gap-1"
                       title={hasGps(p) ? `Coordenadas registradas para auditoria${p.accuracy ? ` · precisão ~${p.accuracy}m` : ''}` : undefined}
                     >
-                      <span className="material-symbols-outlined shrink-0 text-sm text-slate-400">location_on</span>
+                      <span className="material-symbols-outlined shrink-0 text-sm text-fg-muted">location_on</span>
                       <span className="min-w-0 whitespace-normal break-words leading-snug">
                         {locationLabel(p)}
                       </span>
@@ -1483,7 +1483,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
                         href={mapsUrl(p)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[#1A1A72] font-semibold hover:underline"
+                        className="text-primary font-semibold hover:underline"
                       >
                         Ver no mapa
                       </a>
@@ -1492,8 +1492,8 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
                 }
                 center={
                   <div className="text-left md:text-center">
-                    <p className="text-[10px] text-slate-400 uppercase tracking-wider">Data &amp; hora</p>
-                    <p className="font-data-mono text-slate-700 font-semibold">{p.timestamp}</p>
+                    <p className="text-[10px] text-fg-muted uppercase tracking-wider">Data &amp; hora</p>
+                    <p className="font-data-mono text-fg-secondary font-semibold">{p.timestamp}</p>
                   </div>
                 }
                 right={
@@ -1513,15 +1513,15 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
       </div>
 
       {selectedAdjustedPunch && (
-        <div className="fixed inset-0 z-50 bg-[#1A1A72]/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setSelectedAdjustedPunch(null)}>
-          <div className="bg-white max-w-md w-full rounded-xl border border-slate-200 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-              <h3 className="font-display text-base font-bold text-[#1A1A72] uppercase tracking-wide">Detalhes do registro ajustado</h3>
-              <button onClick={() => setSelectedAdjustedPunch(null)} className="text-slate-400 hover:text-slate-700 font-bold text-xl" aria-label="Fechar">✕</button>
+        <div className="fixed inset-0 z-50 bg-navy/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setSelectedAdjustedPunch(null)}>
+          <div className="bg-surface max-w-md w-full rounded-xl border border-border shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <h3 className="font-display text-base font-bold text-primary uppercase tracking-wide">Detalhes do registro ajustado</h3>
+              <button onClick={() => setSelectedAdjustedPunch(null)} className="text-fg-muted hover:text-fg-secondary font-bold text-xl" aria-label="Fechar">✕</button>
             </div>
             <dl className="grid grid-cols-2 gap-x-4 gap-y-3 px-6 py-5 text-xs">
               <div><dt className={labelCls}>Horário original</dt><dd className="font-data-mono font-semibold">{selectedAdjustedPunch.originalAt ? fmtClock(new Date(selectedAdjustedPunch.originalAt)) : '—'}</dd></div>
-              <div><dt className={labelCls}>Horário ajustado</dt><dd className="font-data-mono font-semibold text-[#1A1A72]">{selectedAdjustedPunch.at ? fmtClock(new Date(selectedAdjustedPunch.at)) : '—'}</dd></div>
+              <div><dt className={labelCls}>Horário ajustado</dt><dd className="font-data-mono font-semibold text-primary">{selectedAdjustedPunch.at ? fmtClock(new Date(selectedAdjustedPunch.at)) : '—'}</dd></div>
               <div><dt className={labelCls}>Tipo da batida</dt><dd>{TYPE_LABEL[selectedAdjustedPunch.type]}</dd></div>
               <div><dt className={labelCls}>Quem solicitou</dt><dd>{selectedAdjustedPunch.employeeName}</dd></div>
               <div className="col-span-2"><dt className={labelCls}>Justificativa</dt><dd className="whitespace-pre-wrap">{selectedAdjustedPunch.adjustmentReason || '—'}</dd></div>
@@ -1535,15 +1535,15 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
 
       {/* Modal Nova ocorrência do dia */}
       {showDayModal && (
-        <div className="fixed inset-0 z-50 bg-[#1A1A72]/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white max-w-md w-full rounded-xl border border-slate-200 shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-              <h3 className="font-display text-base font-bold text-[#1A1A72] uppercase tracking-wide">
+        <div className="fixed inset-0 z-50 bg-navy/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-surface max-w-md w-full rounded-xl border border-border shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <h3 className="font-display text-base font-bold text-primary uppercase tracking-wide">
                 Nova ocorrência do dia
               </h3>
               <button
                 onClick={() => setShowDayModal(false)}
-                className="text-slate-400 hover:text-slate-700 font-bold text-xl"
+                className="text-fg-muted hover:text-fg-secondary font-bold text-xl"
               >
                 ✕
               </button>
@@ -1600,25 +1600,25 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
                     type="file"
                     accept="application/pdf,image/*"
                     onChange={(e) => setDayFile(e.target.files?.[0] ?? null)}
-                    className="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#1A1A72]/10 file:text-[#1A1A72] hover:file:bg-[#1A1A72]/20"
+                    className="w-full text-xs text-fg-secondary file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-navy/10 file:text-primary hover:file:bg-navy/20"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">
+                  <p className="text-[10px] text-fg-muted mt-1">
                     Arquivo enviado para armazenamento privado (visível só a você e à gestão).
                   </p>
                 </div>
               )}
             </div>
-            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2">
+            <div className="px-6 py-4 border-t border-border flex justify-end gap-2">
               <button
                 onClick={() => setShowDayModal(false)}
-                className="px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-slate-600 hover:bg-slate-100"
+                className="px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-fg-secondary hover:bg-surface-3"
               >
                 Cancelar
               </button>
               <button
                 onClick={submitDayEntry}
                 disabled={daySaving || (dayForm.kind === 'OBSERVACAO' && !dayForm.note.trim())}
-                className="bg-[#1A1A72] hover:bg-[#12124f] text-white px-5 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 disabled:opacity-60"
+                className="bg-navy hover:bg-navy-3 text-white px-5 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 disabled:opacity-60"
               >
                 <span className={`material-symbols-outlined text-base ${daySaving ? 'animate-spin' : ''}`}>
                   {daySaving ? 'progress_activity' : 'save'}
@@ -1632,13 +1632,13 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
 
       {/* Modal Solicitar ajuste de ponto */}
       {showAdj && (
-        <div className="fixed inset-0 z-50 bg-[#1A1A72]/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white max-w-md w-full rounded-xl border border-slate-200 shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-              <h3 className="font-display text-base font-bold text-[#1A1A72] uppercase tracking-wide">
+        <div className="fixed inset-0 z-50 bg-navy/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-surface max-w-md w-full rounded-xl border border-border shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <h3 className="font-display text-base font-bold text-primary uppercase tracking-wide">
                 Solicitar ajuste de ponto
               </h3>
-              <button onClick={() => setShowAdj(false)} className="text-slate-400 hover:text-slate-700 font-bold text-xl">
+              <button onClick={() => setShowAdj(false)} className="text-fg-muted hover:text-fg-secondary font-bold text-xl">
                 ✕
               </button>
             </div>
@@ -1672,7 +1672,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
                 {(() => {
                   const orig = originalPunchTimeFor(currentUser, adjForm.refDate, adjForm.type);
                   return orig ? (
-                    <p className="text-[11px] text-slate-500 mb-1">
+                    <p className="text-[11px] text-fg-secondary mb-1">
                       Horário original: <span className="font-data-mono font-semibold">{orig}</span>
                     </p>
                   ) : null;
@@ -1684,7 +1684,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
                   className={`${inputCls} font-data-mono`}
                 />
                 {!adjForm.time && (
-                  <p className="text-[11px] text-[#E63946] mt-1">Informe o novo horário para enviar a solicitação.</p>
+                  <p className="text-[11px] text-danger mt-1">Informe o novo horário para enviar a solicitação.</p>
                 )}
               </div>
               <div>
@@ -1698,17 +1698,17 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
                 />
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2">
+            <div className="px-6 py-4 border-t border-border flex justify-end gap-2">
               <button
                 onClick={() => setShowAdj(false)}
-                className="px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-slate-600 hover:bg-slate-100"
+                className="px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-fg-secondary hover:bg-surface-3"
               >
                 Cancelar
               </button>
               <button
                 onClick={submitAdj}
                 disabled={adjSaving || !adjForm.reason.trim() || !hasRequestedTime(adjForm.time)}
-                className="bg-[#1A1A72] hover:bg-[#12124f] text-white px-5 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 disabled:opacity-60"
+                className="bg-navy hover:bg-navy-3 text-white px-5 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 disabled:opacity-60"
               >
                 <span className={`material-symbols-outlined text-base ${adjSaving ? 'animate-spin' : ''}`}>
                   {adjSaving ? 'progress_activity' : 'send'}
@@ -1721,8 +1721,8 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
       )}
 
       {nextType && (
-        <div className="md:hidden fixed bottom-[4.5rem] left-3 right-3 z-30 rounded-xl bg-white/95 backdrop-blur border border-slate-200 shadow-xl p-2 flex items-center gap-2">
-          <div className="min-w-0 flex-1 pl-2"><p className="text-[10px] text-slate-500">Próxima batida</p><p className="text-xs font-bold text-slate-800 truncate">{NEXT_INFO[nextType].label}</p></div>
+        <div className="md:hidden fixed bottom-[4.5rem] left-3 right-3 z-30 rounded-xl bg-white/95 backdrop-blur border border-border shadow-xl p-2 flex items-center gap-2">
+          <div className="min-w-0 flex-1 pl-2"><p className="text-[10px] text-fg-secondary">Próxima batida</p><p className="text-xs font-bold text-fg truncate">{NEXT_INFO[nextType].label}</p></div>
           <button onClick={handleBaterPonto} disabled={punching || locating} className={`shrink-0 px-4 py-3 rounded-lg text-white text-xs font-bold ${NEXT_INFO[nextType].classes}`}>{locating ? 'GPS…' : 'Registrar'}</button>
         </div>
       )}

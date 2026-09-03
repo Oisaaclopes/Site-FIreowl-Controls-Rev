@@ -848,19 +848,19 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     const daysLeft = validityDaysLeft(ped);
     return (
       <div
-        className="bg-white rounded-xl shadow-sm border border-slate-100 border-l-4 flex flex-col md:flex-row md:items-center justify-between gap-3 p-4"
+        className="bg-surface rounded-xl shadow-sm border border-border border-l-4 flex flex-col md:flex-row md:items-center justify-between gap-3 p-4"
         style={{ borderLeftColor: meta.color }}
       >
         {/* Bloco esquerdo */}
         <div className="min-w-0 flex items-center gap-3">
-          {clientLogo ? <span className="w-14 h-14 rounded-xl bg-white border border-slate-200 p-1.5 shrink-0"><img src={clientLogo} alt={`Logo ${nomeFantasiaCliente(ped.clienteNome)}`} className="w-full h-full object-contain" /></span> : <span className="w-14 h-14 rounded-xl bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0"><span className="material-symbols-outlined text-xl">domain</span></span>}
-          <div className="min-w-0"><p className="text-[11px] text-slate-400 font-data-mono">
+          {clientLogo ? <span className="w-14 h-14 rounded-xl bg-surface border border-border p-1.5 shrink-0"><img src={clientLogo} alt={`Logo ${nomeFantasiaCliente(ped.clienteNome)}`} className="w-full h-full object-contain" /></span> : <span className="w-14 h-14 rounded-xl bg-navy/10 text-primary flex items-center justify-center shrink-0"><span className="material-symbols-outlined text-xl">domain</span></span>}
+          <div className="min-w-0"><p className="text-[11px] text-fg-muted font-data-mono">
             nº {num} - {ano}
           </p>
-          <p className="text-[11px] text-slate-400">{dataCurta(ped)}</p>
-          <p className="font-bold text-slate-900 text-sm truncate">{ped.referencia || 'Proposta comercial sem título'}</p>
-          <p className="text-[11px] text-[#1A1A72] font-semibold truncate">{nomeFantasiaCliente(ped.clienteNome)}</p>
-          {nomeFantasiaCliente(ped.clienteNome) !== razaoSocialCliente(ped.clienteNome) && <p className="text-[10px] text-slate-400 truncate">{razaoSocialCliente(ped.clienteNome)}</p>}
+          <p className="text-[11px] text-fg-muted">{dataCurta(ped)}</p>
+          <p className="font-bold text-fg text-sm truncate">{ped.referencia || 'Proposta comercial sem título'}</p>
+          <p className="text-[11px] text-primary font-semibold truncate">{nomeFantasiaCliente(ped.clienteNome)}</p>
+          {nomeFantasiaCliente(ped.clienteNome) !== razaoSocialCliente(ped.clienteNome) && <p className="text-[10px] text-fg-muted truncate">{razaoSocialCliente(ped.clienteNome)}</p>}
           {ped.proposal?.surveyOrigin && <p className="mt-1 inline-flex items-center gap-1 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700"><span className="material-symbols-outlined text-xs">fact_check</span>Levantamento {ped.proposal.surveyOrigin.reportNumber || 'técnico'}</p>}
           {daysLeft !== null && daysLeft <= 7 && <p className={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold ${daysLeft < 0 ? 'bg-red-50 text-red-700' : daysLeft <= 2 ? 'bg-amber-100 text-amber-800' : 'bg-amber-50 text-amber-700'}`}><span className="material-symbols-outlined text-xs">schedule</span>{daysLeft < 0 ? `Vencida há ${Math.abs(daysLeft)} dia(s)` : daysLeft === 0 ? 'Vence hoje' : `Vence em ${daysLeft} dia(s)`}</p>}
           {ped.proposal.motivoRecusa && (ped.status === 'recusado' || ped.status === 'expirado') && (
@@ -868,13 +868,13 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           )}
           {osAnteriores.length > 0 && (
             <div className="mt-1 flex flex-wrap items-center gap-1">
-              <span className="text-[10px] font-bold uppercase text-slate-400">Histórico OS:</span>
+              <span className="text-[10px] font-bold uppercase text-fg-muted">Histórico OS:</span>
               {osAnteriores.slice(0, 4).map((o) => (
                 <button
                   key={o.id}
                   onClick={() => setOsDetail(o)}
                   title={`Abrir ${o.numero || o.id} (${OS_STATUS_LABEL[o.status]?.label || o.status})`}
-                  className="inline-flex items-center gap-1 rounded bg-slate-100 hover:bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 font-data-mono"
+                  className="inline-flex items-center gap-1 rounded bg-surface-3 hover:bg-surface-3 px-1.5 py-0.5 text-[10px] font-semibold text-fg-secondary font-data-mono"
                 >
                   {o.numero || o.id.slice(0, 8)} · {OS_STATUS_LABEL[o.status]?.label || o.status}
                 </button>
@@ -895,7 +895,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
             value={ped.status}
             onChange={(e) => handleStatusChange(ped, e.target.value as PedidoStatus)}
             style={{ color: meta.color, borderColor: meta.color }}
-            className="text-[11px] font-bold uppercase rounded-lg border-2 bg-white px-2 py-1.5 cursor-pointer focus:outline-none"
+            className="text-[11px] font-bold uppercase rounded-lg border-2 bg-surface px-2 py-1.5 cursor-pointer focus:outline-none"
             title="Alterar status"
           >
             {STATUS_ORDER.map((s) => (
@@ -918,55 +918,55 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
               <button
                 onClick={() => confirmGenerateOS(ped)}
                 title="Gerar Ordem de Serviço"
-                className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1 bg-[#E63946] hover:bg-[#a51515] text-white"
+                className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1 bg-danger hover:bg-danger-hover text-white"
               >
                 <Wrench className="w-3 h-3" /> Gerar OS
               </button>
             )
           )}
           {ped.status === 'aceito' && ped.proposal.recorrente && onGenerateContractFromPedido && (
-            <button onClick={() => { if (!existingContract) confirmGenerateContract(ped); }} disabled={!!existingContract} title={existingContract ? `Contrato ${existingContract.id} já foi criado desta proposta` : 'Converter proposta recorrente em contrato'} className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1 ${existingContract ? 'bg-emerald-100 text-emerald-700 cursor-not-allowed' : 'bg-[#1A1A72] hover:bg-[#0B1E38] text-white'}`}>
+            <button onClick={() => { if (!existingContract) confirmGenerateContract(ped); }} disabled={!!existingContract} title={existingContract ? `Contrato ${existingContract.id} já foi criado desta proposta` : 'Converter proposta recorrente em contrato'} className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1 ${existingContract ? 'bg-emerald-100 text-emerald-700 cursor-not-allowed' : 'bg-navy hover:bg-navy-3 text-white'}`}>
               <span className="material-symbols-outlined text-sm">handshake</span>{existingContract ? 'Contrato criado' : 'Criar contrato'}
             </button>
           )}
           {ped.status === 'aceito' && !ped.proposal.recorrente && onGenerateSupplyOrderFromPedido && (
             <button onClick={() => { if (!existingSupplyOrder) confirmGenerateSupplyOrder(ped); }} disabled={!!existingSupplyOrder} title={existingSupplyOrder ? `Pedido ${existingSupplyOrder.id} já foi criado desta proposta` : 'Criar pedido de fornecimento'} className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1 ${existingSupplyOrder ? 'bg-emerald-100 text-emerald-700 cursor-not-allowed' : 'bg-sky-700 hover:bg-sky-800 text-white'}`}><span className="material-symbols-outlined text-sm">shopping_cart</span>{existingSupplyOrder ? 'Pedido criado' : 'Gerar pedido'}</button>
           )}
-          {ped.proposal.revisoes?.some((revision) => revision.snapshot) && <button onClick={() => setComparisonPedido(ped)} title="Comparar revisão anterior com a proposta atual" className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-violet-700 hover:bg-violet-50"><History className="w-4 h-4" /></button>}
+          {ped.proposal.revisoes?.some((revision) => revision.snapshot) && <button onClick={() => setComparisonPedido(ped)} title="Comparar revisão anterior com a proposta atual" className="w-8 h-8 rounded-lg flex items-center justify-center text-fg-muted hover:text-violet-700 hover:bg-violet-50"><History className="w-4 h-4" /></button>}
 
           {/* Ações: gerar documento, editar, excluir */}
           <button
             onClick={() => handleGenerateDocument(ped)}
             title="Gerar documento"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-fg-secondary hover:text-blue-600 hover:bg-blue-50 transition-colors"
           >
             <Eye className="w-4 h-4" />
           </button>
           <button
             onClick={() => setDocModalPedido(ped)}
             title="Gerar outro documento"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-[#1A1A72] hover:bg-slate-100 transition-colors"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-fg-muted hover:text-primary hover:bg-surface-3 transition-colors"
           >
             <Files className="w-4 h-4" />
           </button>
           <button
             onClick={() => handleEditProposal(ped)}
             title="Editar proposta"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-[#1A1A72] hover:bg-slate-100 transition-colors"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-fg-secondary hover:text-primary hover:bg-surface-3 transition-colors"
           >
             <Pencil className="w-4 h-4" />
           </button>
           <button
             onClick={() => handleRevisar(ped)}
             title="Revisar proposta (nova revisão no histórico)"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-fg-secondary hover:text-amber-600 hover:bg-amber-50 transition-colors"
           >
             <History className="w-4 h-4" />
           </button>
           <button
             onClick={() => handleDuplicate(ped)}
             title="Duplicar proposta"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-[#1A1A72] hover:bg-slate-100 transition-colors"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-fg-secondary hover:text-primary hover:bg-surface-3 transition-colors"
           >
             <Files className="w-4 h-4" />
           </button>
@@ -974,7 +974,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
             <button
               onClick={() => handleDelete(ped)}
               title="Excluir proposta"
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-[#E63946] hover:bg-red-50 transition-colors"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-fg-muted hover:text-danger hover:bg-red-50 transition-colors"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -987,12 +987,12 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   return (
     <div className="flex flex-col w-full p-4 md:p-8 gap-5">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-5">
         <div>
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+          <span className="text-xs font-semibold text-fg-secondary uppercase tracking-wider">
             Módulo CRM &bull; Gestão Comercial &amp; Execução
           </span>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">
+          <h1 className="text-2xl font-bold text-fg tracking-tight mt-0.5">
             Pedidos, Propostas Comerciais &amp; Ordens de Serviço (OS)
           </h1>
         </div>
@@ -1000,7 +1000,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
         {!isTecnico && (
           <button
             onClick={handleOpenNewProposal}
-            className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
+            className="bg-danger hover:bg-danger-hover text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
           >
             <Plus className="w-4 h-4" /> Nova Proposta Comercial
           </button>
@@ -1008,7 +1008,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
       </div>
 
       {/* Seletor Propostas vs OS — oculto p/ técnico */}
-      <div className={`flex items-center gap-3 bg-slate-200 p-1.5 rounded-xl w-fit ${isTecnico ? 'hidden' : ''}`}>
+      <div className={`flex items-center gap-3 bg-surface-3 p-1.5 rounded-xl w-fit ${isTecnico ? 'hidden' : ''}`}>
         <button
           onClick={() => {
             setViewTab('propostas');
@@ -1016,7 +1016,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
             if (filterStatus !== 'TODOS' && !STATUS_META[filterStatus as PedidoStatus]) setFilterStatus('TODOS');
           }}
           className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all ${
-            viewTab === 'propostas' ? 'bg-[#0B1E38] text-white shadow-md' : 'text-slate-600 hover:text-slate-900'
+            viewTab === 'propostas' ? 'bg-navy-3 text-white shadow-md' : 'text-fg-secondary hover:text-fg'
           }`}
         >
           <FileText className="w-4 h-4 text-[#F2A900]" /> Propostas Comerciais (CRM) ({pedidos.length})
@@ -1027,12 +1027,12 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
             setFilterStatus('TODOS');
           }}
           className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all ${
-            viewTab === 'ordens_servico' ? 'bg-[#0B1E38] text-white shadow-md' : 'text-slate-600 hover:text-slate-900'
+            viewTab === 'ordens_servico' ? 'bg-navy-3 text-white shadow-md' : 'text-fg-secondary hover:text-fg'
           }`}
         >
           <Wrench className="w-4 h-4 text-emerald-400" /> Ordens de Serviço (Campo) ({ordensServico.length})
         </button>
-        <button onClick={() => { setViewTab('fornecimento'); setFilterStatus('TODOS'); }} className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all ${viewTab === 'fornecimento' ? 'bg-[#0B1E38] text-white shadow-md' : 'text-slate-600 hover:text-slate-900'}`}>
+        <button onClick={() => { setViewTab('fornecimento'); setFilterStatus('TODOS'); }} className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all ${viewTab === 'fornecimento' ? 'bg-navy-3 text-white shadow-md' : 'text-fg-secondary hover:text-fg'}`}>
           <span className="material-symbols-outlined text-base text-sky-600">shopping_cart</span> Fornecimento ({supplyOrders.length})
         </button>
       </div>
@@ -1041,23 +1041,23 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
       {viewTab === 'propostas' && !isTecnico && (
         <>
           {/* Toolbar de filtros e ações */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3 flex flex-col lg:flex-row lg:items-center gap-3">
+          <div className="bg-surface rounded-xl border border-border shadow-sm p-3 flex flex-col lg:flex-row lg:items-center gap-3">
             {/* Filtros (esquerda) */}
             <div className="flex flex-1 flex-wrap items-center gap-2">
               <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 text-slate-400 w-4 h-4" />
+                <Search className="absolute left-2.5 top-2.5 text-fg-muted w-4 h-4" />
                 <input
                   type="text"
                   placeholder="Buscar..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-40 pl-8 pr-2 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                  className="w-40 pl-8 pr-2 py-2 text-xs border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-danger/20"
                 />
               </div>
               <select
                 value={filterClient}
                 onChange={(e) => setFilterClient(e.target.value)}
-                className="py-2 px-2.5 text-xs border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20 max-w-[10rem]"
+                className="py-2 px-2.5 text-xs border border-border rounded-lg bg-surface text-fg-secondary focus:outline-none focus:ring-2 focus:ring-primary/20 max-w-[10rem]"
                 title="Filtrar por cliente"
               >
                 <option value="">Todos os clientes</option>
@@ -1070,7 +1070,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="py-2 px-2.5 text-xs border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                className="py-2 px-2.5 text-xs border border-border rounded-lg bg-surface text-fg-secondary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 title="Filtrar por status"
               >
                 <option value="TODOS">Todos os status</option>
@@ -1080,20 +1080,20 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                   </option>
                 ))}
               </select>
-              <div className="flex items-center gap-1 text-xs text-slate-500">
+              <div className="flex items-center gap-1 text-xs text-fg-secondary">
                 <input
                   type="date"
                   value={filterFrom}
                   onChange={(e) => setFilterFrom(e.target.value)}
-                  className="py-2 px-2 text-xs border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                  className="py-2 px-2 text-xs border border-border rounded-lg bg-surface text-fg-secondary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   title="Período — de"
                 />
-                <span className="text-slate-300">→</span>
+                <span className="text-fg-muted">→</span>
                 <input
                   type="date"
                   value={filterTo}
                   onChange={(e) => setFilterTo(e.target.value)}
-                  className="py-2 px-2 text-xs border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                  className="py-2 px-2 text-xs border border-border rounded-lg bg-surface text-fg-secondary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   title="Período — até"
                 />
               </div>
@@ -1106,7 +1106,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                     setSearchTerm('');
                     setFilterStatus('TODOS');
                   }}
-                  className="text-[11px] font-semibold text-slate-400 hover:text-[#E63946] underline"
+                  className="text-[11px] font-semibold text-fg-muted hover:text-danger underline"
                 >
                   limpar
                 </button>
@@ -1117,19 +1117,19 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={gerarRelatorio}
-                className="flex items-center gap-1.5 border border-slate-200 hover:border-[#1A1A72] text-slate-700 hover:text-[#1A1A72] text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 border border-border hover:border-primary text-fg-secondary hover:text-primary text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
                 title="Gerar relatório das propostas filtradas"
               >
                 <Printer className="w-4 h-4" /> Gerar Relatório
               </button>
 
               {/* Modo de exibição */}
-              <div className="flex items-center bg-slate-100 rounded-lg p-0.5">
+              <div className="flex items-center bg-surface-3 rounded-lg p-0.5">
                 <button
                   onClick={() => setDisplayMode('lista')}
                   title="Lista"
                   className={`w-8 h-8 rounded-md flex items-center justify-center transition-colors ${
-                    displayMode === 'lista' ? 'bg-white shadow-sm text-[#1A1A72]' : 'text-slate-400 hover:text-slate-600'
+                    displayMode === 'lista' ? 'bg-surface shadow-sm text-primary' : 'text-fg-muted hover:text-fg-secondary'
                   }`}
                 >
                   <List className="w-4 h-4" />
@@ -1138,7 +1138,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                   onClick={() => setDisplayMode('timeline')}
                   title="Timeline (por data)"
                   className={`w-8 h-8 rounded-md flex items-center justify-center transition-colors ${
-                    displayMode === 'timeline' ? 'bg-white shadow-sm text-[#1A1A72]' : 'text-slate-400 hover:text-slate-600'
+                    displayMode === 'timeline' ? 'bg-surface shadow-sm text-primary' : 'text-fg-muted hover:text-fg-secondary'
                   }`}
                 >
                   <CalendarDays className="w-4 h-4" />
@@ -1150,19 +1150,19 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                 <button
                   onClick={() => setShowDefaultMenu((v) => !v)}
                   title="Status inicial padrão"
-                  className="w-9 h-9 rounded-lg flex items-center justify-center border border-slate-200 text-slate-500 hover:text-[#1A1A72] hover:border-[#1A1A72] transition-colors"
+                  className="w-9 h-9 rounded-lg flex items-center justify-center border border-border text-fg-secondary hover:text-primary hover:border-primary transition-colors"
                 >
                   <Settings className="w-4 h-4" />
                 </button>
                 {showDefaultMenu && (
-                  <div className="absolute right-0 mt-1 w-52 bg-white border border-slate-200 rounded-lg shadow-lg z-20 p-1.5">
-                    <p className="text-[10px] uppercase tracking-wider text-slate-400 px-2 py-1">Status inicial padrão</p>
+                  <div className="absolute right-0 mt-1 w-52 bg-surface border border-border rounded-lg shadow-lg z-20 p-1.5">
+                    <p className="text-[10px] uppercase tracking-wider text-fg-muted px-2 py-1">Status inicial padrão</p>
                     {['TODOS', ...STATUS_ORDER].map((s) => (
                       <button
                         key={s}
                         onClick={() => setDefaultStatus(s)}
-                        className={`w-full text-left px-2 py-1.5 rounded-md text-xs font-semibold hover:bg-slate-100 ${
-                          filterStatus === s ? 'text-[#1A1A72]' : 'text-slate-600'
+                        className={`w-full text-left px-2 py-1.5 rounded-md text-xs font-semibold hover:bg-surface-3 ${
+                          filterStatus === s ? 'text-primary' : 'text-fg-secondary'
                         }`}
                       >
                         {s === 'TODOS' ? 'Todos os status' : STATUS_META[s as PedidoStatus].label}
@@ -1193,8 +1193,8 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                 onClick={() => setFilterStatus(filterStatus === s ? 'TODOS' : s)}
               />
             ))}
-            <div className="ml-auto shrink-0 flex flex-col justify-center px-4 py-2 rounded-xl bg-white border border-slate-200 shadow-sm">
-              <p className="text-[10px] font-semibold text-slate-500 uppercase">Volume filtrado</p>
+            <div className="ml-auto shrink-0 flex flex-col justify-center px-4 py-2 rounded-xl bg-surface border border-border shadow-sm">
+              <p className="text-[10px] font-semibold text-fg-secondary uppercase">Volume filtrado</p>
               <p className="font-data-mono text-lg font-bold text-emerald-600">{maskMoney(brl(volumeFiltrado))}</p>
             </div>
           </div>
@@ -1209,9 +1209,9 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
 
           {/* Lista / Timeline */}
           {filteredPedidos.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm py-16 text-center text-slate-400">
-              <FileText className="w-10 h-10 text-slate-300 mx-auto" />
-              <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">Nenhuma proposta encontrada</p>
+            <div className="bg-surface rounded-xl shadow-sm py-16 text-center text-fg-muted">
+              <FileText className="w-10 h-10 text-fg-muted mx-auto" />
+              <p className="mt-2 text-sm font-bold text-fg-secondary uppercase tracking-wider">Nenhuma proposta encontrada</p>
             </div>
           ) : displayMode === 'lista' ? (
             <div className="flex flex-col gap-3">
@@ -1224,12 +1224,12 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
               {groupedByDate.map(([key, group]) => (
                 <div key={key} className="flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    <CalendarDays className="w-3.5 h-3.5 text-slate-400" />
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 capitalize">
+                    <CalendarDays className="w-3.5 h-3.5 text-fg-muted" />
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-fg-secondary capitalize">
                       {group.label}
                     </span>
-                    <span className="text-[11px] text-slate-300">· {group.items.length}</span>
-                    <div className="flex-1 h-px bg-slate-100" />
+                    <span className="text-[11px] text-fg-muted">· {group.items.length}</span>
+                    <div className="flex-1 h-px bg-surface-3" />
                   </div>
                   {group.items.map((ped) => (
                     <ProposalRow key={ped.id} ped={ped} />
@@ -1245,14 +1245,14 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
       {viewTab === 'fornecimento' && !isTecnico && (
         <section className="space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {(['ABERTO', 'EM_COTACAO', 'COMPRADO', 'RECEBIDO'] as SupplyOrder['status'][]).map((status) => <div key={status} className="bg-white border border-slate-200 rounded-xl p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{status.replace('_', ' ')}</p><p className="mt-1 font-data-mono text-2xl font-bold text-slate-800">{supplyOrders.filter((order) => order.status === status).length}</p></div>)}
+            {(['ABERTO', 'EM_COTACAO', 'COMPRADO', 'RECEBIDO'] as SupplyOrder['status'][]).map((status) => <div key={status} className="bg-surface border border-border rounded-xl p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-fg-muted">{status.replace('_', ' ')}</p><p className="mt-1 font-data-mono text-2xl font-bold text-fg">{supplyOrders.filter((order) => order.status === status).length}</p></div>)}
           </div>
-          {supplyOrders.length === 0 ? <div className="bg-white rounded-xl border border-slate-200 py-16 text-center text-slate-400"><span className="material-symbols-outlined text-4xl">shopping_cart</span><p className="mt-2 text-sm font-bold">Nenhum pedido de fornecimento</p><p className="text-xs mt-1">Gere a partir de uma proposta aceita.</p></div> : <div className="space-y-3">{supplyOrders.map((order) => (
-            <div key={order.id} className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col lg:flex-row lg:items-center gap-3">
-              <div className="min-w-0 flex-1"><p className="font-data-mono text-[11px] text-sky-700 font-bold">{order.id}</p><p className="font-bold text-slate-900 truncate">{order.title}</p><p className="text-xs text-slate-500 truncate">{order.clientName} · {order.items.length} item(ns) · origem {order.sourcePedidoId}</p></div>
-              <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${order.status === 'CONCLUIDO' ? 'bg-emerald-50 text-emerald-700' : order.status === 'CANCELADO' ? 'bg-slate-100 text-slate-400' : order.status.startsWith('RECEB') || order.status.startsWith('ENTRADA') ? 'bg-amber-50 text-amber-700' : 'bg-sky-50 text-sky-700'}`}>{SUPPLY_STATUS_LABEL[order.status] || order.status.replace(/_/g, ' ')}</span>
-              <div className="text-right shrink-0"><p className="font-data-mono font-bold text-emerald-600">{maskMoney(brl(order.totalValue))}</p><p className="text-[10px] text-slate-400">{order.supplier || 'Fornecimento'}</p></div>
-              <button onClick={() => setDetailOrder(order)} className="shrink-0 inline-flex items-center gap-1 bg-[#0B1E38] hover:bg-[#13315C] text-white text-[11px] font-bold uppercase tracking-wide rounded-lg px-3 py-2" title="Abrir detalhe do fornecimento">
+          {supplyOrders.length === 0 ? <div className="bg-surface rounded-xl border border-border py-16 text-center text-fg-muted"><span className="material-symbols-outlined text-4xl">shopping_cart</span><p className="mt-2 text-sm font-bold">Nenhum pedido de fornecimento</p><p className="text-xs mt-1">Gere a partir de uma proposta aceita.</p></div> : <div className="space-y-3">{supplyOrders.map((order) => (
+            <div key={order.id} className="bg-surface rounded-xl border border-border p-4 flex flex-col lg:flex-row lg:items-center gap-3">
+              <div className="min-w-0 flex-1"><p className="font-data-mono text-[11px] text-sky-700 font-bold">{order.id}</p><p className="font-bold text-fg truncate">{order.title}</p><p className="text-xs text-fg-secondary truncate">{order.clientName} · {order.items.length} item(ns) · origem {order.sourcePedidoId}</p></div>
+              <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${order.status === 'CONCLUIDO' ? 'bg-emerald-50 text-emerald-700' : order.status === 'CANCELADO' ? 'bg-surface-3 text-fg-muted' : order.status.startsWith('RECEB') || order.status.startsWith('ENTRADA') ? 'bg-amber-50 text-amber-700' : 'bg-sky-50 text-sky-700'}`}>{SUPPLY_STATUS_LABEL[order.status] || order.status.replace(/_/g, ' ')}</span>
+              <div className="text-right shrink-0"><p className="font-data-mono font-bold text-emerald-600">{maskMoney(brl(order.totalValue))}</p><p className="text-[10px] text-fg-muted">{order.supplier || 'Fornecimento'}</p></div>
+              <button onClick={() => setDetailOrder(order)} className="shrink-0 inline-flex items-center gap-1 bg-navy-3 hover:bg-[#13315C] text-white text-[11px] font-bold uppercase tracking-wide rounded-lg px-3 py-2" title="Abrir detalhe do fornecimento">
                 <span className="material-symbols-outlined text-base">open_in_full</span> Abrir
               </button>
             </div>
@@ -1321,42 +1321,42 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
         <>
           {/* Métricas de OS (entidade real ordens_servico) */}
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-              <p className="text-[11px] font-semibold text-slate-500 uppercase">
+            <div className="bg-surface p-4 rounded-xl border border-border shadow-sm">
+              <p className="text-[11px] font-semibold text-fg-secondary uppercase">
                 {isTecnico ? 'Minhas OS' : 'Ordens de Serviço'}
               </p>
-              <p className="font-data-mono text-2xl font-bold text-slate-900 mt-1">{baseOS.length}</p>
+              <p className="font-data-mono text-2xl font-bold text-fg mt-1">{baseOS.length}</p>
             </div>
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-              <p className="text-[11px] font-semibold text-slate-500 uppercase">Ativas</p>
+            <div className="bg-surface p-4 rounded-xl border border-border shadow-sm">
+              <p className="text-[11px] font-semibold text-fg-secondary uppercase">Ativas</p>
               <p className="font-data-mono text-2xl font-bold text-amber-600 mt-1">
                 {baseOS.filter((o) => OS_STATUS_ATIVOS.includes(o.status)).length}
               </p>
             </div>
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-              <p className="text-[11px] font-semibold text-slate-500 uppercase">Concluídas</p>
+            <div className="bg-surface p-4 rounded-xl border border-border shadow-sm">
+              <p className="text-[11px] font-semibold text-fg-secondary uppercase">Concluídas</p>
               <p className="font-data-mono text-2xl font-bold text-emerald-600 mt-1">
                 {baseOS.filter((o) => o.status === 'concluida').length}
               </p>
             </div>
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-              <p className="text-[11px] font-semibold text-slate-500 uppercase">Canceladas</p>
-              <p className="font-data-mono text-2xl font-bold text-slate-500 mt-1">
+            <div className="bg-surface p-4 rounded-xl border border-border shadow-sm">
+              <p className="text-[11px] font-semibold text-fg-secondary uppercase">Canceladas</p>
+              <p className="font-data-mono text-2xl font-bold text-fg-secondary mt-1">
                 {baseOS.filter((o) => o.status === 'cancelada').length}
               </p>
             </div>
           </div>
 
           {/* Busca + status canônico */}
-          <div className="flex flex-col sm:flex-row gap-3 justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex flex-col sm:flex-row gap-3 justify-between items-center bg-surface p-4 rounded-xl border border-border shadow-sm">
             <div className="relative w-full sm:w-80">
-              <Search className="absolute left-3 top-2.5 text-slate-400 w-4 h-4" />
+              <Search className="absolute left-3 top-2.5 text-fg-muted w-4 h-4" />
               <input
                 type="text"
                 placeholder="Buscar por OS, cliente, título, tipo..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E63946]/20"
+                className="w-full pl-9 pr-3 py-2 text-xs border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-danger/20"
               />
             </div>
             <div className="flex gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
@@ -1365,7 +1365,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                   key={st}
                   onClick={() => setFilterStatus(st)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
-                    filterStatus === st ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    filterStatus === st ? 'bg-slate-900 text-white shadow-sm' : 'bg-surface-3 text-fg-secondary hover:bg-surface-3'
                   }`}
                 >
                   {st === 'TODOS' ? 'Todas' : OS_STATUS_LABEL[st].label}
@@ -1375,9 +1375,9 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           </div>
 
           {filteredOS.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm py-16 text-center text-slate-400">
-              <Wrench className="w-10 h-10 text-slate-300 mx-auto" />
-              <p className="mt-2 text-sm font-bold text-slate-500 uppercase tracking-wider">Nenhuma ordem de serviço encontrada</p>
+            <div className="bg-surface rounded-xl shadow-sm py-16 text-center text-fg-muted">
+              <Wrench className="w-10 h-10 text-fg-muted mx-auto" />
+              <p className="mt-2 text-sm font-bold text-fg-secondary uppercase tracking-wider">Nenhuma ordem de serviço encontrada</p>
             </div>
           ) : (
             <div className="flex flex-col gap-3">
@@ -1391,20 +1391,20 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                     key={o.id}
                     onClick={() => setOsDetail(o)}
                     leading={logo
-                      ? <span className="w-14 h-14 rounded-xl bg-white border border-slate-200 p-1.5 shrink-0"><img src={logo} alt={`Logo ${nomeFantasiaCliente(cliNome)}`} className="w-full h-full object-contain" /></span>
-                      : <span className="w-14 h-14 rounded-xl bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center shrink-0"><Wrench className="w-6 h-6" /></span>}
+                      ? <span className="w-14 h-14 rounded-xl bg-surface border border-border p-1.5 shrink-0"><img src={logo} alt={`Logo ${nomeFantasiaCliente(cliNome)}`} className="w-full h-full object-contain" /></span>
+                      : <span className="w-14 h-14 rounded-xl bg-navy/10 text-primary flex items-center justify-center shrink-0"><Wrench className="w-6 h-6" /></span>}
                     title={<span className="text-sm">{o.titulo || 'Ordem de serviço sem título'}</span>}
                     meta={
                       <>
-                        <span className="text-[#1A1A72] font-semibold">{nomeFantasiaCliente(cliNome)}</span>
-                        {nomeFantasiaCliente(cliNome) !== razaoSocialCliente(cliNome) && <span className="text-slate-400 truncate">{razaoSocialCliente(cliNome)}</span>}
+                        <span className="text-primary font-semibold">{nomeFantasiaCliente(cliNome)}</span>
+                        {nomeFantasiaCliente(cliNome) !== razaoSocialCliente(cliNome) && <span className="text-fg-muted truncate">{razaoSocialCliente(cliNome)}</span>}
                         <RowMeta label="OS" value={<span className="font-data-mono">{o.numero || o.id.slice(0, 8)}</span>} />
                         <Badge color="slate">{o.tipo}</Badge>
                       </>
                     }
                     center={
                       <div className="text-left md:text-center">
-                        <p className="text-[10px] text-slate-400 font-data-mono">{o.dataPrevista ? `Previsto ${o.dataPrevista}` : o.dataAbertura || ''}</p>
+                        <p className="text-[10px] text-fg-muted font-data-mono">{o.dataPrevista ? `Previsto ${o.dataPrevista}` : o.dataAbertura || ''}</p>
                       </div>
                     }
                     right={
@@ -1608,21 +1608,21 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
       {/* Config antes de gerar o PDF */}
       {pdfConfigPedido && (
         <div className="fixed inset-0 z-[55] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white max-w-md w-full rounded-xl border border-slate-200 shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+          <div className="bg-surface max-w-md w-full rounded-xl border border-border shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-[#1A1A72]" />
-                <h3 className="font-display text-base font-bold text-[#1A1A72] uppercase tracking-wide">Opções do PDF</h3>
+                <FileText className="w-5 h-5 text-primary" />
+                <h3 className="font-display text-base font-bold text-primary uppercase tracking-wide">Opções do PDF</h3>
               </div>
-              <button onClick={() => setPdfConfigPedido(null)} className="text-slate-400 hover:text-slate-700 font-bold text-xl">
+              <button onClick={() => setPdfConfigPedido(null)} className="text-fg-muted hover:text-fg-secondary font-bold text-xl">
                 ✕
               </button>
             </div>
             <div className="px-6 py-5 space-y-3 text-xs">
-              <p className="text-slate-500">
-                Proposta <span className="font-data-mono font-bold text-slate-700">{pdfConfigPedido.numeroPedido}</span> — ajuste o que incluir no documento.
+              <p className="text-fg-secondary">
+                Proposta <span className="font-data-mono font-bold text-fg-secondary">{pdfConfigPedido.numeroPedido}</span> — ajuste o que incluir no documento.
               </p>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Elementos do documento</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-fg-muted">Elementos do documento</p>
               {[
                 { key: 'showLogo', label: 'Logotipo no cabeçalho' },
                 { key: 'showCarta', label: 'Carta de apresentação' },
@@ -1633,14 +1633,14 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                 { key: 'detailedSubtotal', label: 'Detalhar itens e subtotais' },
                 { key: 'showBankData', label: 'Dados para pagamento' },
               ].map((opt) => (
-                <div key={opt.key} className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
-                  <span className="font-semibold text-slate-700">{opt.label}</span>
+                <div key={opt.key} className="flex items-center justify-between bg-surface-2 border border-border rounded-lg px-3 py-2.5">
+                  <span className="font-semibold text-fg-secondary">{opt.label}</span>
                   <Toggle checked={(pdfOptions as any)[opt.key]} onChange={(v) => setPdfOptions((prev) => ({ ...prev, [opt.key]: v }))} />
                 </div>
               ))}
 
               {/* Imagem da capa (opcional) */}
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 pt-2">Imagem da capa (opcional)</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-fg-muted pt-2">Imagem da capa (opcional)</p>
               <input
                 ref={capaInputRef}
                 type="file"
@@ -1649,22 +1649,22 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                 onChange={(e) => handleCapaFile(e.target.files?.[0])}
               />
               {pdfOptions.capaImagemUrl ? (
-                <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg p-2.5">
+                <div className="flex items-center gap-3 bg-surface-2 border border-border rounded-lg p-2.5">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={pdfOptions.capaImagemUrl}
                     alt="Pré-visualização da capa"
-                    className="w-24 h-16 object-cover rounded-md border border-slate-300 bg-white shrink-0"
+                    className="w-24 h-16 object-cover rounded-md border border-border-strong bg-surface shrink-0"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-semibold text-slate-700">Imagem aplicada à capa</p>
-                    <p className="text-[10px] text-slate-400">Aparece no topo da capa; sem imagem, usa o grafismo.</p>
+                    <p className="text-[11px] font-semibold text-fg-secondary">Imagem aplicada à capa</p>
+                    <p className="text-[10px] text-fg-muted">Aparece no topo da capa; sem imagem, usa o grafismo.</p>
                     <div className="flex gap-2 mt-1.5">
                       <button
                         type="button"
                         onClick={() => capaInputRef.current?.click()}
                         disabled={capaBusy}
-                        className="text-[10px] font-bold uppercase tracking-wider text-[#1A1A72] hover:underline disabled:opacity-50"
+                        className="text-[10px] font-bold uppercase tracking-wider text-primary hover:underline disabled:opacity-50"
                       >
                         {capaBusy ? 'Enviando…' : 'Trocar'}
                       </button>
@@ -1684,21 +1684,21 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                   type="button"
                   onClick={() => capaInputRef.current?.click()}
                   disabled={capaBusy}
-                  className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-slate-300 hover:border-[#1A1A72] hover:bg-slate-50 rounded-lg py-3 text-[11px] font-semibold text-slate-500 hover:text-[#1A1A72] transition-colors disabled:opacity-60"
+                  className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-border-strong hover:border-primary hover:bg-surface-2 rounded-lg py-3 text-[11px] font-semibold text-fg-secondary hover:text-primary transition-colors disabled:opacity-60"
                 >
                   <Plus className="w-4 h-4" /> {capaBusy ? 'Enviando…' : 'Adicionar imagem (JPG/PNG)'}
                 </button>
               )}
 
-              <p className="text-[10px] text-slate-400 pt-1">
+              <p className="text-[10px] text-fg-muted pt-1">
                 As cláusulas jurídicas (multas, responsabilidade, sigilo, condições gerais, termo de aceite) são
                 ligadas/desligadas na própria proposta, em <strong>&ldquo;Cláusulas Jurídicas&rdquo;</strong>.
               </p>
             </div>
-            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2">
+            <div className="px-6 py-4 border-t border-border flex justify-end gap-2">
               <button
                 onClick={() => setPdfConfigPedido(null)}
-                className="px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-slate-600 hover:bg-slate-100 transition-colors"
+                className="px-4 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-fg-secondary hover:bg-surface-3 transition-colors"
               >
                 Cancelar
               </button>
@@ -1708,7 +1708,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                   setPdfConfigPedido(null);
                   setPdfPreviewPedido(ped);
                 }}
-                className="bg-[#E63946] hover:bg-[#a51515] text-white px-5 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm flex items-center gap-1.5"
+                className="bg-danger hover:bg-danger-hover text-white px-5 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm flex items-center gap-1.5"
               >
                 <Eye className="w-4 h-4" /> Gerar PDF
               </button>
@@ -1743,15 +1743,15 @@ const PipelineCard: React.FC<{
 }> = ({ label, count, color, active, onClick }) => (
   <button
     onClick={onClick}
-    className={`shrink-0 min-w-[7rem] text-left px-3 py-2 rounded-xl border bg-white shadow-sm cursor-pointer transition-all hover:shadow-md active:scale-[0.97] ${
-      active ? 'border-current ring-2' : 'border-slate-200'
+    className={`shrink-0 min-w-[7rem] text-left px-3 py-2 rounded-xl border bg-surface shadow-sm cursor-pointer transition-all hover:shadow-md active:scale-[0.97] ${
+      active ? 'border-current ring-2' : 'border-border'
     }`}
     style={active ? { color, boxShadow: `0 0 0 2px ${color}22` } : undefined}
   >
     <p className="font-data-mono text-2xl font-bold leading-none" style={{ color }}>
       {count}
     </p>
-    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mt-1 truncate">{label}</p>
+    <p className="text-[10px] font-semibold uppercase tracking-wider text-fg-secondary mt-1 truncate">{label}</p>
   </button>
 );
 
@@ -1760,8 +1760,8 @@ const InsightCard: React.FC<{ label: string; value: string; detail: string; tone
     emerald: 'border-emerald-200 bg-emerald-50 text-emerald-700',
     amber: 'border-amber-200 bg-amber-50 text-amber-800',
     red: 'border-red-200 bg-red-50 text-red-700',
-    slate: 'border-slate-200 bg-slate-50 text-slate-700',
-    navy: 'border-[#1A1A72]/20 bg-[#1A1A72]/5 text-[#1A1A72]',
+    slate: 'border-border bg-surface-2 text-fg-secondary',
+    navy: 'border-primary/20 bg-navy/5 text-primary',
   } as const;
   return <div className={`rounded-xl border p-3 min-w-0 ${palette[tone]}`}>
     <p className="text-[10px] font-bold uppercase tracking-wide opacity-75">{label}</p>
@@ -1789,10 +1789,10 @@ const RevisionComparisonModal: React.FC<{ pedido: Pedido; onClose: () => void }>
     { label: 'Pagamento', before: before.pagamento, current: current.pagamento },
   ];
   return <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-    <div className="bg-white w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-xl shadow-2xl flex flex-col">
-      <div className="p-5 border-b border-slate-200 flex items-start justify-between"><div><p className="text-[10px] font-bold text-violet-700 uppercase tracking-wide">Comparação de revisão</p><h3 className="font-bold text-slate-900 mt-1">{revision.numero} → {pedido.numeroPedido}</h3><p className="text-xs text-slate-500 mt-1">{revision.motivo || 'Revisão comercial'}</p></div><button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-xl">×</button></div>
-      <div className="overflow-y-auto p-5"><div className="grid grid-cols-[9rem_1fr_1fr] gap-px bg-slate-200 border border-slate-200 rounded-lg overflow-hidden text-xs"><div className="bg-slate-100 p-2 font-bold text-slate-500">Campo</div><div className="bg-slate-100 p-2 font-bold text-slate-500">Versão anterior</div><div className="bg-slate-100 p-2 font-bold text-slate-500">Versão atual</div>{fields.map((field) => { const changed = field.before !== field.current; return <React.Fragment key={field.label}><div className="bg-white p-2 font-semibold text-slate-700">{field.label}</div><div className={`bg-white p-2 whitespace-pre-wrap break-words ${changed ? 'text-red-700 bg-red-50/40' : 'text-slate-600'}`}>{field.before || '—'}</div><div className={`bg-white p-2 whitespace-pre-wrap break-words ${changed ? 'text-emerald-700 bg-emerald-50/50 font-medium' : 'text-slate-600'}`}>{field.current || '—'}</div></React.Fragment>; })}</div></div>
-      <div className="p-4 border-t border-slate-200 flex justify-end"><button onClick={onClose} className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-bold">Fechar</button></div>
+    <div className="bg-surface w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-xl shadow-2xl flex flex-col">
+      <div className="p-5 border-b border-border flex items-start justify-between"><div><p className="text-[10px] font-bold text-violet-700 uppercase tracking-wide">Comparação de revisão</p><h3 className="font-bold text-fg mt-1">{revision.numero} → {pedido.numeroPedido}</h3><p className="text-xs text-fg-secondary mt-1">{revision.motivo || 'Revisão comercial'}</p></div><button onClick={onClose} className="text-fg-muted hover:text-fg-secondary text-xl">×</button></div>
+      <div className="overflow-y-auto p-5"><div className="grid grid-cols-[9rem_1fr_1fr] gap-px bg-surface-3 border border-border rounded-lg overflow-hidden text-xs"><div className="bg-surface-3 p-2 font-bold text-fg-secondary">Campo</div><div className="bg-surface-3 p-2 font-bold text-fg-secondary">Versão anterior</div><div className="bg-surface-3 p-2 font-bold text-fg-secondary">Versão atual</div>{fields.map((field) => { const changed = field.before !== field.current; return <React.Fragment key={field.label}><div className="bg-surface p-2 font-semibold text-fg-secondary">{field.label}</div><div className={`bg-surface p-2 whitespace-pre-wrap break-words ${changed ? 'text-red-700 bg-red-50/40' : 'text-fg-secondary'}`}>{field.before || '—'}</div><div className={`bg-surface p-2 whitespace-pre-wrap break-words ${changed ? 'text-emerald-700 bg-emerald-50/50 font-medium' : 'text-fg-secondary'}`}>{field.current || '—'}</div></React.Fragment>; })}</div></div>
+      <div className="p-4 border-t border-border flex justify-end"><button onClick={onClose} className="px-4 py-2 rounded-lg bg-surface-3 hover:bg-surface-3 text-xs font-bold">Fechar</button></div>
     </div>
   </div>;
 };
@@ -1821,21 +1821,21 @@ const OrdemServicoDetailModal: React.FC<{
   const podeCancelar = canManage && !!onCancel && isCancelable(os);
   const podeExcluir = canManage && !!onDelete && isHardDeleteEligible(os);
   const linha = (label: string, value: React.ReactNode) => (
-    <div className="flex gap-3 py-1.5 border-b border-slate-100 last:border-0">
-      <span className="w-32 shrink-0 text-[11px] font-bold text-slate-500 uppercase">{label}</span>
-      <span className="text-sm text-slate-800 break-words min-w-0">{value}</span>
+    <div className="flex gap-3 py-1.5 border-b border-border last:border-0">
+      <span className="w-32 shrink-0 text-[11px] font-bold text-fg-secondary uppercase">{label}</span>
+      <span className="text-sm text-fg break-words min-w-0">{value}</span>
     </div>
   );
   return (
     <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-lg max-h-[90vh] overflow-hidden rounded-xl shadow-2xl flex flex-col">
-        <div className="p-5 border-b border-slate-200 flex items-start justify-between">
+      <div className="bg-surface w-full max-w-lg max-h-[90vh] overflow-hidden rounded-xl shadow-2xl flex flex-col">
+        <div className="p-5 border-b border-border flex items-start justify-between">
           <div>
             <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide">Ordem de Serviço</p>
-            <h3 className="font-bold text-slate-900 mt-1 font-data-mono">{os.numero || os.id}</h3>
+            <h3 className="font-bold text-fg mt-1 font-data-mono">{os.numero || os.id}</h3>
             <div className="mt-1"><Badge color={st.color}>{st.label}</Badge></div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-xl">×</button>
+          <button onClick={onClose} className="text-fg-muted hover:text-fg-secondary text-xl">×</button>
         </div>
         <div className="overflow-y-auto p-5">
           {linha('Cliente', clienteNome)}
@@ -1854,7 +1854,7 @@ const OrdemServicoDetailModal: React.FC<{
             </>
           )}
         </div>
-        <div className="p-4 border-t border-slate-200 flex justify-between items-center gap-2">
+        <div className="p-4 border-t border-border flex justify-between items-center gap-2">
           <div className="flex gap-2">
             {podeExcluir && (
               <button onClick={onDelete} className="px-3 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold">Excluir OS</button>
@@ -1863,7 +1863,7 @@ const OrdemServicoDetailModal: React.FC<{
               <button onClick={onCancel} className="px-3 py-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold">Cancelar OS</button>
             )}
           </div>
-          <button onClick={onClose} className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-bold">Fechar</button>
+          <button onClick={onClose} className="px-4 py-2 rounded-lg bg-surface-3 hover:bg-surface-3 text-xs font-bold">Fechar</button>
         </div>
       </div>
     </div>
@@ -1894,26 +1894,26 @@ const CancelOsModal: React.FC<{
   };
   return (
     <div className="fixed inset-0 z-[75] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-md rounded-xl shadow-2xl flex flex-col">
-        <div className="p-5 border-b border-slate-200">
+      <div className="bg-surface w-full max-w-md rounded-xl shadow-2xl flex flex-col">
+        <div className="p-5 border-b border-border">
           <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">Cancelar Ordem de Serviço</p>
-          <h3 className="font-bold text-slate-900 mt-1 font-data-mono">{os.numero || os.id}</h3>
+          <h3 className="font-bold text-fg mt-1 font-data-mono">{os.numero || os.id}</h3>
         </div>
         <div className="p-5">
-          <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Motivo do cancelamento</label>
+          <label className="block text-[11px] font-bold text-fg-secondary uppercase mb-1">Motivo do cancelamento</label>
           <textarea
             value={motivo}
             onChange={(e) => setMotivo(e.target.value)}
             rows={4}
             autoFocus
             placeholder="Descreva por que esta OS não será mais executada…"
-            className="w-full border border-slate-200 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+            className="w-full border border-border rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30"
           />
-          <p className="text-[11px] text-slate-400 mt-1">O histórico, evidências e relatórios são preservados. O Pedido poderá gerar uma nova OS.</p>
+          <p className="text-[11px] text-fg-muted mt-1">O histórico, evidências e relatórios são preservados. O Pedido poderá gerar uma nova OS.</p>
           {erro && <p className="text-xs text-red-600 mt-2 font-semibold">{erro}</p>}
         </div>
-        <div className="p-4 border-t border-slate-200 flex justify-end gap-2">
-          <button onClick={onClose} disabled={busy} className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-bold disabled:opacity-50">Voltar</button>
+        <div className="p-4 border-t border-border flex justify-end gap-2">
+          <button onClick={onClose} disabled={busy} className="px-4 py-2 rounded-lg bg-surface-3 hover:bg-surface-3 text-xs font-bold disabled:opacity-50">Voltar</button>
           <button onClick={confirmar} disabled={!podeConfirmar} className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold disabled:opacity-50">
             {busy ? 'Cancelando…' : 'Confirmar cancelamento'}
           </button>
@@ -1944,19 +1944,19 @@ const DeleteOsModal: React.FC<{
   };
   return (
     <div className="fixed inset-0 z-[75] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-md rounded-xl shadow-2xl flex flex-col">
-        <div className="p-5 border-b border-slate-200">
+      <div className="bg-surface w-full max-w-md rounded-xl shadow-2xl flex flex-col">
+        <div className="p-5 border-b border-border">
           <p className="text-[10px] font-bold text-red-700 uppercase tracking-wide">Excluir Ordem de Serviço</p>
-          <h3 className="font-bold text-slate-900 mt-1 font-data-mono">{os.numero || os.id}</h3>
+          <h3 className="font-bold text-fg mt-1 font-data-mono">{os.numero || os.id}</h3>
         </div>
         <div className="p-5">
-          <p className="text-sm text-slate-700">Esta Ordem de Serviço ainda não possui atendimento, relatório ou evidências operacionais e pode ser excluída permanentemente.</p>
-          <p className="text-[11px] text-slate-400 mt-2">A verificação é refeita no servidor: se houver qualquer vínculo, a exclusão é bloqueada.</p>
+          <p className="text-sm text-fg-secondary">Esta Ordem de Serviço ainda não possui atendimento, relatório ou evidências operacionais e pode ser excluída permanentemente.</p>
+          <p className="text-[11px] text-fg-muted mt-2">A verificação é refeita no servidor: se houver qualquer vínculo, a exclusão é bloqueada.</p>
           {erro && <p className="text-xs text-red-600 mt-2 font-semibold">{erro}</p>}
         </div>
-        <div className="p-4 border-t border-slate-200 flex justify-end gap-2">
-          <button onClick={onClose} disabled={busy} className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-bold disabled:opacity-50">Voltar</button>
-          <button onClick={excluir} disabled={busy} className="px-4 py-2 rounded-lg bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-bold disabled:opacity-50">
+        <div className="p-4 border-t border-border flex justify-end gap-2">
+          <button onClick={onClose} disabled={busy} className="px-4 py-2 rounded-lg bg-surface-3 hover:bg-surface-3 text-xs font-bold disabled:opacity-50">Voltar</button>
+          <button onClick={excluir} disabled={busy} className="px-4 py-2 rounded-lg bg-danger hover:bg-danger-hover text-white text-xs font-bold disabled:opacity-50">
             {busy ? 'Excluindo…' : 'Excluir permanentemente'}
           </button>
         </div>

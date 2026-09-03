@@ -28,15 +28,15 @@ const sameDay = (a: number, b: number) => new Date(a).toDateString() === new Dat
 const NEXT_TONE: Record<string, string> = {
   ENTRADA: 'bg-emerald-600 hover:bg-emerald-700',
   PAUSA: 'bg-amber-500 hover:bg-amber-600',
-  RETORNO: 'bg-[#1A1A72] hover:bg-[#12124f]',
-  SAIDA: 'bg-[#E63946] hover:bg-[#a51515]',
+  RETORNO: 'bg-navy hover:bg-navy-3',
+  SAIDA: 'bg-danger hover:bg-danger-hover',
 };
 const OS_TONE: Record<OrdemServico['status'], string> = {
-  aberta: 'bg-slate-100 text-slate-700',
+  aberta: 'bg-surface-3 text-fg-secondary',
   agendada: 'bg-indigo-100 text-indigo-700',
   em_execucao: 'bg-amber-100 text-amber-700',
   concluida: 'bg-emerald-100 text-emerald-700',
-  cancelada: 'bg-slate-100 text-slate-400',
+  cancelada: 'bg-surface-3 text-fg-muted',
 };
 
 export const TechDashboard: React.FC<TechDashboardProps> = ({
@@ -126,12 +126,12 @@ export const TechDashboard: React.FC<TechDashboardProps> = ({
       {/* Saudação + status de sincronização */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-lg font-bold text-slate-900 truncate">{saudacao}, {currentUser || 'técnico'} 👋</p>
-          <p className="text-[11px] text-slate-500 capitalize">{hoje}</p>
+          <p className="text-lg font-bold text-fg truncate">{saudacao}, {currentUser || 'técnico'} 👋</p>
+          <p className="text-[11px] text-fg-secondary capitalize">{hoje}</p>
         </div>
         <span
           className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${
-            online ? (pend > 0 ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200') : 'bg-slate-100 text-slate-500 border border-slate-200'
+            online ? (pend > 0 ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200') : 'bg-surface-3 text-fg-secondary border border-border'
           }`}
           title={online ? (pend > 0 ? `${pend} relatório(s) aguardando envio` : 'Tudo sincronizado') : 'Sem conexão — dados salvos no aparelho'}
         >
@@ -141,24 +141,24 @@ export const TechDashboard: React.FC<TechDashboardProps> = ({
       </div>
 
       {/* Bater ponto INLINE — registra no próprio Dashboard (mesmo motor do Ponto) */}
-      <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-4">
+      <div className="rounded-2xl bg-surface border border-border shadow-sm p-4">
         <div className="grid grid-cols-4 gap-2 mb-3">
           {(['ENTRADA', 'PAUSA', 'RETORNO', 'SAIDA'] as const).map((t, i) => (
             <div key={t} className="text-center">
-              <p className="text-[9px] uppercase tracking-wider text-slate-400">{['Entrada', 'Almoço', 'Retorno', 'Saída'][i]}</p>
-              <p className={`font-data-mono text-sm font-bold mt-0.5 ${marco(t) ? 'text-slate-900' : 'text-slate-300'}`}>{hm(marco(t))}</p>
+              <p className="text-[9px] uppercase tracking-wider text-fg-muted">{['Entrada', 'Almoço', 'Retorno', 'Saída'][i]}</p>
+              <p className={`font-data-mono text-sm font-bold mt-0.5 ${marco(t) ? 'text-fg' : 'text-fg-muted'}`}>{hm(marco(t))}</p>
             </div>
           ))}
         </div>
         <button
           onClick={baterPonto}
           disabled={!nextT || punching}
-          className={`w-full min-h-[72px] rounded-xl text-white shadow-md flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:opacity-60 ${nextT ? NEXT_TONE[nextT] : 'bg-slate-400'}`}
+          className={`w-full min-h-[72px] rounded-xl text-white shadow-md flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:opacity-60 ${nextT ? NEXT_TONE[nextT] : 'bg-border-strong'}`}
         >
           <span className={`material-symbols-outlined text-3xl ${punching ? 'animate-spin' : ''}`}>{punching ? 'progress_activity' : nextT ? 'fingerprint' : 'task_alt'}</span>
           <span className="text-base font-bold uppercase tracking-wide">{punching ? 'Registrando…' : nextT ? PUNCH_LABEL[nextT] : 'Jornada encerrada'}</span>
         </button>
-        <button onClick={() => onNavigateToTab('ponto')} className="mt-2 w-full text-[11px] font-semibold text-[#1A1A72] hover:underline uppercase">
+        <button onClick={() => onNavigateToTab('ponto')} className="mt-2 w-full text-[11px] font-semibold text-primary hover:underline uppercase">
           Abrir Ponto completo / Meu Espelho
         </button>
       </div>
@@ -167,40 +167,40 @@ export const TechDashboard: React.FC<TechDashboardProps> = ({
       <div className="grid grid-cols-2 gap-3">
         <button
           onClick={onNewAtendimento}
-          className="min-h-[80px] rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col items-center justify-center gap-1 text-[#E63946] hover:border-[#E63946] transition-colors"
+          className="min-h-[80px] rounded-xl bg-surface border border-border shadow-sm flex flex-col items-center justify-center gap-1 text-danger hover:border-danger transition-colors"
         >
           <span className="material-symbols-outlined text-3xl">assignment</span>
-          <span className="text-xs font-bold uppercase tracking-wide text-slate-700">Novo Atendimento</span>
+          <span className="text-xs font-bold uppercase tracking-wide text-fg-secondary">Novo Atendimento</span>
         </button>
         <button
           onClick={onNewOSClick}
-          className="min-h-[80px] rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col items-center justify-center gap-1 text-[#1A1A72] hover:border-[#1A1A72] transition-colors"
+          className="min-h-[80px] rounded-xl bg-surface border border-border shadow-sm flex flex-col items-center justify-center gap-1 text-primary hover:border-primary transition-colors"
         >
           <span className="material-symbols-outlined text-3xl">add_task</span>
-          <span className="text-xs font-bold uppercase tracking-wide text-slate-700">Nova OS</span>
+          <span className="text-xs font-bold uppercase tracking-wide text-fg-secondary">Nova OS</span>
         </button>
         <button
           onClick={() => setQuickPhotoOpen(true)}
-          className="min-h-[80px] rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col items-center justify-center gap-1 text-[#1A1A72] hover:border-[#1A1A72] transition-colors"
+          className="min-h-[80px] rounded-xl bg-surface border border-border shadow-sm flex flex-col items-center justify-center gap-1 text-primary hover:border-primary transition-colors"
         >
           <span className="material-symbols-outlined text-3xl">photo_camera</span>
-          <span className="text-xs font-bold uppercase tracking-wide text-slate-700">Registro Rápido</span>
+          <span className="text-xs font-bold uppercase tracking-wide text-fg-secondary">Registro Rápido</span>
         </button>
       </div>
 
       {/* Mini-agenda — minhas próximas OS (por UUID, RLS já restringe) */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Minhas próximas OS</p>
-          <button onClick={() => onNavigateToTab('agenda')} className="text-[11px] font-semibold text-[#1A1A72] hover:underline uppercase">
+          <p className="text-xs font-bold uppercase tracking-wider text-fg-secondary">Minhas próximas OS</p>
+          <button onClick={() => onNavigateToTab('agenda')} className="text-[11px] font-semibold text-primary hover:underline uppercase">
             Ver agenda completa
           </button>
         </div>
         {minhasOS.length === 0 ? (
-          <div className="bg-white rounded-xl border border-dashed border-slate-200 py-10 text-center">
-            <span className="material-symbols-outlined text-4xl text-slate-300">event_available</span>
-            <p className="mt-1 text-sm font-bold text-slate-500 uppercase tracking-wider">Sem OS atribuídas</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Nada pendente para você agora.</p>
+          <div className="bg-surface rounded-xl border border-dashed border-border py-10 text-center">
+            <span className="material-symbols-outlined text-4xl text-fg-muted">event_available</span>
+            <p className="mt-1 text-sm font-bold text-fg-secondary uppercase tracking-wider">Sem OS atribuídas</p>
+            <p className="text-[11px] text-fg-muted mt-0.5">Nada pendente para você agora.</p>
           </div>
         ) : (
           <div className="flex flex-col gap-2">
@@ -208,14 +208,14 @@ export const TechDashboard: React.FC<TechDashboardProps> = ({
               <button
                 key={os.id}
                 onClick={() => onNavigateToTab('pedidos')}
-                className="text-left bg-white rounded-xl border border-slate-200 shadow-sm p-3 hover:border-slate-300 transition-colors"
+                className="text-left bg-surface rounded-xl border border-border shadow-sm p-3 hover:border-border-strong transition-colors"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-data-mono text-[11px] font-bold text-slate-500">{os.numero || os.id.slice(0, 8)}</span>
+                  <span className="font-data-mono text-[11px] font-bold text-fg-secondary">{os.numero || os.id.slice(0, 8)}</span>
                   <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${OS_TONE[os.status]}`}>{os.status.replace('_', ' ')}</span>
                 </div>
-                <p className="font-bold text-slate-900 text-sm truncate mt-1">{clientName(os.clienteId)}</p>
-                <p className="text-[11px] text-slate-500 truncate">
+                <p className="font-bold text-fg text-sm truncate mt-1">{clientName(os.clienteId)}</p>
+                <p className="text-[11px] text-fg-secondary truncate">
                   {os.tipo}{os.dataPrevista ? ` · ${new Date(os.dataPrevista).toLocaleDateString('pt-BR')}` : ''}
                 </p>
               </button>

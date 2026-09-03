@@ -148,7 +148,7 @@ const shortId = (id: string) => `#${id.slice(0, 8)}`;
 const fmtDate = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '—');
 
 const STATUS_COLOR: Record<string, string> = {
-  rascunho: 'bg-slate-100 text-slate-700',
+  rascunho: 'bg-surface-3 text-fg-secondary',
   finalizado: 'bg-emerald-100 text-emerald-800',
   cancelado: 'bg-red-100 text-red-700',
 };
@@ -821,29 +821,29 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   // formulário e do índice). Some fornecedor/custo: são preenchidos no Estoque.
   const provPanel = provProdOpen ? (
     <div className="fixed inset-0 z-[80] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-md rounded-xl shadow-2xl border border-slate-200 max-h-[92vh] flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-slate-100">
+      <div className="bg-surface w-full max-w-md rounded-xl shadow-2xl border border-border max-h-[92vh] flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b border-border">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[#E63946]">inventory_2</span>
+            <span className="material-symbols-outlined text-danger">inventory_2</span>
             <div>
-              <h3 className="text-sm font-bold text-slate-900 uppercase">Cadastro rápido de produto</h3>
-              <p className="text-[11px] text-slate-500">Vai para o Estoque como pendente</p>
+              <h3 className="text-sm font-bold text-fg uppercase">Cadastro rápido de produto</h3>
+              <p className="text-[11px] text-fg-secondary">Vai para o Estoque como pendente</p>
             </div>
           </div>
-          <button onClick={() => setProvProdOpen(false)} className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none">✕</button>
+          <button onClick={() => setProvProdOpen(false)} className="text-fg-muted hover:text-fg-secondary font-bold text-lg leading-none">✕</button>
         </div>
 
         {ppDone ? (
           <div className="p-6 text-center">
             <span className="material-symbols-outlined text-5xl text-emerald-500">task_alt</span>
-            <h4 className="text-base font-bold text-slate-900 mt-2">Produto enviado ao Estoque</h4>
-            <p className="text-xs text-slate-500 mt-1">
+            <h4 className="text-base font-bold text-fg mt-2">Produto enviado ao Estoque</h4>
+            <p className="text-xs text-fg-secondary mt-1">
               <b>{ppDone}</b> foi criado como <b>cadastro pendente</b>. Abra a aba <b>Estoque</b> quando puder para
               informar fornecedor, custo e preço de venda e finalizar o cadastro.
             </p>
             <button
               onClick={() => setProvProdOpen(false)}
-              className="mt-4 px-6 py-2.5 rounded-lg bg-[#1A1A72] text-white text-xs font-semibold uppercase tracking-wide"
+              className="mt-4 px-6 py-2.5 rounded-lg bg-navy text-white text-xs font-semibold uppercase tracking-wide"
             >
               Continuar relatório
             </button>
@@ -852,26 +852,26 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
           <>
             <div className="p-4 overflow-y-auto space-y-3">
               <div>
-                <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Nome do produto *</label>
+                <label className="block text-fg-secondary mb-1 font-semibold uppercase text-[11px]">Nome do produto *</label>
                 <input
                   autoFocus
                   type="text"
                   value={ppName}
                   onChange={(e) => setPpName(e.target.value)}
                   placeholder="Ex.: Detector óptico endereçável"
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                  className="w-full border border-border rounded-lg p-2.5 text-fg bg-surface text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Marca</label>
+                  <label className="block text-fg-secondary mb-1 font-semibold uppercase text-[11px]">Marca</label>
                   <input
                     type="text"
                     list="prov-marcas"
                     value={ppBrand}
                     onChange={(e) => setPpBrand(e.target.value)}
                     placeholder="Ex.: Tecnohold"
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                    className="w-full border border-border rounded-lg p-2.5 text-fg bg-surface text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                   <datalist id="prov-marcas">
                     {marcaOptions.map((m) => (
@@ -880,49 +880,49 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                   </datalist>
                 </div>
                 <div>
-                  <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Modelo</label>
+                  <label className="block text-fg-secondary mb-1 font-semibold uppercase text-[11px]">Modelo</label>
                   <input
                     type="text"
                     value={ppModel}
                     onChange={(e) => setPpModel(e.target.value)}
                     placeholder="Ex.: TH-2000"
-                    className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                    className="w-full border border-border rounded-lg p-2.5 text-fg bg-surface text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Unidade (opcional)</label>
+                <label className="block text-fg-secondary mb-1 font-semibold uppercase text-[11px]">Unidade (opcional)</label>
                 <input
                   type="text"
                   value={ppUnit}
                   onChange={(e) => setPpUnit(e.target.value)}
                   placeholder="Ex.: UN, PC, M"
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs font-data-mono focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                  className="w-full border border-border rounded-lg p-2.5 text-fg bg-surface text-xs font-data-mono focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
               </div>
               <div>
-                <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Observação (opcional)</label>
+                <label className="block text-fg-secondary mb-1 font-semibold uppercase text-[11px]">Observação (opcional)</label>
                 <textarea
                   rows={2}
                   value={ppDesc}
                   onChange={(e) => setPpDesc(e.target.value)}
                   placeholder="Detalhe técnico que ajude a finalizar o cadastro depois…"
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs resize-none focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                  className="w-full border border-border rounded-lg p-2.5 text-fg bg-surface text-xs resize-none focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
               </div>
-              <p className="text-[10px] text-slate-500 flex items-start gap-1 bg-amber-50 border border-amber-200 rounded-lg p-2">
+              <p className="text-[10px] text-fg-secondary flex items-start gap-1 bg-amber-50 border border-amber-200 rounded-lg p-2">
                 <span className="material-symbols-outlined text-sm text-amber-600">info</span>
                 <span>Você não precisa do fornecedor nem do preço agora. O produto vai para o Estoque marcado como <b>pendente</b> para você finalizar com calma.</span>
               </p>
             </div>
-            <div className="flex items-center justify-between p-4 border-t border-slate-100">
-              <button onClick={() => setProvProdOpen(false)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 uppercase">
+            <div className="flex items-center justify-between p-4 border-t border-border">
+              <button onClick={() => setProvProdOpen(false)} className="px-4 py-2 text-xs font-semibold text-fg-secondary hover:text-fg uppercase">
                 Cancelar
               </button>
               <button
                 onClick={confirmProvProduct}
                 disabled={!(ppName.trim() || ppModel.trim()) || ppSaving}
-                className="px-5 py-2 rounded-lg bg-[#E63946] hover:bg-[#a51515] disabled:opacity-50 text-white text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5"
+                className="px-5 py-2 rounded-lg bg-danger hover:bg-danger-hover disabled:opacity-50 text-white text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5"
               >
                 {ppSaving && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
                 {ppSaving ? 'Enviando…' : 'Enviar ao Estoque'}
@@ -938,29 +938,29 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   // categoria e vínculo opcional a um fornecedor. Evita marca solta/duplicada.
   const brandPanel = brandOpen ? (
     <div className="fixed inset-0 z-[80] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-md rounded-xl shadow-2xl border border-slate-200 max-h-[92vh] flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-slate-100">
+      <div className="bg-surface w-full max-w-md rounded-xl shadow-2xl border border-border max-h-[92vh] flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b border-border">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[#1A1A72]">verified</span>
+            <span className="material-symbols-outlined text-primary">verified</span>
             <div>
-              <h3 className="text-sm font-bold text-slate-900 uppercase">Cadastro de marca</h3>
-              <p className="text-[11px] text-slate-500">Fabricante / marca parceira</p>
+              <h3 className="text-sm font-bold text-fg uppercase">Cadastro de marca</h3>
+              <p className="text-[11px] text-fg-secondary">Fabricante / marca parceira</p>
             </div>
           </div>
-          <button onClick={() => setBrandOpen(false)} className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none">✕</button>
+          <button onClick={() => setBrandOpen(false)} className="text-fg-muted hover:text-fg-secondary font-bold text-lg leading-none">✕</button>
         </div>
 
         {bDone ? (
           <div className="p-6 text-center">
             <span className="material-symbols-outlined text-5xl text-emerald-500">task_alt</span>
-            <h4 className="text-base font-bold text-slate-900 mt-2">Marca cadastrada</h4>
-            <p className="text-xs text-slate-500 mt-1">
+            <h4 className="text-base font-bold text-fg mt-2">Marca cadastrada</h4>
+            <p className="text-xs text-fg-secondary mt-1">
               <b>{bDone}</b> está disponível no campo de fabricante. Você pode gerenciar as marcas em{' '}
               <b>Conta → Marcas Parceiras</b>.
             </p>
             <button
               onClick={() => setBrandOpen(false)}
-              className="mt-4 px-6 py-2.5 rounded-lg bg-[#1A1A72] text-white text-xs font-semibold uppercase tracking-wide"
+              className="mt-4 px-6 py-2.5 rounded-lg bg-navy text-white text-xs font-semibold uppercase tracking-wide"
             >
               Continuar relatório
             </button>
@@ -969,14 +969,14 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
           <>
             <div className="p-4 overflow-y-auto space-y-3">
               <div>
-                <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Nome da marca *</label>
+                <label className="block text-fg-secondary mb-1 font-semibold uppercase text-[11px]">Nome da marca *</label>
                 <input
                   autoFocus
                   type="text"
                   value={bName}
                   onChange={(e) => setBName(e.target.value)}
                   placeholder="Ex.: Tecnohold"
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                  className="w-full border border-border rounded-lg p-2.5 text-fg bg-surface text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
                 {bName.trim() && brandJaExiste(bName) && (
                   <p className="mt-1 text-[10px] font-semibold text-amber-600 flex items-center gap-1">
@@ -986,21 +986,21 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                 )}
               </div>
               <div>
-                <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Categoria / segmento</label>
+                <label className="block text-fg-secondary mb-1 font-semibold uppercase text-[11px]">Categoria / segmento</label>
                 <input
                   type="text"
                   value={bCategoria}
                   onChange={(e) => setBCategoria(e.target.value)}
                   placeholder="Ex.: SDAI"
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                  className="w-full border border-border rounded-lg p-2.5 text-fg bg-surface text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
               </div>
               <div>
-                <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Fornecedor (opcional)</label>
+                <label className="block text-fg-secondary mb-1 font-semibold uppercase text-[11px]">Fornecedor (opcional)</label>
                 <select
                   value={bFornecedor}
                   onChange={(e) => setBFornecedor(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                  className="w-full border border-border rounded-lg p-2.5 text-fg bg-surface text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
                 >
                   <option value="">— Sem vínculo —</option>
                   {suppliers.map((s) => (
@@ -1009,46 +1009,46 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                     </option>
                   ))}
                 </select>
-                <p className="mt-1 text-[10px] text-slate-400">Vincular a um fornecedor deixa a marca ligada a quem você compra.</p>
+                <p className="mt-1 text-[10px] text-fg-muted">Vincular a um fornecedor deixa a marca ligada a quem você compra.</p>
               </div>
 
               {/* Marcas já cadastradas — permite remover marcas soltas/duplicadas */}
               {onDeletePartnerBrand && removableBrands.length > 0 && (
                 <div className="pt-1">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Marcas cadastradas</p>
-                  <div className="max-h-40 overflow-y-auto flex flex-col gap-1 border border-slate-100 rounded-lg p-1.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-fg-muted mb-1.5">Marcas cadastradas</p>
+                  <div className="max-h-40 overflow-y-auto flex flex-col gap-1 border border-border rounded-lg p-1.5">
                     {removableBrands
                       .slice()
                       .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
                       .map((b) => (
-                        <div key={b.id} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-md hover:bg-slate-50">
-                          <span className="text-xs text-slate-700 truncate">
+                        <div key={b.id} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-md hover:bg-surface-2">
+                          <span className="text-xs text-fg-secondary truncate">
                             {b.name}
-                            {b.category ? <span className="text-slate-400"> · {b.category}</span> : null}
+                            {b.category ? <span className="text-fg-muted"> · {b.category}</span> : null}
                           </span>
                           <button
                             type="button"
                             onClick={() => handleRemoveBrand(b.id, b.name)}
                             title="Remover marca"
-                            className="shrink-0 w-7 h-7 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#E63946] hover:bg-red-50 transition-colors"
+                            className="shrink-0 w-7 h-7 rounded-lg inline-flex items-center justify-center text-fg-muted hover:text-danger hover:bg-red-50 transition-colors"
                           >
                             <span className="material-symbols-outlined text-base">delete</span>
                           </button>
                         </div>
                       ))}
                   </div>
-                  <p className="mt-1 text-[10px] text-slate-400">Remova aqui marcas duplicadas ou criadas por engano.</p>
+                  <p className="mt-1 text-[10px] text-fg-muted">Remova aqui marcas duplicadas ou criadas por engano.</p>
                 </div>
               )}
             </div>
-            <div className="flex items-center justify-between p-4 border-t border-slate-100">
-              <button onClick={() => setBrandOpen(false)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 uppercase">
+            <div className="flex items-center justify-between p-4 border-t border-border">
+              <button onClick={() => setBrandOpen(false)} className="px-4 py-2 text-xs font-semibold text-fg-secondary hover:text-fg uppercase">
                 Cancelar
               </button>
               <button
                 onClick={confirmBrand}
                 disabled={!bName.trim() || bSaving}
-                className="px-5 py-2 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] disabled:opacity-50 text-white text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5"
+                className="px-5 py-2 rounded-lg bg-navy hover:bg-navy-3 disabled:opacity-50 text-white text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5"
               >
                 {bSaving && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
                 {bSaving ? 'Salvando…' : brandJaExiste(bName) ? 'Usar existente' : 'Cadastrar marca'}
@@ -1121,12 +1121,12 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         />
       )}
       {/* Header */}
-      <div className="flex flex-row items-center justify-between gap-3 border-b border-slate-200 pb-3">
+      <div className="flex flex-row items-center justify-between gap-3 border-b border-border pb-3">
         <div className="min-w-0">
-          <h1 className="text-lg md:text-2xl font-bold text-slate-900 tracking-tight truncate">
+          <h1 className="text-lg md:text-2xl font-bold text-fg tracking-tight truncate">
             Acompanhamento de Atendimentos
           </h1>
-          <p className="mt-1 text-xs text-slate-500">Relatórios técnicos, levantamentos e atendimentos executados.</p>
+          <p className="mt-1 text-xs text-fg-secondary">Relatórios técnicos, levantamentos e atendimentos executados.</p>
         </div>
         <div className="flex items-center gap-2">
           {/* Propostas comerciais são tratadas no módulo PEDIDOS. A partir de um
@@ -1135,7 +1135,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
           {canCreate && (
             <button
               onClick={openWizard}
-              className="bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
+              className="bg-danger hover:bg-danger-hover text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
             >
               <span className="material-symbols-outlined text-base">add</span> Novo atendimento
             </button>
@@ -1145,13 +1145,13 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 
       {/* Fila de sincronização offline (relatórios finalizados sem conexão) */}
       {(offlinePend > 0 || !online) && (
-        <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border px-4 py-3 ${offlinePend > 0 ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
+        <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border px-4 py-3 ${offlinePend > 0 ? 'bg-amber-50 border-amber-200' : 'bg-surface-2 border-border'}`}>
           <div className="flex items-center gap-2 text-xs">
-            <span className={`material-symbols-outlined text-lg ${online ? 'text-amber-600' : 'text-slate-500'}`}>
+            <span className={`material-symbols-outlined text-lg ${online ? 'text-amber-600' : 'text-fg-secondary'}`}>
               {online ? 'cloud_upload' : 'cloud_off'}
             </span>
-            <span className="text-slate-700">
-              {!online && <strong className="text-slate-900">Sem conexão. </strong>}
+            <span className="text-fg-secondary">
+              {!online && <strong className="text-fg">Sem conexão. </strong>}
               {offlinePend > 0
                 ? `${offlinePend} relatório(s) aguardando envio ao servidor.`
                 : 'Você está offline — relatórios finalizados ficam guardados no aparelho.'}
@@ -1161,7 +1161,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
             <button
               onClick={sincronizar}
               disabled={syncing}
-              className="shrink-0 px-4 py-1.5 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] text-white text-[11px] font-bold uppercase tracking-wide disabled:opacity-50"
+              className="shrink-0 px-4 py-1.5 rounded-lg bg-navy hover:bg-navy-3 text-white text-[11px] font-bold uppercase tracking-wide disabled:opacity-50"
             >
               {syncing ? 'Sincronizando…' : 'Sincronizar agora'}
             </button>
@@ -1170,13 +1170,13 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       )}
 
       {/* Central de operação: o atendimento é o ponto de entrada principal em campo. */}
-      <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 w-fit">
+      <div className="flex items-center gap-1 bg-surface-3 p-1 rounded-lg border border-border w-fit">
         {(['atendimentos', 'relatorios', 'pendencias'] as const).map((b) => (
           <button
             key={b}
             onClick={() => setBoard(b)}
             className={`px-4 py-1.5 rounded-md text-xs font-semibold uppercase transition-colors ${
-              board === b ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              board === b ? 'bg-slate-900 text-white shadow-sm' : 'text-fg-secondary hover:text-fg'
             }`}
           >
             {b === 'atendimentos' ? 'Meus atendimentos' : b === 'relatorios' ? 'Relatórios' : 'Pendências'}
@@ -1197,20 +1197,20 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
               {ordens.filter((os) => ['aberta', 'agendada', 'em_execucao'].includes(os.status)).map((os) => {
                 const cliente = clients.find((c) => c.id === os.clienteId);
                 return (
-                  <article key={os.id} className="rounded-xl bg-white border border-slate-200 shadow-sm p-4 flex flex-col gap-3">
+                  <article key={os.id} className="rounded-xl bg-surface border border-border shadow-sm p-4 flex flex-col gap-3">
                     <div className="flex items-start gap-3">
-                      <div className="w-11 h-11 shrink-0 rounded-xl bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center"><span className="material-symbols-outlined">business</span></div>
-                      <div className="min-w-0 flex-1"><p className="font-bold text-slate-900 truncate">{cliente?.name || 'Cliente não identificado'}</p><p className="text-[11px] text-slate-500 mt-0.5">{os.numero || os.id.slice(0, 8)} · Corretiva · {os.status.replace('_', ' ')}</p><p className="text-xs text-slate-600 mt-1 line-clamp-2">{os.titulo || `${os.pendenciaIds.length} pendência(s) vinculada(s)`}</p></div>
+                      <div className="w-11 h-11 shrink-0 rounded-xl bg-navy/10 text-primary flex items-center justify-center"><span className="material-symbols-outlined">business</span></div>
+                      <div className="min-w-0 flex-1"><p className="font-bold text-fg truncate">{cliente?.name || 'Cliente não identificado'}</p><p className="text-[11px] text-fg-secondary mt-0.5">{os.numero || os.id.slice(0, 8)} · Corretiva · {os.status.replace('_', ' ')}</p><p className="text-xs text-fg-secondary mt-1 line-clamp-2">{os.titulo || `${os.pendenciaIds.length} pendência(s) vinculada(s)`}</p></div>
                     </div>
-                    <div className="flex items-center gap-2 text-[11px] border-t border-slate-100 pt-2">
-                      <span className="material-symbols-outlined text-[16px] text-slate-400">engineering</span>
-                      <span className="text-slate-500 shrink-0">Responsável:</span>
+                    <div className="flex items-center gap-2 text-[11px] border-t border-border pt-2">
+                      <span className="material-symbols-outlined text-[16px] text-fg-muted">engineering</span>
+                      <span className="text-fg-secondary shrink-0">Responsável:</span>
                       {podeAtribuir ? (
                         <select
                           aria-label="Responsável técnico da OS"
                           value={os.tecnicoResponsavelId || ''}
                           onChange={(e) => setOsResponsavel(os, e.target.value)}
-                          className="flex-1 min-w-0 border border-slate-200 rounded-lg px-2 py-1 text-[11px] font-semibold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                          className="flex-1 min-w-0 border border-border rounded-lg px-2 py-1 text-[11px] font-semibold text-fg-secondary bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20"
                         >
                           <option value="">Não atribuído</option>
                           {/* Mantém o responsável atual visível mesmo se já não estiver na lista de ativos */}
@@ -1222,10 +1222,10 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                           ))}
                         </select>
                       ) : (
-                        <span className="font-semibold text-slate-700 truncate">{responsavelLabel(os)}</span>
+                        <span className="font-semibold text-fg-secondary truncate">{responsavelLabel(os)}</span>
                       )}
                     </div>
-                    <button onClick={() => iniciarAtendimentoDaOs(os)} className="min-h-12 rounded-lg bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-bold uppercase tracking-wide flex items-center justify-center gap-2"><span className="material-symbols-outlined text-base">play_arrow</span>Iniciar atendimento</button>
+                    <button onClick={() => iniciarAtendimentoDaOs(os)} className="min-h-12 rounded-lg bg-danger hover:bg-danger-hover text-white text-xs font-bold uppercase tracking-wide flex items-center justify-center gap-2"><span className="material-symbols-outlined text-base">play_arrow</span>Iniciar atendimento</button>
                   </article>
                 );
               })}
@@ -1256,27 +1256,27 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-col gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+      <div className="flex flex-col gap-3 bg-surface p-3 rounded-xl border border-border shadow-sm">
         <div className="relative w-full">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-fg-muted text-lg">search</span>
           <input
             type="text"
             placeholder="Buscar por nº, cliente ou local…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+            className="w-full pl-9 pr-3 py-2 text-xs border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
         </div>
         <div className="grid gap-3 xl:grid-cols-2">
           <fieldset className="min-w-0">
-            <legend className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">Tipo</legend>
+            <legend className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-fg-secondary">Tipo</legend>
             <div className="flex gap-1.5 overflow-x-auto pb-1">
           {['TODOS', 'LEVANTAMENTO', 'CORRETIVA', 'PREVENTIVA'].map((t) => (
             <button
               key={t}
               onClick={() => setFTipo(t)}
               className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold uppercase whitespace-nowrap transition-colors ${
-                fTipo === t ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                fTipo === t ? 'bg-slate-900 text-white' : 'bg-surface-3 text-fg-secondary hover:bg-surface-3'
               }`}
             >
               {t === 'TODOS' ? 'Todos' : TIPO_LABEL[t]}
@@ -1285,14 +1285,14 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
             </div>
           </fieldset>
           <fieldset className="min-w-0">
-            <legend className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">Status</legend>
+            <legend className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-fg-secondary">Status</legend>
             <div className="flex gap-1.5 overflow-x-auto pb-1">
           {['TODOS', 'rascunho', 'finalizado'].map((st) => (
             <button
               key={st}
               onClick={() => setFStatus(st)}
               className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold uppercase whitespace-nowrap transition-colors ${
-                fStatus === st ? 'bg-[#1A1A72] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                fStatus === st ? 'bg-navy text-white' : 'bg-surface-3 text-fg-secondary hover:bg-surface-3'
               }`}
             >
               {st === 'TODOS' ? 'Todos' : st}
@@ -1305,8 +1305,8 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 
       {/* Lista */}
       {loading ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3" aria-label="Carregando relatórios" aria-busy="true">
-          {[0, 1, 2].map((item) => <div key={item} className="h-12 animate-pulse rounded-lg bg-slate-100" />)}
+        <div className="rounded-xl border border-border bg-surface p-4 space-y-3" aria-label="Carregando relatórios" aria-busy="true">
+          {[0, 1, 2].map((item) => <div key={item} className="h-12 animate-pulse rounded-lg bg-surface-3" />)}
         </div>
       ) : filtered.length === 0 ? (
         <EmptyState
@@ -1321,10 +1321,10 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       ) : (
         <>
         {/* Desktop: tabela; Mobile: cards compactos (mais intuitivo no celular) */}
-        <div className="hidden md:block bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+        <div className="hidden md:block bg-surface rounded-xl border border-border shadow-sm overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider border-b border-slate-200">
+              <tr className="bg-surface-2 text-fg-secondary font-semibold uppercase tracking-wider border-b border-border">
                 <th className="py-3 px-4">Nº</th>
                 <th className="py-3 px-4">Tipo</th>
                 <th className="py-3 px-4">Cliente / Local</th>
@@ -1335,31 +1335,31 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                 <th className="py-3 px-4 text-center">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
+            <tbody className="divide-y divide-border text-fg-secondary font-medium">
               {filtered.map((r) => (
-                <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="py-3 px-4 font-data-mono font-bold text-slate-500">{r.numero || shortId(r.id)}</td>
+                <tr key={r.id} className="hover:bg-surface-2/80 transition-colors">
+                  <td className="py-3 px-4 font-data-mono font-bold text-fg-secondary">{r.numero || shortId(r.id)}</td>
                   <td className="py-3 px-4"><span className="rounded-full bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-800">{TIPO_LABEL[r.tipo] || r.tipo}</span></td>
-                  <td className="py-3 px-4"><p className="font-bold text-slate-900 uppercase">{clientName(r.clienteId)}</p><p className="mt-0.5 max-w-xs truncate text-[11px] font-normal text-slate-500">{r.local || 'Local não informado'}</p></td>
-                  <td className="py-3 px-4 text-slate-500">{r.tecnicoNome || '—'}</td>
-                  <td className="py-3 px-4 font-data-mono text-slate-500">{fmtDate(r.finalizadoEm || r.iniciadoEm)}</td>
+                  <td className="py-3 px-4"><p className="font-bold text-fg uppercase">{clientName(r.clienteId)}</p><p className="mt-0.5 max-w-xs truncate text-[11px] font-normal text-fg-secondary">{r.local || 'Local não informado'}</p></td>
+                  <td className="py-3 px-4 text-fg-secondary">{r.tecnicoNome || '—'}</td>
+                  <td className="py-3 px-4 font-data-mono text-fg-secondary">{fmtDate(r.finalizadoEm || r.iniciadoEm)}</td>
                   <td className="py-3 px-4">
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${STATUS_COLOR[r.status] || 'bg-slate-100 text-slate-700'}`}>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${STATUS_COLOR[r.status] || 'bg-surface-3 text-fg-secondary'}`}>
                       {r.status}
                     </span>
                   </td>
-                  <td className={`py-3 px-4 text-center font-data-mono font-bold ${(pendCountByReport[r.id] || 0) > 0 ? 'text-[#E63946]' : 'text-slate-400'}`}>{pendCountByReport[r.id] || 0}</td>
+                  <td className={`py-3 px-4 text-center font-data-mono font-bold ${(pendCountByReport[r.id] || 0) > 0 ? 'text-danger' : 'text-fg-muted'}`}>{pendCountByReport[r.id] || 0}</td>
                   <td className="py-3 px-4">
                     <div className="flex items-center justify-center gap-2">
-                      <button onClick={() => r.status === 'finalizado' ? setReportPreview(r) : openEditReport(r)} className="min-h-9 rounded-lg bg-[#1A1A72] px-3 text-[11px] font-bold text-white hover:bg-[#12124f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1A1A72]/40">Abrir</button>
+                      <button onClick={() => r.status === 'finalizado' ? setReportPreview(r) : openEditReport(r)} className="min-h-9 rounded-lg bg-navy px-3 text-[11px] font-bold text-white hover:bg-navy-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">Abrir</button>
                       <details className="relative">
-                        <summary aria-label={`Mais ações para ${r.numero || shortId(r.id)}`} title="Mais ações" className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1A1A72]/40"><span className="material-symbols-outlined">more_vert</span></summary>
-                        <div className="absolute right-0 z-30 mt-1 w-48 rounded-lg border border-slate-200 bg-white p-1 shadow-xl">
-                          {r.status === 'finalizado' && <button onClick={() => setReportPreview(r)} className="w-full rounded-md px-3 py-2 text-left text-xs hover:bg-slate-50">Visualizar / gerar PDF</button>}
-                          {surveyOrderFor(r.id) && <button onClick={onNavigateToPedidos} className="w-full rounded-md px-3 py-2 text-left text-xs hover:bg-slate-50">Abrir {surveyOrderFor(r.id)?.numeroPedido}</button>}
-                          {canManage && r.tipo === 'LEVANTAMENTO' && r.status === 'finalizado' && <button onClick={() => handleCreateOrderFromSurvey(r)} disabled={creatingOrderFromReport === r.id} className="w-full rounded-md px-3 py-2 text-left text-xs hover:bg-slate-50 disabled:opacity-50">Gerar proposta</button>}
-                          {canManage && <button onClick={() => openEditReport(r)} className="w-full rounded-md px-3 py-2 text-left text-xs hover:bg-slate-50">Editar dados</button>}
-                          {canManage && <div className="mt-1 border-t border-slate-100 pt-1"><button onClick={() => handleDeleteReport(r)} disabled={deletingReportId === r.id} className="w-full rounded-md px-3 py-2 text-left text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">{deletingReportId === r.id ? 'Excluindo…' : 'Excluir permanentemente'}</button></div>}
+                        <summary aria-label={`Mais ações para ${r.numero || shortId(r.id)}`} title="Mais ações" className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-lg border border-border text-fg-secondary hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><span className="material-symbols-outlined">more_vert</span></summary>
+                        <div className="absolute right-0 z-30 mt-1 w-48 rounded-lg border border-border bg-surface p-1 shadow-xl">
+                          {r.status === 'finalizado' && <button onClick={() => setReportPreview(r)} className="w-full rounded-md px-3 py-2 text-left text-xs hover:bg-surface-2">Visualizar / gerar PDF</button>}
+                          {surveyOrderFor(r.id) && <button onClick={onNavigateToPedidos} className="w-full rounded-md px-3 py-2 text-left text-xs hover:bg-surface-2">Abrir {surveyOrderFor(r.id)?.numeroPedido}</button>}
+                          {canManage && r.tipo === 'LEVANTAMENTO' && r.status === 'finalizado' && <button onClick={() => handleCreateOrderFromSurvey(r)} disabled={creatingOrderFromReport === r.id} className="w-full rounded-md px-3 py-2 text-left text-xs hover:bg-surface-2 disabled:opacity-50">Gerar proposta</button>}
+                          {canManage && <button onClick={() => openEditReport(r)} className="w-full rounded-md px-3 py-2 text-left text-xs hover:bg-surface-2">Editar dados</button>}
+                          {canManage && <div className="mt-1 border-t border-border pt-1"><button onClick={() => handleDeleteReport(r)} disabled={deletingReportId === r.id} className="w-full rounded-md px-3 py-2 text-left text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">{deletingReportId === r.id ? 'Excluindo…' : 'Excluir permanentemente'}</button></div>}
                         </div>
                       </details>
                     </div>
@@ -1373,35 +1373,35 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         {/* Mobile: lista de cards */}
         <div className="md:hidden flex flex-col gap-2">
           {filtered.map((r) => (
-            <article key={r.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <article key={r.id} className="bg-surface rounded-xl border border-border shadow-sm p-4">
               <div className="flex items-center justify-between gap-2">
-                <span className="font-data-mono text-[11px] font-bold text-slate-500">{r.numero || shortId(r.id)}</span>
-                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${STATUS_COLOR[r.status] || 'bg-slate-100 text-slate-700'}`}>
+                <span className="font-data-mono text-[11px] font-bold text-fg-secondary">{r.numero || shortId(r.id)}</span>
+                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${STATUS_COLOR[r.status] || 'bg-surface-3 text-fg-secondary'}`}>
                   {r.status}
                 </span>
               </div>
-              <p className="mt-2 font-bold text-slate-900 text-sm uppercase truncate">{clientName(r.clienteId)}</p>
-              <p className="mt-0.5 truncate text-xs text-slate-500">{r.local || 'Local não informado'}</p>
+              <p className="mt-2 font-bold text-fg text-sm uppercase truncate">{clientName(r.clienteId)}</p>
+              <p className="mt-0.5 truncate text-xs text-fg-secondary">{r.local || 'Local não informado'}</p>
               {surveyOrderFor(r.id) && <button onClick={onNavigateToPedidos} className="mt-1 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">Pedido: {surveyOrderFor(r.id)?.numeroPedido}</button>}
               <div className="flex items-center justify-between gap-2 mt-1.5">
-                <span className="text-[11px] text-slate-500 font-data-mono truncate">
+                <span className="text-[11px] text-fg-secondary font-data-mono truncate">
                   {TIPO_LABEL[r.tipo] || r.tipo} · {fmtDate(r.finalizadoEm || r.iniciadoEm)}
                 </span>
                 <div className="flex items-center gap-3 shrink-0">
                   {(pendCountByReport[r.id] || 0) > 0 && (
-                    <span className="font-data-mono text-[11px] font-bold text-[#E63946]">{pendCountByReport[r.id]} pend.</span>
+                    <span className="font-data-mono text-[11px] font-bold text-danger">{pendCountByReport[r.id]} pend.</span>
                   )}
                 </div>
               </div>
-              <div className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-3">
-                <button onClick={() => r.status === 'finalizado' ? setReportPreview(r) : openEditReport(r)} className="min-h-11 flex-1 rounded-lg bg-[#1A1A72] px-4 text-xs font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1A1A72]/40">Abrir</button>
+              <div className="mt-4 flex items-center gap-2 border-t border-border pt-3">
+                <button onClick={() => r.status === 'finalizado' ? setReportPreview(r) : openEditReport(r)} className="min-h-11 flex-1 rounded-lg bg-navy px-4 text-xs font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">Abrir</button>
                 <details className="relative">
-                  <summary aria-label={`Mais ações para ${r.numero || shortId(r.id)}`} className="flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center rounded-lg border border-slate-200 text-slate-600"><span className="material-symbols-outlined">more_vert</span></summary>
-                  <div className="absolute bottom-12 right-0 z-30 w-52 rounded-lg border border-slate-200 bg-white p-1 shadow-xl">
-                    {r.status === 'finalizado' && <button onClick={() => setReportPreview(r)} className="w-full rounded-md px-3 py-2.5 text-left text-xs hover:bg-slate-50">Visualizar / gerar PDF</button>}
-                    {canManage && r.tipo === 'LEVANTAMENTO' && r.status === 'finalizado' && <button onClick={() => handleCreateOrderFromSurvey(r)} className="w-full rounded-md px-3 py-2.5 text-left text-xs hover:bg-slate-50">Gerar proposta</button>}
-                    {canManage && <button onClick={() => openEditReport(r)} className="w-full rounded-md px-3 py-2.5 text-left text-xs hover:bg-slate-50">Editar dados</button>}
-                    {canManage && <div className="border-t border-slate-100"><button onClick={() => handleDeleteReport(r)} disabled={deletingReportId === r.id} className="w-full rounded-md px-3 py-2.5 text-left text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">Excluir permanentemente</button></div>}
+                  <summary aria-label={`Mais ações para ${r.numero || shortId(r.id)}`} className="flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center rounded-lg border border-border text-fg-secondary"><span className="material-symbols-outlined">more_vert</span></summary>
+                  <div className="absolute bottom-12 right-0 z-30 w-52 rounded-lg border border-border bg-surface p-1 shadow-xl">
+                    {r.status === 'finalizado' && <button onClick={() => setReportPreview(r)} className="w-full rounded-md px-3 py-2.5 text-left text-xs hover:bg-surface-2">Visualizar / gerar PDF</button>}
+                    {canManage && r.tipo === 'LEVANTAMENTO' && r.status === 'finalizado' && <button onClick={() => handleCreateOrderFromSurvey(r)} className="w-full rounded-md px-3 py-2.5 text-left text-xs hover:bg-surface-2">Gerar proposta</button>}
+                    {canManage && <button onClick={() => openEditReport(r)} className="w-full rounded-md px-3 py-2.5 text-left text-xs hover:bg-surface-2">Editar dados</button>}
+                    {canManage && <div className="border-t border-border"><button onClick={() => handleDeleteReport(r)} disabled={deletingReportId === r.id} className="w-full rounded-md px-3 py-2.5 text-left text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">Excluir permanentemente</button></div>}
                   </div>
                 </details>
               </div>
@@ -1412,7 +1412,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       )}
 
       {!isSupabaseConfigured() && (
-        <p className="text-[10px] text-slate-400">Supabase não configurado: a lista fica vazia; o formulário funciona em modo protótipo.</p>
+        <p className="text-[10px] text-fg-muted">Supabase não configurado: a lista fica vazia; o formulário funciona em modo protótipo.</p>
       )}
       </>
       )}
@@ -1420,13 +1420,13 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       {/* ===== Wizard "+ Novo Atendimento" (3 passos) ===== */}
       {wizardStep > 0 && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-xl shadow-2xl border border-slate-200 max-h-[92vh] flex flex-col">
-            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+          <div className="bg-surface w-full max-w-lg rounded-xl shadow-2xl border border-border max-h-[92vh] flex flex-col">
+            <div className="flex items-center justify-between p-5 border-b border-border">
               <div>
-                <h3 className="text-base font-bold text-slate-900 uppercase">Novo atendimento</h3>
-                <p className="text-[11px] text-slate-500">Passo {wizardStep} de 3</p>
+                <h3 className="text-base font-bold text-fg uppercase">Novo atendimento</h3>
+                <p className="text-[11px] text-fg-secondary">Passo {wizardStep} de 3</p>
               </div>
-              <button onClick={closeWizard} className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none">✕</button>
+              <button onClick={closeWizard} className="text-fg-muted hover:text-fg-secondary font-bold text-lg leading-none">✕</button>
             </div>
 
             <div className="p-5 overflow-y-auto">
@@ -1434,7 +1434,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
               {wizardStep === 1 && (
                 <div className="space-y-5">
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">1. Tipo de atendimento</p>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-fg-secondary mb-2">1. Tipo de atendimento</p>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                       {[
                         { id: 'CORRETIVA', label: 'Manutenção Corretiva', icon: 'build' },
@@ -1459,11 +1459,11 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                             }}
                             aria-pressed={on}
                             className={`border-2 rounded-xl p-4 text-left transition-colors ${
-                              on ? 'border-[#1A1A72] bg-[#1A1A72]/5' : 'border-slate-200 hover:border-[#1A1A72]/50'
+                              on ? 'border-primary bg-navy/5' : 'border-border hover:border-primary/50'
                             }`}
                           >
-                            <span className={`material-symbols-outlined text-2xl ${on ? 'text-[#1A1A72]' : 'text-slate-400'}`}>{t.icon}</span>
-                            <p className="font-bold text-slate-900 text-[13px] mt-2 leading-tight">{t.label}</p>
+                            <span className={`material-symbols-outlined text-2xl ${on ? 'text-primary' : 'text-fg-muted'}`}>{t.icon}</span>
+                            <p className="font-bold text-fg text-[13px] mt-2 leading-tight">{t.label}</p>
                           </button>
                         );
                       })}
@@ -1471,7 +1471,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                   </div>
 
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">2. Selecione a área</p>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-fg-secondary mb-2">2. Selecione a área</p>
                     <div className="flex flex-wrap gap-2">
                       {[
                         { id: 'SDAI', label: 'SDAI' },
@@ -1491,7 +1491,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                             disabled={auditoriaIncompativel}
                             title={auditoriaIncompativel ? 'Checklist de auditoria ainda não disponível.' : undefined}
                             className={`px-4 py-2 rounded-full text-xs font-semibold border transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-                              on ? 'bg-[#E63946] text-white border-[#E63946] shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-[#E63946]'
+                              on ? 'bg-danger text-white border-danger shadow-sm' : 'bg-surface text-fg-secondary border-border hover:border-danger'
                             }`}
                           >
                             {a.label}
@@ -1500,8 +1500,8 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                       })}
                     </div>
                     {wTipo && wArea && (
-                      <p className="text-[10px] text-slate-400 mt-2">
-                        Selecionado: <b className="text-slate-600">{attendanceMode === 'AUDITORIA' ? 'Auditoria Técnica' : TIPO_LABEL[wTipo]} · {wArea === 'CONTROLE_ACESSO' ? 'Controle de Acesso' : wArea === 'BMS' ? 'BMS' : wArea === 'ALARME' ? 'Alarme' : wArea}</b>
+                      <p className="text-[10px] text-fg-muted mt-2">
+                        Selecionado: <b className="text-fg-secondary">{attendanceMode === 'AUDITORIA' ? 'Auditoria Técnica' : TIPO_LABEL[wTipo]} · {wArea === 'CONTROLE_ACESSO' ? 'Controle de Acesso' : wArea === 'BMS' ? 'BMS' : wArea === 'ALARME' ? 'Alarme' : wArea}</b>
                       </p>
                     )}
                     {attendanceMode === 'AUDITORIA' && <p className="text-[10px] text-indigo-700 mt-1">Auditoria de conformidade — ABNT NBR 17240</p>}
@@ -1528,7 +1528,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                         placeholder="Nome / Razão Social"
                         value={provNome}
                         onChange={(e) => setProvNome(e.target.value)}
-                        className="bg-white border border-amber-200 rounded p-2 text-xs text-slate-800"
+                        className="bg-surface border border-amber-200 rounded p-2 text-xs text-fg"
                       />
                       <input
                         type="text"
@@ -1538,7 +1538,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                           setProvCnpj(e.target.value);
                           setProvCnpjErr('');
                         }}
-                        className="bg-white border border-amber-200 rounded p-2 text-xs font-data-mono text-slate-800"
+                        className="bg-surface border border-amber-200 rounded p-2 text-xs font-data-mono text-fg"
                       />
                     </div>
                     {provCnpjErr && (
@@ -1565,11 +1565,11 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
               {wizardStep === 3 && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Contrato (opcional)</label>
+                    <label className="block text-fg-secondary mb-1 font-semibold uppercase text-[11px]">Contrato (opcional)</label>
                     <select
                       value={wContratoId}
                       onChange={(e) => setWContratoId(e.target.value)}
-                      className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                      className="w-full border border-border rounded-lg p-2.5 text-fg bg-surface text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
                     >
                       <option value="">— Sem vínculo —</option>
                       {clienteContratos.map((c) => (
@@ -1580,12 +1580,12 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                     </select>
                   </div>
                   <div>
-                    <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">OS vinculada (opcional)</label>
+                    <label className="block text-fg-secondary mb-1 font-semibold uppercase text-[11px]">OS vinculada (opcional)</label>
                     {clienteOrdensAbertas.length > 0 ? (
                       <select
                         value={wOsId}
                         onChange={(e) => setWOsId(e.target.value)}
-                        className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                        className="w-full border border-border rounded-lg p-2.5 text-fg bg-surface text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
                       >
                         <option value="">Sem OS — abrir avulso</option>
                         {clienteOrdensAbertas.map((os) => (
@@ -1595,20 +1595,20 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                         ))}
                       </select>
                     ) : (
-                      <div className="w-full border border-dashed border-slate-200 rounded-lg p-2.5 text-[11px] text-slate-400 italic">
+                      <div className="w-full border border-dashed border-border rounded-lg p-2.5 text-[11px] text-fg-muted italic">
                         Nenhuma OS aberta para este cliente. Gere uma no quadro de pendências.
                       </div>
                     )}
                   </div>
                   {wTipo === 'CORRETIVA' && (
-                    <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/50">
-                      <p className="text-[11px] font-bold text-slate-700 uppercase mb-1">Pendências aprovadas (viram checklist)</p>
+                    <div className="border border-border rounded-lg p-3 bg-surface-2/50">
+                      <p className="text-[11px] font-bold text-fg-secondary uppercase mb-1">Pendências aprovadas (viram checklist)</p>
                       {clientePendAprovadas.length === 0 ? (
-                        <p className="text-[10px] text-slate-400 italic">Nenhuma pendência aprovada — a corretiva abre em branco.</p>
+                        <p className="text-[10px] text-fg-muted italic">Nenhuma pendência aprovada — a corretiva abre em branco.</p>
                       ) : (
                         <ul className="space-y-1 max-h-32 overflow-y-auto">
                           {clientePendAprovadas.map((p) => (
-                            <li key={p.id} className="text-[10px] text-slate-600">• {p.grupo ? `${p.grupo}: ` : ''}{p.descricao}</li>
+                            <li key={p.id} className="text-[10px] text-fg-secondary">• {p.grupo ? `${p.grupo}: ` : ''}{p.descricao}</li>
                           ))}
                         </ul>
                       )}
@@ -1619,10 +1619,10 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
             </div>
 
             {/* Rodapé do wizard */}
-            <div className="flex items-center justify-between p-4 border-t border-slate-100">
+            <div className="flex items-center justify-between p-4 border-t border-border">
               <button
                 onClick={() => (wizardStep > 1 ? setWizardStep((wizardStep - 1) as 1 | 2) : closeWizard())}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 uppercase"
+                className="px-4 py-2 text-xs font-semibold text-fg-secondary hover:text-fg uppercase"
               >
                 {wizardStep > 1 ? 'Voltar' : 'Cancelar'}
               </button>
@@ -1630,7 +1630,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                 <button
                   onClick={() => setWizardStep(2)}
                   disabled={!wTipo || !wArea}
-                  className="px-5 py-2 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] disabled:opacity-50 text-white text-xs font-semibold uppercase tracking-wide"
+                  className="px-5 py-2 rounded-lg bg-navy hover:bg-navy-3 disabled:opacity-50 text-white text-xs font-semibold uppercase tracking-wide"
                 >
                   Próximo
                 </button>
@@ -1639,7 +1639,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                 <button
                   onClick={() => setWizardStep(3)}
                   disabled={!wClienteId}
-                  className="px-5 py-2 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] disabled:opacity-50 text-white text-xs font-semibold uppercase tracking-wide"
+                  className="px-5 py-2 rounded-lg bg-navy hover:bg-navy-3 disabled:opacity-50 text-white text-xs font-semibold uppercase tracking-wide"
                 >
                   Próximo
                 </button>
@@ -1647,7 +1647,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
               {wizardStep === 3 && (
                 <button
                   onClick={() => startForm()}
-                  className="px-5 py-2 rounded-lg bg-[#E63946] hover:bg-[#a51515] text-white text-xs font-semibold uppercase tracking-wide"
+                  className="px-5 py-2 rounded-lg bg-danger hover:bg-danger-hover text-white text-xs font-semibold uppercase tracking-wide"
                 >
                   Iniciar atendimento
                 </button>
@@ -1660,70 +1660,70 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       {/* ===== Editar dados do relatório ===== */}
       {editRep && (
         <div className="fixed inset-0 z-[80] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-xl shadow-2xl border border-slate-200 max-h-[92vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-slate-100">
+          <div className="bg-surface w-full max-w-md rounded-xl shadow-2xl border border-border max-h-[92vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-border">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#1A1A72]">edit_document</span>
+                <span className="material-symbols-outlined text-primary">edit_document</span>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900 uppercase">Editar relatório</h3>
-                  <p className="text-[11px] text-slate-500 font-data-mono">{editRep.numero || shortId(editRep.id)}</p>
+                  <h3 className="text-sm font-bold text-fg uppercase">Editar relatório</h3>
+                  <p className="text-[11px] text-fg-secondary font-data-mono">{editRep.numero || shortId(editRep.id)}</p>
                 </div>
               </div>
-              <button onClick={() => setEditRep(null)} className="text-slate-400 hover:text-slate-700 font-bold text-lg leading-none">✕</button>
+              <button onClick={() => setEditRep(null)} className="text-fg-muted hover:text-fg-secondary font-bold text-lg leading-none">✕</button>
             </div>
             <div className="p-4 overflow-y-auto space-y-3">
               <div>
-                <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Título</label>
+                <label className="block text-fg-secondary mb-1 font-semibold uppercase text-[11px]">Título</label>
                 <input
                   type="text"
                   value={erTitulo}
                   onChange={(e) => setErTitulo(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                  className="w-full border border-border rounded-lg p-2.5 text-fg bg-surface text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
               </div>
               <div>
-                <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Local</label>
+                <label className="block text-fg-secondary mb-1 font-semibold uppercase text-[11px]">Local</label>
                 <input
                   type="text"
                   value={erLocal}
                   onChange={(e) => setErLocal(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                  className="w-full border border-border rounded-lg p-2.5 text-fg bg-surface text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
               </div>
               <div>
-                <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Técnico responsável</label>
+                <label className="block text-fg-secondary mb-1 font-semibold uppercase text-[11px]">Técnico responsável</label>
                 <input
                   type="text"
                   value={erTecnico}
                   onChange={(e) => setErTecnico(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                  className="w-full border border-border rounded-lg p-2.5 text-fg bg-surface text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
               </div>
               <div>
-                <label className="block text-slate-600 mb-1 font-semibold uppercase text-[11px]">Status</label>
+                <label className="block text-fg-secondary mb-1 font-semibold uppercase text-[11px]">Status</label>
                 <select
                   value={erStatus}
                   onChange={(e) => setErStatus(e.target.value as ReportInstance['status'])}
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-slate-900 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#1A1A72]/20"
+                  className="w-full border border-border rounded-lg p-2.5 text-fg bg-surface text-xs focus:outline-none focus:ring-2 focus:ring-primary/20"
                 >
                   <option value="rascunho">Rascunho</option>
                   <option value="finalizado">Finalizado</option>
                   <option value="cancelado">Cancelado</option>
                 </select>
               </div>
-              <p className="text-[10px] text-slate-500 flex items-start gap-1 bg-slate-50 border border-slate-200 rounded-lg p-2">
-                <span className="material-symbols-outlined text-sm text-slate-400">info</span>
+              <p className="text-[10px] text-fg-secondary flex items-start gap-1 bg-surface-2 border border-border rounded-lg p-2">
+                <span className="material-symbols-outlined text-sm text-fg-muted">info</span>
                 <span>Aqui você ajusta os dados do relatório. As respostas e fotos de campo não são reabertas por esta tela.</span>
               </p>
             </div>
-            <div className="flex items-center justify-between p-4 border-t border-slate-100">
-              <button onClick={() => setEditRep(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 uppercase">
+            <div className="flex items-center justify-between p-4 border-t border-border">
+              <button onClick={() => setEditRep(null)} className="px-4 py-2 text-xs font-semibold text-fg-secondary hover:text-fg uppercase">
                 Cancelar
               </button>
               <button
                 onClick={saveEditReport}
                 disabled={erSaving}
-                className="px-5 py-2 rounded-lg bg-[#1A1A72] hover:bg-[#12124f] disabled:opacity-50 text-white text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5"
+                className="px-5 py-2 rounded-lg bg-navy hover:bg-navy-3 disabled:opacity-50 text-white text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5"
               >
                 {erSaving && <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>}
                 {erSaving ? 'Salvando…' : 'Salvar'}
@@ -1742,8 +1742,8 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 /* --------------------------- subcomponentes --------------------------- */
 
 const VolCard: React.FC<{ label: string; value: number }> = ({ label, value }) => (
-  <div className="bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm">
-    <p className="font-data-mono text-lg font-bold text-slate-900 leading-none">{value}</p>
-    <p className="text-[9px] text-slate-500 uppercase tracking-wider mt-0.5">{label}</p>
+  <div className="bg-surface border border-border rounded-lg px-3 py-2 shadow-sm">
+    <p className="font-data-mono text-lg font-bold text-fg leading-none">{value}</p>
+    <p className="text-[9px] text-fg-secondary uppercase tracking-wider mt-0.5">{label}</p>
   </div>
 );
