@@ -446,6 +446,15 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
 
   const hasGps = (p: TimePunch) => !!(p.lat || p.lng);
   const mapsUrl = (p: TimePunch) => `https://www.google.com/maps?q=${p.lat},${p.lng}`;
+  // Janela em que a resolução assíncrona de endereço ainda é plausível.
+  const ADDRESS_RESOLUTION_WINDOW_MS = 24 * 60 * 60 * 1000;
+  // Rótulo humano do local da batida (apresentação — sem geocoding aqui).
+  const locationLabel = (p: TimePunch) => {
+    if (p.locationAddress) return p.locationAddress;
+    if (!hasGps(p)) return 'Localização não informada';
+    const recent = typeof p.at === 'number' && Date.now() - p.at < ADDRESS_RESOLUTION_WINDOW_MS;
+    return recent ? 'Endereço sendo identificado' : 'Localização registrada';
+  };
 
   const shortcut = (id: string) =>
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1461,11 +1470,13 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
                 meta={
                   <>
                     <span
-                      className="flex items-center gap-1"
+                      className="flex min-w-0 max-w-full items-start gap-1"
                       title={hasGps(p) ? `Coordenadas registradas para auditoria${p.accuracy ? ` · precisão ~${p.accuracy}m` : ''}` : undefined}
                     >
-                      <span className="material-symbols-outlined text-sm text-slate-400">location_on</span>
-                      <span>{hasGps(p) ? 'Localização registrada' : 'Sem localização'}</span>
+                      <span className="material-symbols-outlined shrink-0 text-sm text-slate-400">location_on</span>
+                      <span className="min-w-0 whitespace-normal break-words leading-snug">
+                        {locationLabel(p)}
+                      </span>
                     </span>
                     {hasGps(p) && (
                       <a
