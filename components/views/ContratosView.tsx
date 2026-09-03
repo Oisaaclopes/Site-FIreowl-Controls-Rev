@@ -106,6 +106,8 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
   // ETAPA 3 — modo edição + campos estruturados
   const [editingId, setEditingId] = useState<string | null>(null);
   const [detailContract, setDetailContract] = useState<Contract | null>(null);
+  const [detailTab, setDetailTab] = useState<'rotinas' | 'operacoes' | 'horas' | 'docs'>('rotinas');
+  const openDetail = (ctr: Contract, tab: 'rotinas' | 'operacoes' | 'horas' | 'docs') => { setDetailTab(tab); setDetailContract(ctr); };
   const [fNumero, setFNumero] = useState('');
   const [fRespComercial, setFRespComercial] = useState('');
   const [fRenovAuto, setFRenovAuto] = useState(false);
@@ -388,7 +390,8 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
                       <span className="text-[10px] text-fg-muted uppercase">por mês</span>
                     </div>
                     <Badge color={contractStatusColor(ctr.status)}>{ctr.status}</Badge>
-                    <RowAction icon="event_repeat" label="Rotinas, agenda, bolsa de horas e documentos" onClick={() => setDetailContract(ctr)} />
+                    <RowAction icon="hub" label="Operações de campo (auditoria, residente, preventiva…)" onClick={() => openDetail(ctr, 'operacoes')} />
+                    <RowAction icon="event_repeat" label="Rotinas, agenda, bolsa de horas e documentos" onClick={() => openDetail(ctr, 'rotinas')} />
                     <RowAction icon="edit" label="Editar contrato" onClick={() => openEdit(ctr)} />
                     <RowAction icon="print" label="Imprimir resumo do contrato" onClick={() => setSelectedPdfContract(ctr)} />
                   </>
@@ -702,7 +705,7 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
       )}
 
       {detailContract && (
-        <ContractDetailPanel contract={detailContract} onClose={() => setDetailContract(null)} userRole={userRole} />
+        <ContractDetailPanel contract={detailContract} onClose={() => setDetailContract(null)} userRole={userRole} initialTab={detailTab} />
       )}
     </div>
   );

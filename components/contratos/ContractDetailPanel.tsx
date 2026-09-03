@@ -22,10 +22,12 @@ const EXEC_LABEL: Record<ContractExecutionStatus, string> = {
 };
 const EXEC_ORDER: ContractExecutionStatus[] = ['previsto', 'agendado', 'os_gerada', 'executado', 'relatorio_emitido'];
 
-export const ContractDetailPanel: React.FC<{ contract: Contract; onClose: () => void; userRole?: UserRole }> = ({ contract, onClose, userRole }) => {
+type DetailTab = 'rotinas' | 'operacoes' | 'horas' | 'docs';
+
+export const ContractDetailPanel: React.FC<{ contract: Contract; onClose: () => void; userRole?: UserRole; initialTab?: DetailTab }> = ({ contract, onClose, userRole, initialTab = 'rotinas' }) => {
   const online = isSupabaseConfigured();
   const canManageOps = userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR';
-  const [tab, setTab] = useState<'rotinas' | 'operacoes' | 'horas' | 'docs'>('rotinas');
+  const [tab, setTab] = useState<DetailTab>(initialTab);
   const [routines, setRoutines] = useState<ContractRoutine[]>([]);
   const [execs, setExecs] = useState<ContractRoutineExecution[]>([]);
   const [hours, setHours] = useState<ContractHourEntry[]>([]);
