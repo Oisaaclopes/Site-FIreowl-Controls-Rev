@@ -32,19 +32,19 @@ export const SidePanel: React.FC<SidePanelProps> = ({
 }) => {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-[#1A1A72]/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex justify-end bg-navy/50 backdrop-blur-sm">
       {/* Backdrop clicável (fecha) */}
       <div className="flex-1 hidden md:block" onClick={onClose} />
 
-      <div className="bg-slate-50 w-full md:w-[45%] md:min-w-[520px] max-w-2xl h-full shadow-2xl flex flex-col">
+      <div className="bg-bg w-full md:w-[45%] md:min-w-[520px] max-w-2xl h-full shadow-pop flex flex-col">
         {/* Cabeçalho fixo */}
-        <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-200 shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 bg-surface border-b border-border shrink-0">
           <div className="min-w-0">
-            <h3 className="font-display text-lg font-bold text-[#1A1A72] uppercase tracking-wide truncate">
+            <h3 className="font-display text-lg font-bold text-fg uppercase tracking-wide truncate">
               {title}
             </h3>
             {subtitle && (
-              <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider truncate">
+              <p className="text-[11px] text-fg-muted font-semibold uppercase tracking-wider truncate">
                 {subtitle}
               </p>
             )}
@@ -55,7 +55,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
                 type="button"
                 onClick={onSave}
                 disabled={saving}
-                className="bg-[#E63946] hover:bg-[#a51515] text-white px-5 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed"
+                className="bg-primary hover:bg-primary-hover text-white px-5 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed"
               >
                 <span className={`material-symbols-outlined text-base ${saving ? 'animate-spin' : ''}`}>
                   {saving ? 'progress_activity' : 'save'}
@@ -67,7 +67,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({
               type="button"
               onClick={onClose}
               aria-label="Fechar"
-              className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              className="w-9 h-9 rounded-lg flex items-center justify-center text-fg-muted hover:text-fg hover:bg-surface-3 transition-colors"
             >
               <span className="material-symbols-outlined">close</span>
             </button>
@@ -88,13 +88,13 @@ export const FormSection: React.FC<{
   action?: React.ReactNode;
   children: React.ReactNode;
 }> = ({ icon, title, action, children }) => (
-  <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+  <div className="bg-surface rounded-xl border border-border shadow-soft p-5">
     <div className="flex items-center justify-between mb-4">
       <div className="flex items-center gap-2">
-        <span className="w-8 h-8 rounded-lg bg-[#1A1A72]/10 text-[#1A1A72] flex items-center justify-center">
+        <span className="w-8 h-8 rounded-lg bg-primary-soft text-primary flex items-center justify-center">
           <span className="material-symbols-outlined text-lg">{icon}</span>
         </span>
-        <h4 className="font-display text-sm font-bold uppercase tracking-wide text-[#1A1A72]">{title}</h4>
+        <h4 className="font-display text-sm font-bold uppercase tracking-wide text-primary">{title}</h4>
       </div>
       {action}
     </div>
@@ -109,14 +109,14 @@ export const Toggle: React.FC<{
   label?: string;
 }> = ({ checked, onChange, label }) => (
   <label className="flex items-center gap-2 cursor-pointer select-none">
-    {label && <span className="text-[10px] font-semibold uppercase text-slate-500">{label}</span>}
+    {label && <span className="text-[10px] font-semibold uppercase text-fg-secondary">{label}</span>}
     <button
       type="button"
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-        checked ? 'bg-[#E63946]' : 'bg-slate-300'
+        checked ? 'bg-primary' : 'bg-border-strong'
       }`}
     >
       <span

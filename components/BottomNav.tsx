@@ -22,7 +22,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onSelectTab, u
 
   return (
     <nav
-      className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-[#1A1A72] border-t border-white/10 shadow-[0_-4px_12px_rgba(0,0,0,0.18)]"
+      className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-navy border-t border-white/10 shadow-[0_-4px_12px_rgba(0,0,0,0.18)]"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       aria-label="Navegação principal"
     >
@@ -32,7 +32,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onSelectTab, u
           aria-current={homeActive ? 'page' : undefined}
           className={`flex-1 min-h-[56px] flex flex-col items-center justify-center gap-0.5 transition-colors ${homeActive ? 'text-white' : 'text-white/60 hover:text-white/90'}`}
         >
-          <span className={`material-symbols-outlined text-[22px] ${homeActive ? 'text-[#E63946]' : ''}`}>home</span>
+          <span className={`material-symbols-outlined text-[22px] ${homeActive ? 'text-primary' : ''}`}>home</span>
           <span className="text-[10px] font-semibold uppercase tracking-wide">Início</span>
         </button>
         {tabs.map((t) => {
@@ -44,7 +44,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onSelectTab, u
               aria-current={active ? 'page' : undefined}
               className={`flex-1 min-h-[56px] flex flex-col items-center justify-center gap-0.5 transition-colors ${active ? 'text-white' : 'text-white/60 hover:text-white/90'}`}
             >
-              <span className={`material-symbols-outlined text-[22px] ${active ? 'text-[#E63946]' : ''}`}>{MODULE_META[t].icon}</span>
+              <span className={`material-symbols-outlined text-[22px] ${active ? 'text-primary' : ''}`}>{MODULE_META[t].icon}</span>
               <span className="text-[10px] font-semibold uppercase tracking-wide truncate max-w-[68px]">{MODULE_META[t].short || MODULE_META[t].label}</span>
             </button>
           );

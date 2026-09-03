@@ -13,8 +13,8 @@ const ROLE_LABEL: Record<UserRole, string> = {
 };
 // Tom de destaque só para o ícone — cards permanecem sóbrios (B2B, §40).
 const ICON_TONE: Partial<Record<TabPath, string>> = {
-  relatorios: 'text-[#E63946]', 'fotos-de-campo': 'text-[#1A1A72]', agenda: 'text-indigo-600',
-  ponto: 'text-emerald-600', pedidos: 'text-[#1A1A72]', painel: 'text-slate-700',
+  relatorios: 'text-danger', 'fotos-de-campo': 'text-primary', agenda: 'text-indigo-500',
+  ponto: 'text-emerald-500', pedidos: 'text-primary', painel: 'text-fg-secondary',
 };
 
 interface Props {
@@ -54,8 +54,8 @@ export const MobileQuickMenu: React.FC<Props> = ({ userName, cargo, userRole, us
       {/* Saudação + status de sincronização (dados reais, §29) */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-lg font-bold text-slate-900">{greeting()}, {userName?.split(' ')[0] || 'operador'} 👋</p>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{perfil}</p>
+          <p className="truncate text-lg font-bold text-fg">{greeting()}, {userName?.split(' ')[0] || 'operador'} 👋</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-fg-muted">{perfil}</p>
         </div>
         <span
           className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
@@ -72,7 +72,7 @@ export const MobileQuickMenu: React.FC<Props> = ({ userName, cargo, userRole, us
       {canQuickPhoto && (
         <button
           onClick={() => setQuickPhotoOpen(true)}
-          className="flex min-h-[64px] items-center gap-3 rounded-2xl bg-[#1A1A72] px-4 text-left text-white shadow-sm active:scale-[0.99]"
+          className="flex min-h-[64px] items-center gap-3 rounded-2xl bg-navy px-4 text-left text-white shadow-card active:scale-[0.99]"
         >
           <span className="material-symbols-outlined text-3xl">photo_camera</span>
           <div>
@@ -84,22 +84,22 @@ export const MobileQuickMenu: React.FC<Props> = ({ userName, cargo, userRole, us
 
       {/* Acesso rápido — cards derivados exclusivamente do RBAC (§25/§26) */}
       <div>
-        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Acesso rápido</p>
+        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-fg-secondary">Acesso rápido</p>
         <div className="grid grid-cols-2 gap-3">
           {tabs.map((t) => (
             <button
               key={t}
               onClick={() => onSelectTab(t)}
-              className="flex min-h-[92px] flex-col items-start justify-between rounded-2xl border border-slate-200 bg-white p-3.5 text-left shadow-sm transition-colors hover:border-slate-300 active:scale-[0.99]"
+              className="flex min-h-[92px] flex-col items-start justify-between rounded-2xl border border-border bg-surface p-3.5 text-left shadow-soft transition-colors hover:border-border-strong active:scale-[0.99]"
             >
-              <span className={`material-symbols-outlined text-[26px] ${ICON_TONE[t] || 'text-slate-600'}`}>{MODULE_META[t].icon}</span>
-              <span className="text-sm font-bold text-slate-800">{MODULE_META[t].label}</span>
+              <span className={`material-symbols-outlined text-[26px] ${ICON_TONE[t] || 'text-fg-secondary'}`}>{MODULE_META[t].icon}</span>
+              <span className="text-sm font-bold text-fg">{MODULE_META[t].label}</span>
             </button>
           ))}
         </div>
       </div>
 
-      <p className="text-center text-[11px] text-slate-400">Use o menu para acessar todos os módulos.</p>
+      <p className="text-center text-[11px] text-fg-muted">Use o menu para acessar todos os módulos.</p>
 
       {canQuickPhoto && (
         <QuickFieldPhotoModal
