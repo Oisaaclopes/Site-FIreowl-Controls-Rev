@@ -369,6 +369,40 @@ export const CrmView: React.FC<CrmViewProps> = ({
     resetClientForm();
   };
 
+  // Client 360 em página cheia: quando um cliente está selecionado, o dossiê
+  // OCUPA o container do CRM (<main>, que já compensa a sidebar). Substituir o
+  // diretório por completo evita padding/gaps extras e garante width:100% real.
+  if (selectedClientDetail) {
+    return (
+      <ClientDossie
+        client={selectedClientDetail}
+        contracts={contracts}
+        pedidos={pedidos}
+        ordensServico={ordensServico}
+        transactions={transactions}
+        inventory={inventory}
+        suppliers={suppliers}
+        fabricantes={partnerBrands}
+        onAddFabricante={(name) => onAddPartnerBrand({ id: `pb_${Date.now()}`, name, category: 'SDAI' })}
+        onClose={closeClientDossie}
+        onEditClient={(c) => {
+          closeClientDossie();
+          startEditClient(c);
+        }}
+        onDeleteClient={onDeleteClient}
+        onOpenReport={(name) => {
+          closeClientDossie();
+          onSelectClientForReport?.(name);
+        }}
+        onNavigateToTab={(tab) => {
+          closeClientDossie();
+          onNavigateToTab?.(tab);
+        }}
+        userRole={userRole}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col w-full min-h-screen relative p-4 md:p-8 gap-6">
       {/* Header & Search */}
@@ -912,36 +946,6 @@ export const CrmView: React.FC<CrmViewProps> = ({
             </div>
           </div>
         </div>
-      )}
-
-      {/* Client 360 — dossiê operacional em página cheia (substitui o antigo modal). */}
-      {selectedClientDetail && (
-        <ClientDossie
-          client={selectedClientDetail}
-          contracts={contracts}
-          pedidos={pedidos}
-          ordensServico={ordensServico}
-          transactions={transactions}
-          inventory={inventory}
-          suppliers={suppliers}
-          fabricantes={partnerBrands}
-          onAddFabricante={(name) => onAddPartnerBrand({ id: `pb_${Date.now()}`, name, category: 'SDAI' })}
-          onClose={closeClientDossie}
-          onEditClient={(c) => {
-            closeClientDossie();
-            startEditClient(c);
-          }}
-          onDeleteClient={onDeleteClient}
-          onOpenReport={(name) => {
-            closeClientDossie();
-            onSelectClientForReport?.(name);
-          }}
-          onNavigateToTab={(tab) => {
-            closeClientDossie();
-            onNavigateToTab?.(tab);
-          }}
-          userRole={userRole}
-        />
       )}
     </div>
   );

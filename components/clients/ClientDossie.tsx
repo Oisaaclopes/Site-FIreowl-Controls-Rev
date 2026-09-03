@@ -319,10 +319,17 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-slate-50">
+    // In-flow dentro do container do CRM (o <main> já compensa a sidebar via
+    // padding). Nada de fixed/100vw/margin-left aqui: largura = 100% do container,
+    // min-w-0 permite o conteúdo encolher junto com a abertura/recolhimento da
+    // sidebar sem estourar o viewport.
+    <div className="flex min-h-[calc(100vh-56px)] w-full min-w-0 flex-col bg-slate-50">
       {/* ============================ Cabeçalho do cliente ============================ */}
-      <header className="shrink-0 border-b border-slate-200 bg-white">
-        <div className="flex items-start gap-3 px-4 py-3 md:px-8 md:py-4">
+      {/* Sticky logo abaixo do header fixo do app. O top casa com a altura do
+          .fireowl-header (3.5rem + safe-area em telas com notch). z abaixo da
+          sidebar (z-50) e do header (z-40) para nunca sobrepô-los. */}
+      <header className="sticky z-30 border-b border-slate-200 bg-white" style={{ top: 'calc(3.5rem + env(safe-area-inset-top))' }}>
+        <div className="flex flex-wrap items-start gap-x-3 gap-y-3 px-4 py-3 md:px-8 md:py-4">
           <button
             onClick={onClose}
             className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"
@@ -331,7 +338,7 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
           >
             <span className="material-symbols-outlined">arrow_back</span>
           </button>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 basis-64">
             <span className="font-data-mono text-xs font-bold text-[#E63946]">{client.code}</span>
             <h1 className="mt-0.5 truncate text-lg font-bold uppercase tracking-tight text-slate-900 md:text-2xl">
               {nomeFantasiaCliente(client.name)}
@@ -358,7 +365,7 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
               </div>
             )}
           </div>
-          <div className="hidden shrink-0 items-center gap-2 sm:flex">
+          <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">
             <button
               onClick={() => onOpenReport(client.name)}
               className="flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-slate-800"
@@ -413,11 +420,15 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
       </header>
 
       {/* ============================ Conteúdo das abas ============================ */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-8">
+      {/* Sem scroll interno: quem rola é a página (respeita o BottomNav mobile e a
+          largura do container). */}
+      <div className="min-w-0 flex-1 p-4 md:p-8">
         {tab === 'overview' && (
-          <div className="mx-auto flex max-w-6xl flex-col gap-6">
-            {/* Cards clicáveis com números reais */}
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="mx-auto flex w-full min-w-0 max-w-[1600px] flex-col gap-6">
+            {/* Cards clicáveis com números reais. O grid responde à LARGURA DO
+                CONTAINER (auto-fit/minmax), então redistribui sozinho quando a
+                sidebar abre/recolhe — sem depender do viewport. */}
+            <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(10.5rem,1fr))]">
               <OverviewCard icon="assignment_late" label="OS abertas" value={osAbertas.length} tone="amber" onClick={() => goTab('os')} />
               <OverviewCard icon="engineering" label="OS em execução" value={osExecucao.length} tone="blue" onClick={() => goTab('os')} />
               <OverviewCard icon="flag" label="Pendências abertas" value={pendencias === null ? '…' : pendAbertas.length} tone="rose" onClick={() => goTab('pendencias')} />
@@ -429,7 +440,7 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
             </div>
 
             {/* Resumo financeiro */}
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(12rem,1fr))]">
               <MoneyTile label="MRR (contratos)" value={brlM(mrr)} tone="brand" />
               <MoneyTile label="Recebido (confirmado)" value={brlM(totalRecebido)} tone="emerald" />
               <MoneyTile label="Propostas em aberto" value={brlM(volumeAberto)} tone="amber" />
@@ -437,7 +448,7 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
             </div>
 
             {/* Atalhos recentes */}
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(20rem,1fr))]">
               <PanelCard title="OS em andamento" icon="engineering" actionLabel="Ver todas" onAction={() => goTab('os')}>
                 {osAtivas.length === 0 ? <EmptyLine text="Nenhuma OS em andamento." /> : osAtivas.slice(0, 4).map((o) => (
                   <RowLine key={o.id} title={o.numero || o.titulo || o.id} subtitle={`${OS_TIPO_LABEL[o.tipo]}${o.dataPrevista ? ` · ${fmtDate(o.dataPrevista)}` : ''}`} badge={<Badge color={OS_STATUS_UI[o.status].color === 'blue' ? 'slate' : OS_STATUS_UI[o.status].color}>{OS_STATUS_UI[o.status].label}</Badge>} />
@@ -686,8 +697,8 @@ const MoneyTile: React.FC<{ label: string; value: string; tone: string }> = ({ l
 );
 
 const SectionWrap: React.FC<{ title: string; children: React.ReactNode; actionLabel?: string; onAction?: () => void }> = ({ title, children, actionLabel, onAction }) => (
-  <div className="mx-auto flex max-w-6xl flex-col gap-4">
-    <div className="flex items-center justify-between gap-3">
+  <div className="mx-auto flex w-full min-w-0 max-w-[1600px] flex-col gap-4">
+    <div className="flex flex-wrap items-center justify-between gap-3">
       <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">{title}</h2>
       {actionLabel && onAction && (
         <button onClick={onAction} className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-[#1A1A72] transition-colors hover:border-[#1A1A72] hover:bg-[#1A1A72] hover:text-white">
@@ -822,7 +833,7 @@ const PhotosTab: React.FC<{
       </div>
 
       {filtered.length === 0 ? <EmptyLine text="Nenhuma foto para os filtros selecionados." /> : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(9rem,1fr))]">
           {filtered.map((p) => (
             <div key={p.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
               <div className="aspect-square bg-slate-100">
@@ -881,7 +892,7 @@ const DevicesTab: React.FC<{ devices: Device[] | null; inventory: InventoryItem[
       {Array.from(bySistema.entries()).map(([sistema, list]) => (
         <div key={sistema}>
           <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">{sistema} · {list.length} dispositivo(s)</p>
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+          <div className="grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(20rem,1fr))]">
             {list.map((d) => {
               const cat = catalogById(d.itemCatalogoId);
               const identificado = !!cat || !!(d.fabricante || d.modelo);
