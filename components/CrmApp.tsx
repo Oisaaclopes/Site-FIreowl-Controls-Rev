@@ -113,6 +113,7 @@ interface CrmAppProps {
   /** Cargo do perfil (exibido na Home Mobile). */
   userCargo?: string;
   userSchedule?: WorkSchedule;
+  usesTimeClock?: boolean;
   /** Aba inicial (vem da URL /funcionarios/<aba>). */
   initialTab?: TabPath;
   onLogout?: () => void;
@@ -125,6 +126,7 @@ export function CrmApp({
   userEmail = '',
   userCargo,
   userSchedule,
+  usesTimeClock = true,
   initialTab,
   onLogout,
 }: CrmAppProps) {
@@ -1393,6 +1395,7 @@ export function CrmApp({
               currentUser={userName}
               userRole={userRole}
               schedule={userSchedule}
+              usesTimeClock={usesTimeClock}
             />
           )}
 

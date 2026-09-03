@@ -17,6 +17,7 @@ export interface ManagedUser {
   courses?: string[];
   firstAccessCompleted: boolean;
   invitationSentAt?: string;
+  usesTimeClock: boolean;
 }
 
 export interface NewUserInput {
@@ -32,6 +33,7 @@ export interface NewUserInput {
   schedule?: WorkSchedule;
   courses?: string[];
   temporaryPassword: string;
+  usesTimeClock?: boolean;
 }
 
 const VALID_STATUS: UserStatus[] = ['ATIVO', 'INATIVO', 'DESLIGADO'];
@@ -53,6 +55,7 @@ function rowToUser(r: any): ManagedUser {
     courses: Array.isArray(r.courses) ? r.courses : undefined,
     firstAccessCompleted: r.first_access_completed !== false,
     invitationSentAt: r.invitation_sent_at ?? undefined,
+    usesTimeClock: r.uses_time_clock !== false,
   };
 }
 
@@ -76,7 +79,19 @@ const profileFields = (u: Partial<NewUserInput>) => ({
   cargo: u.cargo || null,
   schedule: u.schedule ?? null,
   courses: u.courses ?? null,
+  ...(u.usesTimeClock !== undefined ? { uses_time_clock: u.usesTimeClock } : {}),
 });
+
+export interface TimeClockParticipant { id: string; name: string; usesTimeClock: boolean }
+
+export async function fetchTimeClockParticipants(): Promise<TimeClockParticipant[]> {
+  try {
+    const supabase = getSupabaseClient() as any;
+    const { data, error } = await supabase.rpc('get_time_clock_participants');
+    if (error) throw error;
+    return (data || []).map((r: any) => ({ id: String(r.id), name: r.name || '', usesTimeClock: r.uses_time_clock !== false }));
+  } catch { return []; }
+}
 
 // Trilha de auditoria (best-effort; nunca bloqueia; sem senha). user_id (actor)
 // é preenchido pelo default auth.uid() no banco.
@@ -106,6 +121,7 @@ export async function fetchAssignableTechnicians(): Promise<ManagedUser[]> {
       status: normStatus(r.status),
       cargo: r.cargo ?? undefined,
       fullName: r.full_name ?? undefined,
+      usesTimeClock: r.uses_time_clock !== false,
     }));
   } catch {
     return [];
@@ -152,6 +168,7 @@ export async function createUser(input: NewUserInput): Promise<void> {
       phone: input.phone ?? null,
       schedule: input.schedule ?? null,
       courses: input.courses ?? null,
+      usesTimeClock: input.usesTimeClock !== false,
       temporaryPassword: input.temporaryPassword,
     },
   });

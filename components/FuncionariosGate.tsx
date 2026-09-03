@@ -101,6 +101,7 @@ export function FuncionariosGate({ initialTab }: { initialTab?: TabPath }) {
         userEmail={authUser.email}
         userCargo={authUser.cargo}
         userSchedule={authUser.schedule}
+        usesTimeClock={authUser.usesTimeClock}
         initialTab={initialTab}
         onLogout={handleLogout}
       /></RealtimeProvider>

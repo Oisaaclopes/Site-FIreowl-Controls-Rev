@@ -19,10 +19,11 @@ function rowToPunch(r: any): TimePunch {
     employeeName: r.employee_name || '',
     timestamp: at ? fmtTimestamp(new Date(at)) : '',
     type: r.type,
-    locationStr:
+    locationStr: r.location_address || (
       r.lat != null && r.lng != null && (Number(r.lat) || Number(r.lng))
         ? `${Number(r.lat).toFixed(6)}, ${Number(r.lng).toFixed(6)}`
-        : 'Sem localização',
+        : 'Sem localização'),
+    locationAddress: r.location_address || undefined,
     lat: Number(r.lat ?? 0),
     lng: Number(r.lng ?? 0),
     status: r.status || 'APROVADO',
@@ -60,5 +61,14 @@ export async function insertPunch(p: TimePunch): Promise<TimePunch> {
   };
   const { data, error } = await supabase.from(TABLE).insert(row).select().single();
   if (error) throw error;
-  return rowToPunch(data);
+  const saved = rowToPunch(data);
+  if (saved.lat || saved.lng) void requestPunchAddress(saved.id).catch(() => {});
+  return saved;
+}
+
+/** Best-effort: a batida já foi salva; falha de geocoding nunca invalida o ponto. */
+export async function requestPunchAddress(punchId: string): Promise<void> {
+  const supabase = getSupabaseClient() as any;
+  const { error } = await supabase.functions.invoke('reverse-geocode', { body: { punchId } });
+  if (error) throw error;
 }

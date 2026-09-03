@@ -739,6 +739,8 @@ export interface TimePunch {
   timestamp: string;
   type: 'ENTRADA' | 'PAUSA' | 'RETORNO' | 'SAIDA';
   locationStr: string;
+  /** Endereço humano persistido; lat/lng continuam disponíveis para auditoria. */
+  locationAddress?: string;
   lat: number;
   lng: number;
   status: 'APROVADO' | 'PENDENTE' | 'AJUSTADO';

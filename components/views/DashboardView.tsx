@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { FinancialTransaction, OrdemServico, Contract, TabPath, TimePunch, Client } from '@/lib/types';
 import { OS_STATUS_ATIVOS } from '@/lib/ordensServico';
 import { usePrivacy } from '@/lib/privacy';
-import { fetchAssignableTechnicians, ManagedUser } from '@/lib/users';
+import { fetchTimeClockParticipants, TimeClockParticipant } from '@/lib/users';
+import { requestPunchAddress } from '@/lib/timepunch';
 import { deriveFieldOperatorStates } from '@/lib/fieldOperations';
 import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 
@@ -31,11 +32,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onNavigateToTab,
 }) => {
   const { isPrivacyModeActive, maskMoney } = usePrivacy();
-  const [fieldTechnicians, setFieldTechnicians] = useState<ManagedUser[]>([]);
-  const refreshFieldTechnicians = useCallback(async () => setFieldTechnicians(await fetchAssignableTechnicians()), []);
+  const [fieldTechnicians, setFieldTechnicians] = useState<TimeClockParticipant[]>([]);
+  const refreshFieldTechnicians = useCallback(async () => setFieldTechnicians(await fetchTimeClockParticipants()), []);
   useEffect(() => { void refreshFieldTechnicians(); }, [refreshFieldTechnicians]);
   useDomainRefresh('dashboard', refreshFieldTechnicians);
-  const fieldStates = deriveFieldOperatorStates(fieldTechnicians, punches, ordensServico, clients);
+  const fieldStates = useMemo(() => deriveFieldOperatorStates(fieldTechnicians, punches, ordensServico, clients), [fieldTechnicians, punches, ordensServico, clients]);
+  useEffect(() => {
+    const unresolved = fieldStates
+      .map((state) => state.locationSource === 'punch' ? punches.find((p) => p.userId === state.userId && (p.lat || p.lng) && !p.locationAddress) : undefined)
+      .filter((p): p is TimePunch => Boolean(p));
+    for (const punch of unresolved) void requestPunchAddress(punch.id).catch(() => {});
+  }, [fieldStates, punches]);
 
   // Indicadores reais derivados dos dados do sistema
   const receitaTotal = transactions

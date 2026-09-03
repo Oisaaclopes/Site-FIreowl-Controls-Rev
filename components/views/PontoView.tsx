@@ -13,6 +13,7 @@ import { fetchHolidays, Holiday } from '@/lib/holidays';
 import { fetchDayEntries, createDayEntry, deleteDayEntry, DayEntry, DayEntryKind } from '@/lib/dayentries';
 import { uploadCertificate, signedDocUrl } from '@/lib/storage';
 import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
+import { fetchTimeClockParticipants } from '@/lib/users';
 import { TimecardPDFView } from '@/components/documentos/TimecardPDFView';
 import { nextPunchType, buildPunch } from '@/lib/pontoActions';
 import { effectivePunchLabel } from '@/lib/effectivePunches';
@@ -32,6 +33,7 @@ interface PontoViewProps {
   currentUser?: string;
   userRole?: UserRole;
   schedule?: WorkSchedule;
+  usesTimeClock?: boolean;
 }
 
 // Escala fixa (poderia vir do cadastro do funcionário)
@@ -181,7 +183,19 @@ const MiniCalendar: React.FC<{
   );
 };
 
-export const PontoView: React.FC<PontoViewProps> = ({
+export const PontoView: React.FC<PontoViewProps> = (props) => {
+  const isManager = props.userRole === 'ADMINISTRATIVO' || props.userRole === 'GESTOR';
+  if (props.usesTimeClock === false && !isManager) return (
+    <div className="p-6"><div className="rounded-xl border border-slate-200 bg-white p-6 text-center">
+      <span className="material-symbols-outlined text-3xl text-slate-400">event_busy</span>
+      <h2 className="mt-2 text-sm font-bold text-slate-800">Controle de ponto desativado</h2>
+      <p className="mt-1 text-xs text-slate-500">Seu usuário não participa do registro de jornada nem do espelho de ponto.</p>
+    </div></div>
+  );
+  return <PontoViewCore {...props} />;
+};
+
+const PontoViewCore: React.FC<PontoViewProps> = ({
   punches,
   onAddPunch,
   onReloadPunches,
@@ -205,6 +219,11 @@ export const PontoView: React.FC<PontoViewProps> = ({
   const [recordPeriod, setRecordPeriod] = useState('');
   const [recordType, setRecordType] = useState<'TODOS' | PunchType>('TODOS');
   const [recordGps, setRecordGps] = useState<'TODOS' | 'COM_GPS' | 'SEM_GPS'>('TODOS');
+  const [participantNames, setParticipantNames] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    if (!isManager || !isSupabaseConfigured()) return;
+    fetchTimeClockParticipants().then((rows) => setParticipantNames(new Set(rows.filter((r) => r.usesTimeClock).map((r) => r.name)))).catch(() => {});
+  }, [isManager]);
 
   // Solicitações de ajuste de ponto
   const [adjustments, setAdjustments] = useState<PunchAdjustment[]>([]);
@@ -598,8 +617,8 @@ export const PontoView: React.FC<PontoViewProps> = ({
   };
 
   const employees = useMemo(
-    () => Array.from(new Set(punches.map((p) => p.employeeName).filter(Boolean))).sort(),
-    [punches]
+    () => Array.from(new Set(punches.map((p) => p.employeeName).filter((name) => Boolean(name) && (!participantNames || participantNames.has(name))))).sort(),
+    [punches, participantNames]
   );
   const filteredRecentPunches = useMemo(() => punches.filter((p) => {
     const period = p.at ? new Date(p.at).toISOString().slice(0, 7) : '';
@@ -685,8 +704,8 @@ export const PontoView: React.FC<PontoViewProps> = ({
       emps = [employeeFilter];
     } else {
       const set = new Set<string>();
-      punches.filter(inMonth).forEach((p) => p.employeeName && set.add(p.employeeName));
-      dayEntries.filter((e) => e.refDate.startsWith(month)).forEach((e) => e.employeeName && set.add(e.employeeName));
+      punches.filter(inMonth).forEach((p) => p.employeeName && (!participantNames || participantNames.has(p.employeeName)) && set.add(p.employeeName));
+      dayEntries.filter((e) => e.refDate.startsWith(month)).forEach((e) => e.employeeName && (!participantNames || participantNames.has(e.employeeName)) && set.add(e.employeeName));
       emps = Array.from(set).sort();
     }
     return emps.map((emp) => {

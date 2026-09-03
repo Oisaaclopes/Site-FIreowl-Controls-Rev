@@ -269,6 +269,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
   const [nuRole, setNuRole] = useState<UserRole>('TECNICO');
   const [nuCargo, setNuCargo] = useState('');
   const [nuStatus, setNuStatus] = useState<UserStatus>('ATIVO');
+  const [nuUsesTimeClock, setNuUsesTimeClock] = useState(true);
   const [nuFullName, setNuFullName] = useState('');
   const [nuCpf, setNuCpf] = useState('');
   const [nuBirth, setNuBirth] = useState('');
@@ -295,6 +296,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
     role: 'TECNICO' as UserRole,
     cargo: '',
     status: 'ATIVO' as UserStatus,
+    usesTimeClock: true,
     courses: '',
     schedule: DEFAULT_SCHEDULE.map((d) => ({ ...d })) as WorkSchedule,
   });
@@ -373,6 +375,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
       role: u.role,
       cargo: u.cargo || '',
       status: u.status || 'ATIVO',
+      usesTimeClock: u.usesTimeClock,
       courses: (u.courses || []).join('\n'),
       schedule: u.schedule ? u.schedule.map((d) => ({ ...d })) : DEFAULT_SCHEDULE.map((d) => ({ ...d })),
     });
@@ -389,6 +392,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
         role: euForm.role,
         cargo: euForm.cargo.trim() || undefined,
         status: euForm.status,
+        usesTimeClock: euForm.usesTimeClock,
         fullName: euForm.fullName.trim() || undefined,
         cpf: euForm.cpf.trim() || undefined,
         birthDate: euForm.birthDate || undefined,
@@ -403,6 +407,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
       if (prev.role !== euForm.role) logUserAudit('USER_ROLE_CHANGED', `target=${prev.id} ${prev.role}→${euForm.role}`);
       if ((prev.cargo || '') !== euForm.cargo.trim()) logUserAudit('USER_CARGO_CHANGED', `target=${prev.id} "${prev.cargo || ''}"→"${euForm.cargo.trim()}"`);
       if (prev.status !== euForm.status) logUserAudit('USER_STATUS_CHANGED', `target=${prev.id} ${prev.status}→${euForm.status}`);
+      if (prev.usesTimeClock !== euForm.usesTimeClock) logUserAudit('USER_TIME_CLOCK_CHANGED', `target=${prev.id} ${prev.usesTimeClock}→${euForm.usesTimeClock}`);
       setEditUser(null);
       setTimeout(refreshUsers, 300);
       toast.success('Dados do funcionário atualizados.');
@@ -451,6 +456,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
         name: (nuName || nuFullName || nuEmail.split('@')[0]).trim(),
         role: nuRole,
         status: nuStatus,
+        usesTimeClock: nuUsesTimeClock,
         cargo: nuCargo.trim() || undefined,
         fullName: nuFullName.trim() || undefined,
         cpf: nuCpf.trim() || undefined,
@@ -470,6 +476,7 @@ export const ContaView: React.FC<ContaViewProps> = ({
       setNuRole('TECNICO');
       setNuCargo('');
       setNuStatus('ATIVO');
+      setNuUsesTimeClock(true);
       setNuFullName('');
       setNuCpf('');
       setNuBirth('');
@@ -1450,6 +1457,10 @@ export const ContaView: React.FC<ContaViewProps> = ({
                     <option value="INATIVO">Inativo</option>
                   </select>
                 </div>
+                <label className="md:col-span-2 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 cursor-pointer">
+                  <input type="checkbox" checked={nuUsesTimeClock} onChange={(e) => setNuUsesTimeClock(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[#1A1A72]" />
+                  <span><strong className="block text-xs text-slate-800">Controle de ponto {nuUsesTimeClock ? 'ativado' : 'desativado'}</strong><span className="text-[10px] text-slate-500">Quando ativado, este funcionário participa do registro de jornada, ajustes e espelho de ponto.</span></span>
+                </label>
                 <div>
                   <label className={labelCls}>E-mail (login)</label>
                   <input type="email" value={nuEmail} onChange={(e) => setNuEmail(e.target.value)} className={`${inputCls} font-data-mono`} placeholder="nome@fireowlcontrols.com.br" />
@@ -1676,6 +1687,10 @@ export const ContaView: React.FC<ContaViewProps> = ({
               </select>
               <p className="text-[10px] text-slate-400 mt-1">Só ATIVO acessa o sistema. Não exclui histórico.</p>
             </div>
+            <label className="md:col-span-2 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 cursor-pointer">
+              <input type="checkbox" checked={euForm.usesTimeClock} onChange={(e) => setEuForm({ ...euForm, usesTimeClock: e.target.checked })} className="mt-0.5 h-4 w-4 accent-[#1A1A72]" />
+              <span><strong className="block text-xs text-slate-800">Controle de ponto {euForm.usesTimeClock ? 'ativado' : 'desativado'}</strong><span className="text-[10px] text-slate-500">Quando ativado, este funcionário participa do registro de jornada, ajustes e espelho de ponto.</span></span>
+            </label>
             <div>
               <label className={labelCls}>Nome completo</label>
               <input value={euForm.fullName} onChange={(e) => setEuForm({ ...euForm, fullName: e.target.value })} className={inputCls} />

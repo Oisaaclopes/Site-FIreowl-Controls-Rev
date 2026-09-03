@@ -1,5 +1,5 @@
 import { Client, OrdemServico, TimePunch } from './types';
-import type { ManagedUser } from './users';
+import type { TimeClockParticipant } from './users';
 import { OS_STATUS_ATIVOS } from './ordensServico';
 
 export type FieldOperationalStatus = 'EM ATENDIMENTO' | 'EM JORNADA' | 'FORA DE JORNADA';
@@ -34,7 +34,7 @@ export function hasOpenJourney(punches: TimePunch[], now = Date.now()): boolean 
 }
 
 export function deriveFieldOperatorStates(
-  technicians: ManagedUser[],
+  technicians: TimeClockParticipant[],
   punches: TimePunch[],
   orders: OrdemServico[],
   clients: Client[],
@@ -50,7 +50,7 @@ export function deriveFieldOperatorStates(
     }
   }
 
-  return technicians.map((technician) => {
+  return technicians.filter((technician) => technician.usesTimeClock).map((technician) => {
     const employeePunches = punches
       .filter((p) => p.userId === technician.id)
       .sort((a, b) => (b.at || 0) - (a.at || 0));
@@ -62,16 +62,16 @@ export function deriveFieldOperatorStates(
       ? 'EM ATENDIMENTO'
       : hasOpenJourney(employeePunches, now) ? 'EM JORNADA' : 'FORA DE JORNADA';
     const osAddress = activeOs && client?.address?.trim();
-    const punchLocation = lastLocatedPunch?.locationStr?.trim();
+    const punchLocation = lastLocatedPunch?.locationAddress?.trim();
+    const locationSource: FieldOperatorState['locationSource'] = osAddress ? 'os' : lastLocatedPunch ? 'punch' : 'none';
 
-    const locationSource: FieldOperatorState['locationSource'] = osAddress ? 'os' : punchLocation ? 'punch' : 'none';
     return {
       userId: technician.id,
-      name: technician.name || technician.fullName || 'Funcionário',
+      name: technician.name || 'Funcionário',
       status,
       activeOs,
       clientName: activeOs && client ? client.name : undefined,
-      location: osAddress || punchLocation || 'Localização não informada',
+      location: osAddress || punchLocation || (lastLocatedPunch ? 'Endereço sendo identificado' : 'Localização não informada'),
       locationSource,
       lastPunch,
       updatedAt: lastPunch?.at,

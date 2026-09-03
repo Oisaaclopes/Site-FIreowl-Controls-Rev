@@ -4,10 +4,10 @@ import { Client, OrdemServico, TimePunch } from './types';
 import { ManagedUser } from './users';
 
 const now = new Date(2026, 8, 3, 14).getTime();
-const technician = { id: 'u1', name: 'Ana', role: 'TECNICO', status: 'ATIVO' } as ManagedUser;
+const technician = { id: 'u1', name: 'Ana', role: 'TECNICO', status: 'ATIVO', usesTimeClock: true } as ManagedUser;
 const punch = (type: TimePunch['type'], hour: number, extra: Partial<TimePunch> = {}): TimePunch => ({
   id: `${type}-${hour}`, userId: 'u1', employeeName: 'Ana', timestamp: '', type,
-  locationStr: 'Rua X, 123', lat: -23.3, lng: -51.1, status: 'APROVADO',
+  locationStr: 'Rua X, 123', locationAddress: 'Rua X, 123', lat: -23.3, lng: -51.1, status: 'APROVADO',
   at: new Date(2026, 8, 3, hour).getTime(), ...extra,
 });
 const order = (status: OrdemServico['status']): OrdemServico => ({
@@ -29,7 +29,7 @@ describe('localização operacional', () => {
     expect(hasOpenJourney([punch('ENTRADA', 8, { at: now - 86_400_000 })], now)).toBe(false);
   });
   it('usa última localização válida e tolera ausência de GPS/endereço', () => {
-    const noGps = punch('RETORNO', 13, { lat: 0, lng: 0, locationStr: 'Sem localização' });
+    const noGps = punch('RETORNO', 13, { lat: 0, lng: 0, locationStr: 'Sem localização', locationAddress: undefined });
     expect(deriveFieldOperatorStates([technician], [noGps, punch('ENTRADA', 8)], [], [], now)[0].location).toBe('Rua X, 123');
     expect(deriveFieldOperatorStates([technician], [noGps], [], [], now)[0].location).toBe('Localização não informada');
   });
@@ -42,5 +42,8 @@ describe('localização operacional', () => {
   });
   it('não infere cliente a partir de coordenadas', () => {
     expect(deriveFieldOperatorStates([technician], [punch('ENTRADA', 8)], [], [client], now)[0].clientName).toBeUndefined();
+  });
+  it('não inclui funcionário com controle de ponto desativado', () => {
+    expect(deriveFieldOperatorStates([{ id: 'u1', name: 'Ana', usesTimeClock: false }], [punch('ENTRADA', 8)], [], [], now)).toEqual([]);
   });
 });

@@ -11,6 +11,7 @@ export interface AuthUser {
   cargo?: string;
   schedule?: WorkSchedule;
   firstAccessCompleted: boolean;
+  usesTimeClock: boolean;
 }
 
 const VALID_STATUS: UserStatus[] = ['ATIVO', 'INATIVO', 'DESLIGADO'];
@@ -59,6 +60,7 @@ async function readProfileState(supabase: any, user: any): Promise<{ state: 'ok'
       cargo: profile.cargo ?? undefined,
       schedule: profile.schedule ? normalizeSchedule(profile.schedule) : undefined,
       firstAccessCompleted: profile.first_access_completed !== false,
+      usesTimeClock: profile.uses_time_clock !== false,
     },
   };
 }

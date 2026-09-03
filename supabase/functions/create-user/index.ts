@@ -28,7 +28,7 @@ Deno.serve(async (req: Request) => {
   const {data:created,error:createError}=await admin.auth.admin.createUser({email,password:temporaryPassword,email_confirm:true,user_metadata:{name}});
   if(createError||!created.user){const message=(createError?.message||'').toLowerCase();const exists=message.includes('already')||message.includes('registered');return json(exists?409:400,{error:exists?'email_exists':'create_failed'},cors);}
   const id=created.user.id;
-  const {error:profileError}=await admin.from('profiles').upsert({id,name,email,role,status,cargo:body.cargo??null,full_name:body.fullName??null,cpf:body.cpf??null,birth_date:body.birthDate??null,phone:body.phone??null,schedule:body.schedule??null,courses:body.courses??null,first_access_completed:false,first_access_completed_at:null},{onConflict:'id'});
+  const {error:profileError}=await admin.from('profiles').upsert({id,name,email,role,status,cargo:body.cargo??null,full_name:body.fullName??null,cpf:body.cpf??null,birth_date:body.birthDate??null,phone:body.phone??null,schedule:body.schedule??null,courses:body.courses??null,uses_time_clock:body.usesTimeClock!==false,first_access_completed:false,first_access_completed_at:null},{onConflict:'id'});
   if(profileError){await admin.auth.admin.deleteUser(id).catch(()=>{});return json(500,{error:'profile_update_failed'},cors);}
   await admin.from('audit_logs').insert({user_id:identity.user.id,user_name:actor.name,user_role:actor.role,action:'USER_CREATED',module:'usuarios',details:`target_user_id=${id} target_role=${role}`});
   return json(200,{ok:true,id},cors);
