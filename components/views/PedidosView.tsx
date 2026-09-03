@@ -2,7 +2,8 @@
 import { showToast, requestConfirm, requestText } from '@/components/ui/Feedback';
 
 import React, { useMemo, useRef, useState, useEffect } from 'react';
-import { SupplyOrder, Client, Pedido, Contract, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem, DocumentosPadrao, DocumentType, FinancialTransaction, RecebimentoProposta, EmpresaAtendida, MarcaTecnologia, OrdemServico } from '@/lib/types';
+import { SupplyOrder, Client, Pedido, Contract, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem, DocumentosPadrao, DocumentType, FinancialTransaction, RecebimentoProposta, EmpresaAtendida, MarcaTecnologia, OrdemServico, TimePunch } from '@/lib/types';
+import { StartAttendanceButton, AttendanceHistoryList } from '@/components/operacoes/ServiceAttendanceFlow';
 import { OS_STATUS_ATIVOS, osHistoryForPedido, isHardDeleteEligible, isCancelable } from '@/lib/ordensServico';
 import { selecionarEmpresas, selecionarMarcas, experienciaAtiva } from '@/lib/experienciaSelecao';
 import { resolveLogoDataUrls } from '@/lib/institucional';
@@ -107,6 +108,11 @@ interface PedidosViewProps {
   onAddTransaction?: (tx: FinancialTransaction) => void;
   userRole: UserRole;
   currentUserName?: string;
+  /** Ponto do usuário autenticado — usado no aviso de jornada ao iniciar
+   *  atendimento (3B, §6). Opcional: sem ele, o aviso é simplesmente omitido. */
+  currentUserPunches?: TimePunch[];
+  /** profiles.uses_time_clock do usuário — condiciona o aviso de jornada. */
+  usesTimeClock?: boolean;
   /** Aba inicial ao abrir (ex.: atalho "Nova OS" do painel). */
   initialView?: 'propostas' | 'ordens_servico' | null;
 }
@@ -175,6 +181,8 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   nextProposalNumber = 249,
   userRole,
   currentUserName = '',
+  currentUserPunches = [],
+  usesTimeClock = false,
   initialView,
 }) => {
   const { maskMoney } = usePrivacy();
@@ -1297,6 +1305,11 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           clients={clients}
           contracts={contracts}
           canManage={!isTecnico}
+          isTecnico={isTecnico}
+          currentUserId={userId}
+          currentUserName={currentUserName}
+          currentUserPunches={currentUserPunches}
+          usesTimeClock={usesTimeClock}
           onCancel={onCancelOs ? () => { setOsCancelTarget(osDetail); setOsDetail(null); } : undefined}
           onDelete={onDeleteOs ? () => { setOsDeleteTarget(osDetail); setOsDetail(null); } : undefined}
           onClose={() => setOsDetail(null)}
@@ -1810,15 +1823,23 @@ const OrdemServicoDetailModal: React.FC<{
   clients: Client[];
   contracts: Contract[];
   canManage?: boolean;
+  isTecnico?: boolean;
+  currentUserId?: string;
+  currentUserName?: string;
+  currentUserPunches?: TimePunch[];
+  usesTimeClock?: boolean;
   onCancel?: () => void;
   onDelete?: () => void;
   onClose: () => void;
-}> = ({ os, clients, contracts, canManage = false, onCancel, onDelete, onClose }) => {
+}> = ({ os, clients, contracts, canManage = false, isTecnico = false, currentUserId, currentUserName, currentUserPunches = [], usesTimeClock = false, onCancel, onDelete, onClose }) => {
   const clienteNome = clients.find((c) => c.id === os.clienteId)?.name || os.clienteId || '—';
   const contrato = contracts.find((c) => c.id === os.contratoId);
   const st = OS_STATUS_LABEL[os.status] || { label: os.status, color: 'slate' as const };
   const podeCancelar = canManage && !!onCancel && isCancelable(os);
   const podeExcluir = canManage && !!onDelete && isHardDeleteEligible(os);
+  // Técnico responsável pode iniciar atendimento numa OS ativa (§5/§25).
+  const osAtiva = OS_STATUS_ATIVOS.includes(os.status);
+  const podeIniciarAtendimento = isTecnico && osAtiva && !!currentUserId && os.tecnicoResponsavelId === currentUserId;
   const linha = (label: string, value: React.ReactNode) => (
     <div className="flex gap-3 py-1.5 border-b border-border last:border-0">
       <span className="w-32 shrink-0 text-[11px] font-bold text-fg-secondary uppercase">{label}</span>
@@ -1852,6 +1873,26 @@ const OrdemServicoDetailModal: React.FC<{
               {os.canceladaEm ? linha('Cancelada em', new Date(os.canceladaEm).toLocaleString('pt-BR')) : null}
             </>
           )}
+
+          {/* ETAPA 3B — INICIAR ATENDIMENTO (técnico responsável, OS ativa) */}
+          {podeIniciarAtendimento && (
+            <div className="mt-4">
+              <StartAttendanceButton
+                os={os}
+                technicianId={currentUserId}
+                technicianName={currentUserName}
+                clients={clients}
+                usesTimeClock={usesTimeClock}
+                punches={currentUserPunches}
+              />
+            </div>
+          )}
+
+          {/* ETAPA 3B — HISTÓRICO DE ATENDIMENTOS da OS (§26/§27/§38) */}
+          <div className="mt-5">
+            <p className="text-[11px] font-bold text-fg-secondary uppercase tracking-wide mb-2">Atendimentos</p>
+            <AttendanceHistoryList osId={os.id} />
+          </div>
         </div>
         <div className="p-4 border-t border-border flex justify-between items-center gap-2">
           <div className="flex gap-2">

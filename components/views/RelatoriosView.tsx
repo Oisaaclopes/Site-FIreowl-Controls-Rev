@@ -58,7 +58,7 @@ interface RelatoriosViewProps {
   userRole: UserRole;
   companyProfile?: CompanyProfile;
   currentUserName?: string;
-  /** Atalho vindo do Dashboard: 'wizard' abre o Novo Atendimento direto. */
+  /** Atalho vindo do Dashboard: 'wizard' abre o Novo Relatório direto. */
   initialAction?: 'wizard' | null;
   onInitialActionConsumed?: () => void;
   onAddClient?: (newClient: Client) => void;
@@ -253,7 +253,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     }
   };
 
-  // Wizard "+ Novo Atendimento". Auditoria continua usando PREVENTIVA/SDAI
+  // Wizard "+ Novo Relatório". Auditoria continua usando PREVENTIVA/SDAI
   // internamente, mas conserva o contexto operacional apenas nesta sessão.
   const [wizardStep, setWizardStep] = useState<0 | 1 | 2 | 3>(0);
   const [wTipo, setWTipo] = useState<string>(''); // LEVANTAMENTO | CORRETIVA | PREVENTIVA
@@ -666,7 +666,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     setWizardStep(1);
   };
   const closeWizard = () => setWizardStep(0);
-  // Atalho do Dashboard: abre o wizard direto (uma ação → dentro do Novo Atendimento).
+  // Atalho do Dashboard: abre o wizard direto (uma ação → dentro do Novo Relatório).
   useEffect(() => {
     if (initialAction === 'wizard') {
       openWizard();
@@ -1137,7 +1137,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
               onClick={openWizard}
               className="bg-danger hover:bg-danger-hover text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
             >
-              <span className="material-symbols-outlined text-base">add</span> Novo atendimento
+              <span className="material-symbols-outlined text-base">add</span> Novo relatório
             </button>
           )}
         </div>
@@ -1313,7 +1313,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
           variant="relatorio"
           title={(search || fTipo !== 'TODOS' || fStatus !== 'TODOS') ? 'Nenhum relatório corresponde aos filtros selecionados.' : 'Nenhum relatório finalizado ainda.'}
           description={(search || fTipo !== 'TODOS' || fStatus !== 'TODOS') ? 'Ajuste a busca ou limpe os filtros para ver outros resultados.' : 'Os relatórios aparecerão aqui após a conclusão e sincronização de um atendimento.'}
-          actionLabel={(search || fTipo !== 'TODOS' || fStatus !== 'TODOS') ? 'Limpar filtros' : canCreate ? 'Novo atendimento' : undefined}
+          actionLabel={(search || fTipo !== 'TODOS' || fStatus !== 'TODOS') ? 'Limpar filtros' : canCreate ? 'Novo relatório' : undefined}
           onAction={(search || fTipo !== 'TODOS' || fStatus !== 'TODOS')
             ? () => { setSearch(''); setFTipo('TODOS'); setFStatus('TODOS'); }
             : canCreate ? openWizard : undefined}
@@ -1417,13 +1417,13 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       </>
       )}
 
-      {/* ===== Wizard "+ Novo Atendimento" (3 passos) ===== */}
+      {/* ===== Wizard "+ Novo Relatório" (3 passos) ===== */}
       {wizardStep > 0 && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-surface w-full max-w-lg rounded-xl shadow-2xl border border-border max-h-[92vh] flex flex-col">
             <div className="flex items-center justify-between p-5 border-b border-border">
               <div>
-                <h3 className="text-base font-bold text-fg uppercase">Novo atendimento</h3>
+                <h3 className="text-base font-bold text-fg uppercase">Novo relatório</h3>
                 <p className="text-[11px] text-fg-secondary">Passo {wizardStep} de 3</p>
               </div>
               <button onClick={closeWizard} className="text-fg-muted hover:text-fg-secondary font-bold text-lg leading-none">✕</button>

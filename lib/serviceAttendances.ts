@@ -48,7 +48,43 @@ export async function fetchServiceAttendances(filter?: {
   return (data || []).map(rowToAttendance);
 }
 
-/** Inicia um atendimento de uma OS (GPS pontual opcional, sem rastreio contínuo). */
+/** Atendimento ATIVO (EM_EXECUCAO) do técnico, se houver. A 0083 garante no
+ *  máximo um por técnico (índice único parcial); aqui pegamos o mais recente
+ *  como reforço defensivo. Retorna null quando o técnico está livre. */
+export async function fetchActiveAttendanceForTechnician(
+  technicianId: string
+): Promise<ServiceAttendance | null> {
+  if (!technicianId) return null;
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select('*')
+    .eq('technician_id', technicianId)
+    .eq('status', 'EM_EXECUCAO')
+    .order('started_at', { ascending: false })
+    .limit(1);
+  if (error) throw error;
+  return data && data[0] ? rowToAttendance(data[0]) : null;
+}
+
+/** Erro tipado: o técnico já tem um atendimento EM_EXECUCAO (viola o índice
+ *  único da 0083). Carrega o atendimento existente para a UI oferecer "Continuar"
+ *  em vez de tentar contornar a proteção do banco (§7/§34). */
+export class ActiveAttendanceExistsError extends Error {
+  existing: ServiceAttendance | null;
+  constructor(existing: ServiceAttendance | null) {
+    super('Você já possui um atendimento em andamento.');
+    this.name = 'ActiveAttendanceExistsError';
+    this.existing = existing;
+  }
+}
+
+/**
+ * Inicia um atendimento de uma OS (GPS pontual opcional, sem rastreio contínuo).
+ * IDEMPOTENTE em relação ao índice único da 0083: se o técnico já tiver um
+ * atendimento EM_EXECUCAO, o banco rejeita (23505) e devolvemos o atendimento
+ * atual dentro de ActiveAttendanceExistsError — nunca criamos um segundo (§7/§34).
+ */
 export async function startServiceAttendance(input: {
   workOrderId: string;
   technicianId: string;
@@ -67,6 +103,35 @@ export async function startServiceAttendance(input: {
     })
     .select()
     .single();
+  if (error) {
+    // 23505 = unique_violation do índice service_attendances_one_active_per_tech.
+    if (error.code === '23505') {
+      const existing = await fetchActiveAttendanceForTechnician(input.technicianId).catch(() => null);
+      throw new ActiveAttendanceExistsError(existing);
+    }
+    throw error;
+  }
+  return rowToAttendance(data);
+}
+
+/** Salvamento incremental durante o atendimento (§12): diagnóstico/execução,
+ *  sem tocar em status/resultado/horários. Base do autosave da tela de campo. */
+export async function saveAttendanceProgress(input: {
+  id: string;
+  diagnosis?: string;
+  executionNotes?: string;
+}): Promise<ServiceAttendance> {
+  const supabase = getSupabaseClient() as any;
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (input.diagnosis !== undefined) patch.diagnosis = input.diagnosis || null;
+  if (input.executionNotes !== undefined) patch.execution_notes = input.executionNotes || null;
+  const { data, error } = await supabase
+    .from(TABLE)
+    .update(patch)
+    .eq('id', input.id)
+    .eq('status', 'EM_EXECUCAO') // nunca reabre um atendimento finalizado
+    .select()
+    .single();
   if (error) throw error;
   return rowToAttendance(data);
 }
@@ -81,18 +146,21 @@ export async function finishServiceAttendance(input: {
   longitude?: number;
 }): Promise<ServiceAttendance> {
   const supabase = getSupabaseClient() as any;
+  // Só sobrescreve diagnóstico/execução quando o caller informa: preserva o que
+  // já foi autosalvo durante o atendimento (§12) se a finalização não os reenviar.
+  const patch: Record<string, unknown> = {
+    status: 'FINALIZADO',
+    finished_at: new Date().toISOString(),
+    result: input.result,
+    latitude_end: input.latitude ?? null,
+    longitude_end: input.longitude ?? null,
+    updated_at: new Date().toISOString(),
+  };
+  if (input.diagnosis !== undefined) patch.diagnosis = input.diagnosis || null;
+  if (input.executionNotes !== undefined) patch.execution_notes = input.executionNotes || null;
   const { data, error } = await supabase
     .from(TABLE)
-    .update({
-      status: 'FINALIZADO',
-      finished_at: new Date().toISOString(),
-      result: input.result,
-      diagnosis: input.diagnosis ?? null,
-      execution_notes: input.executionNotes ?? null,
-      latitude_end: input.latitude ?? null,
-      longitude_end: input.longitude ?? null,
-      updated_at: new Date().toISOString(),
-    })
+    .update(patch)
     .eq('id', input.id)
     .select()
     .single();

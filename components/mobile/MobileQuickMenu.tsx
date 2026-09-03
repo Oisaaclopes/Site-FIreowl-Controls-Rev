@@ -7,6 +7,7 @@ import { allowedTabs } from '@/lib/rbac';
 import { QuickFieldPhotoModal } from '@/components/field-photos/QuickFieldPhotoModal';
 import { QuickPunchCard } from '@/components/ponto/QuickPunchCard';
 import { SyncIndicator } from '@/components/ui/SyncIndicator';
+import { ActiveAttendanceCard } from '@/components/operacoes/ServiceAttendanceFlow';
 
 const ROLE_LABEL: Record<UserRole, string> = {
   ADMINISTRATIVO: 'Administrativo', GESTOR: 'Gestor', FINANCEIRO: 'Financeiro', TECNICO: 'Técnico',
@@ -58,6 +59,12 @@ export const MobileQuickMenu: React.FC<Props> = ({ userName, cargo, userRole, us
           usesTimeClock={usesTimeClock}
           onOpenPonto={() => onSelectTab('ponto')}
         />
+      )}
+
+      {/* ATENDIMENTO ATUAL — só aparece quando o técnico tem atendimento em
+          execução (§23/§37). Prioridade acima das ações operacionais. */}
+      {userRole === 'TECNICO' && (
+        <ActiveAttendanceCard technicianId={userId} technicianName={userName} clients={clients} />
       )}
 
       {/* Ação operacional (só quando o módulo é permitido, sem inventar ação §28) */}

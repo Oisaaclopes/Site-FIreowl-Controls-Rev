@@ -8,6 +8,7 @@ import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 import { QuickFieldPhotoModal } from '@/components/field-photos/QuickFieldPhotoModal';
 import { QuickPunchCard } from '@/components/ponto/QuickPunchCard';
 import { SyncIndicator } from '@/components/ui/SyncIndicator';
+import { ActiveAttendanceCard } from '@/components/operacoes/ServiceAttendanceFlow';
 
 interface TechDashboardProps {
   currentUser: string;
@@ -18,8 +19,9 @@ interface TechDashboardProps {
   clients: Client[];
   onNavigateToTab: (tab: TabPath) => void;
   onNewOSClick: () => void;
-  /** Abre o wizard de Novo Atendimento (mesmo fluxo existente). */
-  onNewAtendimento: () => void;
+  /** Abre o wizard de relatório técnico (fluxo de Relatórios; não confundir com
+   *  o ATENDIMENTO operacional da OS — ver ETAPA 3B, §31). */
+  onNewReport: () => void;
   /** profiles.uses_time_clock — quando false, o card de Ponto não aparece. */
   usesTimeClock?: boolean;
 }
@@ -40,7 +42,7 @@ export const TechDashboard: React.FC<TechDashboardProps> = ({
   clients,
   onNavigateToTab,
   onNewOSClick,
-  onNewAtendimento,
+  onNewReport,
   usesTimeClock = true,
 }) => {
   const [ordens, setOrdens] = useState<OrdemServico[]>([]);
@@ -100,6 +102,10 @@ export const TechDashboard: React.FC<TechDashboardProps> = ({
         onOpenPonto={() => onNavigateToTab('ponto')}
       />
 
+      {/* ATENDIMENTO ATUAL — prioridade visual acima da operação (§23). Só
+          aparece quando há um service_attendance EM_EXECUCAO do técnico. */}
+      <ActiveAttendanceCard technicianId={currentUserId} technicianName={currentUser} clients={clients} orders={ordens} />
+
       {/* OPERAÇÃO DE HOJE — operação de campo recorrente do técnico (§17). Não é
           OS: é a atividade contínua (ex.: Auditoria SDAI no Catuaí). */}
       {operacoes.length > 0 && (
@@ -147,11 +153,11 @@ export const TechDashboard: React.FC<TechDashboardProps> = ({
       {/* Atalhos operacionais */}
       <div className="grid grid-cols-2 gap-3">
         <button
-          onClick={onNewAtendimento}
+          onClick={onNewReport}
           className="min-h-[80px] rounded-xl bg-surface border border-border shadow-sm flex flex-col items-center justify-center gap-1 text-danger hover:border-danger transition-colors"
         >
           <span className="material-symbols-outlined text-3xl">assignment</span>
-          <span className="text-xs font-bold uppercase tracking-wide text-fg-secondary">Novo Atendimento</span>
+          <span className="text-xs font-bold uppercase tracking-wide text-fg-secondary">Novo Relatório</span>
         </button>
         <button
           onClick={onNewOSClick}

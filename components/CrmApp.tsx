@@ -159,7 +159,7 @@ export function CrmApp({
   const [sidebarOpen, setSidebarOpen] = useState(false); // menu off-canvas (mobile)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // mini-sidebar (desktop)
   const [pedidosInitialView, setPedidosInitialView] = useState<'propostas' | 'ordens_servico' | null>(null); // atalho "Nova OS"
-  const [relatoriosInitialAction, setRelatoriosInitialAction] = useState<'wizard' | null>(null); // atalho "Novo Atendimento"
+  const [relatoriosInitialAction, setRelatoriosInitialAction] = useState<'wizard' | null>(null); // atalho "Novo Relatório"
 
   // RBAC: se a aba atual não é permitida ao perfil, volta para a primeira permitida
   useEffect(() => {
@@ -1130,9 +1130,9 @@ export function CrmApp({
     setCurrentTab('pedidos');
   };
 
-  // "Novo Atendimento" do Dashboard → abre o wizard existente em uma ação
-  // (leva o técnico direto ao wizard, sem parar na lista de Relatórios).
-  const handleNewAtendimento = () => {
+  // "Novo Relatório" do Dashboard → abre o wizard de relatório técnico em uma
+  // ação (§31: renomeado — o ATENDIMENTO operacional agora nasce na OS, não aqui).
+  const handleNewReport = () => {
     setRelatoriosInitialAction('wizard');
     setCurrentTab('relatorios');
   };
@@ -1215,7 +1215,7 @@ export function CrmApp({
               clients={clients}
               onNavigateToTab={setCurrentTab}
               onNewOSClick={handleNewOSQuick}
-              onNewAtendimento={handleNewAtendimento}
+              onNewReport={handleNewReport}
               usesTimeClock={usesTimeClock}
             />
           )}
@@ -1274,6 +1274,8 @@ export function CrmApp({
               nextProposalNumber={nextProposalNumber}
               userRole={userRole}
               currentUserName={userName}
+              currentUserPunches={punches}
+              usesTimeClock={usesTimeClock}
               initialView={pedidosInitialView}
             />
           )}

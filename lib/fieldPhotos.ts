@@ -21,6 +21,8 @@ export interface FieldPhoto {
   clientId: string;
   reportId?: string;
   osId?: string;
+  /** Atendimento (service_attendances) em que a evidência foi capturada (0084). */
+  serviceAttendanceId?: string;
   pendenciaId?: string;
   storagePathOriginal: string;
   storagePathMarkup?: string;
@@ -41,12 +43,12 @@ const uuid = () => {
   });
 };
 const sessionRow = (s: FieldPhotoSession) => ({ id: s.id, client_id: s.clientId, local_setor: s.localSetor ?? null, tecnico_id: s.tecnicoId, tecnico_nome: s.tecnicoNome ?? null, iniciado_em: s.iniciadoEm, finalizado_em: s.finalizadoEm ?? null, client_uuid: s.clientUuid, sync_status: s.syncStatus });
-const photoRow = (p: FieldPhoto) => ({ id: p.id, session_id: p.sessionId, client_id: p.clientId, report_id: p.reportId ?? null, os_id: p.osId ?? null, pendencia_id: p.pendenciaId ?? null, storage_path_original: p.storagePathOriginal, storage_path_markup: p.storagePathMarkup ?? null, storage_path_evidencia: p.storagePathEvidencia ?? null, nota_rapida: p.notaRapida ?? null, marcador: p.marcador ?? null, capturado_em: p.capturadoEm, geo: p.geo ?? null, client_uuid: p.clientUuid, sync_status: p.syncStatus });
-const fromPhoto = (r: any): FieldPhoto => ({ id: r.id, sessionId: r.session_id, clientId: r.client_id, reportId: r.report_id ?? undefined, osId: r.os_id ?? undefined, pendenciaId: r.pendencia_id ?? undefined, storagePathOriginal: r.storage_path_original, storagePathMarkup: r.storage_path_markup ?? undefined, storagePathEvidencia: r.storage_path_evidencia ?? undefined, notaRapida: r.nota_rapida ?? undefined, marcador: r.marcador ?? undefined, capturadoEm: r.capturado_em, geo: r.geo ?? undefined, clientUuid: r.client_uuid, syncStatus: r.sync_status });
+const photoRow = (p: FieldPhoto) => ({ id: p.id, session_id: p.sessionId, client_id: p.clientId, report_id: p.reportId ?? null, os_id: p.osId ?? null, service_attendance_id: p.serviceAttendanceId ?? null, pendencia_id: p.pendenciaId ?? null, storage_path_original: p.storagePathOriginal, storage_path_markup: p.storagePathMarkup ?? null, storage_path_evidencia: p.storagePathEvidencia ?? null, nota_rapida: p.notaRapida ?? null, marcador: p.marcador ?? null, capturado_em: p.capturadoEm, geo: p.geo ?? null, client_uuid: p.clientUuid, sync_status: p.syncStatus });
+const fromPhoto = (r: any): FieldPhoto => ({ id: r.id, sessionId: r.session_id, clientId: r.client_id, reportId: r.report_id ?? undefined, osId: r.os_id ?? undefined, serviceAttendanceId: r.service_attendance_id ?? undefined, pendenciaId: r.pendencia_id ?? undefined, storagePathOriginal: r.storage_path_original, storagePathMarkup: r.storage_path_markup ?? undefined, storagePathEvidencia: r.storage_path_evidencia ?? undefined, notaRapida: r.nota_rapida ?? undefined, marcador: r.marcador ?? undefined, capturadoEm: r.capturado_em, geo: r.geo ?? undefined, clientUuid: r.client_uuid, syncStatus: r.sync_status });
 const fromSession = (r: any): FieldPhotoSession => ({ id: r.id, clientId: r.client_id, localSetor: r.local_setor ?? undefined, tecnicoId: r.tecnico_id, tecnicoNome: r.tecnico_nome ?? undefined, iniciadoEm: r.iniciado_em, finalizadoEm: r.finalizado_em ?? undefined, clientUuid: r.client_uuid, syncStatus: r.sync_status });
 
 export const newFieldPhotoSession = (input: Pick<FieldPhotoSession, 'clientId' | 'tecnicoId' | 'tecnicoNome' | 'localSetor'>, capturedAt = new Date().toISOString()): FieldPhotoSession => ({ id: uuid(), clientUuid: uuid(), syncStatus: 'pendente', iniciadoEm: capturedAt, ...input });
-export const newFieldPhoto = (input: Pick<FieldPhoto, 'sessionId' | 'clientId' | 'storagePathOriginal' | 'notaRapida' | 'marcador' | 'geo'>, capturedAt = new Date().toISOString()): FieldPhoto => ({ id: uuid(), clientUuid: uuid(), syncStatus: 'pendente', capturadoEm: capturedAt, ...input });
+export const newFieldPhoto = (input: Pick<FieldPhoto, 'sessionId' | 'clientId' | 'storagePathOriginal' | 'notaRapida' | 'marcador' | 'geo'> & Partial<Pick<FieldPhoto, 'osId' | 'serviceAttendanceId'>>, capturedAt = new Date().toISOString()): FieldPhoto => ({ id: uuid(), clientUuid: uuid(), syncStatus: 'pendente', capturadoEm: capturedAt, ...input });
 export const isUnclassifiedFieldPhoto = (p: Pick<FieldPhoto, 'reportId' | 'osId' | 'pendenciaId'>) => !p.reportId && !p.osId && !p.pendenciaId;
 export const evidenceLines = (p: Pick<FieldPhoto, 'capturadoEm' | 'notaRapida'>, session: Pick<FieldPhotoSession, 'localSetor' | 'tecnicoNome'>, clientName: string) => {
   const date = new Date(p.capturadoEm);
@@ -90,4 +92,21 @@ export async function listFieldPhotosBySession(sessionId: string): Promise<Field
 export async function updateFieldPhotoSessionStatus(id: string, syncStatus: FieldPhotoSyncStatus): Promise<void> {
   const { error } = await (getSupabaseClient() as any).from('field_photo_sessions').update({ sync_status: syncStatus }).eq('id', id);
   if (error) throw error;
+}
+
+/** Evidências (fotos) classificadas para uma OS. Base do painel de evidências do
+ *  atendimento — a RLS de field_photos continua valendo. */
+export async function listFieldPhotosForOs(osId: string): Promise<FieldPhoto[]> {
+  if (!osId) return [];
+  const { data, error } = await (getSupabaseClient() as any).from('field_photos').select('*').eq('os_id', osId).order('capturado_em', { ascending: true });
+  if (error) throw error;
+  return (data || []).map(fromPhoto);
+}
+
+/** Evidências vinculadas a UM atendimento específico (0084). */
+export async function listFieldPhotosForAttendance(attendanceId: string): Promise<FieldPhoto[]> {
+  if (!attendanceId) return [];
+  const { data, error } = await (getSupabaseClient() as any).from('field_photos').select('*').eq('service_attendance_id', attendanceId).order('capturado_em', { ascending: true });
+  if (error) throw error;
+  return (data || []).map(fromPhoto);
 }

@@ -30,9 +30,13 @@ interface Props {
   onClose: () => void;
   afterReference?: GalleryPhoto;
   onComparisonCreated?: () => void;
+  /** Contexto do atendimento (3B): vincula a foto à OS e ao atendimento (0084)
+   *  já na captura, sem quebrar o fluxo genérico (ambos opcionais). */
+  osId?: string;
+  serviceAttendanceId?: string;
 }
 
-export const QuickFieldPhotoModal: React.FC<Props> = ({ isOpen, clients, technicianId, technicianName, onClose, afterReference, onComparisonCreated }) => {
+export const QuickFieldPhotoModal: React.FC<Props> = ({ isOpen, clients, technicianId, technicianName, onClose, afterReference, onComparisonCreated, osId, serviceAttendanceId }) => {
   const toast = useToast();
   const confirm = useConfirm();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -112,7 +116,7 @@ export const QuickFieldPhotoModal: React.FC<Props> = ({ isOpen, clients, technic
     if (!session || !client || !current || busy) return;
     setBusy(true);
     const captured = current;
-    const basePhoto = newFieldPhoto({ sessionId: session.id, clientId: client.id, storagePathOriginal: '', notaRapida: note.trim() || undefined, marcador: afterReference?'depois':marker, geo }, captured.capturedAt);
+    const basePhoto = newFieldPhoto({ sessionId: session.id, clientId: client.id, storagePathOriginal: '', notaRapida: note.trim() || undefined, marcador: afterReference?'depois':marker, geo, osId: afterReference?.osId ?? osId, serviceAttendanceId }, captured.capturedAt);
     const pathBase = { technicianId: session.tecnicoId, sessionClientUuid: session.clientUuid, photoClientUuid: basePhoto.clientUuid };
     const photo = {
       ...basePhoto,
