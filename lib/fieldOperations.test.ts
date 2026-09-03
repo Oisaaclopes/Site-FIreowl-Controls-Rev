@@ -28,6 +28,41 @@ describe('localização operacional', () => {
     expect(hasOpenJourney([punch('SAIDA', 18)], now)).toBe(false);
     expect(hasOpenJourney([punch('ENTRADA', 8, { at: now - 86_400_000 })], now)).toBe(false);
   });
+  it('SAÍDA prevalece sobre OS em execução: FORA DE JORNADA, sem cliente', () => {
+    const state = deriveFieldOperatorStates(
+      [technician], [punch('SAIDA', 18), punch('ENTRADA', 8)], [order('em_execucao')], [client], now
+    )[0];
+    expect(state).toMatchObject({ status: 'FORA DE JORNADA', clientName: undefined, activeOs: undefined });
+  });
+  it('jornada aberta + OS apenas ABERTA (não iniciada) => EM JORNADA (não associa cliente)', () => {
+    for (const s of ['aberta', 'agendada'] as const) {
+      const state = deriveFieldOperatorStates([technician], [punch('ENTRADA', 8)], [order(s)], [client], now)[0];
+      expect(state).toMatchObject({ status: 'EM JORNADA', clientName: undefined, activeOs: undefined, locationSource: 'punch' });
+    }
+  });
+  it('atendimento encerrado (OS concluída) + jornada aberta => EM JORNADA', () => {
+    const state = deriveFieldOperatorStates([technician], [punch('ENTRADA', 8)], [order('concluida')], [client], now)[0];
+    expect(state.status).toBe('EM JORNADA');
+  });
+  it('atendimento encerrado + SAÍDA => FORA DE JORNADA', () => {
+    const state = deriveFieldOperatorStates([technician], [punch('SAIDA', 18), punch('ENTRADA', 8)], [order('concluida')], [client], now)[0];
+    expect(state.status).toBe('FORA DE JORNADA');
+  });
+  it('OS aberta de cliente antigo não vira localização atual; mostra o atendimento em execução real', () => {
+    const clienteA = { id: 'cA', name: 'Cliente A (antigo)', address: 'Rua Antiga, 1' } as Client;
+    const clienteB = { id: 'cB', name: 'Cliente B (atual)', address: 'Rua Atual, 2' } as Client;
+    const osA: OrdemServico = { ...order('aberta'), id: 'osA', numero: 'OS-A', clienteId: 'cA' };
+    const osB: OrdemServico = { ...order('em_execucao'), id: 'osB', numero: 'OS-B', clienteId: 'cB' };
+    const state = deriveFieldOperatorStates([technician], [punch('ENTRADA', 8)], [osA, osB], [clienteA, clienteB], now)[0];
+    expect(state).toMatchObject({ status: 'EM ATENDIMENTO', clientName: 'Cliente B (atual)', location: 'Rua Atual, 2' });
+    expect(state.activeOs?.numero).toBe('OS-B');
+  });
+  it('batida com lat/lng + location_address mostra o endereço; sem endereço fica "sendo identificado"', () => {
+    const semEndereco = deriveFieldOperatorStates([technician], [punch('SAIDA', 18, { locationAddress: undefined })], [], [], now)[0];
+    expect(semEndereco).toMatchObject({ status: 'FORA DE JORNADA', location: 'Endereço sendo identificado', locationSource: 'punch' });
+    const comEndereco = deriveFieldOperatorStates([technician], [punch('SAIDA', 18)], [], [], now)[0];
+    expect(comEndereco.location).toBe('Rua X, 123');
+  });
   it('usa última localização válida e tolera ausência de GPS/endereço', () => {
     const noGps = punch('RETORNO', 13, { lat: 0, lng: 0, locationStr: 'Sem localização', locationAddress: undefined });
     expect(deriveFieldOperatorStates([technician], [noGps, punch('ENTRADA', 8)], [], [], now)[0].location).toBe('Rua X, 123');

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { FinancialTransaction, OrdemServico, Contract, TabPath, TimePunch, Client } from '@/lib/types';
 import { OS_STATUS_ATIVOS } from '@/lib/ordensServico';
 import { usePrivacy } from '@/lib/privacy';
@@ -37,11 +37,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   useEffect(() => { void refreshFieldTechnicians(); }, [refreshFieldTechnicians]);
   useDomainRefresh('dashboard', refreshFieldTechnicians);
   const fieldStates = useMemo(() => deriveFieldOperatorStates(fieldTechnicians, punches, ordensServico, clients), [fieldTechnicians, punches, ordensServico, clients]);
+  // Resolução sob demanda do endereço da última batida exibida (lat/lng sem
+  // location_address). Best-effort: nunca bloqueia a UI. O guard evita repetir
+  // indefinidamente a mesma batida a cada refresh se o provedor falhar.
+  const requestedAddressIds = useRef<Set<string>>(new Set());
   useEffect(() => {
     const unresolved = fieldStates
       .map((state) => state.locationSource === 'punch' ? punches.find((p) => p.userId === state.userId && (p.lat || p.lng) && !p.locationAddress) : undefined)
-      .filter((p): p is TimePunch => Boolean(p));
-    for (const punch of unresolved) void requestPunchAddress(punch.id).catch(() => {});
+      .filter((p): p is TimePunch => p !== undefined && !requestedAddressIds.current.has(p.id));
+    for (const punch of unresolved) {
+      requestedAddressIds.current.add(punch.id);
+      void requestPunchAddress(punch.id).catch(() => {});
+    }
   }, [fieldStates, punches]);
 
   // Indicadores reais derivados dos dados do sistema

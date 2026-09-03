@@ -1,8 +1,15 @@
 import { Client, OrdemServico, TimePunch } from './types';
 import type { TimeClockParticipant } from './users';
-import { OS_STATUS_ATIVOS } from './ordensServico';
 
 export type FieldOperationalStatus = 'EM ATENDIMENTO' | 'EM JORNADA' | 'FORA DE JORNADA';
+
+/**
+ * Atendimento operacional ATIVO = OS EM EXECUÇÃO atribuída ao técnico. Uma OS
+ * apenas 'aberta'/'agendada' é backlog/atribuição, NÃO um atendimento em curso;
+ * 'concluida'/'cancelada' são terminais. Só 'em_execucao' significa "o técnico
+ * iniciou este atendimento e ainda não o encerrou".
+ */
+const isActiveAttendance = (os: OrdemServico) => os.status === 'em_execucao';
 
 export interface FieldOperatorState {
   userId: string;
@@ -41,12 +48,13 @@ export function deriveFieldOperatorStates(
   now = Date.now()
 ): FieldOperatorState[] {
   const clientById = new Map(clients.map((client) => [client.id, client]));
-  const activeOrderByTechnician = new Map<string, OrdemServico>();
+  // Só OS EM EXECUÇÃO conta como atendimento; a mais antiga prevista primeiro.
+  const attendanceByTechnician = new Map<string, OrdemServico>();
   for (const order of orders) {
-    if (!order.tecnicoResponsavelId || !OS_STATUS_ATIVOS.includes(order.status)) continue;
-    const current = activeOrderByTechnician.get(order.tecnicoResponsavelId);
+    if (!order.tecnicoResponsavelId || !isActiveAttendance(order)) continue;
+    const current = attendanceByTechnician.get(order.tecnicoResponsavelId);
     if (!current || (order.dataPrevista || '') < (current.dataPrevista || '')) {
-      activeOrderByTechnician.set(order.tecnicoResponsavelId, order);
+      attendanceByTechnician.set(order.tecnicoResponsavelId, order);
     }
   }
 
@@ -56,11 +64,17 @@ export function deriveFieldOperatorStates(
       .sort((a, b) => (b.at || 0) - (a.at || 0));
     const lastPunch = employeePunches[0];
     const lastLocatedPunch = employeePunches.find(hasCoordinates);
-    const activeOs = activeOrderByTechnician.get(technician.id);
+    const journeyOpen = hasOpenJourney(employeePunches, now);
+    // PRECEDÊNCIA: jornada fechada (última batida efetiva = SAÍDA, ou sem batida
+    // hoje) SEMPRE prevalece. Uma OS aberta/em execução NÃO mantém alguém "em
+    // atendimento" depois da SAÍDA — por isso o atendimento só vale com jornada
+    // aberta. Sem atendimento ativo, jornada aberta é apenas EM JORNADA.
+    const activeOs = journeyOpen ? attendanceByTechnician.get(technician.id) : undefined;
     const client = activeOs?.clienteId ? clientById.get(activeOs.clienteId) : undefined;
     const status: FieldOperationalStatus = activeOs
       ? 'EM ATENDIMENTO'
-      : hasOpenJourney(employeePunches, now) ? 'EM JORNADA' : 'FORA DE JORNADA';
+      : journeyOpen ? 'EM JORNADA' : 'FORA DE JORNADA';
+    // Cliente/endereço só do atendimento ATIVO; nunca de OS aberta atribuída.
     const osAddress = activeOs && client?.address?.trim();
     const punchLocation = lastLocatedPunch?.locationAddress?.trim();
     const locationSource: FieldOperatorState['locationSource'] = osAddress ? 'os' : lastLocatedPunch ? 'punch' : 'none';
