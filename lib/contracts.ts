@@ -3,6 +3,33 @@ import { Contract } from './types';
 
 const TABLE = 'contracts';
 
+/**
+ * Referência amigável do contrato exibida ao cliente. Usa o número estruturado
+ * (`numero`, ex.: CTR-FWL-103) quando houver; senão deriva um código curto e
+ * ESTÁVEL a partir do id — sem revelar ordem/sequência (nada de "001") e sem
+ * expor o id interno (CTR-FOWL-<timestamp>).
+ */
+export function friendlyContractRef(c: Pick<Contract, 'id' | 'numero'>): string {
+  const n = (c.numero || '').trim();
+  if (n) return n;
+  let h = 0;
+  for (let i = 0; i < c.id.length; i++) h = (h * 31 + c.id.charCodeAt(i)) >>> 0;
+  return `CTR-FWL-${100 + (h % 900)}`; // 3 dígitos, estável por contrato
+}
+
+/**
+ * Próximo número sequencial para um NOVO contrato no padrão CTR-FWL-NNN,
+ * a partir do maior número já usado nesse padrão; começa em 101.
+ */
+export function nextContractNumero(contracts: Pick<Contract, 'numero'>[]): string {
+  let max = 100;
+  for (const c of contracts) {
+    const m = (c.numero || '').match(/CTR-FWL-(\d+)/i);
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+  return `CTR-FWL-${max + 1}`;
+}
+
 function rowToContract(r: any): Contract {
   return {
     id: String(r.id),

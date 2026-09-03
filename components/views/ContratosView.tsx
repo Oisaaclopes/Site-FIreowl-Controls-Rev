@@ -1,13 +1,17 @@
 'use client';
 import { showToast } from '@/components/ui/Feedback';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { Contract, Client, UserRole } from '@/lib/types';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
 import { usePrivacy } from '@/lib/privacy';
 import { publishDocumentVerification, verificationUrl } from '@/lib/documentVerification';
 import { ContractDetailPanel } from '@/components/contratos/ContractDetailPanel';
+import { ClientLogo } from '@/components/ClientLogo';
+import { resolveLogoDataUrls } from '@/lib/institucional';
+import { friendlyContractRef, nextContractNumero } from '@/lib/contracts';
+import { nomeFantasiaCliente } from '@/lib/utils';
 
 interface ContratosViewProps {
   contracts: Contract[];
@@ -108,6 +112,19 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
   const [detailContract, setDetailContract] = useState<Contract | null>(null);
   const [detailTab, setDetailTab] = useState<'rotinas' | 'operacoes' | 'horas' | 'docs'>('rotinas');
   const openDetail = (ctr: Contract, tab: 'rotinas' | 'operacoes' | 'horas' | 'docs') => { setDetailTab(tab); setDetailContract(ctr); };
+
+  // Logos dos clientes (data URLs) para exibir na linha do contrato.
+  const [clientLogoUrls, setClientLogoUrls] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let alive = true;
+    resolveLogoDataUrls(clients.map((c) => c.logoPath || '').filter(Boolean))
+      .then((map) => { if (alive) setClientLogoUrls(map); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [clients]);
+  const clientForContract = (ctr: Contract) =>
+    clients.find((c) => c.id === ctr.clientId)
+    || clients.find((c) => (c.name || '').toUpperCase() === (ctr.clientName || '').toUpperCase());
   const [fNumero, setFNumero] = useState('');
   const [fRespComercial, setFRespComercial] = useState('');
   const [fRenovAuto, setFRenovAuto] = useState(false);
@@ -216,8 +233,9 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
       status: fStatus,
       responsibleTech: fResponsible,
       artDocumentRef: existing?.artDocumentRef || `ART-PR-2026-${stamp}`,
-      // ETAPA 3 — estruturados
-      numero: fNumero.trim() || undefined,
+      // ETAPA 3 — estruturados. Número amigável (CTR-FWL-NNN): mantém o existente,
+      // respeita o informado no formulário, ou gera o próximo sequencial.
+      numero: fNumero.trim() || existing?.numero || nextContractNumero(contracts),
       responsavelComercial: fRespComercial.trim() || undefined,
       renovacaoAutomatica: fRenovAuto,
       avisoAntecedenciaDias: fAvisoDias === '' ? undefined : Number(fAvisoDias),
@@ -348,18 +366,22 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
               <DataListRow
                 key={ctr.id}
                 leading={
-                  <span className="w-10 h-10 rounded-lg bg-navy/10 text-primary flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-lg">description</span>
-                  </span>
+                  <ClientLogo
+                    src={(() => { const cli = clientForContract(ctr); return cli?.logoPath ? clientLogoUrls[cli.logoPath] : undefined; })()}
+                    name={nomeFantasiaCliente(ctr.clientName)}
+                    sizeClass="w-10 h-10"
+                    rounded="rounded-lg"
+                    padding="p-1"
+                    fallback={<span className="material-symbols-outlined text-lg">description</span>}
+                  />
                 }
                 title={<span className="uppercase">{ctr.clientName}</span>}
                 meta={
                   <>
-                    <RowMeta label="Ref" value={<span className="font-data-mono">{ctr.id}</span>} />
+                    <RowMeta label="Ref" value={<span className="font-data-mono">{friendlyContractRef(ctr)}</span>} />
                     {ctr.contractType && <RowMeta label="Escopo" value={ctr.contractType} />}
                     <RowMeta label="Unidade" value={ctr.unit} />
                     <RowMeta label="Resp" value={ctr.responsibleTech} />
-                    <RowMeta label="ART" value={<span className="font-data-mono">{ctr.artDocumentRef}</span>} />
                   </>
                 }
                 center={
