@@ -99,7 +99,8 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <span className="material-symbols-outlined">menu</span>
         </button>
-        <div className="flex items-center gap-1.5 bg-surface-2 px-2.5 py-1 rounded-md border border-border">
+        {/* Data/hora — apenas desktop; no mobile o header fica limpo. */}
+        <div className="hidden md:flex items-center gap-1.5 bg-surface-2 px-2.5 py-1 rounded-md border border-border">
           <span className="material-symbols-outlined text-fg-muted text-[15px]">event</span>
           <span className="font-data-mono text-fg-secondary uppercase text-[11px] font-semibold whitespace-nowrap">
             {currentDateTime}
@@ -129,7 +130,15 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           {showNotifications && (
-            <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-1.5rem)] bg-surface border border-border rounded-xl shadow-pop z-50 p-4 text-xs">
+            <>
+              {/* Overlay discreto no mobile — toque fora fecha (ESC segue no desktop). */}
+              <div
+                className="fixed inset-0 z-40 bg-black/30 md:hidden"
+                onClick={() => setShowNotifications(false)}
+                aria-hidden="true"
+              />
+              {/* Mobile: painel centralizado na viewport (fixed). Desktop: popover ancorado ao sino. */}
+              <div className="fixed left-1/2 -translate-x-1/2 top-[calc(3.5rem_+_env(safe-area-inset-top)_+_0.5rem)] w-[calc(100vw-24px)] max-w-[420px] max-h-[calc(100dvh_-_4rem_-_env(safe-area-inset-top))] overflow-y-auto md:absolute md:left-auto md:right-0 md:translate-x-0 md:top-auto md:mt-2 md:w-80 md:max-w-[calc(100vw-1.5rem)] md:max-h-none md:overflow-visible bg-surface border border-border rounded-xl shadow-pop z-50 p-4 text-xs">
               <div className="flex justify-between items-center border-b border-border pb-3 mb-3">
                 <span className="font-bold text-fg uppercase text-xs">Avisos do sistema</span>
                 <span className={`font-data-mono text-[10px] px-2 py-0.5 rounded-full font-bold ${attentionCount > 0 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{attentionCount > 0 ? 'Atenção' : 'Em dia'}</span>
@@ -166,7 +175,8 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 Fechar
               </button>
-            </div>
+              </div>
+            </>
           )}
         </div>
 
