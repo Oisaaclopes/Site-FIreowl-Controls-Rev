@@ -8,6 +8,7 @@ import { fetchTimeClockParticipants, TimeClockParticipant } from '@/lib/users';
 import { requestPunchAddress } from '@/lib/timepunch';
 import { deriveFieldOperatorStates } from '@/lib/fieldOperations';
 import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
+import { QuickPunchCard } from '@/components/ponto/QuickPunchCard';
 
 /** Máscara curta para os números dos cards (o prefixo "R$" já é exibido à parte). */
 const MASK_DIGITS = '•••••••';
@@ -20,6 +21,10 @@ interface DashboardViewProps {
   clients: Client[];
   onNewOSClick: () => void;
   onNavigateToTab: (tab: TabPath) => void;
+  /** Ponto rápido no painel — depende de uses_time_clock, não do cargo. */
+  currentUser?: string;
+  onAddPunch?: (p: TimePunch) => void;
+  usesTimeClock?: boolean;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -30,6 +35,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   clients,
   onNewOSClick,
   onNavigateToTab,
+  currentUser = '',
+  onAddPunch,
+  usesTimeClock = false,
 }) => {
   const { isPrivacyModeActive, maskMoney } = usePrivacy();
   const [fieldTechnicians, setFieldTechnicians] = useState<TimeClockParticipant[]>([]);
@@ -122,6 +130,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Ponto rápido — para gestores/administrativos que usam controle de ponto
+          (uses_time_clock). Mesmo componente e motor do painel do técnico. */}
+      {onAddPunch && usesTimeClock && (
+        <div className="w-full sm:max-w-sm">
+          <QuickPunchCard
+            currentUser={currentUser}
+            punches={punches}
+            onAddPunch={onAddPunch}
+            usesTimeClock={usesTimeClock}
+            onOpenPonto={() => onNavigateToTab('ponto')}
+          />
+        </div>
+      )}
 
       {/* Indicator Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

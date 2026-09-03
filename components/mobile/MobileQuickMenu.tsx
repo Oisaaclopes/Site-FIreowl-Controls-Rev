@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
-import { Client, TabPath, UserRole } from '@/lib/types';
+import React, { useState } from 'react';
+import { Client, TabPath, TimePunch, UserRole } from '@/lib/types';
 import { greeting, MODULE_META, quickMenuTabs } from '@/lib/modules';
 import { allowedTabs } from '@/lib/rbac';
-import { flushOutbox, isOnline, pendingCount } from '@/lib/offline/reportSync';
-import { pendingFieldPhotoJobs } from '@/lib/offline/fieldPhotoSync';
 import { QuickFieldPhotoModal } from '@/components/field-photos/QuickFieldPhotoModal';
+import { QuickPunchCard } from '@/components/ponto/QuickPunchCard';
+import { SyncIndicator } from '@/components/ui/SyncIndicator';
 
 const ROLE_LABEL: Record<UserRole, string> = {
   ADMINISTRATIVO: 'Administrativo', GESTOR: 'Gestor', FINANCEIRO: 'Financeiro', TECNICO: 'Técnico',
@@ -24,49 +24,41 @@ interface Props {
   userId?: string;
   clients: Client[];
   onSelectTab: (t: TabPath) => void;
+  /** Ponto rápido na Home — depende de uses_time_clock, não do cargo. */
+  punches?: TimePunch[];
+  onAddPunch?: (p: TimePunch) => void;
+  usesTimeClock?: boolean;
 }
 
-export const MobileQuickMenu: React.FC<Props> = ({ userName, cargo, userRole, userId, clients, onSelectTab }) => {
-  const [pend, setPend] = useState(0);
-  const [online, setOnline] = useState(true);
+export const MobileQuickMenu: React.FC<Props> = ({ userName, cargo, userRole, userId, clients, onSelectTab, punches = [], onAddPunch, usesTimeClock = false }) => {
   const [quickPhotoOpen, setQuickPhotoOpen] = useState(false);
   const tabs = quickMenuTabs(userRole);
   const canQuickPhoto = allowedTabs(userRole).includes('fotos-de-campo');
-
-  const refresh = useCallback(() => {
-    void Promise.all([pendingCount(), pendingFieldPhotoJobs()]).then(([r, p]) => setPend(r + p)).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    setOnline(isOnline());
-    refresh();
-    const on = () => { setOnline(true); void flushOutbox().finally(refresh); };
-    const off = () => setOnline(false);
-    window.addEventListener('online', on);
-    window.addEventListener('offline', off);
-    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
-  }, [refresh]);
 
   const perfil = cargo || ROLE_LABEL[userRole];
 
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-5 p-4">
-      {/* Saudação + status de sincronização (dados reais, §29) */}
+      {/* Saudação + status de sincronização (só aparece em exceções, §4/§5) */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-lg font-bold text-fg">{greeting()}, {userName?.split(' ')[0] || 'operador'} 👋</p>
           <p className="text-[11px] font-semibold uppercase tracking-wide text-fg-muted">{perfil}</p>
         </div>
-        <span
-          className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
-            online ? (pend > 0 ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700') : 'border-border bg-surface-3 text-fg-secondary'
-          }`}
-          title={online ? (pend > 0 ? `${pend} registro(s) aguardando envio` : 'Tudo sincronizado') : 'Sem conexão — dados salvos no aparelho'}
-        >
-          <span className="material-symbols-outlined text-sm">{online ? (pend > 0 ? 'cloud_upload' : 'cloud_done') : 'cloud_off'}</span>
-          {online ? (pend > 0 ? `${pend} p/ enviar` : 'Sincronizado') : 'Offline'}
-        </span>
+        <SyncIndicator />
       </div>
+
+      {/* Ponto rápido — orientado à próxima batida. Aparece para qualquer perfil
+          com uses_time_clock (Técnico, Gestor com ponto…), nunca por cargo. */}
+      {onAddPunch && (
+        <QuickPunchCard
+          currentUser={userName}
+          punches={punches}
+          onAddPunch={onAddPunch}
+          usesTimeClock={usesTimeClock}
+          onOpenPonto={() => onSelectTab('ponto')}
+        />
+      )}
 
       {/* Ação operacional (só quando o módulo é permitido, sem inventar ação §28) */}
       {canQuickPhoto && (

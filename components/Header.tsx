@@ -5,10 +5,15 @@ import { Pedido, UserRole } from '@/lib/types';
 import { usePrivacy } from '@/lib/privacy';
 import { pendingCount, isOnline } from '@/lib/offline/reportSync';
 import { useTheme } from '@/lib/theme';
+import { UserMenu } from '@/components/user/UserMenu';
 
 interface HeaderProps {
   userRole: UserRole;
   userName: string;
+  userEmail?: string;
+  userCargo?: string;
+  usesTimeClock?: boolean;
+  /** Abre o modal de simulação de perfil (admin). */
   onOpenAuthModal: () => void;
   onQuickSearchClick?: () => void;
   onOpenMenu?: () => void;
@@ -17,11 +22,18 @@ interface HeaderProps {
   sidebarCollapsed?: boolean;
   pedidos?: Pedido[];
   onOpenPedidos?: () => void;
+  /** Menu do usuário (avatar) — navegação pessoal e sessão. */
+  onOpenPonto?: () => void;
+  onOpenConfig?: () => void;
+  onLogout?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   userRole,
   userName,
+  userEmail,
+  userCargo,
+  usesTimeClock = true,
   onOpenAuthModal,
   onQuickSearchClick,
   onOpenMenu,
@@ -29,6 +41,9 @@ export const Header: React.FC<HeaderProps> = ({
   sidebarCollapsed = false,
   pedidos = [],
   onOpenPedidos,
+  onOpenPonto,
+  onOpenConfig,
+  onLogout,
 }) => {
   const { isPrivacyModeActive, togglePrivacy } = usePrivacy();
   const { resolvedTheme, toggleTheme } = useTheme();
@@ -208,28 +223,26 @@ export const Header: React.FC<HeaderProps> = ({
           </span>
         </button>
 
-        {/* User Profile Info */}
+        {/* Menu do usuário — ponto central da conta/preferências/sessão da pessoa
+            logada. O avatar deixou de ser apenas "simular perfil": agora abre o
+            UserMenu (popover no desktop, bottom sheet no mobile). */}
         <div className="flex items-center gap-2 border-l border-border pl-3">
           <div className="text-right hidden sm:block">
             <p className="font-bold text-fg text-xs truncate max-w-36">{userName}</p>
-            <p className="font-label-caps text-fg-muted text-[10px]">{userRole}</p>
+            <p className="font-label-caps text-fg-muted text-[10px]">{userCargo || userRole}</p>
           </div>
-          {canSwitchRole ? (
-            <button
-              onClick={onOpenAuthModal}
-              className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white hover:ring-2 hover:ring-primary/40 transition-all shadow-sm"
-              title="Simular perfil de acesso"
-            >
-              <span className="material-symbols-outlined text-[20px]">person</span>
-            </button>
-          ) : (
-            <div
-              className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white shadow-sm"
-              title="Perfil de acesso"
-            >
-              <span className="material-symbols-outlined text-[20px]">person</span>
-            </div>
-          )}
+          <UserMenu
+            userName={userName}
+            userEmail={userEmail}
+            userRole={userRole}
+            userCargo={userCargo}
+            usesTimeClock={usesTimeClock}
+            canSwitchRole={canSwitchRole}
+            onOpenPonto={onOpenPonto}
+            onOpenConfig={onOpenConfig}
+            onSimularPerfil={onOpenAuthModal}
+            onLogout={onLogout}
+          />
         </div>
       </div>
     </header>

@@ -1180,12 +1180,18 @@ export function CrmApp({
         <Header
           userRole={userRole}
           userName={userName}
+          userEmail={userEmail}
+          userCargo={userCargo}
+          usesTimeClock={usesTimeClock}
           onOpenAuthModal={() => setIsAuthModalOpen(true)}
           onOpenMenu={() => setSidebarOpen(true)}
           canSwitchRole={canSwitchRole}
           sidebarCollapsed={isSidebarCollapsed}
           pedidos={pedidos}
           onOpenPedidos={() => setCurrentTab('pedidos')}
+          onOpenPonto={() => setCurrentTab('ponto')}
+          onOpenConfig={() => setCurrentTab('conta')}
+          onLogout={onLogout}
         />
 
         {/* View Switcher — padding inferior no mobile p/ o BottomNav (todos os perfis) */}
@@ -1198,6 +1204,9 @@ export function CrmApp({
               userId={userId}
               clients={clients}
               onSelectTab={handleSelectTab}
+              punches={punches}
+              onAddPunch={handleAddPunch}
+              usesTimeClock={usesTimeClock}
             />
           ) : (
           <>
@@ -1223,6 +1232,9 @@ export function CrmApp({
               clients={clients}
               onNewOSClick={handleNewOSQuick}
               onNavigateToTab={setCurrentTab}
+              currentUser={userName}
+              onAddPunch={handleAddPunch}
+              usesTimeClock={usesTimeClock}
             />
           )}
 
