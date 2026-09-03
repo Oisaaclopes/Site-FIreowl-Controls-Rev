@@ -39,6 +39,7 @@ import { validateProposal, ValidationIssue } from '@/lib/proposalValidation';
 import { capaAreaPath } from '@/lib/companyProfile';
 import { ProposalValidationModal } from '@/components/proposta/ProposalValidationModal';
 import { DataListRow, RowMeta, Badge } from '@/components/DataListRow';
+import { ClientLogo } from '@/components/ClientLogo';
 import { Toggle } from '@/components/SidePanel';
 import { usePrivacy } from '@/lib/privacy';
 import {
@@ -853,7 +854,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
       >
         {/* Bloco esquerdo */}
         <div className="min-w-0 flex items-center gap-3">
-          {clientLogo ? <span className="w-14 h-14 rounded-xl bg-surface border border-border p-1.5 shrink-0"><img src={clientLogo} alt={`Logo ${nomeFantasiaCliente(ped.clienteNome)}`} className="w-full h-full object-contain" /></span> : <span className="w-14 h-14 rounded-xl bg-navy/10 text-primary flex items-center justify-center shrink-0"><span className="material-symbols-outlined text-xl">domain</span></span>}
+          <ClientLogo src={clientLogo} name={nomeFantasiaCliente(ped.clienteNome)} />
           <div className="min-w-0"><p className="text-[11px] text-fg-muted font-data-mono">
             nº {num} - {ano}
           </p>
@@ -1390,9 +1391,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                   <DataListRow
                     key={o.id}
                     onClick={() => setOsDetail(o)}
-                    leading={logo
-                      ? <span className="w-14 h-14 rounded-xl bg-surface border border-border p-1.5 shrink-0"><img src={logo} alt={`Logo ${nomeFantasiaCliente(cliNome)}`} className="w-full h-full object-contain" /></span>
-                      : <span className="w-14 h-14 rounded-xl bg-navy/10 text-primary flex items-center justify-center shrink-0"><Wrench className="w-6 h-6" /></span>}
+                    leading={<ClientLogo src={logo} name={nomeFantasiaCliente(cliNome)} fallback={<Wrench className="w-6 h-6" />} />}
                     title={<span className="text-sm">{o.titulo || 'Ordem de serviço sem título'}</span>}
                     meta={
                       <>

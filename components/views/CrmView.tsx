@@ -19,6 +19,7 @@ import {
   ClientEvent,
 } from '@/lib/types';
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
+import { ClientLogo } from '@/components/ClientLogo';
 import { usePrivacy } from '@/lib/privacy';
 import { DevicesManager } from '@/components/reports/DevicesManager';
 import { EmptyState } from '@/components/EmptyState';
@@ -516,11 +517,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
                   <DataListRow
                     key={client.id}
                     onClick={() => openClientDossie(client)}
-                    leading={client.logoPath && clientLogoUrls[client.logoPath] ? (
-                      <span className="w-14 h-14 rounded-xl bg-surface border border-border flex items-center justify-center shrink-0 p-1.5 overflow-hidden">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}<img src={clientLogoUrls[client.logoPath]} alt={`Logo ${nomeFantasiaCliente(client.name)}`} className="w-full h-full object-contain" />
-                      </span>
-                    ) : <span className="w-14 h-14 rounded-xl bg-navy/10 text-primary flex items-center justify-center shrink-0"><span className="material-symbols-outlined text-xl">domain</span></span>}
+                    leading={<ClientLogo src={client.logoPath ? clientLogoUrls[client.logoPath] : undefined} name={nomeFantasiaCliente(client.name)} />}
                     title={<span className="uppercase">{nomeFantasiaCliente(client.name)}</span>}
                     meta={
                       <>
