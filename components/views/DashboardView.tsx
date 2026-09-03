@@ -1,9 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { FinancialTransaction, OrdemServico, Contract, TabPath } from '@/lib/types';
+import React, { useState, useEffect, useCallback } from 'react';
+import { FinancialTransaction, OrdemServico, Contract, TabPath, TimePunch, Client } from '@/lib/types';
 import { OS_STATUS_ATIVOS } from '@/lib/ordensServico';
 import { usePrivacy } from '@/lib/privacy';
+import { fetchAssignableTechnicians, ManagedUser } from '@/lib/users';
+import { deriveFieldOperatorStates } from '@/lib/fieldOperations';
+import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 
 /** Máscara curta para os números dos cards (o prefixo "R$" já é exibido à parte). */
 const MASK_DIGITS = '•••••••';
@@ -12,6 +15,8 @@ interface DashboardViewProps {
   transactions: FinancialTransaction[];
   ordensServico: OrdemServico[];
   contracts: Contract[];
+  punches: TimePunch[];
+  clients: Client[];
   onNewOSClick: () => void;
   onNavigateToTab: (tab: TabPath) => void;
 }
@@ -20,10 +25,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   transactions,
   ordensServico,
   contracts,
+  punches,
+  clients,
   onNewOSClick,
   onNavigateToTab,
 }) => {
   const { isPrivacyModeActive, maskMoney } = usePrivacy();
+  const [fieldTechnicians, setFieldTechnicians] = useState<ManagedUser[]>([]);
+  const refreshFieldTechnicians = useCallback(async () => setFieldTechnicians(await fetchAssignableTechnicians()), []);
+  useEffect(() => { void refreshFieldTechnicians(); }, [refreshFieldTechnicians]);
+  useDomainRefresh('dashboard', refreshFieldTechnicians);
+  const fieldStates = deriveFieldOperatorStates(fieldTechnicians, punches, ordensServico, clients);
 
   // Indicadores reais derivados dos dados do sistema
   const receitaTotal = transactions
@@ -268,20 +280,38 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </button>
           </div>
 
-          {/* Manutenção de campo — sem dados simulados: estado vazio real até
-              existir atribuição de equipe/localização de verdade. */}
+          {/* Estado operacional derivado de vínculos reais de Ponto, OS e cliente. */}
           <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex flex-col gap-2">
-            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Manutenção de Campo em Tempo Real
-            </h4>
-            <button
-              onClick={() => onNavigateToTab('agenda')}
-              className="flex-1 min-h-[76px] rounded-md border border-dashed border-slate-200 text-slate-400 hover:border-[#1A1A72] hover:text-[#1A1A72] transition-colors flex flex-col items-center justify-center gap-1 text-center px-3"
-            >
-              <span className="material-symbols-outlined text-2xl">groups_off</span>
-              <span className="text-[11px] font-semibold uppercase tracking-wide">Nenhuma equipe em atendimento</span>
-              <span className="text-[10px]">Abrir a Agenda de despacho</span>
-            </button>
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Manutenção de Campo em Tempo Real</h4>
+              <button onClick={() => onNavigateToTab('agenda')} className="text-[10px] font-semibold text-[#1A1A72] hover:underline">Abrir agenda</button>
+            </div>
+            <p className="text-[10px] text-slate-500">Último evento operacional conhecido — sem rastreamento contínuo.</p>
+            <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
+              {fieldStates.length === 0 ? (
+                <div className="min-h-[76px] text-slate-400 flex flex-col items-center justify-center text-center">
+                  <span className="material-symbols-outlined text-2xl">groups_off</span>
+                  <span className="text-[11px] font-semibold">Nenhum técnico ativo encontrado</span>
+                </div>
+              ) : fieldStates.map((operator) => {
+                const chip = operator.status === 'EM ATENDIMENTO' ? 'bg-blue-50 text-blue-700' : operator.status === 'EM JORNADA' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600';
+                const time = operator.updatedAt ? new Date(operator.updatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : undefined;
+                return (
+                  <div key={operator.userId} className="py-3 first:pt-1 last:pb-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-xs font-bold text-slate-900">{operator.name}</span>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold ${chip}`}>{operator.status}</span>
+                    </div>
+                    {operator.clientName && <p className="mt-1 text-[11px] font-semibold text-slate-700">{operator.clientName}</p>}
+                    <p className="mt-0.5 text-[10px] leading-snug text-slate-500 flex gap-1"><span className="material-symbols-outlined text-[13px]">location_on</span>{operator.location}</p>
+                    <div className="mt-1 flex justify-between text-[9px] text-slate-400">
+                      <span>{operator.activeOs?.numero || (operator.lastPunch ? `${operator.lastPunch.type} ${new Date(operator.lastPunch.at || 0).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : 'Sem registro de ponto')}</span>
+                      {time && <span>Atualizado {time}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>

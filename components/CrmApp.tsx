@@ -1216,6 +1216,8 @@ export function CrmApp({
               transactions={transactions}
               ordensServico={ordensServico}
               contracts={contracts}
+              punches={punches}
+              clients={clients}
               onNewOSClick={handleNewOSQuick}
               onNavigateToTab={setCurrentTab}
             />
