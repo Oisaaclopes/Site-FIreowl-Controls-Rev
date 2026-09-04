@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ATTENDANCE_RESULT_LABEL,
+  attendanceFinalizationBlockers,
   canConcludeOsFromResult,
   findActiveAttendance,
   formatAttendanceElapsed,
@@ -61,6 +62,31 @@ describe('findActiveAttendance (§7)', () => {
   it('ignora atendimento finalizado e de outro técnico', () => {
     expect(findActiveAttendance([att({ status: 'FINALIZADO' })], 'u1')).toBeUndefined();
     expect(findActiveAttendance([att({ technicianId: 'u2' })], 'u1')).toBeUndefined();
+  });
+});
+
+describe('validação de finalização — central SDAI (§24/§52)', () => {
+  const base = { isSdai: true, centralNotApplicable: false, hasCentralBefore: false, hasCentralAfter: false };
+  it('SDAI sem condição inicial → bloqueia', () => {
+    const b = attendanceFinalizationBlockers({ ...base, hasCentralBefore: false, hasCentralAfter: true });
+    expect(b.map((x) => x.key)).toContain('central_before');
+  });
+  it('SDAI sem condição final → bloqueia', () => {
+    const b = attendanceFinalizationBlockers({ ...base, hasCentralBefore: true, hasCentralAfter: false });
+    expect(b.map((x) => x.key)).toContain('central_after');
+  });
+  it('SDAI com ambas → libera', () => {
+    expect(attendanceFinalizationBlockers({ ...base, hasCentralBefore: true, hasCentralAfter: true })).toEqual([]);
+  });
+  it('SDAI + central não aplicável + motivo → libera', () => {
+    expect(attendanceFinalizationBlockers({ ...base, centralNotApplicable: true, centralNaReason: 'Serviço só em infraestrutura' })).toEqual([]);
+  });
+  it('SDAI + central não aplicável sem motivo → bloqueia', () => {
+    const b = attendanceFinalizationBlockers({ ...base, centralNotApplicable: true, centralNaReason: '' });
+    expect(b.map((x) => x.key)).toContain('central_na_reason');
+  });
+  it('CFTV/BMS (não SDAI) → nunca exige central', () => {
+    expect(attendanceFinalizationBlockers({ ...base, isSdai: false })).toEqual([]);
   });
 });
 

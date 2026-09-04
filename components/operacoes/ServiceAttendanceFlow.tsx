@@ -14,6 +14,7 @@ import { fetchTimeClockParticipants } from '@/lib/users';
 import {
   ATTENDANCE_RESULT_LABEL,
   ATTENDANCE_RESULT_TONE,
+  attendanceFinalizationBlockers,
   canConcludeOsFromResult,
   formatAttendanceElapsed,
   formatStartedAt,
@@ -22,12 +23,12 @@ import {
 } from '@/lib/attendanceFlow';
 import { fetchOrdensServico, updateOrdemServicoStatus } from '@/lib/ordensServico';
 import { capturePosition } from '@/lib/fieldPhotoGeo';
-import { fetchOsMission, missionHasContent, OsMission } from '@/lib/osMission';
+import { fetchOsMission, missionHasContent, missionIsSdai, OsMission } from '@/lib/osMission';
+import { AttendanceEvidence, EvidenceState } from '@/components/operacoes/AttendanceEvidence';
 import { resolveLogoDataUrls } from '@/lib/institucional';
 import { getClientOperationalName } from '@/lib/utils';
 import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 import { useConfirm, useToast } from '@/components/ui/Feedback';
-import { QuickFieldPhotoModal } from '@/components/field-photos/QuickFieldPhotoModal';
 import { ClientLogo } from '@/components/ClientLogo';
 
 /* ===================================================================
@@ -399,9 +400,34 @@ export const AttendanceScreen: React.FC<{
   const [result, setResult] = useState<AttendanceResult | undefined>(attendance.result);
   const [saving, setSaving] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [finishing, setFinishing] = useState(false);
-  const [photoOpen, setPhotoOpen] = useState(false);
   const [tick, setTick] = useState(0);
   const savedRef = useRef({ diagnosis: attendance.diagnosis || '', execution: attendance.executionNotes || '' });
+
+  // Missão da OS (para saber se é SDAI, de forma ESTRUTURADA §28) + área.
+  const [mission, setMission] = useState<OsMission | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetchOsMission(attendance.workOrderId).then((m) => { if (alive) setMission(m); }).catch(() => {});
+    return () => { alive = false; };
+  }, [attendance.workOrderId]);
+  const isSdai = missionIsSdai(mission);
+  const missionArea = mission?.area?.[0];
+
+  // Estado das evidências (reportado pela seção inline) p/ validar finalização.
+  const [evidence, setEvidence] = useState<EvidenceState>({
+    hasBefore: false, hasDuring: false, hasAfter: false,
+    hasCentralBefore: !!(attendance.centralConditionInitial || '').trim(),
+    hasCentralAfter: !!(attendance.centralConditionFinal || '').trim(),
+    centralNotApplicable: !!attendance.centralNotApplicable,
+    centralNaReason: attendance.centralNaReason || '',
+  });
+  const blockers = attendanceFinalizationBlockers({
+    isSdai,
+    centralNotApplicable: evidence.centralNotApplicable,
+    centralNaReason: evidence.centralNaReason,
+    hasCentralBefore: evidence.hasCentralBefore,
+    hasCentralAfter: evidence.hasCentralAfter,
+  });
 
   const cliente = clientNameOf(clients, os?.clienteId);
 
@@ -444,6 +470,12 @@ export const AttendanceScreen: React.FC<{
   const finalize = useCallback(async () => {
     if (finishing) return;
     if (!result) { toast.error('Selecione o resultado do atendimento.'); return; }
+    // §24/§38/§52 — SDAI: exige condição inicial/final da central (ou "não
+    // aplicável" com motivo). Não apaga nada; só aponta o que falta.
+    if (blockers.length > 0) {
+      toast.error(`Registros pendentes: ${blockers.map((b) => b.label).join(', ')}.`);
+      return;
+    }
     if (resultNeedsObservation(result) && !execution.trim() && !diagnosis.trim()) {
       const go = await confirm({
         title: 'Sem observação',
@@ -488,7 +520,7 @@ export const AttendanceScreen: React.FC<{
       toast.error((e as Error)?.message || 'Não foi possível finalizar o atendimento.');
       setFinishing(false);
     }
-  }, [attendance.id, confirm, diagnosis, execution, finishing, onClose, os, result, toast]);
+  }, [attendance.id, blockers, confirm, diagnosis, execution, finishing, onClose, os, result, toast]);
 
   const elapsed = formatAttendanceElapsed(attendance.startedAt);
 
@@ -545,18 +577,26 @@ export const AttendanceScreen: React.FC<{
             {saving === 'saving' ? 'Salvando…' : saving === 'saved' ? 'Rascunho salvo' : ''}
           </p>
 
-          {/* EVIDÊNCIAS (§13) — reutiliza Fotos de Campo, vinculando ao atendimento */}
-          <div>
-            <span className="text-xs font-bold uppercase tracking-wide text-fg-secondary">Evidências</span>
-            <button
-              onClick={() => setPhotoOpen(true)}
-              className="mt-1 w-full min-h-[48px] rounded-lg border border-dashed border-border bg-surface-2 text-fg-secondary text-sm font-semibold flex items-center justify-center gap-2 hover:border-primary hover:text-primary transition-colors"
-            >
-              <span className="material-symbols-outlined text-xl">add_a_photo</span>
-              Adicionar foto
-            </button>
-            <p className="mt-1 text-[10px] text-fg-muted">As fotos usam o fluxo de Fotos de Campo (Antes/Depois preservados) e ficam vinculadas a este atendimento.</p>
-          </div>
+          {/* EVIDÊNCIAS INLINE (§2–§35) — câmera + upload, Antes/Durante/Depois,
+              condição da central SDAI. Mesmo pipeline (field_photos/outbox), sem
+              abrir o Registro Rápido; contexto automático. */}
+          <AttendanceEvidence
+            attendanceId={attendance.id}
+            osId={os?.id}
+            clientId={os?.clienteId}
+            clientName={cliente}
+            technicianId={technicianId}
+            technicianName={technicianName}
+            isSdai={isSdai}
+            area={missionArea}
+            initialCentral={{
+              conditionInitial: attendance.centralConditionInitial,
+              conditionFinal: attendance.centralConditionFinal,
+              notApplicable: attendance.centralNotApplicable,
+              naReason: attendance.centralNaReason,
+            }}
+            onStateChange={setEvidence}
+          />
 
           {/* RESULTADO (§15) */}
           <div>
@@ -582,6 +622,20 @@ export const AttendanceScreen: React.FC<{
               <p className="mt-1.5 text-[11px] text-amber-700">A OS permanece aberta. Registre no diagnóstico/execução o que ficou pendente.</p>
             )}
           </div>
+
+          {/* REGISTROS PENDENTES (§24) — só quando há bloqueio (SDAI). */}
+          {blockers.length > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-amber-800 mb-1.5">Registros pendentes</p>
+              <ul className="flex flex-col gap-1">
+                {blockers.map((b) => (
+                  <li key={b.key} className="flex items-center gap-2 text-[12px] text-amber-900">
+                    <span className="material-symbols-outlined text-base">radio_button_unchecked</span>{b.label}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         {/* FINALIZAÇÃO (§17–§20) */}
@@ -599,18 +653,6 @@ export const AttendanceScreen: React.FC<{
           </button>
         </div>
       </div>
-
-      {photoOpen && (
-        <QuickFieldPhotoModal
-          isOpen={photoOpen}
-          onClose={() => setPhotoOpen(false)}
-          clients={clients}
-          technicianId={technicianId}
-          technicianName={technicianName}
-          osId={os?.id}
-          serviceAttendanceId={attendance.id}
-        />
-      )}
     </div>
   );
 };

@@ -75,6 +75,44 @@ export function formatAttendanceElapsed(
   return `${h}h ${String(min).padStart(2, '0')}min`;
 }
 
+/* ===================================================================
+ * 3B.3 — Validação de finalização (SDAI: condição da central). PURA.
+ * =================================================================== */
+
+export interface AttendanceFinalizationInput {
+  /** OS estruturalmente SDAI (mission.area inclui 'sdai'). */
+  isSdai: boolean;
+  /** "Central não aplicável a este serviço" marcado (§26). */
+  centralNotApplicable: boolean;
+  centralNaReason?: string;
+  /** Há evidência da central na CHEGADA (foto CENTRAL_ANTES ou texto). */
+  hasCentralBefore: boolean;
+  /** Há evidência da central na ENTREGA (foto CENTRAL_DEPOIS ou texto). */
+  hasCentralAfter: boolean;
+}
+
+export interface FinalizationBlocker { key: string; label: string; }
+
+/**
+ * Pendências que IMPEDEM a finalização (§24/§26/§38/§52). Só se aplica a SDAI:
+ * exige condição inicial e final da central — a menos que "central não
+ * aplicável" esteja marcado com um motivo. Fora de SDAI, nunca bloqueia por
+ * central (§27). Retorna [] quando é possível finalizar.
+ */
+export function attendanceFinalizationBlockers(input: AttendanceFinalizationInput): FinalizationBlocker[] {
+  const blockers: FinalizationBlocker[] = [];
+  if (!input.isSdai) return blockers;
+  if (input.centralNotApplicable) {
+    if (!(input.centralNaReason || '').trim()) {
+      blockers.push({ key: 'central_na_reason', label: 'Informe o motivo de a central não se aplicar' });
+    }
+    return blockers;
+  }
+  if (!input.hasCentralBefore) blockers.push({ key: 'central_before', label: 'Condição inicial da central' });
+  if (!input.hasCentralAfter) blockers.push({ key: 'central_after', label: 'Condição final da central' });
+  return blockers;
+}
+
 /** "Iniciado 09:42" a partir de started_at (§8/§22). */
 export function formatStartedAt(startedAt?: string | number): string {
   if (startedAt == null) return '';

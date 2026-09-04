@@ -29,11 +29,19 @@ export interface OsMission {
   responsibilities: string[];
   /** Blocos "Serviços ofertados" (título + itens) quando a proposta os tiver. */
   servicosOfertados: { titulo: string; itens: string[] }[];
+  /** Área(s) estruturada(s) da OS de origem (proposal.areaPrincipal): 'sdai'… */
+  area: string[];
 }
 
 const EMPTY_MISSION: OsMission = {
-  found: false, source: 'os', services: [], materials: [], responsibilities: [], servicosOfertados: [],
+  found: false, source: 'os', services: [], materials: [], responsibilities: [], servicosOfertados: [], area: [],
 };
+
+/** SDAI estrutural (§28): a OS de origem tem a área 'sdai'. Sem pedido/área
+ *  (OS manual), retorna false — a regra da central NÃO se aplica. */
+export function missionIsSdai(m: OsMission | null | undefined): boolean {
+  return !!m && Array.isArray(m.area) && m.area.some((a) => (a || '').toLowerCase() === 'sdai');
+}
 
 const num = (v: unknown): number | undefined => {
   if (v == null || v === '') return undefined;
@@ -84,6 +92,7 @@ export function buildOsMissionFromProposal(
     materials,
     responsibilities,
     servicosOfertados,
+    area: Array.isArray(proposal?.areaPrincipal) ? proposal!.areaPrincipal.filter((a) => (a || '').trim()) : [],
   };
 }
 
@@ -107,6 +116,7 @@ function fromRpc(data: any): OsMission {
           .filter((b: any) => b && (b.titulo || (b.itens || []).length))
           .map((b: any) => ({ titulo: b.titulo || '', itens: (b.itens || []).filter((i: any) => (i || '').trim()) }))
       : [],
+    area: Array.isArray(data.area) ? data.area.filter((a: any) => (a || '').toString().trim()) : [],
   };
 }
 

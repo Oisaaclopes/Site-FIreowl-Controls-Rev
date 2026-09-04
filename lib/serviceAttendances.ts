@@ -28,6 +28,10 @@ function rowToAttendance(r: any): ServiceAttendance {
     longitudeStart: r.longitude_start ?? undefined,
     latitudeEnd: r.latitude_end ?? undefined,
     longitudeEnd: r.longitude_end ?? undefined,
+    centralConditionInitial: r.central_condition_initial ?? undefined,
+    centralConditionFinal: r.central_condition_final ?? undefined,
+    centralNotApplicable: r.central_not_applicable ?? undefined,
+    centralNaReason: r.central_na_reason ?? undefined,
     createdAt: r.created_at ?? undefined,
     updatedAt: r.updated_at ?? undefined,
   };
@@ -130,6 +134,32 @@ export async function saveAttendanceProgress(input: {
     .update(patch)
     .eq('id', input.id)
     .eq('status', 'EM_EXECUCAO') // nunca reabre um atendimento finalizado
+    .select()
+    .single();
+  if (error) throw error;
+  return rowToAttendance(data);
+}
+
+/** Salva a condição da central SDAI (§18–§26) durante o atendimento. Só campos
+ *  informados são tocados; não altera status/resultado/horários. */
+export async function saveAttendanceCentral(input: {
+  id: string;
+  conditionInitial?: string;
+  conditionFinal?: string;
+  notApplicable?: boolean;
+  naReason?: string;
+}): Promise<ServiceAttendance> {
+  const supabase = getSupabaseClient() as any;
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (input.conditionInitial !== undefined) patch.central_condition_initial = input.conditionInitial || null;
+  if (input.conditionFinal !== undefined) patch.central_condition_final = input.conditionFinal || null;
+  if (input.notApplicable !== undefined) patch.central_not_applicable = input.notApplicable;
+  if (input.naReason !== undefined) patch.central_na_reason = input.naReason || null;
+  const { data, error } = await supabase
+    .from(TABLE)
+    .update(patch)
+    .eq('id', input.id)
+    .eq('status', 'EM_EXECUCAO')
     .select()
     .single();
   if (error) throw error;

@@ -1186,6 +1186,12 @@ export interface ServiceAttendance {
   longitudeStart?: number;
   latitudeEnd?: number;
   longitudeEnd?: number;
+  /** SDAI (3B.3): condição/falhas da central na chegada e na entrega. */
+  centralConditionInitial?: string;
+  centralConditionFinal?: string;
+  /** Central não acessível/aplicável neste serviço (dispensa Antes/Depois). */
+  centralNotApplicable?: boolean;
+  centralNaReason?: string;
   createdAt?: string;
   updatedAt?: string;
 }

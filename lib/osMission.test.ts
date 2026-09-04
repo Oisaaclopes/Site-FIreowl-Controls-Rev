@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildOsMissionFromProposal, missionHasContent } from './osMission';
+import { buildOsMissionFromProposal, missionHasContent, missionIsSdai } from './osMission';
 import { CommercialProposalData, OrdemServico, PedidoEquipmentItem } from './types';
 
 const item = (over: Partial<PedidoEquipmentItem>): PedidoEquipmentItem => ({
@@ -68,5 +68,14 @@ describe('buildOsMissionFromProposal (§18–§21)', () => {
     expect(missionHasContent(buildOsMissionFromProposal(proposal(), os()))).toBe(false);
     const p = proposal({ equipmentItems: [item({ descricao: 'Serviço', tipo: 'servico' })] });
     expect(missionHasContent(buildOsMissionFromProposal(p, os()))).toBe(true);
+  });
+
+  it('detecta SDAI estruturalmente pela área (§28)', () => {
+    const sdai = proposal({ areaPrincipal: ['sdai', 'cftv'] } as any);
+    expect(missionIsSdai(buildOsMissionFromProposal(sdai, os()))).toBe(true);
+    const cftv = proposal({ areaPrincipal: ['cftv'] } as any);
+    expect(missionIsSdai(buildOsMissionFromProposal(cftv, os()))).toBe(false);
+    // OS manual (sem área) nunca é SDAI → regra da central não se aplica.
+    expect(missionIsSdai(buildOsMissionFromProposal(proposal(), os({ sourcePedidoId: undefined })))).toBe(false);
   });
 });
