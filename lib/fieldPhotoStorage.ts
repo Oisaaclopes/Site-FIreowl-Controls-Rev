@@ -37,6 +37,14 @@ export async function uploadFieldPhotoAsset(input: {
   return input.path;
 }
 
+/** Remove assets do bucket privado (best-effort; ignora caminhos vazios). */
+export async function removeFieldPhotoAssets(paths: (string | undefined)[]): Promise<void> {
+  const clean = paths.filter((p): p is string => !!p && p.trim().length > 0);
+  if (clean.length === 0) return;
+  const supabase = getSupabaseClient() as any;
+  await supabase.storage.from(FIELD_PHOTO_BUCKET).remove(clean);
+}
+
 export async function signedFieldPhotoUrl(path: string, seconds = 900): Promise<string> {
   const supabase = getSupabaseClient() as any;
   const { data, error } = await supabase.storage.from(FIELD_PHOTO_BUCKET).createSignedUrl(path, seconds);

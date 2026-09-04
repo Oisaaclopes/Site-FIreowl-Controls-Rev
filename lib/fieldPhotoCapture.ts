@@ -70,6 +70,8 @@ export async function captureAttendanceEvidence(input: {
   osId?: string;
   serviceAttendanceId: string;
   moment: FieldPhotoMoment;
+  /** Item de Evidência (3B.4) a que a foto pertence, quando houver. */
+  evidenceItemId?: string;
   note?: string;
   equipmentCatalogItemId?: string;
   equipmentBrand?: string;
@@ -92,6 +94,7 @@ export async function captureAttendanceEvidence(input: {
       osId: input.osId,
       serviceAttendanceId: input.serviceAttendanceId,
       evidenceMoment: input.moment,
+      evidenceItemId: input.evidenceItemId,
       equipmentCatalogItemId: input.equipmentCatalogItemId,
       equipmentBrand: input.equipmentBrand?.trim() || undefined,
       equipmentModel: input.equipmentModel?.trim() || undefined,

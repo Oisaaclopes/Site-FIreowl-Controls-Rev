@@ -80,7 +80,7 @@ export const OsMissionPanel: React.FC<{ osId: string; osDescricao?: string }> = 
       <span className="min-w-0">
         {i.quantidade ? <span className="font-data-mono font-bold">{i.quantidade}{i.unidade ? ` ${i.unidade}` : ''} · </span> : null}
         {i.descricao}
-        {i.marcaModelo ? <span className="text-fg-secondary"> — {i.marcaModelo}</span> : null}
+        {i.marcaModelo ? <span className="text-fg-secondary"> · {i.marcaModelo}</span> : null}
       </span>
     </div>
   );
@@ -415,7 +415,6 @@ export const AttendanceScreen: React.FC<{
 
   // Estado das evidências (reportado pela seção inline) p/ validar finalização.
   const [evidence, setEvidence] = useState<EvidenceState>({
-    hasBefore: false, hasDuring: false, hasAfter: false,
     hasCentralBefore: !!(attendance.centralConditionInitial || '').trim(),
     hasCentralAfter: !!(attendance.centralConditionFinal || '').trim(),
     centralNotApplicable: !!attendance.centralNotApplicable,

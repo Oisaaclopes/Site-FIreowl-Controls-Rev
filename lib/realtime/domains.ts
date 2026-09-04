@@ -6,7 +6,7 @@ export const REALTIME_DOMAINS = {
   agenda: ['ordens_servico', 'contract_routine_executions'],
   reports: ['reports', 'report_answers', 'report_media', 'report_signatures'],
   pending: ['pendencias'],
-  fieldPhotos: ['field_photos', 'field_photo_sessions', 'field_photo_comparisons'],
+  fieldPhotos: ['field_photos', 'field_photo_sessions', 'field_photo_comparisons', 'service_attendance_evidence_items'],
   inventory: ['inventory_items', 'stock_movements', 'supply_orders', 'supply_purchases', 'supply_purchase_items', 'supply_receipts', 'supply_receipt_items'],
   contracts: ['contracts', 'contract_routines', 'contract_routine_executions', 'contract_hour_ledger'],
   fieldOps: ['field_operations', 'field_operation_assignments', 'service_attendances'],

@@ -1171,6 +1171,28 @@ export interface FieldOperationAssignment {
 export type AttendanceStatus = 'EM_EXECUCAO' | 'FINALIZADO';
 export type AttendanceResult = 'RESOLVIDO' | 'PARCIALMENTE_RESOLVIDO' | 'NAO_RESOLVIDO';
 
+/** ETAPA 3B.4 — Item de Evidência: unidade técnica (equipamento/infra/…) que
+ *  agrega N fotos por momento (Antes/Durante/Depois). Ver migração 0088. */
+export type EvidenceItemCategory = 'EQUIPAMENTO' | 'INFRAESTRUTURA' | 'CABEAMENTO' | 'CENTRAL' | 'OUTRO';
+
+export interface ServiceAttendanceEvidenceItem {
+  id: string;
+  serviceAttendanceId: string;
+  workOrderId?: string;
+  title: string;
+  category: EvidenceItemCategory;
+  location?: string;
+  deviceAddress?: string;
+  catalogItemId?: string;
+  manufacturer?: string;
+  model?: string;
+  notes?: string;
+  status?: AttendanceResult | 'PENDENTE';
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 /** Atendimento — execução/visita real de UMA OS. Resultado ≠ status da OS. */
 export interface ServiceAttendance {
   id: string;

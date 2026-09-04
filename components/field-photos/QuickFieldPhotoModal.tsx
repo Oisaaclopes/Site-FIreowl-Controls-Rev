@@ -133,11 +133,11 @@ export const QuickFieldPhotoModal: React.FC<Props> = ({ isOpen, clients, technic
     let evidence: Blob | undefined;
     let evidenceUrl: string | undefined;
     try {
-      evidence = await createFireowlEvidence(captured.file, photo, session, client.name);
+      evidence = await createFireowlEvidence(captured.file, photo, session, getClientOperationalName(client));
       evidenceUrl = URL.createObjectURL(evidence);
     } catch { toast.info('Foto salva. A evidência será gerada novamente na sincronização.'); }
     try {
-      await enqueueFieldPhoto({ photo, session, original: captured.file, evidence, clientName: client.name });
+      await enqueueFieldPhoto({ photo, session, original: captured.file, evidence, clientName: getClientOperationalName(client) });
       if(afterReference&&technicianId){await enqueueFieldPhotoComparison({ownerUserId:technicianId,comparison:{beforePhotoId:afterReference.id,afterPhotoId:photo.id,clientId:client.id,reportId:afterReference.reportId,osId:afterReference.osId,pendenciaId:afterReference.pendenciaId,resultado:comparisonResult}});onComparisonCreated?.();}
       setPhotos((items) => [...items, { photo, original: captured.file, evidence, previewUrl: captured.url, evidenceUrl, synced: false }]);
       setCurrent(null); // a URL passa a pertencer ao card salvo e será liberada no reset.

@@ -32,6 +32,8 @@ export interface FieldPhoto {
   equipmentModel?: string;
   /** Fase da evidência no atendimento (3B.3/0087). */
   evidenceMoment?: FieldPhotoMoment;
+  /** Item de Evidência (3B.4/0088) a que a foto pertence. */
+  evidenceItemId?: string;
   storagePathOriginal: string;
   storagePathMarkup?: string;
   storagePathEvidencia?: string;
@@ -51,12 +53,12 @@ const uuid = () => {
   });
 };
 const sessionRow = (s: FieldPhotoSession) => ({ id: s.id, client_id: s.clientId, local_setor: s.localSetor ?? null, tecnico_id: s.tecnicoId, tecnico_nome: s.tecnicoNome ?? null, iniciado_em: s.iniciadoEm, finalizado_em: s.finalizadoEm ?? null, client_uuid: s.clientUuid, sync_status: s.syncStatus });
-const photoRow = (p: FieldPhoto) => ({ id: p.id, session_id: p.sessionId, client_id: p.clientId, report_id: p.reportId ?? null, os_id: p.osId ?? null, service_attendance_id: p.serviceAttendanceId ?? null, pendencia_id: p.pendenciaId ?? null, storage_path_original: p.storagePathOriginal, storage_path_markup: p.storagePathMarkup ?? null, storage_path_evidencia: p.storagePathEvidencia ?? null, nota_rapida: p.notaRapida ?? null, marcador: p.marcador ?? null, capturado_em: p.capturadoEm, geo: p.geo ?? null, client_uuid: p.clientUuid, sync_status: p.syncStatus, equipment_catalog_item_id: p.equipmentCatalogItemId ?? null, equipment_brand: p.equipmentBrand ?? null, equipment_model: p.equipmentModel ?? null, evidence_moment: p.evidenceMoment ?? null });
-const fromPhoto = (r: any): FieldPhoto => ({ id: r.id, sessionId: r.session_id, clientId: r.client_id, reportId: r.report_id ?? undefined, osId: r.os_id ?? undefined, serviceAttendanceId: r.service_attendance_id ?? undefined, pendenciaId: r.pendencia_id ?? undefined, storagePathOriginal: r.storage_path_original, storagePathMarkup: r.storage_path_markup ?? undefined, storagePathEvidencia: r.storage_path_evidencia ?? undefined, notaRapida: r.nota_rapida ?? undefined, marcador: r.marcador ?? undefined, capturadoEm: r.capturado_em, geo: r.geo ?? undefined, clientUuid: r.client_uuid, syncStatus: r.sync_status, equipmentCatalogItemId: r.equipment_catalog_item_id ?? undefined, equipmentBrand: r.equipment_brand ?? undefined, equipmentModel: r.equipment_model ?? undefined, evidenceMoment: r.evidence_moment ?? undefined });
+const photoRow = (p: FieldPhoto) => ({ id: p.id, session_id: p.sessionId, client_id: p.clientId, report_id: p.reportId ?? null, os_id: p.osId ?? null, service_attendance_id: p.serviceAttendanceId ?? null, pendencia_id: p.pendenciaId ?? null, storage_path_original: p.storagePathOriginal, storage_path_markup: p.storagePathMarkup ?? null, storage_path_evidencia: p.storagePathEvidencia ?? null, nota_rapida: p.notaRapida ?? null, marcador: p.marcador ?? null, capturado_em: p.capturadoEm, geo: p.geo ?? null, client_uuid: p.clientUuid, sync_status: p.syncStatus, equipment_catalog_item_id: p.equipmentCatalogItemId ?? null, equipment_brand: p.equipmentBrand ?? null, equipment_model: p.equipmentModel ?? null, evidence_moment: p.evidenceMoment ?? null, evidence_item_id: p.evidenceItemId ?? null });
+const fromPhoto = (r: any): FieldPhoto => ({ id: r.id, sessionId: r.session_id, clientId: r.client_id, reportId: r.report_id ?? undefined, osId: r.os_id ?? undefined, serviceAttendanceId: r.service_attendance_id ?? undefined, pendenciaId: r.pendencia_id ?? undefined, storagePathOriginal: r.storage_path_original, storagePathMarkup: r.storage_path_markup ?? undefined, storagePathEvidencia: r.storage_path_evidencia ?? undefined, notaRapida: r.nota_rapida ?? undefined, marcador: r.marcador ?? undefined, capturadoEm: r.capturado_em, geo: r.geo ?? undefined, clientUuid: r.client_uuid, syncStatus: r.sync_status, equipmentCatalogItemId: r.equipment_catalog_item_id ?? undefined, equipmentBrand: r.equipment_brand ?? undefined, equipmentModel: r.equipment_model ?? undefined, evidenceMoment: r.evidence_moment ?? undefined, evidenceItemId: r.evidence_item_id ?? undefined });
 const fromSession = (r: any): FieldPhotoSession => ({ id: r.id, clientId: r.client_id, localSetor: r.local_setor ?? undefined, tecnicoId: r.tecnico_id, tecnicoNome: r.tecnico_nome ?? undefined, iniciadoEm: r.iniciado_em, finalizadoEm: r.finalizado_em ?? undefined, clientUuid: r.client_uuid, syncStatus: r.sync_status });
 
 export const newFieldPhotoSession = (input: Pick<FieldPhotoSession, 'clientId' | 'tecnicoId' | 'tecnicoNome' | 'localSetor'>, capturedAt = new Date().toISOString()): FieldPhotoSession => ({ id: uuid(), clientUuid: uuid(), syncStatus: 'pendente', iniciadoEm: capturedAt, ...input });
-export const newFieldPhoto = (input: Pick<FieldPhoto, 'sessionId' | 'clientId' | 'storagePathOriginal' | 'notaRapida' | 'marcador' | 'geo'> & Partial<Pick<FieldPhoto, 'osId' | 'serviceAttendanceId' | 'equipmentCatalogItemId' | 'equipmentBrand' | 'equipmentModel' | 'evidenceMoment'>>, capturedAt = new Date().toISOString()): FieldPhoto => ({ id: uuid(), clientUuid: uuid(), syncStatus: 'pendente', capturadoEm: capturedAt, ...input });
+export const newFieldPhoto = (input: Pick<FieldPhoto, 'sessionId' | 'clientId' | 'storagePathOriginal' | 'notaRapida' | 'marcador' | 'geo'> & Partial<Pick<FieldPhoto, 'osId' | 'serviceAttendanceId' | 'equipmentCatalogItemId' | 'equipmentBrand' | 'equipmentModel' | 'evidenceMoment' | 'evidenceItemId'>>, capturedAt = new Date().toISOString()): FieldPhoto => ({ id: uuid(), clientUuid: uuid(), syncStatus: 'pendente', capturadoEm: capturedAt, ...input });
 export const isUnclassifiedFieldPhoto = (p: Pick<FieldPhoto, 'reportId' | 'osId' | 'pendenciaId'>) => !p.reportId && !p.osId && !p.pendenciaId;
 export const evidenceLines = (p: Pick<FieldPhoto, 'capturadoEm' | 'notaRapida'>, session: Pick<FieldPhotoSession, 'localSetor' | 'tecnicoNome'>, clientName: string) => {
   const date = new Date(p.capturadoEm);
@@ -99,6 +101,38 @@ export async function listFieldPhotosBySession(sessionId: string): Promise<Field
 
 export async function updateFieldPhotoSessionStatus(id: string, syncStatus: FieldPhotoSyncStatus): Promise<void> {
   const { error } = await (getSupabaseClient() as any).from('field_photo_sessions').update({ sync_status: syncStatus }).eq('id', id);
+  if (error) throw error;
+}
+
+/**
+ * Exclusão segura de UMA foto de campo (§19/§20). Reutiliza a arquitetura
+ * existente: cancela o job pendente na outbox (se ainda não sincronizou),
+ * remove os assets do storage privado e apaga o registro sob RLS. O CASCADE da
+ * 0067 limpa comparações Before×After que referenciam a foto. Best-effort nos
+ * passos de storage/outbox: o que importa é o registro sair do banco.
+ */
+export async function deleteFieldPhoto(photo: Pick<FieldPhoto, 'id' | 'clientUuid' | 'storagePathOriginal' | 'storagePathEvidencia' | 'storagePathMarkup'>): Promise<void> {
+  const { removeOfflineJob } = await import('./offline/outbox');
+  const { removeFieldPhotoAssets } = await import('./fieldPhotoStorage');
+  // 1) cancela upload pendente (id = `${domain}:${entityClientUuid}`).
+  if (photo.clientUuid) await removeOfflineJob(`FIELD_PHOTO:${photo.clientUuid}`).catch(() => {});
+  // 2) remove arquivos do bucket.
+  await removeFieldPhotoAssets([photo.storagePathOriginal, photo.storagePathEvidencia, photo.storagePathMarkup]).catch(() => {});
+  // 3) apaga o registro (RLS: dono da sessão ou gestão). Ignora se ainda não existir.
+  const { error } = await (getSupabaseClient() as any).from('field_photos').delete().eq('id', photo.id);
+  if (error && error.code !== 'PGRST116') throw error;
+}
+
+/** Atualiza metadados de UMA foto (§18/§32): observação, momento, equipamento. */
+export async function updateFieldPhotoMeta(id: string, patch: Partial<Pick<FieldPhoto, 'notaRapida' | 'evidenceMoment' | 'equipmentCatalogItemId' | 'equipmentBrand' | 'equipmentModel'>>): Promise<void> {
+  const row: Record<string, unknown> = {};
+  if (patch.notaRapida !== undefined) row.nota_rapida = patch.notaRapida || null;
+  if (patch.evidenceMoment !== undefined) row.evidence_moment = patch.evidenceMoment ?? null;
+  if (patch.equipmentCatalogItemId !== undefined) row.equipment_catalog_item_id = patch.equipmentCatalogItemId || null;
+  if (patch.equipmentBrand !== undefined) row.equipment_brand = patch.equipmentBrand || null;
+  if (patch.equipmentModel !== undefined) row.equipment_model = patch.equipmentModel || null;
+  if (Object.keys(row).length === 0) return;
+  const { error } = await (getSupabaseClient() as any).from('field_photos').update(row).eq('id', id);
   if (error) throw error;
 }
 

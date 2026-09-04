@@ -81,6 +81,8 @@ export const EquipmentIdentifier: React.FC<Props> = ({ value, onChange, catalog,
             <span className="text-[10px] font-bold uppercase text-fg-muted">Fabricante</span>
             <ResponsibleSelect
               ariaLabel="Fabricante do equipamento"
+              sheetTitle="Selecionar fabricante"
+              searchPlaceholder="Buscar fabricante..."
               value={v.brand && manufacturers.includes(v.brand) ? v.brand : ''}
               onChange={pickBrand}
               options={manufacturers.map((m) => ({ id: m, name: m }))}
@@ -93,6 +95,8 @@ export const EquipmentIdentifier: React.FC<Props> = ({ value, onChange, catalog,
               <span className="text-[10px] font-bold uppercase text-fg-muted">Modelo</span>
               <ResponsibleSelect
                 ariaLabel="Modelo do equipamento"
+                sheetTitle="Selecionar modelo"
+                searchPlaceholder="Buscar modelo..."
                 value={v.catalogItemId || ''}
                 onChange={pickModel}
                 options={models.map((m) => ({ id: m.id, name: m.model || m.name }))}

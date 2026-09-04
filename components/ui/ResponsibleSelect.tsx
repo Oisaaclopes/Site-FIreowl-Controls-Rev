@@ -30,6 +30,10 @@ interface Props {
   /** Largura/estilo do botão-gatilho. */
   triggerClassName?: string;
   ariaLabel?: string;
+  /** Título do bottom-sheet (mobile). Padrão: contexto de responsável. */
+  sheetTitle?: string;
+  /** Placeholder da busca. Padrão: "Buscar funcionário...". */
+  searchPlaceholder?: string;
 }
 
 const UNASSIGNED_LABEL = 'Não atribuído';
@@ -43,6 +47,8 @@ export const ResponsibleSelect: React.FC<Props> = ({
   disabled = false,
   triggerClassName = '',
   ariaLabel = 'Selecionar responsável',
+  sheetTitle = 'Selecionar responsável',
+  searchPlaceholder = 'Buscar funcionário...',
 }) => {
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
@@ -104,7 +110,7 @@ export const ResponsibleSelect: React.FC<Props> = ({
             ref={searchRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar funcionário..."
+            placeholder={searchPlaceholder}
             className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25"
           />
         </div>
@@ -146,7 +152,7 @@ export const ResponsibleSelect: React.FC<Props> = ({
         <div className="fixed inset-0 z-[90] flex items-end bg-slate-900/50 backdrop-blur-sm" onMouseDown={(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
           <div className="w-full rounded-t-2xl bg-surface shadow-2xl max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-              <p className="text-xs font-bold uppercase tracking-wide text-fg-secondary">Selecionar responsável</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-fg-secondary">{sheetTitle}</p>
               <button type="button" onClick={() => setOpen(false)} className="text-fg-muted hover:text-fg-secondary text-2xl leading-none">×</button>
             </div>
             {list}
