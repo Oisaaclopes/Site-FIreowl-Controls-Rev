@@ -370,6 +370,8 @@ export interface CompanyProfile {
   endereco: string;
   telefone: string;
   email: string;
+  /** Site institucional (fonte canônica; ex.: www.fireowlcontrols.com.br). */
+  website?: string;
   regimeTributario: string;
   logoUrl?: string;
   /** §8 — biblioteca de textos institucionais (editável em Conta). */

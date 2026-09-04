@@ -26,6 +26,7 @@ import { fetchPendencias, updatePendenciaStatus } from '@/lib/pendencias';
 import { fetchDevices } from '@/lib/devices';
 import { fetchOrdensServico, updateOrdemServico } from '@/lib/ordensServico';
 import { fetchAssignableTechnicians, ManagedUser } from '@/lib/users';
+import { ResponsibleSelect } from '@/components/ui/ResponsibleSelect';
 import { useToast, useConfirm, showToast, requestConfirm } from '@/components/ui/Feedback';
 import { ClientSelector } from '@/components/clients/ClientSelector';
 import { fetchCicloAtivo, quotaPorVisita } from '@/lib/ciclos';
@@ -735,7 +736,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 
   const iniciarAtendimentoDaOs = (os: OrdemServico) => {
     if (!os.clienteId) {
-      showToast('Esta OS não possui cliente vinculado. Complete o cadastro antes de iniciar o atendimento.');
+      showToast('Esta OS não possui cliente vinculado. Complete o cadastro antes de abrir o relatório.');
       return;
     }
     // OSs legadas ainda não possuem área própria. Inferimos pelo título apenas
@@ -1206,26 +1207,23 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                       <span className="material-symbols-outlined text-[16px] text-fg-muted">engineering</span>
                       <span className="text-fg-secondary shrink-0">Responsável:</span>
                       {podeAtribuir ? (
-                        <select
-                          aria-label="Responsável técnico da OS"
-                          value={os.tecnicoResponsavelId || ''}
-                          onChange={(e) => setOsResponsavel(os, e.target.value)}
-                          className="flex-1 min-w-0 border border-border rounded-lg px-2 py-1 text-[11px] font-semibold text-fg-secondary bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20"
-                        >
-                          <option value="">Não atribuído</option>
-                          {/* Mantém o responsável atual visível mesmo se já não estiver na lista de ativos */}
-                          {os.tecnicoResponsavelId && !tecById(os.tecnicoResponsavelId) && (
-                            <option value={os.tecnicoResponsavelId}>Responsável atual (inativo)</option>
-                          )}
-                          {technicians.map((t) => (
-                            <option key={t.id} value={t.id}>{t.name}{t.cargo ? ` · ${t.cargo}` : ''}</option>
-                          ))}
-                        </select>
+                        <div className="flex-1 min-w-0">
+                          <ResponsibleSelect
+                            ariaLabel="Responsável técnico da OS"
+                            value={os.tecnicoResponsavelId || ''}
+                            onChange={(id) => setOsResponsavel(os, id)}
+                            options={technicians.map((t) => ({ id: t.id, name: t.name }))}
+                            triggerClassName="w-full flex items-center justify-between gap-2 border border-border rounded-lg px-2 py-1.5 text-[11px] font-semibold text-fg-secondary bg-surface"
+                          />
+                        </div>
                       ) : (
                         <span className="font-semibold text-fg-secondary truncate">{responsavelLabel(os)}</span>
                       )}
                     </div>
-                    <button onClick={() => iniciarAtendimentoDaOs(os)} className="min-h-12 rounded-lg bg-danger hover:bg-danger-hover text-white text-xs font-bold uppercase tracking-wide flex items-center justify-center gap-2"><span className="material-symbols-outlined text-base">play_arrow</span>Iniciar atendimento</button>
+                    {/* §16/§39 — este botão abre o RELATÓRIO técnico (FormEngine),
+                        não o ATENDIMENTO operacional (3B, iniciado na OS/painel).
+                        Rótulo explícito evita a colisão semântica. */}
+                    <button onClick={() => iniciarAtendimentoDaOs(os)} className="min-h-12 rounded-lg bg-danger hover:bg-danger-hover text-white text-xs font-bold uppercase tracking-wide flex items-center justify-center gap-2"><span className="material-symbols-outlined text-base">description</span>Abrir relatório corretivo</button>
                   </article>
                 );
               })}

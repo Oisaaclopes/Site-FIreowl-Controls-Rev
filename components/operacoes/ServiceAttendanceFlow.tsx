@@ -22,9 +22,13 @@ import {
 } from '@/lib/attendanceFlow';
 import { fetchOrdensServico, updateOrdemServicoStatus } from '@/lib/ordensServico';
 import { capturePosition } from '@/lib/fieldPhotoGeo';
+import { fetchOsMission, missionHasContent, OsMission } from '@/lib/osMission';
+import { resolveLogoDataUrls } from '@/lib/institucional';
+import { nomeFantasiaCliente } from '@/lib/utils';
 import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 import { useConfirm, useToast } from '@/components/ui/Feedback';
 import { QuickFieldPhotoModal } from '@/components/field-photos/QuickFieldPhotoModal';
+import { ClientLogo } from '@/components/ClientLogo';
 
 /* ===================================================================
  * ETAPA 3B — Fluxo operacional REAL de atendimento de OS.
@@ -35,8 +39,98 @@ import { QuickFieldPhotoModal } from '@/components/field-photos/QuickFieldPhotoM
  * (só quando RESOLVIDO) oferecer a conclusão da OS — nunca silenciosamente.
  * =================================================================== */
 
+/** Nome operacional do cliente: nome fantasia com fallback à razão (§8/§9). */
 const clientNameOf = (clients: Client[], id?: string) =>
-  clients.find((c) => c.id === id)?.name || 'Cliente';
+  nomeFantasiaCliente(clients.find((c) => c.id === id)?.name) || 'Cliente';
+
+/** Hook: resolve a logo (data URI) do cliente de uma OS, quando cadastrada. */
+function useClientLogo(clients: Client[], clientId?: string): string | undefined {
+  const [url, setUrl] = useState<string | undefined>(undefined);
+  const path = clients.find((c) => c.id === clientId)?.logoPath;
+  useEffect(() => {
+    if (!path) { setUrl(undefined); return; }
+    let alive = true;
+    resolveLogoDataUrls([path]).then((m) => { if (alive) setUrl(m[path]); }).catch(() => {});
+    return () => { alive = false; };
+  }, [path]);
+  return url;
+}
+
+/** Logo do cliente (real quando cadastrada, senão fallback) para os cards (§10). */
+const AttendanceClientLogo: React.FC<{ clients: Client[]; clientId?: string; name: string; sizeClass?: string }> = ({ clients, clientId, name, sizeClass = 'w-11 h-11' }) => {
+  const logo = useClientLogo(clients, clientId);
+  return <ClientLogo src={logo} name={name} sizeClass={sizeClass} rounded="rounded-lg" />;
+};
+
+/* -------------------------------------------------------------------------- */
+/* Missão da OS (§14–§22) — o que foi contratado, SEM preços                    */
+/* -------------------------------------------------------------------------- */
+export const OsMissionPanel: React.FC<{ osId: string; osDescricao?: string }> = ({ osId, osDescricao }) => {
+  const [mission, setMission] = useState<OsMission | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetchOsMission(osId).then((m) => { if (alive) setMission(m); }).catch(() => { if (alive) setMission(null); });
+    return () => { alive = false; };
+  }, [osId]);
+
+  const Item = ({ i }: { i: { descricao: string; quantidade?: number; unidade?: string; marcaModelo?: string } }) => (
+    <div className="flex gap-2 text-[12px] text-fg">
+      <span className="text-primary shrink-0">•</span>
+      <span className="min-w-0">
+        {i.quantidade ? <span className="font-data-mono font-bold">{i.quantidade}{i.unidade ? ` ${i.unidade}` : ''} · </span> : null}
+        {i.descricao}
+        {i.marcaModelo ? <span className="text-fg-secondary"> — {i.marcaModelo}</span> : null}
+      </span>
+    </div>
+  );
+
+  const hasStructured = mission ? missionHasContent(mission) : false;
+  const fallback = (mission?.osDescricao || osDescricao || mission?.osTitulo || '').trim();
+
+  return (
+    <div className="rounded-xl border border-border bg-surface-2 p-3">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-primary mb-2 flex items-center gap-1">
+        <span className="material-symbols-outlined text-base">flag</span> Missão da OS
+      </p>
+
+      {mission === null ? (
+        <p className="text-[11px] text-fg-muted">Carregando o que foi contratado…</p>
+      ) : hasStructured ? (
+        <div className="flex flex-col gap-3">
+          {mission.services.length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold uppercase text-fg-secondary mb-1">Serviços previstos</p>
+              <div className="flex flex-col gap-1">{mission.services.map((s, i) => <Item key={i} i={s} />)}</div>
+            </div>
+          )}
+          {mission.responsibilities.length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold uppercase text-fg-secondary mb-1">Responsabilidades da Fireowl</p>
+              <div className="flex flex-col gap-1">
+                {mission.responsibilities.map((r, i) => (
+                  <div key={i} className="flex gap-2 text-[12px] text-fg"><span className="text-primary shrink-0">•</span><span className="min-w-0">{r}</span></div>
+                ))}
+              </div>
+            </div>
+          )}
+          {mission.materials.length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold uppercase text-fg-secondary mb-1">Materiais previstos</p>
+              <div className="flex flex-col gap-1">{mission.materials.map((m, i) => <Item key={i} i={m} />)}</div>
+            </div>
+          )}
+        </div>
+      ) : fallback ? (
+        <div>
+          <p className="text-[10px] font-bold uppercase text-fg-secondary mb-1">Descrição da OS</p>
+          <p className="text-[12px] text-fg whitespace-pre-wrap">{fallback}</p>
+        </div>
+      ) : (
+        <p className="text-[11px] text-fg-muted">Sem escopo estruturado. Confirme o serviço com o gestor.</p>
+      )}
+    </div>
+  );
+};
 
 /** Lê o atendimento ATIVO do técnico e mantém sincronizado via realtime (§32). */
 export function useActiveAttendance(technicianId?: string) {
@@ -194,12 +288,16 @@ export const ActiveAttendanceCard: React.FC<{
       <p className="text-xs font-bold uppercase tracking-wider text-primary mb-2">Atendimento atual</p>
       <div className="rounded-xl border border-primary/40 bg-primary-soft/40 shadow-sm p-3">
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="font-bold text-fg text-sm truncate">{cliente}</p>
-            <p className="text-[11px] font-data-mono text-fg-secondary truncate">
-              {os?.numero || attendance.workOrderId.slice(0, 8)}
-              {os?.titulo ? ` · ${os.titulo}` : ''}
-            </p>
+          <div className="flex items-start gap-2.5 min-w-0">
+            {/* Logo real do cliente quando houver; senão, fallback genérico (§10). */}
+            <AttendanceClientLogo clients={clients} clientId={os?.clienteId} name={cliente} />
+            <div className="min-w-0">
+              <p className="font-bold text-fg text-sm truncate">{cliente}</p>
+              <p className="text-[11px] font-data-mono text-fg-secondary truncate">
+                {os?.numero || attendance.workOrderId.slice(0, 8)}
+                {os?.titulo ? ` · ${os.titulo}` : ''}
+              </p>
+            </div>
           </div>
           <span className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold bg-primary text-white uppercase">
             Em atendimento
@@ -364,6 +462,9 @@ export const AttendanceScreen: React.FC<{
         </div>
 
         <div className="overflow-y-auto p-4 sm:p-5 flex flex-col gap-4">
+          {/* SERVIÇO / MISSÃO DA OS (§14–§22) — o que veio fazer, sem preços */}
+          <OsMissionPanel osId={attendance.workOrderId} osDescricao={os?.descricao} />
+
           {/* DIAGNÓSTICO (§10) */}
           <label className="block">
             <span className="text-xs font-bold uppercase tracking-wide text-fg-secondary">Diagnóstico</span>

@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { TabPath, TimePunch, Client, OrdemServico, FieldOperation } from '@/lib/types';
+import { nomeFantasiaCliente } from '@/lib/utils';
 import { fetchOrdensServico } from '@/lib/ordensServico';
 import { fetchFieldOperations } from '@/lib/fieldOperationsDomain';
 import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
@@ -79,7 +80,8 @@ export const TechDashboard: React.FC<TechDashboardProps> = ({
         .slice(0, 5),
     [ordens, currentUserId]
   );
-  const clientName = (id?: string) => clients.find((c) => c.id === id)?.name || 'Cliente';
+  // Interface operacional: nome fantasia com fallback à razão (§8/§9).
+  const clientName = (id?: string) => nomeFantasiaCliente(clients.find((c) => c.id === id)?.name) || 'Cliente';
 
   return (
     <div className="flex flex-col w-full p-4 md:p-6 gap-4 max-w-2xl mx-auto">

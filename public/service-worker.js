@@ -1,6 +1,8 @@
 /* Fireowl Guardian PWA — cache somente para shell e assets públicos same-origin. */
-const CACHE = 'fireowl-shell-v2';
-const SHELL = ['/', '/offline.html', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
+// v3 (3B.1): ícones oficiais Fireowl Controls substituíram o "F" antigo — o bump
+// da versão força o activate a limpar o cache velho e reprecachear os novos.
+const CACHE = 'fireowl-shell-v3';
+const SHELL = ['/', '/offline.html', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/icon-maskable-512.png', '/icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (event) => {
   // Em atualizações, permanece waiting até o usuário escolher atualizar no app.

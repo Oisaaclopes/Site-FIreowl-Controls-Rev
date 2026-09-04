@@ -5,6 +5,7 @@ import { InclusoExcluso, ResumoExecutivoPage, SlaBloco, QrCode, contatoQrUrl, Ex
 import { verificationUrl } from '@/lib/documentVerification';
 import { experienciaAtiva } from '@/lib/experienciaSelecao';
 import { gerarTituloProposta, faixaSiglas, tituloEscopo, conclusaoPorTipo, apresentacaoAreas } from '@/lib/propostaTitulo';
+import { websiteDisplay } from '@/lib/companyProfile';
 import { normalizeCommercialProposalData } from '@/lib/commercialProposal';
 import { renderWarranty } from '@/lib/commercialWarranty';
 import { normalizeUnitCode } from '@/lib/commercialUnits';
@@ -1001,6 +1002,7 @@ export function PropostaDocument({
   const warrantyView = renderWarranty(p.warranty);
   const razao = companyProfile.razaoSocial || 'Fireowl Controls';
   const fantasia = companyProfile.nomeFantasia || razao;
+  const site = websiteDisplay(companyProfile.website);
   // §15 — contrato recorrente (valor mensal / anual / vigência).
   const recorrente = !!p.recorrente && (p.valorMensal || 0) > 0;
   const vMensal = p.valorMensal || 0;
@@ -1222,7 +1224,8 @@ export function PropostaDocument({
           <Text style={{ fontSize: 9, marginBottom: 3 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>CNPJ: </Text>{companyProfile.cnpj}</Text>
           <Text style={{ fontSize: 9, marginBottom: 3 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Endereço: </Text>{companyProfile.endereco}</Text>
           {nv(companyProfile.telefone) && <Text style={{ fontSize: 9, marginBottom: 3 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Telefone: </Text>{companyProfile.telefone}</Text>}
-          {nv(companyProfile.email) && <Text style={{ fontSize: 9 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>E-mail: </Text>{companyProfile.email}</Text>}
+          {nv(companyProfile.email) && <Text style={{ fontSize: 9, marginBottom: nv(site) ? 3 : 0 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>E-mail: </Text>{companyProfile.email}</Text>}
+          {nv(site) && <Text style={{ fontSize: 9 }}><Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Site: </Text>{site}</Text>}
         </View>
       </Sec>
     ),
@@ -1373,8 +1376,8 @@ export function PropostaDocument({
               <Text style={styles.coverFooterStrong}>{`${razao} — CNPJ ${companyProfile.cnpj}`}</Text>
             </View>
             <Text style={styles.coverFooterText}>{companyProfile.endereco}</Text>
-            {(nv(companyProfile.telefone) || nv(companyProfile.email)) && (
-              <Text style={styles.coverFooterText}>{[companyProfile.telefone, companyProfile.email].filter(nv).join('  •  ')}</Text>
+            {(nv(companyProfile.telefone) || nv(companyProfile.email) || nv(site)) && (
+              <Text style={styles.coverFooterText}>{[companyProfile.telefone, companyProfile.email, site].filter(nv).join('  •  ')}</Text>
             )}
           </View>
         </View>

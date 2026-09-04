@@ -3,6 +3,7 @@ import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import { C, brl, nv, lnv, PdfHeader, PdfFooter, CamposExtras, itemTotal, DocCover, AreasAtuacaoPage, InclusoExcluso, ResumoExecutivoPage, SlaBloco, QrCode, contatoQrUrl, AuthenticityStamp } from './pdfKit';
 import { gerarTituloProposta, apresentacaoAreas } from '@/lib/propostaTitulo';
+import { websiteDisplay } from '@/lib/companyProfile';
 import { normalizeCommercialProposalData } from '@/lib/commercialProposal';
 import { renderWarranty } from '@/lib/commercialWarranty';
 import { normalizeUnitCode } from '@/lib/commercialUnits';
@@ -182,7 +183,8 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
       ? [p.formasPagamento?.length ? `Formas: ${p.formasPagamento.join(', ')}` : '', p.condicoesPagamento?.length ? p.condicoesPagamento.join(' · ') : ''].filter(Boolean).join(' — ')
       : (nv(p.formaPagamento) ? p.formaPagamento! : 'A combinar entre as partes.');
 
-  const contato = [companyProfile.telefone, companyProfile.email].filter(nv).join('  •  ');
+  const site = websiteDisplay(companyProfile.website);
+  const contato = [companyProfile.telefone, companyProfile.email, site].filter(nv).join('  •  ');
   const qrUrl = contatoQrUrl(companyProfile.telefone, companyProfile.email); // §32
   const authenticityUrl = verificationUrl('orcamento', pedido.id);
   // P1 — título dinâmico (área × tipo) usado como subtítulo da capa.
@@ -198,6 +200,7 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
           endereco={companyProfile.endereco}
           telefone={companyProfile.telefone}
           email={companyProfile.email}
+          website={site}
           titulo="Orçamento"
           subtitulo={tituloDin || 'Documento Comercial'}
           cliente={cliente}

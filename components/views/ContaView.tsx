@@ -792,6 +792,17 @@ export const ContaView: React.FC<ContaViewProps> = ({
                 </div>
               </div>
               <div>
+                <label className={labelCls}>Site / Website</label>
+                <input
+                  type="text"
+                  placeholder="www.fireowlcontrols.com.br"
+                  value={profile.website || ''}
+                  onChange={(e) => setProfile({ ...profile, website: e.target.value })}
+                  className={inputCls}
+                />
+                <p className="mt-1 text-[10px] text-fg-muted">Aparece nos documentos comerciais. Pode digitar com ou sem “https://”.</p>
+              </div>
+              <div>
                 <label className={labelCls}>URL do logotipo (opcional)</label>
                 <input
                   type="text"

@@ -3,7 +3,7 @@ import { showToast, requestConfirm, requestText } from '@/components/ui/Feedback
 
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { SupplyOrder, Client, Pedido, Contract, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem, DocumentosPadrao, DocumentType, FinancialTransaction, RecebimentoProposta, EmpresaAtendida, MarcaTecnologia, OrdemServico, TimePunch } from '@/lib/types';
-import { StartAttendanceButton, AttendanceHistoryList } from '@/components/operacoes/ServiceAttendanceFlow';
+import { StartAttendanceButton, AttendanceHistoryList, OsMissionPanel } from '@/components/operacoes/ServiceAttendanceFlow';
 import { OS_STATUS_ATIVOS, osHistoryForPedido, isHardDeleteEligible, isCancelable } from '@/lib/ordensServico';
 import { selecionarEmpresas, selecionarMarcas, experienciaAtiva } from '@/lib/experienciaSelecao';
 import { resolveLogoDataUrls } from '@/lib/institucional';
@@ -1832,7 +1832,8 @@ const OrdemServicoDetailModal: React.FC<{
   onDelete?: () => void;
   onClose: () => void;
 }> = ({ os, clients, contracts, canManage = false, isTecnico = false, currentUserId, currentUserName, currentUserPunches = [], usesTimeClock = false, onCancel, onDelete, onClose }) => {
-  const clienteNome = clients.find((c) => c.id === os.clienteId)?.name || os.clienteId || '—';
+  // Interface operacional: nome fantasia com fallback à razão (§8/§9).
+  const clienteNome = nomeFantasiaCliente(clients.find((c) => c.id === os.clienteId)?.name) || os.clienteId || '—';
   const contrato = contracts.find((c) => c.id === os.contratoId);
   const st = OS_STATUS_LABEL[os.status] || { label: os.status, color: 'slate' as const };
   const podeCancelar = canManage && !!onCancel && isCancelable(os);
@@ -1872,6 +1873,13 @@ const OrdemServicoDetailModal: React.FC<{
               {os.motivoCancelamento ? linha('Motivo do cancelamento', <span className="whitespace-pre-wrap">{os.motivoCancelamento}</span>) : null}
               {os.canceladaEm ? linha('Cancelada em', new Date(os.canceladaEm).toLocaleString('pt-BR')) : null}
             </>
+          )}
+
+          {/* ETAPA 3B.1 — MISSÃO DA OS (o que foi contratado; sem preços, §14–§22) */}
+          {os.status !== 'cancelada' && (
+            <div className="mt-4">
+              <OsMissionPanel osId={os.id} osDescricao={os.descricao} />
+            </div>
           )}
 
           {/* ETAPA 3B — INICIAR ATENDIMENTO (técnico responsável, OS ativa) */}

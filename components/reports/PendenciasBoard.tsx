@@ -193,8 +193,9 @@ export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, cl
               className="px-2 py-1.5 rounded-lg text-[11px] font-semibold text-fg-secondary bg-surface border border-white/30 focus:outline-none max-w-[180px]"
             >
               <option value="">Não atribuído</option>
+              {/* §11 — contexto operacional: só o nome (sem cargo/role). */}
               {technicians.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}{t.cargo ? ` · ${t.cargo}` : ''}</option>
+                <option key={t.id} value={t.id}>{t.name}</option>
               ))}
             </select>
             <button

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { FinancialTransaction, OrdemServico, Contract, TabPath, TimePunch, Client } from '@/lib/types';
 import { OS_STATUS_ATIVOS } from '@/lib/ordensServico';
+import { nomeFantasiaCliente } from '@/lib/utils';
 import { usePrivacy } from '@/lib/privacy';
 import { fetchTimeClockParticipants, TimeClockParticipant } from '@/lib/users';
 import { requestPunchAddress } from '@/lib/timepunch';
@@ -379,7 +380,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <span className="text-xs font-bold text-fg">{operator.name}</span>
                       <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold ${chip}`}>{operator.status}</span>
                     </div>
-                    {operator.clientName && <p className="mt-1 text-[11px] font-semibold text-fg-secondary">{operator.clientName}</p>}
+                    {operator.clientName && <p className="mt-1 text-[11px] font-semibold text-fg-secondary">{nomeFantasiaCliente(operator.clientName)}</p>}
                     {operator.status === 'EM OPERAÇÃO' && operator.activeOperation?.name && (
                       <p className="mt-0.5 text-[10px] font-semibold text-indigo-600">{operator.activeOperation.name}</p>
                     )}

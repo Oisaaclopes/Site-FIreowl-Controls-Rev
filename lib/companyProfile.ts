@@ -11,6 +11,7 @@ function rowToProfile(r: any): CompanyProfile {
     endereco: r.endereco || '',
     telefone: r.telefone || '',
     email: r.email || '',
+    website: r.website || undefined,
     regimeTributario: r.regime_tributario || '',
     logoUrl: r.logo_url || undefined,
     apresentacaoGeral: r.apresentacao_geral || undefined,
@@ -25,6 +26,28 @@ function rowToProfile(r: any): CompanyProfile {
     expMaxEmpresas: r.exp_max_empresas ?? undefined,
     expMaxMarcas: r.exp_max_marcas ?? undefined,
   };
+}
+
+/**
+ * §3 — normalização do site institucional. O usuário digita "de qualquer jeito"
+ * (com ou sem https://, com ou sem www, com barra final); daqui saem duas
+ * representações consistentes, sem o usuário precisar entender a diferença:
+ *   - websiteDisplay: para EXIBIÇÃO (ex.: www.fireowlcontrols.com.br)
+ *   - websiteHref:    para LINK     (ex.: https://www.fireowlcontrols.com.br)
+ */
+export function websiteDisplay(raw?: string): string {
+  const s = (raw || '').trim();
+  if (!s) return '';
+  return s
+    .replace(/^https?:\/\//i, '')
+    .replace(/\/+$/, '');
+}
+
+export function websiteHref(raw?: string): string {
+  const s = (raw || '').trim();
+  if (!s) return '';
+  if (/^https?:\/\//i.test(s)) return s.replace(/\/+$/, '');
+  return `https://${s.replace(/\/+$/, '')}`;
 }
 
 /** §20 — storage_path da capa da 1ª área da proposta que tiver capa cadastrada. */
@@ -47,6 +70,7 @@ function profileToRow(p: CompanyProfile): Record<string, unknown> {
     endereco: p.endereco || null,
     telefone: p.telefone || null,
     email: p.email || null,
+    website: p.website || null,
     regime_tributario: p.regimeTributario || null,
     logo_url: p.logoUrl || null,
     apresentacao_geral: p.apresentacaoGeral || null,

@@ -227,8 +227,9 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ onOpenOS, userRole, curr
               <>
                 <option value="TODOS">Todos os técnicos</option>
                 <option value="NAO">Não atribuídas</option>
+                {/* §11 — contexto operacional: só o nome (sem cargo/role). */}
                 {technicians.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}{t.cargo ? ` · ${t.cargo}` : ''}</option>
+                  <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
               </>
             )}

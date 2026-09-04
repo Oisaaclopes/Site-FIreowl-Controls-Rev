@@ -32,13 +32,14 @@ export const metadata: Metadata = {
   title: 'Fireowl Guardian',
   description: 'Soluções corporativas completas em automação predial, alarmes de incêndio, CFTV de alta resolução e sistemas avançados de controle de acesso para empresas de alta confiança técnica.',
   manifest: '/manifest.webmanifest',
-  applicationName: 'Fireowl Guardian',
-  appleWebApp: { capable: true, title: 'Fireowl Guardian', statusBarStyle: 'default' },
+  applicationName: 'Fireowl Controls',
+  // Nome do app instalado (iOS): identidade oficial Fireowl Controls (§7).
+  appleWebApp: { capable: true, title: 'Fireowl Controls', statusBarStyle: 'default' },
   // iOS < 16.4 não lê o manifest: garante o modo standalone via meta legado da Apple.
   other: { 'apple-mobile-web-app-capable': 'yes' },
   icons: {
     icon: '/icon.svg',
-    apple: '/icons/icon-192.png',
+    apple: '/icons/apple-touch-icon.png',
   },
 };
 

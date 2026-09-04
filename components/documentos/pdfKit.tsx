@@ -244,9 +244,9 @@ const CoverBlock = ({ label, value }: { label: string; value: string }) => (
 
 /** Capa institucional marinho (reaproveita o visual da proposta). Renderiza uma <Page>. */
 export const DocCover = ({
-  razao, cnpj, endereco, telefone, email, titulo, subtitulo, cliente, numero, escopo, data, capaImagemUrl, showLogo = true, logoUrl,
+  razao, cnpj, endereco, telefone, email, website, titulo, subtitulo, cliente, numero, escopo, data, capaImagemUrl, showLogo = true, logoUrl,
 }: {
-  razao: string; cnpj?: string; endereco?: string; telefone?: string; email?: string;
+  razao: string; cnpj?: string; endereco?: string; telefone?: string; email?: string; website?: string;
   titulo: string; subtitulo?: string; cliente: string; numero: string; escopo: string; data: string;
   capaImagemUrl?: string; showLogo?: boolean; logoUrl?: string;
 }) => (
@@ -300,7 +300,7 @@ export const DocCover = ({
           <Text style={{ color: C.white, fontSize: 8.5, fontFamily: 'Roboto', fontWeight: 700 }}>{`${razao}${cnpj ? ` — CNPJ ${cnpj}` : ''}`}</Text>
         </View>
         {nv(endereco) ? <Text style={{ color: C.s400, fontSize: 7.5, marginTop: 2 }}>{endereco}</Text> : null}
-        {(nv(telefone) || nv(email)) ? <Text style={{ color: C.s400, fontSize: 7.5, marginTop: 2 }}>{[telefone, email].filter(nv).join('  •  ')}</Text> : null}
+        {(nv(telefone) || nv(email) || nv(website)) ? <Text style={{ color: C.s400, fontSize: 7.5, marginTop: 2 }}>{[telefone, email, website].filter(nv).join('  •  ')}</Text> : null}
       </View>
     </View>
   </Page>
