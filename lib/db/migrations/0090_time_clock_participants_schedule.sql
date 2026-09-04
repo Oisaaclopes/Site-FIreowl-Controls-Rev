@@ -12,7 +12,13 @@
 -- escala. `create or replace` numa migração nova; NÃO edita a 0082. Aditiva,
 -- idempotente, sem tocar dados. Requer 0082 e 0004/0005 (auth_role).
 
-create or replace function public.get_time_clock_participants()
+-- Mudar o tipo de retorno (acrescentar a coluna `schedule`) exige DROP antes do
+-- CREATE: o Postgres não permite CREATE OR REPLACE que altere a assinatura de
+-- saída. Idempotente (IF EXISTS). A assinatura de ENTRADA não muda (sem args),
+-- então nenhum objeto depende dela de forma que impeça o drop.
+drop function if exists public.get_time_clock_participants();
+
+create function public.get_time_clock_participants()
 returns table (id uuid, name text, uses_time_clock boolean, schedule jsonb)
 language plpgsql stable security definer set search_path = public
 as $$
