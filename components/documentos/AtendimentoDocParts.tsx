@@ -12,7 +12,8 @@ import { DocAttendance, DocEvidencePhoto } from '@/lib/osDocuments';
 const s = StyleSheet.create({
   compRow: { flexDirection: 'row', gap: 6, marginTop: 4 },
   compCol: { borderWidth: 1, borderColor: C.s200, borderRadius: 4, padding: 4 },
-  compLabel: { fontSize: 7, fontFamily: 'Roboto', fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3, textAlign: 'center' },
+  compLabel: { fontSize: 7, fontFamily: 'Roboto', fontWeight: 700, color: C.navy, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' },
+  compSub: { fontSize: 6.5, color: C.s600, textAlign: 'center', marginBottom: 3 },
   photoWrap: { marginBottom: 4 },
   cap: { fontSize: 6.5, color: C.s600, marginTop: 1, lineHeight: 1.3 },
   signRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
@@ -31,7 +32,7 @@ const s = StyleSheet.create({
 const fmtDate = (v?: string) => (v ? new Date(v).toLocaleDateString('pt-BR') : '');
 const fmtTime = (v?: string) => (v ? new Date(v).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '');
 
-export interface EvidenceColumn { label: string; photos: DocEvidencePhoto[] }
+export interface EvidenceColumn { label: string; photos: DocEvidencePhoto[]; sublabel?: string }
 
 /**
  * Comparação de evidências em COLUNAS lado a lado (§21A–§21M). Recebe só as
@@ -51,6 +52,7 @@ export const EvidenceComparison: React.FC<{ columns: EvidenceColumn[] }> = ({ co
       {cols.map((col, ci) => (
         <View key={ci} style={{ ...s.compCol, width }}>
           <Text style={s.compLabel}>{col.label}</Text>
+          {nv(col.sublabel) ? <Text style={s.compSub}>{col.sublabel}</Text> : null}
           {col.photos.filter((p) => p.dataUrl).map((p) => (
             <View key={p.id} style={s.photoWrap}>
               {/* eslint-disable-next-line jsx-a11y/alt-text */}

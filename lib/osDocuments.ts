@@ -20,6 +20,9 @@ export interface DocEvidencePhoto { id: string; moment?: FieldPhotoMoment; dataU
 export interface DocEvidenceItem {
   id: string; title: string; category: string; equipmentType?: string;
   manufacturer?: string; model?: string; deviceAddress?: string; location?: string; notes?: string;
+  /** Substituição de equipamento (§21P–§21Y): identificação instalada (depois). */
+  equipmentReplaced?: boolean;
+  finalManufacturer?: string; finalModel?: string; deviceAddressFinal?: string;
   antes: DocEvidencePhoto[]; durante: DocEvidencePhoto[]; depois: DocEvidencePhoto[];
 }
 export interface DocAttendance {
@@ -104,6 +107,8 @@ export async function buildOsDocumentData(
     const its = (itemsByAttendance.get(a.id) || []).map((it): DocEvidenceItem => ({
       id: it.id, title: it.title, category: it.category, equipmentType: it.equipmentType,
       manufacturer: it.manufacturer, model: it.model, deviceAddress: it.deviceAddress, location: it.location, notes: it.notes,
+      equipmentReplaced: it.equipmentReplaced,
+      finalManufacturer: it.equipmentFinalManufacturer, finalModel: it.equipmentFinalModel, deviceAddressFinal: it.deviceAddressFinal,
       antes: photosOf(a.id, it.id, 'ANTES'), durante: photosOf(a.id, it.id, 'DURANTE'), depois: photosOf(a.id, it.id, 'DEPOIS'),
     }));
     const tech = a.technicianId ? techById.get(a.technicianId) : undefined;

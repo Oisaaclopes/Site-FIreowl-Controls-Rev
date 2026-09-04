@@ -139,15 +139,31 @@ export function RelatorioAtendimentoDocument({ data }: { data: OsDocumentData })
                 </View>
               )}
 
-              {att.items.map((it) => (
-                <View key={it.id} style={s.itemBox} minPresenceAhead={110}>
-                  <Text style={s.itemTitle}>{it.title}</Text>
-                  <Text style={s.itemSub}>{[it.equipmentType || it.category, [it.manufacturer, it.model].filter(Boolean).join(' '), it.deviceAddress ? `Endereço ${it.deviceAddress}` : '', it.location].filter(Boolean).join(' · ')}</Text>
-                  {nv(it.notes) ? <Text style={{ ...s.para, marginTop: 2 }}>{it.notes}</Text> : null}
-                  {/* Antes | Durante | Depois lado a lado (§21A–§21F) */}
-                  <EvidenceComparison columns={[{ label: 'Antes', photos: it.antes }, { label: 'Durante', photos: it.durante }, { label: 'Depois', photos: it.depois }]} />
-                </View>
-              ))}
+              {att.items.map((it) => {
+                // CASO A (sem troca): identificação única no cabeçalho.
+                // CASO B (substituído): identificação por momento (antes/depois).
+                const beforeLabel = [it.manufacturer, it.model].filter(Boolean).join(' ');
+                const afterLabel = [it.finalManufacturer, it.finalModel].filter(Boolean).join(' ');
+                const replaced = !!it.equipmentReplaced && (!!afterLabel || !!it.deviceAddressFinal);
+                const headerBits = replaced
+                  ? [it.equipmentType || it.category, it.location].filter(Boolean)
+                  : [it.equipmentType || it.category, beforeLabel, it.deviceAddress ? `Endereço ${it.deviceAddress}` : '', it.location].filter(Boolean);
+                return (
+                  <View key={it.id} style={s.itemBox} minPresenceAhead={110}>
+                    <Text style={s.itemTitle}>{it.title}</Text>
+                    <Text style={s.itemSub}>{headerBits.join(' · ')}</Text>
+                    {nv(it.notes) ? <Text style={{ ...s.para, marginTop: 2 }}>{it.notes}</Text> : null}
+                    {replaced ? <Text style={{ ...s.itemSub, color: C.red, marginTop: 1 }}>Equipamento substituído</Text> : null}
+                    {/* Antes | Durante | Depois lado a lado (§21A–§21F); em troca, a
+                        identificação do equipamento vai como sublabel por momento (§21R). */}
+                    <EvidenceComparison columns={[
+                      { label: 'Antes', photos: it.antes, sublabel: replaced ? [beforeLabel, it.deviceAddress ? `End. ${it.deviceAddress}` : ''].filter(Boolean).join(' · ') : undefined },
+                      { label: 'Durante', photos: it.durante },
+                      { label: 'Depois', photos: it.depois, sublabel: replaced ? [afterLabel, it.deviceAddressFinal ? `End. ${it.deviceAddressFinal}` : ''].filter(Boolean).join(' · ') : undefined },
+                    ]} />
+                  </View>
+                );
+              })}
 
               <View wrap={false}><Text style={s.photoRowLabel}>Resultado</Text><Text style={s.para}>{attendanceResultLabel(att.result)}</Text></View>
 

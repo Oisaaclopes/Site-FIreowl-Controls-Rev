@@ -10,7 +10,7 @@ import { fetchTechnicalCatalog, TechnicalCatalogItem } from '@/lib/technicalCata
 import { saveAttendanceCentral } from '@/lib/serviceAttendances';
 import {
   buildEvidenceCategoryOptions, createEvidenceItem, deleteEvidenceItem, equipmentToItemFields,
-  EVIDENCE_CATEGORY_LABEL, EvidenceCategoryOption, fetchEvidenceItems, updateEvidenceItem,
+  equipmentToFinalItemFields, EVIDENCE_CATEGORY_LABEL, EvidenceCategoryOption, fetchEvidenceItems, updateEvidenceItem,
 } from '@/lib/evidenceItems';
 import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 import { useIsMobile } from '@/lib/useIsMobile';
@@ -275,16 +275,25 @@ export const AttendanceEvidence: React.FC<Props> = ({
       {capture && (
         <CapturePanel
           capture={capture} catalog={catalog} area={area} allowEquipment={!capture.central}
+          item={capture.itemId ? items.find((i) => i.id === capture.itemId) : undefined}
           onCancel={() => { URL.revokeObjectURL(capture.url); setCapture(null); }}
-          onSave={async (note, equipment) => {
+          onSave={async (note, equipment, replacement) => {
             const s = await ensureSession();
             if (!s || !clientId) return;
+            // Substituição: a foto do DEPOIS carrega o equipamento NOVO e o Item
+            // registra o instalado (final) + flag replaced, sem redigitar (§21V).
+            const photoEquip = replacement || equipment;
             const saved = await captureAttendanceEvidence({
               file: capture.file, session: s, clientId, clientName, osId,
               serviceAttendanceId: attendanceId, moment: capture.moment, evidenceItemId: capture.itemId, note,
-              equipmentCatalogItemId: equipment?.catalogItemId, equipmentBrand: equipment?.brand, equipmentModel: equipment?.model,
+              equipmentCatalogItemId: photoEquip?.catalogItemId, equipmentBrand: photoEquip?.brand, equipmentModel: photoEquip?.model,
             });
             addLocal(saved.photo, saved.previewUrl);
+            if (replacement && capture.itemId) {
+              const src = items.find((i) => i.id === capture.itemId);
+              const updated = await updateEvidenceItem(capture.itemId, { equipmentReplaced: true, ...equipmentToFinalItemFields(replacement), equipmentFinalType: src?.equipmentType }).catch(() => null);
+              if (updated) setItems((prev) => prev.map((x) => x.id === capture.itemId ? updated : x));
+            }
             URL.revokeObjectURL(capture.url); setCapture(null);
             afterWrite();
             toast.success('Evidência adicionada.');
@@ -470,17 +479,50 @@ const MOMENT_TITLE: Record<FieldPhotoMoment, string> = {
 const CapturePanel: React.FC<{
   capture: { file: File; url: string; moment: FieldPhotoMoment };
   catalog: TechnicalCatalogItem[]; area?: string; allowEquipment: boolean;
-  onCancel: () => void; onSave: (note: string, equipment?: EquipmentIdentification) => Promise<void>;
-}> = ({ capture, catalog, area, allowEquipment, onCancel, onSave }) => {
+  item?: ServiceAttendanceEvidenceItem;
+  onCancel: () => void; onSave: (note: string, equipment?: EquipmentIdentification, replacement?: EquipmentIdentification) => Promise<void>;
+}> = ({ capture, catalog, area, allowEquipment, item, onCancel, onSave }) => {
   const [note, setNote] = useState('');
   const [equipment, setEquipment] = useState<EquipmentIdentification | undefined>();
   const [busy, setBusy] = useState(false);
-  const save = async () => { setBusy(true); try { await onSave(note, equipment); } catch { setBusy(false); } };
+  // §21V — no DEPOIS de um item que já tem equipamento identificado, perguntar
+  // se permaneceu o mesmo ou foi substituído (sem redigitar quando não mudou).
+  const itemHasEquip = !!item && !!(item.manufacturer || item.model);
+  const askReplacement = capture.moment === 'DEPOIS' && itemHasEquip && !item?.equipmentReplaced;
+  const [subMode, setSubMode] = useState<'same' | 'replaced'>('same');
+  const [replacement, setReplacement] = useState<EquipmentIdentification | undefined>();
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      const repl = askReplacement && subMode === 'replaced' ? replacement : undefined;
+      await onSave(note, equipment, repl);
+    } catch { setBusy(false); }
+  };
   return (
     <Sheet title={MOMENT_TITLE[capture.moment]} onClose={onCancel}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={capture.url} alt="Prévia" className="max-h-[40vh] w-full rounded-xl bg-slate-900 object-contain" />
-      {allowEquipment && <EquipmentIdentifier value={equipment} onChange={setEquipment} catalog={catalog} area={area} />}
+
+      {askReplacement ? (
+        <div className="rounded-lg border border-border bg-surface-2 p-2.5 flex flex-col gap-2">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-fg-secondary">O equipamento permaneceu o mesmo?</p>
+          <p className="text-[11px] text-fg-muted -mt-1">{[item?.manufacturer, item?.model].filter(Boolean).join(' · ') || 'Equipamento do item'}</p>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setSubMode('same')} className={`flex-1 min-h-[40px] rounded-lg text-[11px] font-bold uppercase border ${subMode === 'same' ? 'border-primary bg-primary-soft/50 text-primary' : 'border-border text-fg-secondary'}`}>Sim, o mesmo</button>
+            <button type="button" onClick={() => setSubMode('replaced')} className={`flex-1 min-h-[40px] rounded-lg text-[11px] font-bold uppercase border ${subMode === 'replaced' ? 'border-primary bg-primary-soft/50 text-primary' : 'border-border text-fg-secondary'}`}>Foi substituído</button>
+          </div>
+          {subMode === 'replaced' && (
+            <>
+              <p className="text-[10px] font-bold uppercase text-fg-muted -mb-1">Equipamento instalado (depois)</p>
+              <EquipmentIdentifier value={replacement} onChange={setReplacement} catalog={catalog} area={area} subcategory={item?.equipmentType} />
+            </>
+          )}
+        </div>
+      ) : (
+        allowEquipment && <EquipmentIdentifier value={equipment} onChange={setEquipment} catalog={catalog} area={area} subcategory={item?.equipmentType} />
+      )}
+
       <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Observação (opcional)" className="w-full rounded-lg border border-border bg-surface text-fg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25" />
       <SheetActions onCancel={onCancel} onConfirm={save} busy={busy} confirmLabel="Salvar evidência" />
     </Sheet>
@@ -526,7 +568,7 @@ const ItemDetail: React.FC<{
     <Sheet title={item.title} onClose={onClose}>
       <div className="rounded-lg bg-surface-2 p-2.5">
         <p className="text-[11px] font-bold text-fg">{item.equipmentType || EVIDENCE_CATEGORY_LABEL[item.category]}</p>
-        {subtitle && <p className="text-[11px] text-fg-secondary">{subtitle}</p>}
+        {subtitle && <p className="text-[11px] text-fg-secondary">{item.equipmentReplaced && (item.equipmentFinalManufacturer || item.equipmentFinalModel) ? <>Antes: {subtitle} <span className="text-fg-muted">→</span> Depois: {[item.equipmentFinalManufacturer, item.equipmentFinalModel].filter(Boolean).join(' ')}</> : subtitle}</p>}
         {(item.deviceAddress || item.location) && <p className="text-[11px] text-fg-muted">{[item.deviceAddress ? `Endereço ${item.deviceAddress}` : '', item.location].filter(Boolean).join(' · ')}</p>}
         {item.notes && <p className="mt-1 text-[11px] text-fg-secondary whitespace-pre-wrap">{item.notes}</p>}
       </div>
@@ -554,13 +596,28 @@ const ItemEditSheet: React.FC<{
   const [equipment, setEquipment] = useState<EquipmentIdentification | undefined>(
     item.manufacturer || item.model ? { catalogItemId: item.catalogItemId, brand: item.manufacturer, model: item.model, manual: !item.catalogItemId } : undefined
   );
+  // Substituição de equipamento (§21P–§21X): instalado (depois) + endereço final.
+  const [replaced, setReplaced] = useState(!!item.equipmentReplaced);
+  const [finalEquipment, setFinalEquipment] = useState<EquipmentIdentification | undefined>(
+    item.equipmentFinalManufacturer || item.equipmentFinalModel ? { catalogItemId: item.equipmentFinalCatalogItemId, brand: item.equipmentFinalManufacturer, model: item.equipmentFinalModel, manual: !item.equipmentFinalCatalogItemId } : undefined
+  );
+  const [deviceAddressFinal, setDeviceAddressFinal] = useState(item.deviceAddressFinal || '');
   const [busy, setBusy] = useState(false);
   const toast = useToast();
   const showEquipment = !!opt && (opt.coarse === 'EQUIPAMENTO' || opt.coarse === 'CENTRAL');
   const save = async () => {
     if (!title.trim()) { toast.error('Informe um título.'); return; }
     setBusy(true);
-    try { await onSave({ title: title.trim(), category: opt?.coarse || item.category, equipmentType: opt?.subcategory, location, deviceAddress, notes, ...equipmentToItemFields(equipment) }); }
+    try {
+      await onSave({
+        title: title.trim(), category: opt?.coarse || item.category, equipmentType: opt?.subcategory,
+        location, deviceAddress, notes, ...equipmentToItemFields(equipment),
+        equipmentReplaced: replaced,
+        ...(replaced
+          ? { ...equipmentToFinalItemFields(finalEquipment), equipmentFinalType: opt?.subcategory, deviceAddressFinal }
+          : { equipmentFinalCatalogItemId: undefined, equipmentFinalManufacturer: undefined, equipmentFinalModel: undefined, equipmentFinalType: undefined, deviceAddressFinal: undefined }),
+      });
+    }
     catch { toast.error('Não foi possível salvar.'); setBusy(false); }
   };
   return (
@@ -576,7 +633,23 @@ const ItemEditSheet: React.FC<{
         <label className="block"><span className="text-[10px] font-bold uppercase text-fg-muted">Endereço</span><input value={deviceAddress} onChange={(e) => setDeviceAddress(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25" /></label>
         <label className="block"><span className="text-[10px] font-bold uppercase text-fg-muted">Local</span><input value={location} onChange={(e) => setLocation(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25" /></label>
       </div>
-      {showEquipment && <EquipmentIdentifier value={equipment} onChange={setEquipment} catalog={catalog} area={area} subcategory={opt?.subcategory} />}
+      {showEquipment && (
+        <>
+          {equipment && <p className="text-[10px] font-bold uppercase text-fg-muted -mb-1">Equipamento encontrado (antes)</p>}
+          <EquipmentIdentifier value={equipment} onChange={setEquipment} catalog={catalog} area={area} subcategory={opt?.subcategory} />
+          <label className="flex items-center gap-2 text-[12px] font-semibold text-fg-secondary">
+            <input type="checkbox" checked={replaced} onChange={(e) => setReplaced(e.target.checked)} className="w-4 h-4 accent-primary" />
+            Equipamento foi substituído
+          </label>
+          {replaced && (
+            <>
+              <p className="text-[10px] font-bold uppercase text-fg-muted -mb-1">Equipamento instalado (depois)</p>
+              <EquipmentIdentifier value={finalEquipment} onChange={setFinalEquipment} catalog={catalog} area={area} subcategory={opt?.subcategory} />
+              <label className="block"><span className="text-[10px] font-bold uppercase text-fg-muted">Endereço final (se mudou)</span><input value={deviceAddressFinal} onChange={(e) => setDeviceAddressFinal(e.target.value)} placeholder="Deixe vazio se o mesmo" className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25" /></label>
+            </>
+          )}
+        </>
+      )}
       <label className="block"><span className="text-[10px] font-bold uppercase text-fg-muted">Observação</span><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25" /></label>
       <SheetActions onCancel={onCancel} onConfirm={save} busy={busy} confirmLabel="Salvar" />
     </Sheet>

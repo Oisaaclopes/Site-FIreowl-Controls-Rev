@@ -33,6 +33,12 @@ function rowToItem(r: any): ServiceAttendanceEvidenceItem {
     manufacturer: r.manufacturer ?? undefined,
     model: r.model ?? undefined,
     notes: r.notes ?? undefined,
+    equipmentReplaced: r.equipment_replaced ?? undefined,
+    equipmentFinalCatalogItemId: r.equipment_final_catalog_item_id ?? undefined,
+    equipmentFinalManufacturer: r.equipment_final_manufacturer ?? undefined,
+    equipmentFinalModel: r.equipment_final_model ?? undefined,
+    equipmentFinalType: r.equipment_final_type ?? undefined,
+    deviceAddressFinal: r.device_address_final ?? undefined,
     status: r.status ?? undefined,
     createdBy: r.created_by ?? undefined,
     createdAt: r.created_at ?? undefined,
@@ -53,6 +59,12 @@ function itemToRow(i: Partial<ServiceAttendanceEvidenceItem>): Record<string, un
   if (i.manufacturer !== undefined) row.manufacturer = i.manufacturer || null;
   if (i.model !== undefined) row.model = i.model || null;
   if (i.notes !== undefined) row.notes = i.notes || null;
+  if (i.equipmentReplaced !== undefined) row.equipment_replaced = i.equipmentReplaced;
+  if (i.equipmentFinalCatalogItemId !== undefined) row.equipment_final_catalog_item_id = i.equipmentFinalCatalogItemId || null;
+  if (i.equipmentFinalManufacturer !== undefined) row.equipment_final_manufacturer = i.equipmentFinalManufacturer || null;
+  if (i.equipmentFinalModel !== undefined) row.equipment_final_model = i.equipmentFinalModel || null;
+  if (i.equipmentFinalType !== undefined) row.equipment_final_type = i.equipmentFinalType || null;
+  if (i.deviceAddressFinal !== undefined) row.device_address_final = i.deviceAddressFinal || null;
   if (i.status !== undefined) row.status = i.status || null;
   return row;
 }
@@ -156,11 +168,42 @@ export function buildEvidenceCategoryOptions(catalog: TechnicalCatalogItem[], ar
   return opts;
 }
 
-/** Fabricante/modelo do catálogo → campos do item, sem dado comercial. */
+/** Fabricante/modelo do catálogo → campos do item (encontrado), sem dado comercial. */
 export function equipmentToItemFields(v?: { catalogItemId?: string; brand?: string; model?: string } | null): Pick<ServiceAttendanceEvidenceItem, 'catalogItemId' | 'manufacturer' | 'model'> {
   return {
     catalogItemId: v?.catalogItemId,
     manufacturer: v?.brand?.trim() || undefined,
     model: v?.model?.trim() || undefined,
   };
+}
+
+/* ----------------------- Substituição (Antes × Depois) ------------------- */
+export interface EquipmentRef { catalogItemId?: string; brand?: string; model?: string }
+
+/** Equipamento do catálogo/manual → campos do INSTALADO (depois). */
+export function equipmentToFinalItemFields(v?: EquipmentRef | null): Pick<ServiceAttendanceEvidenceItem, 'equipmentFinalCatalogItemId' | 'equipmentFinalManufacturer' | 'equipmentFinalModel'> {
+  return {
+    equipmentFinalCatalogItemId: v?.catalogItemId,
+    equipmentFinalManufacturer: v?.brand?.trim() || undefined,
+    equipmentFinalModel: v?.model?.trim() || undefined,
+  };
+}
+
+/** Identificação do equipamento ENCONTRADO (antes) do item. */
+export function itemEquipmentBefore(item: Pick<ServiceAttendanceEvidenceItem, 'catalogItemId' | 'manufacturer' | 'model'>): EquipmentRef {
+  return { catalogItemId: item.catalogItemId, brand: item.manufacturer, model: item.model };
+}
+/** Identificação do equipamento INSTALADO (depois) do item. */
+export function itemEquipmentAfter(item: Pick<ServiceAttendanceEvidenceItem, 'equipmentFinalCatalogItemId' | 'equipmentFinalManufacturer' | 'equipmentFinalModel'>): EquipmentRef {
+  return { catalogItemId: item.equipmentFinalCatalogItemId, brand: item.equipmentFinalManufacturer, model: item.equipmentFinalModel };
+}
+
+/** Há identificação de equipamento (fabricante/modelo)? */
+export function hasEquipment(e?: EquipmentRef | null): boolean {
+  return !!e && !!((e.brand || '').trim() || (e.model || '').trim());
+}
+
+/** "Fabricante · Modelo" (ou vazio). */
+export function equipmentLabel(e?: EquipmentRef | null): string {
+  return [e?.brand, e?.model].map((x) => (x || '').trim()).filter(Boolean).join(' · ');
 }

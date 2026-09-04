@@ -1191,6 +1191,14 @@ export interface ServiceAttendanceEvidenceItem {
   manufacturer?: string;
   model?: string;
   notes?: string;
+  /** Substituição de equipamento (3B.4+/0093): base = encontrado (antes),
+   *  *Final = instalado (depois). replaced é decisão do técnico. */
+  equipmentReplaced?: boolean;
+  equipmentFinalCatalogItemId?: string;
+  equipmentFinalManufacturer?: string;
+  equipmentFinalModel?: string;
+  equipmentFinalType?: string;
+  deviceAddressFinal?: string;
   status?: AttendanceResult | 'PENDENTE';
   createdBy?: string;
   createdAt?: string;

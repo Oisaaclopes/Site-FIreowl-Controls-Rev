@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildEvidenceCategoryOptions, coarseFromSubcategory, countPhotosByMoment, equipmentToItemFields, photosForItemMoment } from './evidenceItems';
+import { buildEvidenceCategoryOptions, coarseFromSubcategory, countPhotosByMoment, equipmentLabel, equipmentToFinalItemFields, equipmentToItemFields, hasEquipment, itemEquipmentAfter, itemEquipmentBefore, photosForItemMoment } from './evidenceItems';
+import type { ServiceAttendanceEvidenceItem } from './types';
 import { FieldPhoto, FieldPhotoMoment } from './fieldPhotos';
 import { TechnicalCatalogItem } from './technicalCatalog';
 
@@ -68,6 +69,37 @@ describe('categorias por área / taxonomia (§25/§26/§37)', () => {
   it('sem área/sem taxonomia → só genéricas coarse (não assume SDAI, §33)', () => {
     const opts = buildEvidenceCategoryOptions([], undefined).map((o) => o.coarse);
     expect(opts).toEqual(['EQUIPAMENTO', 'CENTRAL', 'INFRAESTRUTURA', 'CABEAMENTO', 'OUTRO']);
+  });
+});
+
+describe('substituição de equipamento — Antes × Depois (§21P–§21W)', () => {
+  const item = (over: Partial<ServiceAttendanceEvidenceItem>): ServiceAttendanceEvidenceItem => ({
+    id: 'i1', serviceAttendanceId: 'a1', title: 'Detector', category: 'EQUIPAMENTO', ...over,
+  });
+
+  it('equipmentToFinalItemFields mapeia o instalado (depois)', () => {
+    expect(equipmentToFinalItemFields({ catalogItemId: 'x', brand: 'Intelbras', model: 'AFW' }))
+      .toEqual({ equipmentFinalCatalogItemId: 'x', equipmentFinalManufacturer: 'Intelbras', equipmentFinalModel: 'AFW' });
+  });
+
+  it('itemEquipmentBefore/After extraem os dois estados', () => {
+    const it = item({ manufacturer: 'Tecnohold', model: 'IP20', equipmentReplaced: true, equipmentFinalManufacturer: 'Tecnohold', equipmentFinalModel: 'IP67' });
+    expect(itemEquipmentBefore(it)).toMatchObject({ brand: 'Tecnohold', model: 'IP20' });
+    expect(itemEquipmentAfter(it)).toMatchObject({ brand: 'Tecnohold', model: 'IP67' });
+    expect(equipmentLabel(itemEquipmentBefore(it))).toBe('Tecnohold · IP20');
+    expect(equipmentLabel(itemEquipmentAfter(it))).toBe('Tecnohold · IP67');
+  });
+
+  it('mudança de fabricante é representável (Tecnohold → Intelbras)', () => {
+    const it = item({ manufacturer: 'Tecnohold', model: 'DX', equipmentReplaced: true, equipmentFinalManufacturer: 'Intelbras', equipmentFinalModel: 'AFW' });
+    expect(equipmentLabel(itemEquipmentBefore(it))).toBe('Tecnohold · DX');
+    expect(equipmentLabel(itemEquipmentAfter(it))).toBe('Intelbras · AFW');
+  });
+
+  it('sem substituição: after vazio (CASO A = identificação única)', () => {
+    const it = item({ manufacturer: 'Tecnohold', model: 'SAVE485TH' });
+    expect(hasEquipment(itemEquipmentAfter(it))).toBe(false);
+    expect(hasEquipment(itemEquipmentBefore(it))).toBe(true);
   });
 });
 
