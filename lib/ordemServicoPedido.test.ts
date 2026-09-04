@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { OrdemServico } from './types';
-import { findActiveOsForPedido, OS_STATUS_ATIVOS } from './ordensServico';
+import { findActiveOsForPedido, OS_STATUS_ATIVOS, pedidoOsAction } from './ordensServico';
 
 // ---- Fixtures -------------------------------------------------------------
 const os = (over: Partial<OrdemServico>): OrdemServico => ({
@@ -75,6 +75,46 @@ describe('OPERACIONAL 2A — vínculo estrutural Pedido → OS', () => {
       expect(findActiveOsForPedido([encerrada], 'ped_A')).toBeUndefined();
     }
     expect(OS_STATUS_ATIVOS).toEqual(['aberta', 'agendada', 'em_execucao']);
+  });
+});
+
+describe('pedidoOsAction — ação do card do Pedido (correção Gerar OS)', () => {
+  it('Pedido sem OS → none (mostra "Gerar OS")', () => {
+    expect(pedidoOsAction([], 'ped_A')).toEqual({ kind: 'none' });
+  });
+
+  it('Pedido com OS aberta → view (mostra "Ver OS"), não concluída', () => {
+    const ativa = os({ id: 'a', numero: 'OS-1', sourcePedidoId: 'ped_A', status: 'aberta' });
+    const r = pedidoOsAction([ativa], 'ped_A');
+    expect(r.kind).toBe('view');
+    if (r.kind === 'view') { expect(r.os.id).toBe('a'); expect(r.concluded).toBe(false); }
+  });
+
+  it('Pedido com OS concluída → view (NÃO "Gerar OS"), concluded=true', () => {
+    const concl = os({ id: 'c', numero: 'OS-2', sourcePedidoId: 'ped_A', status: 'concluida', dataAbertura: '2026-09-01' });
+    const r = pedidoOsAction([concl], 'ped_A');
+    expect(r.kind).toBe('view');
+    if (r.kind === 'view') { expect(r.concluded).toBe(true); expect(r.os.id).toBe('c'); }
+  });
+
+  it('OS ativa tem precedência sobre concluída antiga do mesmo pedido', () => {
+    const antigaConcluida = os({ id: 'c', sourcePedidoId: 'ped_A', status: 'concluida', dataAbertura: '2026-08-01' });
+    const ativa = os({ id: 'a', sourcePedidoId: 'ped_A', status: 'aberta', dataAbertura: '2026-09-01' });
+    const r = pedidoOsAction([antigaConcluida, ativa], 'ped_A');
+    expect(r.kind).toBe('view');
+    if (r.kind === 'view') { expect(r.os.id).toBe('a'); expect(r.concluded).toBe(false); }
+  });
+
+  it('Pedido só com OS cancelada → regenerate ("Gerar nova OS", explícito §16)', () => {
+    const canc = os({ id: 'x', numero: 'OS-3', sourcePedidoId: 'ped_A', status: 'cancelada' });
+    const r = pedidoOsAction([canc], 'ped_A');
+    expect(r.kind).toBe('regenerate');
+    if (r.kind === 'regenerate') expect(r.lastCancelled.id).toBe('x');
+  });
+
+  it('ignora OS de outro pedido', () => {
+    const outra = os({ id: 'z', sourcePedidoId: 'ped_B', status: 'aberta' });
+    expect(pedidoOsAction([outra], 'ped_A')).toEqual({ kind: 'none' });
   });
 });
 

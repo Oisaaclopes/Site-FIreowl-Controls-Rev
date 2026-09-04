@@ -77,6 +77,30 @@ export function findActiveOsForPedido(
   );
 }
 
+/**
+ * Ação canônica do Pedido em relação à sua OS (para o card de Pedidos).
+ * Corrige o bug de "Gerar OS" reaparecer após a OS concluir: a decisão passa a
+ * olhar TODAS as OS do pedido (não só a ativa).
+ *   - 'none'       → nenhuma OS: oferecer "Gerar OS".
+ *   - 'view'       → há OS ativa OU concluída: oferecer "Ver OS" (nunca gerar).
+ *   - 'regenerate' → só existem OS canceladas: "Gerar nova OS" (explícito, §16).
+ * Retorno técnico é NOVO ATENDIMENTO na mesma OS aberta — nunca nova OS (§18).
+ */
+export type PedidoOsAction =
+  | { kind: 'none' }
+  | { kind: 'view'; os: OrdemServico; concluded: boolean }
+  | { kind: 'regenerate'; lastCancelled: OrdemServico };
+
+export function pedidoOsAction(ordens: OrdemServico[], pedidoId: string): PedidoOsAction {
+  const hist = osHistoryForPedido(ordens, pedidoId); // recente primeiro
+  if (hist.length === 0) return { kind: 'none' };
+  const active = hist.find((o) => OS_STATUS_ATIVOS.includes(o.status));
+  if (active) return { kind: 'view', os: active, concluded: false };
+  const concluded = hist.find((o) => o.status === 'concluida');
+  if (concluded) return { kind: 'view', os: concluded, concluded: true };
+  return { kind: 'regenerate', lastCancelled: hist[0] }; // só canceladas
+}
+
 function osToRow(o: OrdemServico): Record<string, unknown> {
   const row: Record<string, unknown> = {
     numero: o.numero ?? null,

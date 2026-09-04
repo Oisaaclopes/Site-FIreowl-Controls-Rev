@@ -4,7 +4,7 @@ import { showToast, requestConfirm, requestText } from '@/components/ui/Feedback
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { SupplyOrder, Client, Pedido, Contract, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem, DocumentosPadrao, DocumentType, FinancialTransaction, RecebimentoProposta, EmpresaAtendida, MarcaTecnologia, OrdemServico, TimePunch } from '@/lib/types';
 import { StartAttendanceButton, AttendanceHistoryList, OsMissionPanel } from '@/components/operacoes/ServiceAttendanceFlow';
-import { OS_STATUS_ATIVOS, osHistoryForPedido, isHardDeleteEligible, isCancelable } from '@/lib/ordensServico';
+import { OS_STATUS_ATIVOS, osHistoryForPedido, pedidoOsAction, isHardDeleteEligible, isCancelable } from '@/lib/ordensServico';
 import { selecionarEmpresas, selecionarMarcas, experienciaAtiva } from '@/lib/experienciaSelecao';
 import { resolveLogoDataUrls } from '@/lib/institucional';
 import { nomeFantasiaCliente, razaoSocialCliente, getClientOperationalName } from '@/lib/utils';
@@ -164,7 +164,6 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   onGenerateOSFromPedido,
   onCancelOs,
   onDeleteOs,
-  activeOsByPedido = {},
   userId,
   onGenerateContractFromPedido,
   onGenerateSupplyOrderFromPedido,
@@ -846,11 +845,14 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     const clientLogo = client?.logoPath ? clientLogoUrls[client.logoPath] : undefined;
     // OS ATIVA pelo vínculo ESTRUTURAL (source_pedido_id === pedidos.id), nunca
     // por numero_pedido (que não é único). Coerente com contrato/fornecimento abaixo.
-    const existingOs = activeOsByPedido[ped.id];
-    // Histórico estrutural (todas as OS deste pedido, recentes primeiro). As
-    // ANTERIORES (canceladas/concluídas fora a ativa) alimentam o rastreio.
+    // Ação canônica do Pedido↔OS (olha TODAS as OS, não só a ativa): corrige o
+    // "Gerar OS" reaparecendo após a conclusão. Retorno técnico = novo
+    // atendimento na mesma OS, nunca nova OS (§15/§18).
     const osHistorico = osHistoryForPedido(ordensServico, ped.id);
-    const osAnteriores = osHistorico.filter((o) => o.id !== existingOs?.id);
+    const osAction = pedidoOsAction(ordensServico, ped.id);
+    const primaryOs = osAction.kind === 'view' ? osAction.os : undefined;
+    // Chips do histórico: todas as OS do pedido (exceto a já destacada no botão).
+    const osChips = osHistorico.filter((o) => o.id !== primaryOs?.id);
     const existingContract = contracts.find((contract) => contract.sourcePedidoId === ped.id);
     const existingSupplyOrder = supplyOrders.find((order) => order.sourcePedidoId === ped.id);
     const daysLeft = validityDaysLeft(ped);
@@ -874,19 +876,24 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           {ped.proposal.motivoRecusa && (ped.status === 'recusado' || ped.status === 'expirado') && (
             <p className="text-[10px] text-red-600 truncate" title={ped.proposal.motivoRecusa}>Motivo: {ped.proposal.motivoRecusa}</p>
           )}
-          {osAnteriores.length > 0 && (
+          {osChips.length > 0 && (
             <div className="mt-1 flex flex-wrap items-center gap-1">
               <span className="text-[10px] font-bold uppercase text-fg-muted">Histórico OS:</span>
-              {osAnteriores.slice(0, 4).map((o) => (
-                <button
-                  key={o.id}
-                  onClick={() => setOsDetail(o)}
-                  title={`Abrir ${o.numero || o.id} (${OS_STATUS_LABEL[o.status]?.label || o.status})`}
-                  className="inline-flex items-center gap-1 rounded bg-surface-3 hover:bg-surface-3 px-1.5 py-0.5 text-[10px] font-semibold text-fg-secondary font-data-mono"
-                >
-                  {o.numero || o.id.slice(0, 8)} · {OS_STATUS_LABEL[o.status]?.label || o.status}
-                </button>
-              ))}
+              {osChips.slice(0, 4).map((o) => {
+                const st = OS_STATUS_LABEL[o.status];
+                return (
+                  <button
+                    key={o.id}
+                    onClick={() => setOsDetail(o)}
+                    title={`Abrir ${o.numero || o.id} (${st?.label || o.status})`}
+                    className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold font-data-mono min-h-[24px] transition-colors ${OS_CHIP_TONE[st?.color || 'slate']}`}
+                  >
+                    {o.status === 'concluida' && <span className="material-symbols-outlined text-[13px]">check_circle</span>}
+                    {o.status === 'cancelada' && <span className="material-symbols-outlined text-[13px]">cancel</span>}
+                    {o.numero || o.id.slice(0, 8)} · {st?.label || o.status}
+                  </button>
+                );
+              })}
             </div>
           )}
           </div>
@@ -913,24 +920,33 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
             ))}
           </select>
 
-          {ped.status === 'aceito' && (
-            existingOs ? (
-              <button
-                onClick={() => setOsDetail(existingOs)}
-                title={`Abrir a Ordem de Serviço ${existingOs.numero || existingOs.id}`}
-                className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                <Wrench className="w-3 h-3" /> Ver OS {existingOs.numero || ''}
-              </button>
-            ) : (
-              <button
-                onClick={() => confirmGenerateOS(ped)}
-                title="Gerar Ordem de Serviço"
-                className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1 bg-danger hover:bg-danger-hover text-white"
-              >
-                <Wrench className="w-3 h-3" /> Gerar OS
-              </button>
-            )
+          {ped.status === 'aceito' && osAction.kind === 'view' && (
+            <button
+              onClick={() => setOsDetail(osAction.os)}
+              title={`Abrir a Ordem de Serviço ${osAction.os.numero || osAction.os.id}`}
+              className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1 text-white ${osAction.concluded ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-navy hover:bg-navy-3'}`}
+            >
+              {osAction.concluded ? <span className="material-symbols-outlined text-[13px]">check_circle</span> : <Wrench className="w-3 h-3" />}
+              {osAction.concluded ? 'OS concluída' : `Ver OS ${osAction.os.numero || ''}`}
+            </button>
+          )}
+          {ped.status === 'aceito' && osAction.kind === 'regenerate' && (
+            <button
+              onClick={() => confirmGenerateOS(ped)}
+              title={`OS anterior ${osAction.lastCancelled.numero || ''} cancelada. Gerar nova Ordem de Serviço.`}
+              className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1 bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              <Wrench className="w-3 h-3" /> Gerar nova OS
+            </button>
+          )}
+          {ped.status === 'aceito' && osAction.kind === 'none' && (
+            <button
+              onClick={() => confirmGenerateOS(ped)}
+              title="Gerar Ordem de Serviço"
+              className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1 bg-danger hover:bg-danger-hover text-white"
+            >
+              <Wrench className="w-3 h-3" /> Gerar OS
+            </button>
           )}
           {ped.status === 'aceito' && ped.proposal.recorrente && onGenerateContractFromPedido && (
             <button onClick={() => { if (!existingContract) confirmGenerateContract(ped); }} disabled={!!existingContract} title={existingContract ? `Contrato ${existingContract.id} já foi criado desta proposta` : 'Converter proposta recorrente em contrato'} className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1 ${existingContract ? 'bg-emerald-100 text-emerald-700 cursor-not-allowed' : 'bg-navy hover:bg-navy-3 text-white'}`}>
@@ -1816,6 +1832,16 @@ const OS_STATUS_LABEL: Record<OrdemServico['status'], { label: string; color: 'e
   em_execucao: { label: 'Em execução', color: 'amber' },
   concluida: { label: 'Concluída', color: 'emerald' },
   cancelada: { label: 'Cancelada', color: 'red' },
+};
+
+// Tom dos chips de OS no histórico do card do Pedido (§33). Coerente com o
+// design system; concluída em verde, cancelada em vermelho suave, etc.
+const OS_CHIP_TONE: Record<'emerald' | 'amber' | 'slate' | 'red' | 'blue', string> = {
+  emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
+  amber: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100',
+  blue: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100',
+  red: 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100',
+  slate: 'bg-surface-3 text-fg-secondary border-border hover:bg-surface-2',
 };
 const OrdemServicoDetailModal: React.FC<{
   os: OrdemServico;
