@@ -13,8 +13,10 @@ import {
   EVIDENCE_CATEGORY_LABEL, EvidenceCategoryOption, fetchEvidenceItems, updateEvidenceItem,
 } from '@/lib/evidenceItems';
 import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
+import { useIsMobile } from '@/lib/useIsMobile';
 import { useConfirm, useToast } from '@/components/ui/Feedback';
 import { PickerField } from '@/components/ui/PickerField';
+import { CameraCapture } from '@/components/ui/CameraCapture';
 import { EquipmentIdentifier, EquipmentIdentification } from '@/components/catalog/EquipmentIdentifier';
 
 /* ===================================================================
@@ -53,7 +55,9 @@ export const AttendanceEvidence: React.FC<Props> = ({
 }) => {
   const toast = useToast();
   const confirm = useConfirm();
+  const isMobile = useIsMobile();
 
+  const [cameraOpen, setCameraOpen] = useState(false);
   const [items, setItems] = useState<ServiceAttendanceEvidenceItem[]>([]);
   const [serverPhotos, setServerPhotos] = useState<FieldPhoto[]>([]);
   const [localPhotos, setLocalPhotos] = useState<LocalPhoto[]>([]);
@@ -136,24 +140,29 @@ export const AttendanceEvidence: React.FC<Props> = ({
     return s;
   }, [clientId, session, technicianId, technicianName, toast]);
 
-  // Captura UNIFICADA: um input, accept image/*, SEM `capture` (o SO oferece
-  // câmera ou galeria). §18/§19.
+  // Captura: no MOBILE abre a CameraCapture (câmera traseira como ação principal,
+  // galeria acessível dentro dela); no DESKTOP usa o seletor de arquivo (§11).
+  // Os dois caminhos entregam um File ao mesmo `receiveFile`.
   const trigger = (cfg: NonNullable<typeof pendingCfgRef.current>) => {
     pendingCfgRef.current = cfg;
+    if (isMobile) { setCameraOpen(true); return; }
     const el = inputRef.current;
     if (!el) return;
     el.value = '';
     el.click();
   };
-  const onFile = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
+  const receiveFile = (file: File) => {
     const cfg = pendingCfgRef.current;
     if (!file || !cfg) return;
     if (!file.type.startsWith('image/')) { toast.error('Selecione uma imagem válida.'); return; }
     const url = URL.createObjectURL(file);
     if (cfg.kind === 'newItem') setNewItem({ file, url });
     else setCapture({ file, url, moment: cfg.moment || 'DURANTE', itemId: cfg.itemId, central: cfg.central });
+  };
+  const onFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (file) receiveFile(file);
   };
 
   const addLocal = (photo: FieldPhoto, previewUrl: string) => setLocalPhotos((prev) => [...prev, { photo, previewUrl }]);
@@ -165,6 +174,13 @@ export const AttendanceEvidence: React.FC<Props> = ({
     <div className="flex flex-col gap-3">
       <span className="text-xs font-bold uppercase tracking-wide text-fg-secondary">Evidências</span>
       <input ref={inputRef} type="file" accept="image/*" onChange={onFile} className="hidden" />
+
+      {cameraOpen && (
+        <CameraCapture
+          onCapture={(file) => { setCameraOpen(false); receiveFile(file); }}
+          onClose={() => { setCameraOpen(false); pendingCfgRef.current = null; }}
+        />
+      )}
 
       {isSdai && !naOn && (
         <CentralBlock
