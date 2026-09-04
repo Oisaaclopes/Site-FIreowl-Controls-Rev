@@ -82,14 +82,15 @@ const profileFields = (u: Partial<NewUserInput>) => ({
   ...(u.usesTimeClock !== undefined ? { uses_time_clock: u.usesTimeClock } : {}),
 });
 
-export interface TimeClockParticipant { id: string; name: string; usesTimeClock: boolean }
+export interface TimeClockParticipant { id: string; name: string; usesTimeClock: boolean; schedule?: WorkSchedule }
 
 export async function fetchTimeClockParticipants(): Promise<TimeClockParticipant[]> {
   try {
     const supabase = getSupabaseClient() as any;
     const { data, error } = await supabase.rpc('get_time_clock_participants');
     if (error) throw error;
-    return (data || []).map((r: any) => ({ id: String(r.id), name: r.name || '', usesTimeClock: r.uses_time_clock !== false }));
+    // `schedule` só existe após a migração 0090; ausente = undefined (degrada seguro).
+    return (data || []).map((r: any) => ({ id: String(r.id), name: r.name || '', usesTimeClock: r.uses_time_clock !== false, schedule: r.schedule ? normalizeSchedule(r.schedule) : undefined }));
   } catch { return []; }
 }
 

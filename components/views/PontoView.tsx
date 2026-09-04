@@ -6,7 +6,7 @@ import { TimePunch, UserRole } from '@/lib/types';
 import { fetchCompanyProfile } from '@/lib/companyProfile';
 import { resolveLogoDataUrls } from '@/lib/institucional';
 import { DataListRow, Badge } from '@/components/DataListRow';
-import { WorkSchedule, DEFAULT_SCHEDULE, normalizeSchedule, hmToMinutes, WEEKDAY_SHORT } from '@/lib/schedule';
+import { WorkSchedule, DEFAULT_SCHEDULE, normalizeSchedule, hmToMinutes, dayExpectedMs, WEEKDAY_SHORT } from '@/lib/schedule';
 import { fetchAdjustments, createAdjustment, updateAdjustmentStatus, hasRequestedTime, PunchAdjustment } from '@/lib/adjustments';
 import { isSupabaseConfigured } from '@/lib/inventory';
 import { fetchHolidays, Holiday } from '@/lib/holidays';
@@ -219,10 +219,33 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
   const [recordType, setRecordType] = useState<'TODOS' | PunchType>('TODOS');
   const [recordGps, setRecordGps] = useState<'TODOS' | 'COM_GPS' | 'SEM_GPS'>('TODOS');
   const [participantNames, setParticipantNames] = useState<Set<string> | null>(null);
+  // Escala de CADA funcionário (por nome), vinda da RPC canônica (0090). É a
+  // fonte da jornada prevista da folha do funcionário selecionado — nunca a do
+  // usuário autenticado. ADMIN/GESTOR recebem todos; técnico, só a si (RPC).
+  const [scheduleByName, setScheduleByName] = useState<Map<string, WorkSchedule>>(new Map());
   useEffect(() => {
     if (!isManager || !isSupabaseConfigured()) return;
-    fetchTimeClockParticipants().then((rows) => setParticipantNames(new Set(rows.filter((r) => r.usesTimeClock).map((r) => r.name)))).catch(() => {});
+    fetchTimeClockParticipants().then((rows) => {
+      setParticipantNames(new Set(rows.filter((r) => r.usesTimeClock).map((r) => r.name)));
+      const map = new Map<string, WorkSchedule>();
+      rows.forEach((r) => { if (r.name && r.schedule) map.set(r.name, r.schedule); });
+      setScheduleByName(map);
+    }).catch(() => {});
   }, [isManager]);
+
+  // Escala do FUNCIONÁRIO da folha (§2). O próprio usuário usa a escala do seu
+  // perfil (prop `schedule`); os demais vêm do mapa da RPC. Fallback à escala
+  // padrão do sistema quando o cadastro não tem escala — nunca zera por falha
+  // de carregamento (§4/§11).
+  const scheduleFor = useCallback((emp: string): WorkSchedule => {
+    if (emp === currentUser) return sched;
+    const s = scheduleByName.get(emp);
+    return s ? normalizeSchedule(s) : normalizeSchedule(DEFAULT_SCHEDULE);
+  }, [currentUser, sched, scheduleByName]);
+  const scheduleLabelFor = useCallback((emp: string): string => {
+    const s = scheduleFor(emp);
+    return `${s[1].start} às ${s[1].end} · intervalo ${s[1].lunchMinutes} min`;
+  }, [scheduleFor]);
 
   // Solicitações de ajuste de ponto
   const [adjustments, setAdjustments] = useState<PunchAdjustment[]>([]);
@@ -642,14 +665,12 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
   const expectedMsForDate = (d: Date, emp: string = currentUser): number => {
     const dk = fmtDateInput(d);
     if (holidays[dk]) return 0;
-    const cfg = sched[d.getDay()];
-    if (!cfg.works) return 0;
     const justified = dayEntries.some(
       (e) => e.employeeName === emp && e.refDate === dk && (e.kind === 'ATESTADO' || e.kind === 'FOLGA')
     );
     if (justified) return 0;
-    const mins = hmToMinutes(cfg.end) - hmToMinutes(cfg.start) - (cfg.lunchMinutes || 0);
-    return Math.max(0, mins) * 60000;
+    // Jornada prevista pela escala do FUNCIONÁRIO da folha (§2), não do gerador.
+    return dayExpectedMs(scheduleFor(emp), d.getDay());
   };
 
   // Banco de horas acumulado (all-time, apenas dias efetivamente trabalhados)
@@ -715,7 +736,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
         records,
         summary,
         occurrences: occ,
-        scheduleLabel,
+        scheduleLabel: scheduleLabelFor(emp),
         bank: fmtHoursShort(bankMsFor(emp), true),
       };
     });

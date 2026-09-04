@@ -45,3 +45,17 @@ export const hmToMinutes = (hm: string): number => {
   const [h, m] = (hm || '0:0').split(':').map((n) => parseInt(n, 10) || 0);
   return h * 60 + m;
 };
+
+/**
+ * Jornada PREVISTA (ms) para um dia da semana conforme a escala do FUNCIONÁRIO.
+ * Puro e testável. Dia de folga (works=false) → 0. Feriado/atestado são tratados
+ * por quem chama (contexto do funcionário/período), não aqui.
+ * `dayOfWeek`: 0=Domingo … 6=Sábado (Date.getDay()).
+ */
+export const dayExpectedMs = (schedule: WorkSchedule, dayOfWeek: number): number => {
+  const s = normalizeSchedule(schedule);
+  const cfg = s[dayOfWeek];
+  if (!cfg || !cfg.works) return 0;
+  const mins = hmToMinutes(cfg.end) - hmToMinutes(cfg.start) - (cfg.lunchMinutes || 0);
+  return Math.max(0, mins) * 60000;
+};
