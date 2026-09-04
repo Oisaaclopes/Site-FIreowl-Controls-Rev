@@ -1181,6 +1181,8 @@ export interface ServiceAttendanceEvidenceItem {
   workOrderId?: string;
   title: string;
   category: EvidenceItemCategory;
+  /** Tipo/família técnica da taxonomia (technical_catalog.subcategory), 3B.4+. */
+  equipmentType?: string;
   location?: string;
   deviceAddress?: string;
   catalogItemId?: string;

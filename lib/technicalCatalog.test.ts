@@ -3,6 +3,7 @@ import {
   areasFromCatalog,
   manufacturersFromCatalog,
   modelsForManufacturer,
+  subcategoriesForArea,
   TechnicalCatalogItem,
 } from './technicalCatalog';
 
@@ -51,6 +52,34 @@ describe('catálogo técnico — agrupamentos (§30)', () => {
     const avalon = modelsForManufacturer(catalog, 'Tecnohold', 'ALARME')[0];
     expect(avalon.model).toBe('Avalon');
     expect(Object.keys(avalon)).not.toContain('quantity');
+  });
+});
+
+describe('filtro por categoria/subcategoria (§27/§32/§37)', () => {
+  const sdai: TechnicalCatalogItem[] = [
+    item({ category: 'SDAI', subcategory: 'Acionador Manual', brand: 'Tecnohold', model: 'AMETI2' }),
+    item({ category: 'SDAI', subcategory: 'Sirenes/Sinalizadores', brand: 'Tecnohold', model: 'SAVE485TH' }),
+    item({ category: 'SDAI', subcategory: 'Detectores', brand: 'Intelbras', model: 'AFW' }),
+    item({ category: 'CFTV', subcategory: 'Câmeras', brand: 'Intelbras', model: 'MHDX' }),
+  ];
+  it('área é case-insensitive (sdai == SDAI)', () => {
+    expect(manufacturersFromCatalog(sdai, 'sdai')).toEqual(['Intelbras', 'Tecnohold']);
+  });
+  it('subcategoriesForArea lista a taxonomia real da área', () => {
+    expect(subcategoriesForArea(sdai, 'SDAI')).toEqual(['Acionador Manual', 'Detectores', 'Sirenes/Sinalizadores']);
+  });
+  it('fabricantes filtrados por subcategoria (Acionador Manual só Tecnohold)', () => {
+    expect(manufacturersFromCatalog(sdai, 'SDAI', 'Acionador Manual')).toEqual(['Tecnohold']);
+  });
+  it('modelos filtrados por fabricante + subcategoria não vazam de outra categoria', () => {
+    const models = modelsForManufacturer(sdai, 'Tecnohold', 'SDAI', 'Acionador Manual').map((m) => m.model);
+    expect(models).toEqual(['AMETI2']);
+    expect(models).not.toContain('SAVE485TH');
+  });
+  it('detector de fumaça não lista modelos de outra categoria', () => {
+    const models = modelsForManufacturer(sdai, 'Intelbras', 'SDAI', 'Detectores').map((m) => m.model);
+    expect(models).toEqual(['AFW']);
+    expect(models).not.toContain('MHDX');
   });
 });
 

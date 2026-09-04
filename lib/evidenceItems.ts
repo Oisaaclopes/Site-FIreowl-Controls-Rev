@@ -1,6 +1,7 @@
 import { getSupabaseClient } from './supabaseClient';
 import { EvidenceItemCategory, ServiceAttendanceEvidenceItem } from './types';
 import { FieldPhoto, FieldPhotoMoment } from './fieldPhotos';
+import { subcategoriesForArea, TechnicalCatalogItem } from './technicalCatalog';
 
 /* ===================================================================
  * ETAPA 3B.4 — Item de Evidência (service_attendance_evidence_items, 0088).
@@ -25,6 +26,7 @@ function rowToItem(r: any): ServiceAttendanceEvidenceItem {
     workOrderId: r.work_order_id ?? undefined,
     title: r.title ?? '',
     category: (r.category || 'EQUIPAMENTO') as EvidenceItemCategory,
+    equipmentType: r.equipment_type ?? undefined,
     location: r.location ?? undefined,
     deviceAddress: r.device_address ?? undefined,
     catalogItemId: r.catalog_item_id ?? undefined,
@@ -44,6 +46,7 @@ function itemToRow(i: Partial<ServiceAttendanceEvidenceItem>): Record<string, un
   if (i.workOrderId !== undefined) row.work_order_id = i.workOrderId ?? null;
   if (i.title !== undefined) row.title = i.title;
   if (i.category !== undefined) row.category = i.category;
+  if (i.equipmentType !== undefined) row.equipment_type = i.equipmentType || null;
   if (i.location !== undefined) row.location = i.location || null;
   if (i.deviceAddress !== undefined) row.device_address = i.deviceAddress || null;
   if (i.catalogItemId !== undefined) row.catalog_item_id = i.catalogItemId || null;
@@ -106,6 +109,51 @@ export function photosForItemMoment(
   moment: FieldPhotoMoment
 ): FieldPhoto[] {
   return photos.filter((p) => p.evidenceItemId === itemId && p.evidenceMoment === moment);
+}
+
+/* ----------------------- Categorias por área (§25–§36) ------------------- */
+
+/** Opção de categoria do Item: rótulo exibido + categoria "coarse" persistida +
+ *  subcategoria da taxonomia (para filtrar fabricante/modelo). */
+export interface EvidenceCategoryOption {
+  value: string;
+  label: string;
+  coarse: EvidenceItemCategory;
+  /** Tipo/família técnica (taxonomia) — undefined para genéricas. */
+  subcategory?: string;
+}
+
+/** Mapeia uma subcategoria da taxonomia para a categoria coarse do item.
+ *  Central/Repetidora → CENTRAL; cabo → CABEAMENTO; infra/eletroduto →
+ *  INFRAESTRUTURA; o restante é EQUIPAMENTO. */
+export function coarseFromSubcategory(sub?: string): EvidenceItemCategory {
+  const s = (sub || '').toLowerCase();
+  if (/centra|repetidora/.test(s)) return 'CENTRAL'; // central, centrais, repetidora
+  if (/cabe|cabo/.test(s)) return 'CABEAMENTO';
+  if (/infra|eletroduto|eletrocalha|tubula|conduíte|conduite/.test(s)) return 'INFRAESTRUTURA';
+  return 'EQUIPAMENTO';
+}
+
+/**
+ * Constrói as opções de categoria do Item a partir da ÁREA do atendimento e da
+ * taxonomia REAL do catálogo (technical_catalog.subcategory), reutilizando a
+ * nomenclatura canônica (§25/§26). Acrescenta genéricas seguras (Infraestrutura,
+ * Cabeamento, Outro). Sem área/sem taxonomia → só as genéricas coarse (§33):
+ * NÃO assume SDAI silenciosamente. Puro e testável.
+ */
+export function buildEvidenceCategoryOptions(catalog: TechnicalCatalogItem[], area?: string): EvidenceCategoryOption[] {
+  const subs = area ? subcategoriesForArea(catalog, area) : [];
+  if (subs.length === 0) {
+    return (['EQUIPAMENTO', 'CENTRAL', 'INFRAESTRUTURA', 'CABEAMENTO', 'OUTRO'] as EvidenceItemCategory[])
+      .map((c) => ({ value: c, label: EVIDENCE_CATEGORY_LABEL[c], coarse: c }));
+  }
+  const opts: EvidenceCategoryOption[] = subs.map((s) => ({ value: s, label: s, coarse: coarseFromSubcategory(s), subcategory: s }));
+  // Genéricas que não são famílias de equipamento no catálogo.
+  const has = (label: string) => opts.some((o) => o.label.toLowerCase() === label.toLowerCase());
+  if (!has('Infraestrutura')) opts.push({ value: 'INFRAESTRUTURA', label: 'Infraestrutura', coarse: 'INFRAESTRUTURA' });
+  if (!has('Cabeamento')) opts.push({ value: 'CABEAMENTO', label: 'Cabeamento', coarse: 'CABEAMENTO' });
+  opts.push({ value: 'OUTRO', label: 'Outro', coarse: 'OUTRO' });
+  return opts;
 }
 
 /** Fabricante/modelo do catálogo → campos do item, sem dado comercial. */

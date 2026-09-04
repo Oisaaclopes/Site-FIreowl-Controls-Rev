@@ -36,13 +36,15 @@ export async function ensureAttendanceSession(input: {
 }
 
 /**
- * timestamp de captura HONESTO (§11): a câmera captura AGORA; o upload usa o
- * `lastModified` do arquivo (metadado do próprio arquivo) como melhor sinal de
- * quando a foto foi feita — nunca "a hora do upload". `created_at` no banco
- * (default now) continua sendo o enviado_em/criado_em. Não inventamos data.
+ * timestamp de captura HONESTO (§11): usa o `lastModified` do arquivo — que o
+ * navegador define como o momento real de captura tanto para foto tirada na hora
+ * (câmera) quanto para foto escolhida da galeria. Como a captura passou a ser
+ * unificada ([Adicionar foto], sem distinção câmera/galeria), não há como (nem
+ * por que) inferir a origem: o metadado do próprio arquivo é o melhor sinal e
+ * nunca a "hora do upload". Sem lastModified confiável, cai para agora.
+ * `created_at` no banco (default now) segue sendo o enviado_em/criado_em.
  */
-export function evidenceCapturedAt(file: File, source: 'camera' | 'upload'): string {
-  if (source === 'camera') return new Date().toISOString();
+export function evidenceCapturedAt(file: File): string {
   const lm = Number((file as any).lastModified);
   if (Number.isFinite(lm) && lm > 0) return new Date(lm).toISOString();
   return new Date().toISOString();
@@ -63,7 +65,6 @@ export interface CapturedEvidence {
  */
 export async function captureAttendanceEvidence(input: {
   file: File;
-  source: 'camera' | 'upload';
   session: FieldPhotoSession;
   clientId: string;
   clientName: string;
@@ -77,7 +78,7 @@ export async function captureAttendanceEvidence(input: {
   equipmentBrand?: string;
   equipmentModel?: string;
 }): Promise<CapturedEvidence> {
-  const capturedAt = evidenceCapturedAt(input.file, input.source);
+  const capturedAt = evidenceCapturedAt(input.file);
   const geo = await capturePosition().then((p) => (p ? reverseGeocode(p) : undefined)).catch(() => undefined);
 
   const base = newFieldPhoto(

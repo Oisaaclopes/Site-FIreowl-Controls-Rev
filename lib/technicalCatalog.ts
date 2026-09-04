@@ -93,27 +93,49 @@ const uniqCI = (arr: string[]): string[] => {
   return out.sort((a, b) => a.localeCompare(b, 'pt-BR'));
 };
 
-/** Fabricantes distintos, opcionalmente filtrados por área (category). */
-export function manufacturersFromCatalog(items: TechnicalCatalogItem[], area?: string): string[] {
-  const scope = area ? items.filter((i) => (i.category || '') === area) : items;
+/** Comparação de área/categoria tolerante a caixa ('sdai' == 'SDAI'). */
+const sameArea = (a?: string, b?: string) => (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase();
+const sameSub = (a?: string, b?: string) => (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase();
+
+/**
+ * Fabricantes distintos, opcionalmente filtrados por área (category) e por
+ * tipo/família (subcategory). Sem filtro de saldo (§31). Case-insensitive.
+ */
+export function manufacturersFromCatalog(items: TechnicalCatalogItem[], area?: string, subcategory?: string): string[] {
+  const scope = items
+    .filter((i) => !area || sameArea(i.category, area))
+    .filter((i) => !subcategory || sameSub(i.subcategory, subcategory));
   return uniqCI(scope.map((i) => i.brand || ''));
 }
 
-/** Modelos de um fabricante (área opcional). Mantém o item para referência. */
+/** Modelos de um fabricante (área e subcategoria opcionais). */
 export function modelsForManufacturer(
   items: TechnicalCatalogItem[],
   brand: string,
-  area?: string
+  area?: string,
+  subcategory?: string
 ): TechnicalCatalogItem[] {
   const b = (brand || '').trim().toLowerCase();
   return items
     .filter((i) => (i.brand || '').trim().toLowerCase() === b)
-    .filter((i) => !area || (i.category || '') === area)
+    .filter((i) => !area || sameArea(i.category, area))
+    .filter((i) => !subcategory || sameSub(i.subcategory, subcategory))
     .filter((i) => (i.model || i.name || '').trim())
     .sort((a, b2) => (a.model || a.name).localeCompare(b2.model || b2.name, 'pt-BR'));
 }
 
-/** Áreas (categorias) distintas do catálogo. */
+/** Áreas (category) distintas do catálogo. */
 export function areasFromCatalog(items: TechnicalCatalogItem[]): string[] {
   return uniqCI(items.map((i) => i.category || ''));
+}
+
+/**
+ * Tipos/famílias (subcategory) distintos de uma ÁREA — a taxonomia técnica REAL
+ * do catálogo, reutilizada como categoria do Item de Evidência (§25/§26). Sem
+ * inventar nomes: usa exatamente os subcategory cadastrados. Case-insensitive
+ * na área; ordenado em pt-BR.
+ */
+export function subcategoriesForArea(items: TechnicalCatalogItem[], area?: string): string[] {
+  const scope = area ? items.filter((i) => sameArea(i.category, area)) : items;
+  return uniqCI(scope.map((i) => i.subcategory || ''));
 }

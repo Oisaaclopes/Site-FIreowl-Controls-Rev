@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { ResponsibleSelect } from '@/components/ui/ResponsibleSelect';
+import { PickerField } from '@/components/ui/PickerField';
 import {
   manufacturersFromCatalog,
   modelsForManufacturer,
@@ -9,19 +9,19 @@ import {
 } from '@/lib/technicalCatalog';
 
 /* ===================================================================
- * CORREÇÃO 3B.2 — Identificação de EQUIPAMENTO (§32/§33/§34).
- *   FABRICANTE → MODELO a partir do catálogo técnico (view segura, sem preço,
- *   sem filtro de saldo). "Não encontrei no catálogo" → texto manual.
- *   IDENTIFICAÇÃO ≠ material utilizado: NUNCA movimenta estoque (§38/§39).
- * Reutiliza o bottom-sheet do ResponsibleSelect (mobile-first).
+ * CORREÇÃO pós-3B.4 — Identificação de EQUIPAMENTO (§1–§5, §27–§31).
+ *   FABRICANTE e MODELO vêm SOMENTE do technical_catalog (sem preço/saldo).
+ *   NUNCA consulta profiles/funcionários — usa o PickerField genérico com
+ *   linguagem de equipamento e estados vazios corretos.
+ *   Quando a categoria (subcategory da taxonomia) é conhecida, fabricantes e
+ *   modelos são filtrados por ela (§27). "Não encontrei no catálogo" → manual.
+ *   IDENTIFICAÇÃO ≠ material utilizado: NUNCA movimenta estoque (§42 da 3B.4).
  * =================================================================== */
 
 export interface EquipmentIdentification {
-  /** inventory_items.id quando o modelo veio do catálogo; ausente se manual. */
   catalogItemId?: string;
   brand?: string;
   model?: string;
-  /** true quando fabricante/modelo foram digitados (fora do catálogo). */
   manual?: boolean;
 }
 
@@ -33,36 +33,33 @@ interface Props {
   value?: EquipmentIdentification | null;
   onChange: (v: EquipmentIdentification | undefined) => void;
   catalog: TechnicalCatalogItem[];
-  /** Restringe fabricantes/modelos a uma área (category) quando informado. */
+  /** Área da OS (category no catálogo; case-insensitive). */
   area?: string;
+  /** Tipo/família (subcategory da taxonomia) para filtrar fabricantes/modelos. */
+  subcategory?: string;
 }
 
-export const EquipmentIdentifier: React.FC<Props> = ({ value, onChange, catalog, area }) => {
+export const EquipmentIdentifier: React.FC<Props> = ({ value, onChange, catalog, area, subcategory }) => {
   const v = value || {};
   const manual = !!v.manual;
 
   const manufacturers = useMemo(
-    () => manufacturersFromCatalog(catalog, area),
-    [catalog, area]
+    () => manufacturersFromCatalog(catalog, area, subcategory),
+    [catalog, area, subcategory]
   );
   const models = useMemo(
-    () => (v.brand && !manual ? modelsForManufacturer(catalog, v.brand, area) : []),
-    [catalog, v.brand, area, manual]
+    () => (v.brand && !manual ? modelsForManufacturer(catalog, v.brand, area, subcategory) : []),
+    [catalog, v.brand, area, subcategory, manual]
   );
 
   const catalogEmpty = manufacturers.length === 0;
 
-  const pickBrand = (brand: string) => {
-    // Troca de fabricante limpa o modelo anterior.
-    onChange(brand ? { brand, manual: false } : undefined);
-  };
+  const pickBrand = (brand: string) => onChange(brand ? { brand, manual: false } : undefined);
   const pickModel = (itemId: string) => {
     const it = models.find((m) => m.id === itemId);
     onChange({ catalogItemId: it?.id, brand: it?.brand || v.brand, model: it?.model || it?.name, manual: false });
   };
-  const setManualField = (field: 'brand' | 'model', text: string) => {
-    onChange({ ...v, manual: true, catalogItemId: undefined, [field]: text });
-  };
+  const setManualField = (field: 'brand' | 'model', text: string) => onChange({ ...v, manual: true, catalogItemId: undefined, [field]: text });
   const enableManual = () => onChange({ manual: true, brand: v.brand, model: undefined });
   const backToCatalog = () => onChange(undefined);
 
@@ -79,59 +76,45 @@ export const EquipmentIdentifier: React.FC<Props> = ({ value, onChange, catalog,
         <div className="flex flex-col gap-2">
           <div>
             <span className="text-[10px] font-bold uppercase text-fg-muted">Fabricante</span>
-            <ResponsibleSelect
+            <PickerField
               ariaLabel="Fabricante do equipamento"
               sheetTitle="Selecionar fabricante"
+              placeholder="Selecionar fabricante"
               searchPlaceholder="Buscar fabricante..."
+              emptyLabel="Nenhum fabricante encontrado."
               value={v.brand && manufacturers.includes(v.brand) ? v.brand : ''}
               onChange={pickBrand}
               options={manufacturers.map((m) => ({ id: m, name: m }))}
-              allowUnassigned={false}
               triggerClassName="mt-1 w-full flex items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold text-fg-secondary"
             />
           </div>
           {v.brand && (
             <div>
               <span className="text-[10px] font-bold uppercase text-fg-muted">Modelo</span>
-              <ResponsibleSelect
+              <PickerField
                 ariaLabel="Modelo do equipamento"
                 sheetTitle="Selecionar modelo"
+                placeholder="Selecionar modelo"
                 searchPlaceholder="Buscar modelo..."
+                emptyLabel="Nenhum modelo encontrado."
                 value={v.catalogItemId || ''}
                 onChange={pickModel}
                 options={models.map((m) => ({ id: m.id, name: m.model || m.name }))}
-                allowUnassigned={false}
                 triggerClassName="mt-1 w-full flex items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold text-fg-secondary"
               />
             </div>
           )}
-          <button
-            type="button"
-            onClick={enableManual}
-            className="mt-1 self-start text-[11px] font-semibold text-primary hover:underline"
-          >
+          <button type="button" onClick={enableManual} className="mt-1 self-start text-[11px] font-semibold text-primary hover:underline">
             {catalogEmpty ? 'Informar fabricante/modelo manualmente' : 'Não encontrei no catálogo'}
           </button>
         </div>
       ) : (
         <div className="flex flex-col gap-2">
-          <input
-            value={v.brand || ''}
-            onChange={(e) => setManualField('brand', e.target.value)}
-            placeholder="Fabricante (ex.: Tecnohold)"
-            className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25"
-          />
-          <input
-            value={v.model || ''}
-            onChange={(e) => setManualField('model', e.target.value)}
-            placeholder="Modelo (ex.: Avalon)"
-            className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25"
-          />
+          <input value={v.brand || ''} onChange={(e) => setManualField('brand', e.target.value)} placeholder="Fabricante (ex.: Tecnohold)" className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25" />
+          <input value={v.model || ''} onChange={(e) => setManualField('model', e.target.value)} placeholder="Modelo (ex.: AMETI2 IP-67)" className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25" />
           <p className="text-[10px] text-fg-muted">Registro técnico da evidência. Não cria produto no estoque nem movimenta saldo.</p>
           {!catalogEmpty && (
-            <button type="button" onClick={backToCatalog} className="self-start text-[11px] font-semibold text-primary hover:underline">
-              Escolher do catálogo
-            </button>
+            <button type="button" onClick={backToCatalog} className="self-start text-[11px] font-semibold text-primary hover:underline">Escolher do catálogo</button>
           )}
         </div>
       )}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { countPhotosByMoment, equipmentToItemFields, photosForItemMoment } from './evidenceItems';
+import { buildEvidenceCategoryOptions, coarseFromSubcategory, countPhotosByMoment, equipmentToItemFields, photosForItemMoment } from './evidenceItems';
 import { FieldPhoto, FieldPhotoMoment } from './fieldPhotos';
+import { TechnicalCatalogItem } from './technicalCatalog';
 
 const photo = (over: Partial<FieldPhoto>): FieldPhoto => ({
   id: Math.random().toString(36).slice(2), sessionId: 's', clientId: 'c',
@@ -31,6 +32,42 @@ describe('photosForItemMoment (§14/§57)', () => {
     expect(photosForItemMoment(photos, 'i1', 'DEPOIS')).toHaveLength(2);
     expect(photosForItemMoment(photos, 'i1', 'ANTES')).toHaveLength(1);
     expect(photosForItemMoment(photos, 'i2', 'DEPOIS')).toHaveLength(1);
+  });
+});
+
+describe('categorias por área / taxonomia (§25/§26/§37)', () => {
+  const cat = (category: string, subcategory: string): TechnicalCatalogItem => ({ id: Math.random().toString(36).slice(2), name: subcategory, category, subcategory });
+  const catalog = [
+    cat('SDAI', 'Acionador Manual'), cat('SDAI', 'Sirenes/Sinalizadores'),
+    cat('SDAI', 'Detectores'), cat('SDAI', 'Centrais'), cat('CFTV', 'Câmeras'),
+  ];
+
+  it('OS SDAI recebe categorias SDAI da taxonomia + genéricas', () => {
+    const opts = buildEvidenceCategoryOptions(catalog, 'sdai').map((o) => o.label);
+    expect(opts).toContain('Acionador Manual');
+    expect(opts).toContain('Detectores');
+    expect(opts).toContain('Infraestrutura');
+    expect(opts).toContain('Cabeamento');
+    expect(opts).toContain('Outro');
+    expect(opts).not.toContain('Câmeras'); // CFTV não vaza para SDAI
+  });
+
+  it('mapeia subcategoria para categoria coarse', () => {
+    expect(coarseFromSubcategory('Centrais')).toBe('CENTRAL');
+    expect(coarseFromSubcategory('Acionador Manual')).toBe('EQUIPAMENTO');
+    expect(coarseFromSubcategory('Cabeamento estruturado')).toBe('CABEAMENTO');
+    expect(coarseFromSubcategory('Infraestrutura / eletroduto')).toBe('INFRAESTRUTURA');
+  });
+
+  it('a opção de categoria carrega a subcategoria para filtrar equipamento', () => {
+    const acionador = buildEvidenceCategoryOptions(catalog, 'SDAI').find((o) => o.label === 'Acionador Manual');
+    expect(acionador?.subcategory).toBe('Acionador Manual');
+    expect(acionador?.coarse).toBe('EQUIPAMENTO');
+  });
+
+  it('sem área/sem taxonomia → só genéricas coarse (não assume SDAI, §33)', () => {
+    const opts = buildEvidenceCategoryOptions([], undefined).map((o) => o.coarse);
+    expect(opts).toEqual(['EQUIPAMENTO', 'CENTRAL', 'INFRAESTRUTURA', 'CABEAMENTO', 'OUTRO']);
   });
 });
 

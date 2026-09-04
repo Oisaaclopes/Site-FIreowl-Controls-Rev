@@ -9,19 +9,20 @@ import { flushOutbox, isOnline } from '@/lib/offline/reportSync';
 import { fetchTechnicalCatalog, TechnicalCatalogItem } from '@/lib/technicalCatalog';
 import { saveAttendanceCentral } from '@/lib/serviceAttendances';
 import {
-  createEvidenceItem, deleteEvidenceItem, EVIDENCE_CATEGORY_LABEL, equipmentToItemFields,
-  fetchEvidenceItems, updateEvidenceItem,
+  buildEvidenceCategoryOptions, createEvidenceItem, deleteEvidenceItem, equipmentToItemFields,
+  EVIDENCE_CATEGORY_LABEL, EvidenceCategoryOption, fetchEvidenceItems, updateEvidenceItem,
 } from '@/lib/evidenceItems';
 import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 import { useConfirm, useToast } from '@/components/ui/Feedback';
+import { PickerField } from '@/components/ui/PickerField';
 import { EquipmentIdentifier, EquipmentIdentification } from '@/components/catalog/EquipmentIdentifier';
 
 /* ===================================================================
- * ETAPA 3B.4 — EVIDÊNCIAS por ITEM. A unidade principal é o Item de Evidência
- * (equipamento/infra/cabeamento/central), que agrega N fotos por momento
- * (Antes/Durante/Depois). "Registrar depois" reaproveita o Item sem redigitar.
- * Condição geral da central SDAI (chegada/saída) permanece à parte (§12/§40).
- * Câmera + upload no mesmo pipeline (field_photos/outbox); contexto automático.
+ * CORREÇÃO pós-3B.4 — Evidências por ITEM com captura UNIFICADA.
+ *   [Adicionar foto] abre o seletor nativo (câmera OU galeria); sem dois botões
+ *   e sem forçar `capture` (§6–§19). Mesmo pipeline (field_photos/outbox).
+ *   Categorias do item vêm da taxonomia real por ÁREA (§25–§36). Central geral
+ *   do SDAI (chegada/saída) preservada à parte (0087).
  * =================================================================== */
 
 export interface EvidenceState {
@@ -44,10 +45,7 @@ interface Props {
   onStateChange?: (s: EvidenceState) => void;
 }
 
-const CATEGORIES: EvidenceItemCategory[] = ['EQUIPAMENTO', 'INFRAESTRUTURA', 'CABEAMENTO', 'CENTRAL', 'OUTRO'];
-
 type LocalPhoto = { photo: FieldPhoto; previewUrl: string };
-type Source = 'camera' | 'upload';
 
 export const AttendanceEvidence: React.FC<Props> = ({
   attendanceId, osId, clientId, clientName, technicianId, technicianName,
@@ -63,13 +61,11 @@ export const AttendanceEvidence: React.FC<Props> = ({
   const [catalog, setCatalog] = useState<TechnicalCatalogItem[]>([]);
   const [session, setSession] = useState<FieldPhotoSession | null>(null);
 
-  // Fluxos (modais mutuamente exclusivos).
-  const [newItem, setNewItem] = useState<{ file: File; source: Source; url: string } | null>(null);
-  const [capture, setCapture] = useState<{ file: File; source: Source; url: string; moment: FieldPhotoMoment; itemId?: string; central?: boolean } | null>(null);
+  const [newItem, setNewItem] = useState<{ file: File; url: string } | null>(null);
+  const [capture, setCapture] = useState<{ file: File; url: string; moment: FieldPhotoMoment; itemId?: string; central?: boolean } | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [viewer, setViewer] = useState<FieldPhoto | null>(null);
 
-  // Central SDAI (service_attendance) — autosave.
   const [condInitial, setCondInitial] = useState(initialCentral?.conditionInitial || '');
   const [condFinal, setCondFinal] = useState(initialCentral?.conditionFinal || '');
   const [naOn, setNaOn] = useState(!!initialCentral?.notApplicable);
@@ -77,7 +73,7 @@ export const AttendanceEvidence: React.FC<Props> = ({
   const centralSavedRef = useRef({ i: condInitial, f: condFinal, na: naOn, r: naReason });
 
   const inputRef = useRef<HTMLInputElement>(null);
-  const pendingCfgRef = useRef<{ kind: 'newItem' | 'capture'; source: Source; moment?: FieldPhotoMoment; itemId?: string; central?: boolean } | null>(null);
+  const pendingCfgRef = useRef<{ kind: 'newItem' | 'capture'; moment?: FieldPhotoMoment; itemId?: string; central?: boolean } | null>(null);
 
   const refresh = useCallback(() => {
     if (!attendanceId) return;
@@ -88,17 +84,16 @@ export const AttendanceEvidence: React.FC<Props> = ({
   useDomainRefresh('fieldPhotos', refresh);
   useEffect(() => { fetchTechnicalCatalog().then(setCatalog).catch(() => setCatalog([])); }, []);
 
-  // Fotos combinadas (servidor + locais pendentes sem duplicar id).
+  const categoryOptions = useMemo(() => buildEvidenceCategoryOptions(catalog, isSdai ? (area || 'sdai') : area), [catalog, area, isSdai]);
+
   const allPhotos = useMemo(() => {
     const serverIds = new Set(serverPhotos.map((p) => p.id));
     return [...serverPhotos, ...localPhotos.filter((l) => !serverIds.has(l.photo.id)).map((l) => l.photo)];
   }, [serverPhotos, localPhotos]);
   const previewFor = useCallback((photo: FieldPhoto): string | undefined => {
-    const local = localPhotos.find((l) => l.photo.id === photo.id);
-    return local?.previewUrl || urls[photo.id];
+    return localPhotos.find((l) => l.photo.id === photo.id)?.previewUrl || urls[photo.id];
   }, [localPhotos, urls]);
 
-  // URLs assinadas das fotos do servidor (evidência derivada, menor §46).
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -112,7 +107,6 @@ export const AttendanceEvidence: React.FC<Props> = ({
 
   const centralPhotos = useCallback((m: 'CENTRAL_ANTES' | 'CENTRAL_DEPOIS') => allPhotos.filter((p) => !p.evidenceItemId && p.evidenceMoment === m), [allPhotos]);
 
-  // Reporta estado para a validação de finalização do pai.
   useEffect(() => {
     onStateChange?.({
       hasCentralBefore: centralPhotos('CENTRAL_ANTES').length > 0 || !!condInitial.trim(),
@@ -122,7 +116,6 @@ export const AttendanceEvidence: React.FC<Props> = ({
     });
   }, [centralPhotos, condInitial, condFinal, naOn, naReason, onStateChange]);
 
-  // Autosave da condição da central.
   useEffect(() => {
     const s = centralSavedRef.current;
     if (s.i === condInitial && s.f === condFinal && s.na === naOn && s.r === naReason) return;
@@ -143,12 +136,12 @@ export const AttendanceEvidence: React.FC<Props> = ({
     return s;
   }, [clientId, session, technicianId, technicianName, toast]);
 
-  // ------- disparo do input (câmera/galeria) roteado por config -------
+  // Captura UNIFICADA: um input, accept image/*, SEM `capture` (o SO oferece
+  // câmera ou galeria). §18/§19.
   const trigger = (cfg: NonNullable<typeof pendingCfgRef.current>) => {
     pendingCfgRef.current = cfg;
     const el = inputRef.current;
     if (!el) return;
-    if (cfg.source === 'camera') el.setAttribute('capture', 'environment'); else el.removeAttribute('capture');
     el.value = '';
     el.click();
   };
@@ -159,8 +152,8 @@ export const AttendanceEvidence: React.FC<Props> = ({
     if (!file || !cfg) return;
     if (!file.type.startsWith('image/')) { toast.error('Selecione uma imagem válida.'); return; }
     const url = URL.createObjectURL(file);
-    if (cfg.kind === 'newItem') setNewItem({ file, source: cfg.source, url });
-    else setCapture({ file, source: cfg.source, url, moment: cfg.moment || 'DURANTE', itemId: cfg.itemId, central: cfg.central });
+    if (cfg.kind === 'newItem') setNewItem({ file, url });
+    else setCapture({ file, url, moment: cfg.moment || 'DURANTE', itemId: cfg.itemId, central: cfg.central });
   };
 
   const addLocal = (photo: FieldPhoto, previewUrl: string) => setLocalPhotos((prev) => [...prev, { photo, previewUrl }]);
@@ -173,20 +166,17 @@ export const AttendanceEvidence: React.FC<Props> = ({
       <span className="text-xs font-bold uppercase tracking-wide text-fg-secondary">Evidências</span>
       <input ref={inputRef} type="file" accept="image/*" onChange={onFile} className="hidden" />
 
-      {/* CENTRAL SDAI — condição inicial (geral do sistema, §12/§40) */}
       {isSdai && !naOn && (
         <CentralBlock
           title="Central" subtitle="Condição inicial" required
           photos={centralPhotos('CENTRAL_ANTES')} previewFor={previewFor}
-          onCamera={() => trigger({ kind: 'capture', source: 'camera', moment: 'CENTRAL_ANTES', central: true })}
-          onUpload={() => trigger({ kind: 'capture', source: 'upload', moment: 'CENTRAL_ANTES', central: true })}
+          onAdd={() => trigger({ kind: 'capture', moment: 'CENTRAL_ANTES', central: true })}
           onOpen={setViewer}
           text={condInitial} onText={setCondInitial}
           placeholder="Condição da central na chegada (ex.: 3 falhas de comunicação e 1 de bateria)."
         />
       )}
 
-      {/* ITENS DO ATENDIMENTO */}
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-bold uppercase tracking-wide text-fg-secondary">Itens do atendimento</span>
         <span className="text-[10px] text-fg-muted">{items.length}</span>
@@ -201,42 +191,32 @@ export const AttendanceEvidence: React.FC<Props> = ({
           <ItemCard
             key={it.id} item={it} photos={allPhotos} previewFor={previewFor}
             onOpen={() => setDetailId(it.id)}
-            onRegistrarDurante={() => trigger({ kind: 'capture', source: 'camera', moment: 'DURANTE', itemId: it.id })}
-            onRegistrarDepois={() => trigger({ kind: 'capture', source: 'camera', moment: 'DEPOIS', itemId: it.id })}
+            onRegistrarDurante={() => trigger({ kind: 'capture', moment: 'DURANTE', itemId: it.id })}
+            onRegistrarDepois={() => trigger({ kind: 'capture', moment: 'DEPOIS', itemId: it.id })}
           />
         ))}
       </div>
 
       <button
         type="button"
-        onClick={() => trigger({ kind: 'newItem', source: 'camera' })}
+        onClick={() => trigger({ kind: 'newItem' })}
         className="min-h-[48px] rounded-lg border border-dashed border-primary/50 bg-primary-soft/30 text-primary text-sm font-bold uppercase tracking-wide flex items-center justify-center gap-2 hover:bg-primary-soft/50"
       >
         <span className="material-symbols-outlined text-xl">add_a_photo</span>
         Novo item
       </button>
-      <button
-        type="button"
-        onClick={() => trigger({ kind: 'newItem', source: 'upload' })}
-        className="text-[11px] font-semibold text-primary hover:underline self-center"
-      >
-        Novo item enviando foto da galeria
-      </button>
 
-      {/* CENTRAL SDAI — condição final */}
       {isSdai && !naOn && (
         <CentralBlock
           title="Central" subtitle="Condição final" required
           photos={centralPhotos('CENTRAL_DEPOIS')} previewFor={previewFor}
-          onCamera={() => trigger({ kind: 'capture', source: 'camera', moment: 'CENTRAL_DEPOIS', central: true })}
-          onUpload={() => trigger({ kind: 'capture', source: 'upload', moment: 'CENTRAL_DEPOIS', central: true })}
+          onAdd={() => trigger({ kind: 'capture', moment: 'CENTRAL_DEPOIS', central: true })}
           onOpen={setViewer}
           text={condFinal} onText={setCondFinal}
           placeholder="Condição da central após o serviço (ex.: normalizada, sem falhas relacionadas)."
         />
       )}
 
-      {/* Escape "central não aplicável" (§26) */}
       {isSdai && (
         <div className="rounded-lg border border-border bg-surface-2 p-2.5">
           <label className="flex items-center gap-2 text-[12px] font-semibold text-fg-secondary">
@@ -249,22 +229,21 @@ export const AttendanceEvidence: React.FC<Props> = ({
         </div>
       )}
 
-      {/* MODAIS */}
       {newItem && (
         <NewItemSheet
-          capture={newItem} catalog={catalog} area={area}
+          capture={newItem} catalog={catalog} area={area} categoryOptions={categoryOptions}
           onCancel={() => { URL.revokeObjectURL(newItem.url); setNewItem(null); }}
           onSave={async (form, equipment) => {
             const s = await ensureSession();
             if (!s || !clientId) return;
             const created = await createEvidenceItem({
               serviceAttendanceId: attendanceId, workOrderId: osId,
-              title: form.title, category: form.category, location: form.location || undefined,
-              deviceAddress: form.deviceAddress || undefined, notes: form.notes || undefined,
-              ...equipmentToItemFields(equipment),
+              title: form.title, category: form.category, equipmentType: form.equipmentType,
+              location: form.location || undefined, deviceAddress: form.deviceAddress || undefined,
+              notes: form.notes || undefined, ...equipmentToItemFields(equipment),
             });
             const saved = await captureAttendanceEvidence({
-              file: newItem.file, source: newItem.source, session: s, clientId, clientName, osId,
+              file: newItem.file, session: s, clientId, clientName, osId,
               serviceAttendanceId: attendanceId, moment: 'ANTES', evidenceItemId: created.id, note: form.notes,
               equipmentCatalogItemId: equipment?.catalogItemId, equipmentBrand: equipment?.brand, equipmentModel: equipment?.model,
             });
@@ -285,7 +264,7 @@ export const AttendanceEvidence: React.FC<Props> = ({
             const s = await ensureSession();
             if (!s || !clientId) return;
             const saved = await captureAttendanceEvidence({
-              file: capture.file, source: capture.source, session: s, clientId, clientName, osId,
+              file: capture.file, session: s, clientId, clientName, osId,
               serviceAttendanceId: attendanceId, moment: capture.moment, evidenceItemId: capture.itemId, note,
               equipmentCatalogItemId: equipment?.catalogItemId, equipmentBrand: equipment?.brand, equipmentModel: equipment?.model,
             });
@@ -299,10 +278,10 @@ export const AttendanceEvidence: React.FC<Props> = ({
 
       {item && (
         <ItemDetail
-          item={item} photos={allPhotos} previewFor={previewFor} catalog={catalog} area={area}
+          item={item} photos={allPhotos} previewFor={previewFor} catalog={catalog} area={area} categoryOptions={categoryOptions}
           onClose={() => setDetailId(null)}
           onOpenPhoto={setViewer}
-          onAdd={(moment, source) => trigger({ kind: 'capture', source, moment, itemId: item.id })}
+          onAdd={(moment) => trigger({ kind: 'capture', moment, itemId: item.id })}
           onSaveEdit={async (patch) => { const updated = await updateEvidenceItem(item.id, patch); setItems((prev) => prev.map((x) => x.id === item.id ? updated : x)); }}
           onDelete={async () => {
             const n = allPhotos.filter((p) => p.evidenceItemId === item.id).length;
@@ -337,15 +316,9 @@ export const AttendanceEvidence: React.FC<Props> = ({
 };
 
 /* -------------------------------------------------------------------------- */
-/* Card do Item na lista principal                                             */
-/* -------------------------------------------------------------------------- */
 const ItemCard: React.FC<{
-  item: ServiceAttendanceEvidenceItem;
-  photos: FieldPhoto[];
-  previewFor: (p: FieldPhoto) => string | undefined;
-  onOpen: () => void;
-  onRegistrarDurante: () => void;
-  onRegistrarDepois: () => void;
+  item: ServiceAttendanceEvidenceItem; photos: FieldPhoto[]; previewFor: (p: FieldPhoto) => string | undefined;
+  onOpen: () => void; onRegistrarDurante: () => void; onRegistrarDepois: () => void;
 }> = ({ item, photos, previewFor, onOpen, onRegistrarDurante, onRegistrarDepois }) => {
   const mine = photos.filter((p) => p.evidenceItemId === item.id);
   const nAntes = mine.filter((p) => p.evidenceMoment === 'ANTES').length;
@@ -353,6 +326,7 @@ const ItemCard: React.FC<{
   const nDepois = mine.filter((p) => p.evidenceMoment === 'DEPOIS').length;
   const thumb = mine.find((p) => p.evidenceMoment === 'ANTES') || mine[0];
   const thumbUrl = thumb ? previewFor(thumb) : undefined;
+  const typeLabel = item.equipmentType || EVIDENCE_CATEGORY_LABEL[item.category];
   const subtitle = [item.model, item.deviceAddress ? `Endereço ${item.deviceAddress}` : '', item.location].filter(Boolean);
 
   const Count = ({ label, n }: { label: string; n: number }) => (
@@ -373,34 +347,26 @@ const ItemCard: React.FC<{
         </span>
         <span className="min-w-0 flex-1">
           <span className="block font-bold text-fg text-sm truncate">{item.title}</span>
-          <span className="block text-[11px] text-fg-secondary truncate">{EVIDENCE_CATEGORY_LABEL[item.category]}</span>
+          <span className="block text-[11px] text-fg-secondary truncate">{typeLabel}</span>
           {subtitle.length > 0 && <span className="block text-[11px] text-fg-muted truncate">{subtitle.join(' · ')}</span>}
         </span>
       </button>
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-3"><Count label="Antes" n={nAntes} /><Count label="Durante" n={nDurante} /><Count label="Depois" n={nDepois} /></div>
-      </div>
+      <div className="mt-2 flex items-center gap-3"><Count label="Antes" n={nAntes} /><Count label="Durante" n={nDurante} /><Count label="Depois" n={nDepois} /></div>
       <div className="mt-2 flex gap-2">
-        <button type="button" onClick={onRegistrarDurante} className="flex-1 min-h-[40px] rounded-lg border border-border text-fg-secondary text-[11px] font-bold uppercase hover:border-border-strong flex items-center justify-center gap-1">
-          <span className="material-symbols-outlined text-sm">add</span>Durante
-        </button>
-        <button type="button" onClick={onRegistrarDepois} className={`flex-1 min-h-[40px] rounded-lg text-[11px] font-bold uppercase flex items-center justify-center gap-1 ${nDepois === 0 ? 'bg-primary text-white hover:bg-primary-hover' : 'border border-border text-fg-secondary hover:border-border-strong'}`}>
-          <span className="material-symbols-outlined text-sm">add</span>Depois
-        </button>
+        <button type="button" onClick={onRegistrarDurante} className="flex-1 min-h-[40px] rounded-lg border border-border text-fg-secondary text-[11px] font-bold uppercase hover:border-border-strong flex items-center justify-center gap-1"><span className="material-symbols-outlined text-sm">add_a_photo</span>Durante</button>
+        <button type="button" onClick={onRegistrarDepois} className={`flex-1 min-h-[40px] rounded-lg text-[11px] font-bold uppercase flex items-center justify-center gap-1 ${nDepois === 0 ? 'bg-primary text-white hover:bg-primary-hover' : 'border border-border text-fg-secondary hover:border-border-strong'}`}><span className="material-symbols-outlined text-sm">add_a_photo</span>Depois</button>
       </div>
     </div>
   );
 };
 
 /* -------------------------------------------------------------------------- */
-/* Bloco CENTRAL (condição inicial/final) — geral do sistema                   */
-/* -------------------------------------------------------------------------- */
 const CentralBlock: React.FC<{
   title: string; subtitle: string; required?: boolean;
   photos: FieldPhoto[]; previewFor: (p: FieldPhoto) => string | undefined;
-  onCamera: () => void; onUpload: () => void; onOpen: (p: FieldPhoto) => void;
+  onAdd: () => void; onOpen: (p: FieldPhoto) => void;
   text: string; onText: (v: string) => void; placeholder: string;
-}> = ({ title, subtitle, required, photos, previewFor, onCamera, onUpload, onOpen, text, onText, placeholder }) => (
+}> = ({ title, subtitle, required, photos, previewFor, onAdd, onOpen, text, onText, placeholder }) => (
   <div className="rounded-lg border border-primary/40 bg-primary-soft/30 p-2.5">
     <p className="text-[11px] font-bold uppercase tracking-wide text-primary">{title}</p>
     <p className="text-[10px] font-semibold text-fg-secondary mb-1.5">{subtitle}{required && <span className="text-danger"> *</span>}</p>
@@ -413,36 +379,43 @@ const CentralBlock: React.FC<{
             : <span className="w-full h-full flex items-center justify-center"><span className="material-symbols-outlined text-fg-muted">image</span></span>}
         </button>
       ))}
-      <button type="button" onClick={onCamera} className="w-14 h-14 rounded-lg border border-dashed border-border text-fg-secondary hover:border-primary hover:text-primary flex flex-col items-center justify-center shrink-0"><span className="material-symbols-outlined text-lg">photo_camera</span><span className="text-[8px] font-bold uppercase">Tirar</span></button>
-      <button type="button" onClick={onUpload} className="w-14 h-14 rounded-lg border border-dashed border-border text-fg-secondary hover:border-primary hover:text-primary flex flex-col items-center justify-center shrink-0"><span className="material-symbols-outlined text-lg">upload</span><span className="text-[8px] font-bold uppercase">Enviar</span></button>
+      <button type="button" onClick={onAdd} className="w-14 h-14 rounded-lg border border-dashed border-border text-fg-secondary hover:border-primary hover:text-primary flex flex-col items-center justify-center shrink-0"><span className="material-symbols-outlined text-lg">add_a_photo</span><span className="text-[8px] font-bold uppercase">Foto</span></button>
     </div>
     <textarea value={text} onChange={(e) => onText(e.target.value)} rows={2} placeholder={placeholder} className="mt-2 w-full rounded-lg border border-border bg-surface text-fg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25" />
   </div>
 );
 
 /* -------------------------------------------------------------------------- */
-/* Sheet de NOVO ITEM (preview + título + categoria + equipamento + campos)    */
-/* -------------------------------------------------------------------------- */
-interface NewItemForm { title: string; category: EvidenceItemCategory; location: string; deviceAddress: string; notes: string; }
+interface NewItemForm { title: string; category: EvidenceItemCategory; equipmentType?: string; location: string; deviceAddress: string; notes: string; }
 const NewItemSheet: React.FC<{
   capture: { file: File; url: string };
-  catalog: TechnicalCatalogItem[]; area?: string;
+  catalog: TechnicalCatalogItem[]; area?: string; categoryOptions: EvidenceCategoryOption[];
   onCancel: () => void;
   onSave: (form: NewItemForm, equipment?: EquipmentIdentification) => Promise<void>;
-}> = ({ capture, catalog, area, onCancel, onSave }) => {
+}> = ({ capture, catalog, area, categoryOptions, onCancel, onSave }) => {
   const toast = useToast();
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState<EvidenceItemCategory>('EQUIPAMENTO');
+  const [titleTouched, setTitleTouched] = useState(false);
+  const [opt, setOpt] = useState<EvidenceCategoryOption | undefined>();
   const [location, setLocation] = useState('');
   const [deviceAddress, setDeviceAddress] = useState('');
   const [notes, setNotes] = useState('');
   const [equipment, setEquipment] = useState<EquipmentIdentification | undefined>();
   const [busy, setBusy] = useState(false);
 
+  const showEquipment = !!opt && (opt.coarse === 'EQUIPAMENTO' || opt.coarse === 'CENTRAL');
+
+  const pickCategory = (value: string) => {
+    const found = categoryOptions.find((o) => o.value === value);
+    setOpt(found);
+    if (found && !titleTouched && !title.trim()) setTitle(found.label); // §28 sugere, não força
+    setEquipment(undefined);
+  };
+
   const save = async () => {
     if (!title.trim()) { toast.error('Informe um título para o item.'); return; }
     setBusy(true);
-    try { await onSave({ title: title.trim(), category, location, deviceAddress, notes }, equipment); }
+    try { await onSave({ title: title.trim(), category: opt?.coarse || 'OUTRO', equipmentType: opt?.subcategory, location, deviceAddress, notes }, equipment); }
     catch { toast.error('Não foi possível registrar o item.'); setBusy(false); }
   };
 
@@ -451,24 +424,23 @@ const NewItemSheet: React.FC<{
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={capture.url} alt="Prévia" className="max-h-[34vh] w-full rounded-xl bg-slate-900 object-contain" />
       <label className="block">
-        <span className="text-[10px] font-bold uppercase text-fg-muted">Título</span>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus placeholder="Ex.: Sirene com avaria" className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25" />
+        <span className="text-[10px] font-bold uppercase text-fg-muted">Categoria</span>
+        <PickerField
+          sheetTitle="Selecionar categoria" placeholder="Selecionar categoria" searchPlaceholder="Buscar categoria..."
+          emptyLabel="Nenhuma categoria disponível." value={opt?.value || ''} onChange={pickCategory}
+          options={categoryOptions.map((o) => ({ id: o.value, name: o.label }))}
+          triggerClassName="mt-1 w-full flex items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold text-fg-secondary"
+        />
       </label>
       <label className="block">
-        <span className="text-[10px] font-bold uppercase text-fg-muted">Categoria</span>
-        <div className="mt-1 flex flex-wrap gap-1.5">
-          {CATEGORIES.map((c) => (
-            <button type="button" key={c} onClick={() => setCategory(c)} className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border ${category === c ? 'border-primary bg-primary-soft/50 text-primary' : 'border-border text-fg-secondary'}`}>{EVIDENCE_CATEGORY_LABEL[c]}</button>
-          ))}
-        </div>
+        <span className="text-[10px] font-bold uppercase text-fg-muted">Título</span>
+        <input value={title} onChange={(e) => { setTitle(e.target.value); setTitleTouched(true); }} placeholder="Ex.: Sirene com avaria" className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25" />
       </label>
       <div className="grid grid-cols-2 gap-2">
         <label className="block"><span className="text-[10px] font-bold uppercase text-fg-muted">Endereço do dispositivo</span><input value={deviceAddress} onChange={(e) => setDeviceAddress(e.target.value)} placeholder="Ex.: 42" className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25" /></label>
         <label className="block"><span className="text-[10px] font-bold uppercase text-fg-muted">Local / setor</span><input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Ex.: Corredor" className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25" /></label>
       </div>
-      {category === 'EQUIPAMENTO' || category === 'CENTRAL' ? (
-        <EquipmentIdentifier value={equipment} onChange={setEquipment} catalog={catalog} area={area} />
-      ) : null}
+      {showEquipment && <EquipmentIdentifier value={equipment} onChange={setEquipment} catalog={catalog} area={area} subcategory={opt?.subcategory} />}
       <label className="block"><span className="text-[10px] font-bold uppercase text-fg-muted">Observação</span><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Opcional" className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25" /></label>
       <SheetActions onCancel={onCancel} onConfirm={save} busy={busy} confirmLabel="Salvar item" />
     </Sheet>
@@ -476,16 +448,13 @@ const NewItemSheet: React.FC<{
 };
 
 /* -------------------------------------------------------------------------- */
-/* Painel de captura simples (Durante/Depois/Central): preview + nota (+equip)  */
-/* -------------------------------------------------------------------------- */
 const MOMENT_TITLE: Record<FieldPhotoMoment, string> = {
   ANTES: 'Antes', DURANTE: 'Durante', DEPOIS: 'Depois', CENTRAL_ANTES: 'Central na chegada', CENTRAL_DEPOIS: 'Central na saída',
 };
 const CapturePanel: React.FC<{
   capture: { file: File; url: string; moment: FieldPhotoMoment };
   catalog: TechnicalCatalogItem[]; area?: string; allowEquipment: boolean;
-  onCancel: () => void;
-  onSave: (note: string, equipment?: EquipmentIdentification) => Promise<void>;
+  onCancel: () => void; onSave: (note: string, equipment?: EquipmentIdentification) => Promise<void>;
 }> = ({ capture, catalog, area, allowEquipment, onCancel, onSave }) => {
   const [note, setNote] = useState('');
   const [equipment, setEquipment] = useState<EquipmentIdentification | undefined>();
@@ -503,16 +472,14 @@ const CapturePanel: React.FC<{
 };
 
 /* -------------------------------------------------------------------------- */
-/* Detalhe do Item: fotos por momento + adicionar + editar + excluir           */
-/* -------------------------------------------------------------------------- */
 const ItemDetail: React.FC<{
   item: ServiceAttendanceEvidenceItem; photos: FieldPhoto[]; previewFor: (p: FieldPhoto) => string | undefined;
-  catalog: TechnicalCatalogItem[]; area?: string;
+  catalog: TechnicalCatalogItem[]; area?: string; categoryOptions: EvidenceCategoryOption[];
   onClose: () => void; onOpenPhoto: (p: FieldPhoto) => void;
-  onAdd: (moment: FieldPhotoMoment, source: Source) => void;
+  onAdd: (moment: FieldPhotoMoment) => void;
   onSaveEdit: (patch: Partial<ServiceAttendanceEvidenceItem>) => Promise<void>;
   onDelete: () => void;
-}> = ({ item, photos, previewFor, catalog, area, onClose, onOpenPhoto, onAdd, onSaveEdit, onDelete }) => {
+}> = ({ item, photos, previewFor, catalog, area, categoryOptions, onClose, onOpenPhoto, onAdd, onSaveEdit, onDelete }) => {
   const [editing, setEditing] = useState(false);
   const mine = photos.filter((p) => p.evidenceItemId === item.id);
   const group = (m: FieldPhotoMoment) => mine.filter((p) => p.evidenceMoment === m);
@@ -530,20 +497,19 @@ const ItemDetail: React.FC<{
               : <span className="w-full h-full flex items-center justify-center"><span className="material-symbols-outlined text-fg-muted">image</span></span>}
           </button>
         ))}
-        <button type="button" onClick={() => onAdd(moment, 'camera')} className="w-16 h-16 rounded-lg border border-dashed border-border text-fg-secondary hover:border-primary hover:text-primary flex flex-col items-center justify-center shrink-0"><span className="material-symbols-outlined text-lg">photo_camera</span><span className="text-[8px] font-bold uppercase">Tirar</span></button>
-        <button type="button" onClick={() => onAdd(moment, 'upload')} className="w-16 h-16 rounded-lg border border-dashed border-border text-fg-secondary hover:border-primary hover:text-primary flex flex-col items-center justify-center shrink-0"><span className="material-symbols-outlined text-lg">upload</span><span className="text-[8px] font-bold uppercase">Enviar</span></button>
+        <button type="button" onClick={() => onAdd(moment)} className="w-16 h-16 rounded-lg border border-dashed border-border text-fg-secondary hover:border-primary hover:text-primary flex flex-col items-center justify-center shrink-0"><span className="material-symbols-outlined text-lg">add_a_photo</span><span className="text-[8px] font-bold uppercase">Foto</span></button>
       </div>
     </div>
   );
 
   if (editing) {
-    return <ItemEditSheet item={item} catalog={catalog} area={area} onCancel={() => setEditing(false)} onSave={async (patch) => { await onSaveEdit(patch); setEditing(false); }} />;
+    return <ItemEditSheet item={item} catalog={catalog} area={area} categoryOptions={categoryOptions} onCancel={() => setEditing(false)} onSave={async (patch) => { await onSaveEdit(patch); setEditing(false); }} />;
   }
 
   return (
     <Sheet title={item.title} onClose={onClose}>
       <div className="rounded-lg bg-surface-2 p-2.5">
-        <p className="text-[11px] font-bold text-fg">{EVIDENCE_CATEGORY_LABEL[item.category]}</p>
+        <p className="text-[11px] font-bold text-fg">{item.equipmentType || EVIDENCE_CATEGORY_LABEL[item.category]}</p>
         {subtitle && <p className="text-[11px] text-fg-secondary">{subtitle}</p>}
         {(item.deviceAddress || item.location) && <p className="text-[11px] text-fg-muted">{[item.deviceAddress ? `Endereço ${item.deviceAddress}` : '', item.location].filter(Boolean).join(' · ')}</p>}
         {item.notes && <p className="mt-1 text-[11px] text-fg-secondary whitespace-pre-wrap">{item.notes}</p>}
@@ -560,11 +526,12 @@ const ItemDetail: React.FC<{
 };
 
 const ItemEditSheet: React.FC<{
-  item: ServiceAttendanceEvidenceItem; catalog: TechnicalCatalogItem[]; area?: string;
+  item: ServiceAttendanceEvidenceItem; catalog: TechnicalCatalogItem[]; area?: string; categoryOptions: EvidenceCategoryOption[];
   onCancel: () => void; onSave: (patch: Partial<ServiceAttendanceEvidenceItem>) => Promise<void>;
-}> = ({ item, catalog, area, onCancel, onSave }) => {
+}> = ({ item, catalog, area, categoryOptions, onCancel, onSave }) => {
+  const initialOpt = categoryOptions.find((o) => (item.equipmentType && o.subcategory === item.equipmentType)) || categoryOptions.find((o) => !o.subcategory && o.coarse === item.category);
   const [title, setTitle] = useState(item.title);
-  const [category, setCategory] = useState<EvidenceItemCategory>(item.category);
+  const [opt, setOpt] = useState<EvidenceCategoryOption | undefined>(initialOpt);
   const [location, setLocation] = useState(item.location || '');
   const [deviceAddress, setDeviceAddress] = useState(item.deviceAddress || '');
   const [notes, setNotes] = useState(item.notes || '');
@@ -573,29 +540,33 @@ const ItemEditSheet: React.FC<{
   );
   const [busy, setBusy] = useState(false);
   const toast = useToast();
+  const showEquipment = !!opt && (opt.coarse === 'EQUIPAMENTO' || opt.coarse === 'CENTRAL');
   const save = async () => {
     if (!title.trim()) { toast.error('Informe um título.'); return; }
     setBusy(true);
-    try { await onSave({ title: title.trim(), category, location, deviceAddress, notes, ...equipmentToItemFields(equipment) }); }
+    try { await onSave({ title: title.trim(), category: opt?.coarse || item.category, equipmentType: opt?.subcategory, location, deviceAddress, notes, ...equipmentToItemFields(equipment) }); }
     catch { toast.error('Não foi possível salvar.'); setBusy(false); }
   };
   return (
     <Sheet title="Editar item" onClose={onCancel}>
+      <label className="block"><span className="text-[10px] font-bold uppercase text-fg-muted">Categoria</span>
+        <PickerField sheetTitle="Selecionar categoria" placeholder="Selecionar categoria" searchPlaceholder="Buscar categoria..." emptyLabel="Nenhuma categoria disponível."
+          value={opt?.value || ''} onChange={(v) => setOpt(categoryOptions.find((o) => o.value === v))}
+          options={categoryOptions.map((o) => ({ id: o.value, name: o.label }))}
+          triggerClassName="mt-1 w-full flex items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold text-fg-secondary" />
+      </label>
       <label className="block"><span className="text-[10px] font-bold uppercase text-fg-muted">Título</span><input value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25" /></label>
-      <div className="flex flex-wrap gap-1.5">{CATEGORIES.map((c) => <button type="button" key={c} onClick={() => setCategory(c)} className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border ${category === c ? 'border-primary bg-primary-soft/50 text-primary' : 'border-border text-fg-secondary'}`}>{EVIDENCE_CATEGORY_LABEL[c]}</button>)}</div>
       <div className="grid grid-cols-2 gap-2">
         <label className="block"><span className="text-[10px] font-bold uppercase text-fg-muted">Endereço</span><input value={deviceAddress} onChange={(e) => setDeviceAddress(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25" /></label>
         <label className="block"><span className="text-[10px] font-bold uppercase text-fg-muted">Local</span><input value={location} onChange={(e) => setLocation(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25" /></label>
       </div>
-      {(category === 'EQUIPAMENTO' || category === 'CENTRAL') && <EquipmentIdentifier value={equipment} onChange={setEquipment} catalog={catalog} area={area} />}
+      {showEquipment && <EquipmentIdentifier value={equipment} onChange={setEquipment} catalog={catalog} area={area} subcategory={opt?.subcategory} />}
       <label className="block"><span className="text-[10px] font-bold uppercase text-fg-muted">Observação</span><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25" /></label>
       <SheetActions onCancel={onCancel} onConfirm={save} busy={busy} confirmLabel="Salvar" />
     </Sheet>
   );
 };
 
-/* -------------------------------------------------------------------------- */
-/* Visualizador de foto (zoom + metadados + editar + excluir)                  */
 /* -------------------------------------------------------------------------- */
 const PhotoViewer: React.FC<{
   photo: FieldPhoto; url?: string; catalog: TechnicalCatalogItem[]; area?: string;
@@ -618,7 +589,7 @@ const PhotoViewer: React.FC<{
   };
 
   return (
-    <div className="fixed inset-0 z-[95] flex flex-col bg-slate-900/90 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[96] flex flex-col bg-slate-900/90 backdrop-blur-sm">
       <div className="flex items-center justify-between px-4 py-3 text-white">
         <button onClick={onClose} className="text-white/80 hover:text-white text-2xl leading-none">×</button>
         <div className="flex gap-3">
@@ -633,9 +604,7 @@ const PhotoViewer: React.FC<{
           : <span className="text-white/60">Prévia indisponível</span>}
       </div>
       <div className="bg-surface p-4 max-h-[55vh] overflow-y-auto flex flex-col gap-2">
-        <p className="text-[11px] text-fg-secondary">
-          {photo.evidenceMoment ? `${MOMENT_TITLE[photo.evidenceMoment]} · ` : ''}{captured ? captured.toLocaleString('pt-BR') : ''}
-        </p>
+        <p className="text-[11px] text-fg-secondary">{photo.evidenceMoment ? `${MOMENT_TITLE[photo.evidenceMoment]} · ` : ''}{captured ? captured.toLocaleString('pt-BR') : ''}</p>
         {!editing ? (
           <>
             {(photo.equipmentBrand || photo.equipmentModel) && <p className="text-sm font-semibold text-fg">{[photo.equipmentBrand, photo.equipmentModel].filter(Boolean).join(' ')}</p>}
@@ -657,8 +626,6 @@ const PhotoViewer: React.FC<{
   );
 };
 
-/* -------------------------------------------------------------------------- */
-/* Shell de bottom-sheet reutilizável                                          */
 /* -------------------------------------------------------------------------- */
 const Sheet: React.FC<{ title: string; onClose: () => void; children: React.ReactNode }> = ({ title, onClose, children }) => (
   <div className="fixed inset-0 z-[92] flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-sm sm:p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
