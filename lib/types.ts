@@ -1170,6 +1170,8 @@ export interface FieldOperationAssignment {
 
 export type AttendanceStatus = 'EM_EXECUCAO' | 'FINALIZADO';
 export type AttendanceResult = 'RESOLVIDO' | 'PARCIALMENTE_RESOLVIDO' | 'NAO_RESOLVIDO';
+/** Estado da assinatura do responsável no atendimento (0091). */
+export type AttendanceSignatureStatus = 'SIGNED' | 'UNAVAILABLE' | 'REFUSED';
 
 /** ETAPA 3B.4 — Item de Evidência: unidade técnica (equipamento/infra/…) que
  *  agrega N fotos por momento (Antes/Durante/Depois). Ver migração 0088. */
@@ -1216,6 +1218,13 @@ export interface ServiceAttendance {
   /** Central não acessível/aplicável neste serviço (dispensa Antes/Depois). */
   centralNotApplicable?: boolean;
   centralNaReason?: string;
+  /** Assinatura do responsável do cliente neste atendimento (0091). */
+  clientSignatureName?: string;
+  clientSignatureRole?: string;
+  clientSignaturePath?: string;
+  clientSignatureStatus?: AttendanceSignatureStatus;
+  clientSignatureNote?: string;
+  clientSignedAt?: string;
   createdAt?: string;
   updatedAt?: string;
 }

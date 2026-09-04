@@ -1,5 +1,5 @@
 import { getSupabaseClient } from './supabaseClient';
-import { ServiceAttendance, AttendanceResult, AttendanceStatus } from './types';
+import { ServiceAttendance, AttendanceResult, AttendanceStatus, AttendanceSignatureStatus } from './types';
 
 /* ===================================================================
  * ETAPA 3A — ATENDIMENTO: execução/visita real de UMA OS. Uma OS pode
@@ -32,6 +32,12 @@ function rowToAttendance(r: any): ServiceAttendance {
     centralConditionFinal: r.central_condition_final ?? undefined,
     centralNotApplicable: r.central_not_applicable ?? undefined,
     centralNaReason: r.central_na_reason ?? undefined,
+    clientSignatureName: r.client_signature_name ?? undefined,
+    clientSignatureRole: r.client_signature_role ?? undefined,
+    clientSignaturePath: r.client_signature_path ?? undefined,
+    clientSignatureStatus: (r.client_signature_status ?? undefined) as AttendanceSignatureStatus | undefined,
+    clientSignatureNote: r.client_signature_note ?? undefined,
+    clientSignedAt: r.client_signed_at ?? undefined,
     createdAt: r.created_at ?? undefined,
     updatedAt: r.updated_at ?? undefined,
   };
@@ -194,6 +200,43 @@ export async function finishServiceAttendance(input: {
     .eq('id', input.id)
     .select()
     .single();
+  if (error) throw error;
+  return rowToAttendance(data);
+}
+
+/**
+ * Salva a assinatura do responsável no atendimento (0091). Para SIGNED, sobe o
+ * PNG ao bucket privado report-media e grava o caminho + nome/cargo/timestamp.
+ * Para UNAVAILABLE/REFUSED, grava o status + motivo (sem PNG). Não bloqueia a
+ * finalização; apenas registra a evidência do aceite (ou da exceção).
+ */
+export async function saveAttendanceSignature(input: {
+  id: string;
+  status: AttendanceSignatureStatus;
+  name?: string;
+  role?: string;
+  note?: string;
+  /** PNG da assinatura desenhada (obrigatório quando status = SIGNED). */
+  signaturePng?: Blob;
+}): Promise<ServiceAttendance> {
+  const supabase = getSupabaseClient() as any;
+  const patch: Record<string, unknown> = {
+    client_signature_status: input.status,
+    client_signature_name: input.name?.trim() || null,
+    client_signature_role: input.role?.trim() || null,
+    client_signature_note: input.note?.trim() || null,
+    client_signed_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  if (input.status === 'SIGNED' && input.signaturePng) {
+    const path = `attendance-signatures/${input.id}.png`;
+    const { error: upErr } = await supabase.storage.from('report-media').upload(path, input.signaturePng, { upsert: true, contentType: 'image/png' });
+    if (upErr) throw upErr;
+    patch.client_signature_path = path;
+  } else {
+    patch.client_signature_path = null;
+  }
+  const { data, error } = await supabase.from(TABLE).update(patch).eq('id', input.id).select().single();
   if (error) throw error;
   return rowToAttendance(data);
 }

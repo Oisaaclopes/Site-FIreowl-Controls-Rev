@@ -763,24 +763,6 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     setMode('form');
   };
 
-  const iniciarAtendimentoDaOs = (os: OrdemServico) => {
-    if (!os.clienteId) {
-      showToast('Esta OS não possui cliente vinculado. Complete o cadastro antes de abrir o relatório.');
-      return;
-    }
-    // OSs legadas ainda não possuem área própria. Inferimos pelo título apenas
-    // como compatibilidade e usamos SDAI como padrão seguro para corretivas.
-    const titulo = `${os.titulo || ''} ${os.descricao || ''}`.toUpperCase();
-    const area = titulo.includes('CFTV') ? 'CFTV' : titulo.includes('ACESSO') ? 'CONTROLE_ACESSO' : titulo.includes('BMS') ? 'BMS' : titulo.includes('ALARME') ? 'ALARME' : 'SDAI';
-    startForm({ tipo: 'CORRETIVA', area, clienteId: os.clienteId, osId: os.id, contratoId: os.contratoId });
-    // Atualização operacional em segundo plano; uma falha de permissão não
-    // impede o técnico de abrir a corretiva vinculada.
-    if (os.pendenciaIds.length && isSupabaseConfigured()) {
-      Promise.all(os.pendenciaIds.map((id) => updatePendenciaStatus(id, 'em_execucao')))
-        .then(refresh)
-        .catch((error) => console.warn('Não foi possível marcar pendências em execução:', error));
-    }
-  };
 
   // Catálogo do formulário: base + pendências aprovadas do cliente escolhido
   // (para a Corretiva). Derivado sem mutar o catalog memoizado.
@@ -1262,9 +1244,11 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                         punches={currentUserPunches}
                       />
                     ) : null}
-                    {/* Ação SECUNDÁRIA (§7/§41): o relatório corretivo (FormEngine)
-                        continua acessível, mas não é o CTA de execução da OS. */}
-                    <button onClick={() => iniciarAtendimentoDaOs(os)} className="min-h-10 rounded-lg border border-border text-fg-secondary hover:border-border-strong text-[11px] font-bold uppercase tracking-wide flex items-center justify-center gap-2"><span className="material-symbols-outlined text-sm">description</span>Abrir relatório corretivo</button>
+                    {/* Fechamento documental (pós-3B): o relatório corretivo legado
+                        (FormEngine) foi REMOVIDO do fluxo de OS. O relatório da OS
+                        agora é o próprio Atendimento (ServiceAttendanceFlow) e o PDF
+                        sai pelo detalhe da OS. Relatórios históricos seguem na aba
+                        Relatórios (§2/§46). */}
                   </article>
                 );
               })}

@@ -4,6 +4,7 @@ import { showToast, requestConfirm, requestText } from '@/components/ui/Feedback
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { SupplyOrder, Client, Pedido, Contract, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem, DocumentosPadrao, DocumentType, FinancialTransaction, RecebimentoProposta, EmpresaAtendida, MarcaTecnologia, OrdemServico, TimePunch } from '@/lib/types';
 import { StartAttendanceButton, AttendanceHistoryList, OsMissionPanel } from '@/components/operacoes/ServiceAttendanceFlow';
+import { OsDocumentsView, OsDocKind } from '@/components/documentos/OsDocumentsView';
 import { OS_STATUS_ATIVOS, osHistoryForPedido, pedidoOsAction, isHardDeleteEligible, isCancelable } from '@/lib/ordensServico';
 import { selecionarEmpresas, selecionarMarcas, experienciaAtiva } from '@/lib/experienciaSelecao';
 import { resolveLogoDataUrls } from '@/lib/institucional';
@@ -1325,6 +1326,8 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           currentUserName={currentUserName}
           currentUserPunches={currentUserPunches}
           usesTimeClock={usesTimeClock}
+          companyProfile={companyProfile}
+          pedido={osDetail.sourcePedidoId ? pedidos.find((p) => p.id === osDetail.sourcePedidoId) : undefined}
           onCancel={onCancelOs ? () => { setOsCancelTarget(osDetail); setOsDetail(null); } : undefined}
           onDelete={onDeleteOs ? () => { setOsDeleteTarget(osDetail); setOsDetail(null); } : undefined}
           onClose={() => setOsDetail(null)}
@@ -1853,10 +1856,13 @@ const OrdemServicoDetailModal: React.FC<{
   currentUserName?: string;
   currentUserPunches?: TimePunch[];
   usesTimeClock?: boolean;
+  companyProfile?: any;
+  pedido?: Pedido;
   onCancel?: () => void;
   onDelete?: () => void;
   onClose: () => void;
-}> = ({ os, clients, contracts, canManage = false, isTecnico = false, currentUserId, currentUserName, currentUserPunches = [], usesTimeClock = false, onCancel, onDelete, onClose }) => {
+}> = ({ os, clients, contracts, canManage = false, isTecnico = false, currentUserId, currentUserName, currentUserPunches = [], usesTimeClock = false, companyProfile, pedido, onCancel, onDelete, onClose }) => {
+  const [docKind, setDocKind] = useState<OsDocKind | null>(null);
   // Interface operacional: nome fantasia com fallback à razão (§8/§9).
   const clienteNome = getClientOperationalName(clients.find((c) => c.id === os.clienteId), os.clienteId || '—');
   const contrato = contracts.find((c) => c.id === os.contratoId);
@@ -1926,7 +1932,19 @@ const OrdemServicoDetailModal: React.FC<{
             <p className="text-[11px] font-bold text-fg-secondary uppercase tracking-wide mb-2">Atendimentos</p>
             <AttendanceHistoryList osId={os.id} />
           </div>
+
+          {/* DOCUMENTOS (fechamento documental §40): OS executada + Relatório Técnico */}
+          <div className="mt-5">
+            <p className="text-[11px] font-bold text-fg-secondary uppercase tracking-wide mb-2">Documentos</p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button onClick={() => setDocKind('os')} className="flex-1 min-h-[44px] rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-bold uppercase tracking-wide flex items-center justify-center gap-2"><span className="material-symbols-outlined text-base">description</span>Baixar Ordem de Serviço</button>
+              <button onClick={() => setDocKind('relatorio')} className="flex-1 min-h-[44px] rounded-lg border border-border text-fg-secondary text-xs font-bold uppercase tracking-wide flex items-center justify-center gap-2 hover:border-border-strong"><span className="material-symbols-outlined text-base">article</span>Baixar Relatório Técnico</button>
+            </div>
+          </div>
         </div>
+        {docKind && (
+          <OsDocumentsView os={os} company={companyProfile || null} client={clients.find((c) => c.id === os.clienteId)} pedido={pedido} initialKind={docKind} onClose={() => setDocKind(null)} />
+        )}
         <div className="p-4 border-t border-border flex justify-between items-center gap-2">
           <div className="flex gap-2">
             {podeExcluir && (

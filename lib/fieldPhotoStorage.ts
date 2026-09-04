@@ -37,6 +37,28 @@ export async function uploadFieldPhotoAsset(input: {
   return input.path;
 }
 
+/**
+ * Resolve storage_paths de fotos de campo (bucket privado) para data URIs, para
+ * embutir no React-PDF (que não acessa o bucket privado por URL). Falhas
+ * individuais são ignoradas. Reaproveita a assinatura de URL existente.
+ */
+export async function resolveFieldPhotoDataUrls(paths: (string | undefined)[]): Promise<Record<string, string>> {
+  const uniq = Array.from(new Set(paths.filter((p): p is string => !!p && p.trim().length > 0)));
+  if (uniq.length === 0) return {};
+  const { blobToDataUrl } = await import('./propostaCapa');
+  const signed = await signedFieldPhotoUrls(uniq).catch(() => ({} as Record<string, string>));
+  const out: Record<string, string> = {};
+  await Promise.all(uniq.map(async (p) => {
+    try {
+      const url = signed[p];
+      if (!url) return;
+      const resp = await fetch(url);
+      out[p] = await blobToDataUrl(await resp.blob());
+    } catch { /* ignora esta foto */ }
+  }));
+  return out;
+}
+
 /** Remove assets do bucket privado (best-effort; ignora caminhos vazios). */
 export async function removeFieldPhotoAssets(paths: (string | undefined)[]): Promise<void> {
   const clean = paths.filter((p): p is string => !!p && p.trim().length > 0);

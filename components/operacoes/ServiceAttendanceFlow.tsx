@@ -8,8 +8,10 @@ import {
   fetchServiceAttendances,
   finishServiceAttendance,
   saveAttendanceProgress,
+  saveAttendanceSignature,
   startServiceAttendance,
 } from '@/lib/serviceAttendances';
+import type { AttendanceSignatureStatus } from '@/lib/types';
 import { fetchTimeClockParticipants } from '@/lib/users';
 import {
   ATTENDANCE_RESULT_LABEL,
@@ -27,9 +29,14 @@ import { fetchOsMission, missionHasContent, missionIsSdai, OsMission } from '@/l
 import { AttendanceEvidence, EvidenceState } from '@/components/operacoes/AttendanceEvidence';
 import { resolveLogoDataUrls } from '@/lib/institucional';
 import { getClientOperationalName } from '@/lib/utils';
+import { fetchCompanyProfile } from '@/lib/companyProfile';
+import { getSignature } from '@/lib/signatures';
+import { CompanyProfile } from '@/lib/types';
 import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 import { useConfirm, useToast } from '@/components/ui/Feedback';
 import { ClientLogo } from '@/components/ClientLogo';
+import { SignatureCanvas } from '@/components/reports/SignatureCanvas';
+import { OsDocumentsView, OsDocKind } from '@/components/documentos/OsDocumentsView';
 
 /* ===================================================================
  * ETAPA 3B — Fluxo operacional REAL de atendimento de OS.
@@ -400,6 +407,10 @@ export const AttendanceScreen: React.FC<{
   const [result, setResult] = useState<AttendanceResult | undefined>(attendance.result);
   const [saving, setSaving] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [finishing, setFinishing] = useState(false);
+  const [signOpen, setSignOpen] = useState(false);         // etapa de assinatura antes de finalizar
+  const [finalized, setFinalized] = useState(false);        // pós-finalização (baixar docs)
+  const [docKind, setDocKind] = useState<OsDocKind | null>(null);
+  const [company, setCompany] = useState<CompanyProfile | null>(null);
   const [tick, setTick] = useState(0);
   const savedRef = useRef({ diagnosis: attendance.diagnosis || '', execution: attendance.executionNotes || '' });
 
@@ -466,11 +477,11 @@ export const AttendanceScreen: React.FC<{
     onClose();
   }, [flushSave, onClose]);
 
-  const finalize = useCallback(async () => {
+  // §28/§29/§55 — a assinatura acontece DEPOIS do resultado e antes do fecho.
+  // Aqui só validamos e abrimos a etapa de assinatura; o fecho real é runFinalize.
+  const requestFinalize = useCallback(async () => {
     if (finishing) return;
     if (!result) { toast.error('Selecione o resultado do atendimento.'); return; }
-    // §24/§38/§52 — SDAI: exige condição inicial/final da central (ou "não
-    // aplicável" com motivo). Não apaga nada; só aponta o que falta.
     if (blockers.length > 0) {
       toast.error(`Registros pendentes: ${blockers.map((b) => b.label).join(', ')}.`);
       return;
@@ -483,43 +494,39 @@ export const AttendanceScreen: React.FC<{
       });
       if (!go) return;
     }
+    setSignOpen(true);
+  }, [blockers, confirm, diagnosis, execution, finishing, result, toast]);
+
+  // Persiste a assinatura (ou a exceção) e finaliza o atendimento. Ao final,
+  // mantém a tela em modo pós-finalização (baixar OS/Relatório).
+  const runFinalize = useCallback(async (sig: { status: AttendanceSignatureStatus; name?: string; role?: string; note?: string; blob?: Blob }) => {
+    if (!result || finishing) return;
+    setSignOpen(false);
     setFinishing(true);
     try {
-      const geo = await capturePosition().catch(() => undefined);
-      await finishServiceAttendance({
-        id: attendance.id,
-        result,
-        diagnosis,
-        executionNotes: execution,
-        latitude: geo?.latitude,
-        longitude: geo?.longitude,
+      await saveAttendanceSignature({ id: attendance.id, status: sig.status, name: sig.name, role: sig.role, note: sig.note, signaturePng: sig.blob }).catch((e) => {
+        // Não perde o fecho por falha só da assinatura; registra e segue.
+        console.warn('Assinatura não persistida:', e);
       });
+      const geo = await capturePosition().catch(() => undefined);
+      await finishServiceAttendance({ id: attendance.id, result, diagnosis, executionNotes: execution, latitude: geo?.latitude, longitude: geo?.longitude });
       savedRef.current = { diagnosis, execution };
       toast.success('Atendimento finalizado.');
 
-      // Resultado ≠ status da OS (§16). Só RESOLVIDO oferece concluir a OS, e
-      // NUNCA silenciosamente (§17). PARCIAL/NÃO mantêm a OS aberta (§18/§19).
       if (canConcludeOsFromResult(result) && os && os.status !== 'concluida' && os.status !== 'cancelada') {
-        const concluir = await confirm({
-          title: 'Concluir a Ordem de Serviço?',
-          message: 'Este atendimento resolveu completamente a Ordem de Serviço?',
-          confirmLabel: 'Sim, concluir OS',
-        });
+        const concluir = await confirm({ title: 'Concluir a Ordem de Serviço?', message: 'Este atendimento resolveu completamente a Ordem de Serviço?', confirmLabel: 'Sim, concluir OS' });
         if (concluir) {
-          try {
-            await updateOrdemServicoStatus(os.id, 'concluida', { dataConclusao: new Date().toISOString() });
-            toast.success('Ordem de Serviço concluída.');
-          } catch {
-            toast.error('Atendimento finalizado, mas não foi possível concluir a OS. Tente pela tela da OS.');
-          }
+          try { await updateOrdemServicoStatus(os.id, 'concluida', { dataConclusao: new Date().toISOString() }); toast.success('Ordem de Serviço concluída.'); }
+          catch { toast.error('Atendimento finalizado, mas não foi possível concluir a OS. Tente pela tela da OS.'); }
         }
       }
-      onClose();
+      fetchCompanyProfile().then(setCompany).catch(() => {});
+      setFinalized(true); // pós-finalização (baixar documentos)
     } catch (e) {
       toast.error((e as Error)?.message || 'Não foi possível finalizar o atendimento.');
       setFinishing(false);
     }
-  }, [attendance.id, blockers, confirm, diagnosis, execution, finishing, onClose, os, result, toast]);
+  }, [attendance.id, confirm, diagnosis, execution, finishing, os, result, toast]);
 
   const elapsed = formatAttendanceElapsed(attendance.startedAt);
 
@@ -637,21 +644,126 @@ export const AttendanceScreen: React.FC<{
           )}
         </div>
 
-        {/* FINALIZAÇÃO (§17–§20) */}
+        {/* FINALIZAÇÃO (§17–§20/§28) — abre a etapa de assinatura antes do fecho */}
         <div className="p-4 border-t border-border flex items-center justify-between gap-2">
           <button onClick={handleClose} className="px-4 py-2.5 rounded-lg bg-surface-3 text-xs font-bold uppercase text-fg-secondary hover:bg-surface-2">
             Sair
           </button>
           <button
-            onClick={finalize}
+            onClick={requestFinalize}
             disabled={finishing || !result}
             className="flex-1 min-h-[48px] rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold uppercase tracking-wide flex items-center justify-center gap-2 disabled:opacity-60 transition-colors"
           >
             <span className="material-symbols-outlined text-xl">check_circle</span>
-            {finishing ? 'Finalizando…' : 'Finalizar atendimento'}
+            {finishing ? 'Finalizando…' : 'Assinar e finalizar'}
           </button>
         </div>
       </div>
+
+      {/* Etapa de assinatura (§28–§57): resumo + aceite + assinar/indisponível/recusa */}
+      {signOpen && (
+        <SignatureStep
+          resultLabel={result ? ATTENDANCE_RESULT_LABEL[result] : ''}
+          execution={execution}
+          diagnosis={diagnosis}
+          onCancel={() => setSignOpen(false)}
+          onConfirm={runFinalize}
+        />
+      )}
+
+      {/* Pós-finalização: baixar OS / Relatório Técnico (§42) */}
+      {finalized && (
+        <div className="fixed inset-0 z-[84] flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4">
+          <div className="bg-surface w-full max-w-sm rounded-2xl shadow-2xl p-5 text-center">
+            <span className="material-symbols-outlined text-5xl text-emerald-600">task_alt</span>
+            <p className="mt-2 text-base font-bold text-fg">Atendimento finalizado</p>
+            <p className="text-[11px] text-fg-secondary">Os documentos refletem os atendimentos realizados até agora.</p>
+            <div className="mt-4 flex flex-col gap-2">
+              <button onClick={() => setDocKind('os')} className="min-h-[48px] rounded-lg bg-primary hover:bg-primary-hover text-white text-sm font-bold uppercase tracking-wide flex items-center justify-center gap-2"><span className="material-symbols-outlined text-lg">description</span>Baixar Ordem de Serviço</button>
+              <button onClick={() => setDocKind('relatorio')} className="min-h-[48px] rounded-lg border border-border text-fg-secondary text-sm font-bold uppercase tracking-wide flex items-center justify-center gap-2 hover:border-border-strong"><span className="material-symbols-outlined text-lg">article</span>Baixar Relatório Técnico</button>
+              <button onClick={onClose} className="min-h-[44px] rounded-lg text-fg-muted text-xs font-bold uppercase">Voltar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {docKind && os && (
+        <OsDocumentsView os={os} company={company} client={clients.find((c) => c.id === os.clienteId)} initialKind={docKind} onClose={() => setDocKind(null)} />
+      )}
+    </div>
+  );
+};
+
+/* -------------------------------------------------------------------------- */
+/* Etapa de ASSINATURA do responsável (§28–§57)                                */
+/* -------------------------------------------------------------------------- */
+const SignatureStep: React.FC<{
+  resultLabel: string;
+  execution: string;
+  diagnosis: string;
+  onCancel: () => void;
+  onConfirm: (sig: { status: AttendanceSignatureStatus; name?: string; role?: string; note?: string; blob?: Blob }) => void;
+}> = ({ resultLabel, execution, diagnosis, onCancel, onConfirm }) => {
+  const toast = useToast();
+  const [mode, setMode] = useState<'choose' | 'unavailable' | 'refused'>('choose');
+  const [canvasOpen, setCanvasOpen] = useState(false);
+  const [note, setNote] = useState('');
+
+  const confirmException = (status: 'UNAVAILABLE' | 'REFUSED') => {
+    if (!note.trim()) { toast.error('Informe um motivo.'); return; }
+    onConfirm({ status, note: note.trim() });
+  };
+
+  return (
+    <div className="fixed inset-0 z-[86] flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-sm sm:p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
+      <div className="bg-surface w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <p className="text-sm font-bold text-fg">Assinatura do responsável</p>
+          <button onClick={onCancel} className="text-fg-muted hover:text-fg-secondary text-2xl leading-none">×</button>
+        </div>
+        <div className="overflow-y-auto p-4 flex flex-col gap-3">
+          {/* Resumo antes de assinar (§56) */}
+          <div className="rounded-lg bg-surface-2 p-3">
+            <p className="text-[10px] font-bold uppercase text-fg-muted">Resumo</p>
+            {diagnosis.trim() ? <p className="text-[12px] text-fg mt-1"><span className="font-semibold">Diagnóstico:</span> {diagnosis}</p> : null}
+            {execution.trim() ? <p className="text-[12px] text-fg mt-1"><span className="font-semibold">Serviço executado:</span> {execution}</p> : null}
+            <p className="text-[12px] text-fg mt-1"><span className="font-semibold">Resultado:</span> {resultLabel}</p>
+          </div>
+          {/* Texto de aceite (§57) */}
+          <p className="text-[11px] text-fg-secondary leading-relaxed">Declaro ter acompanhado ou recebido as informações referentes aos serviços realizados neste atendimento.</p>
+
+          {mode === 'choose' && (
+            <div className="flex flex-col gap-2">
+              <button onClick={() => setCanvasOpen(true)} className="min-h-[48px] rounded-lg bg-primary hover:bg-primary-hover text-white text-sm font-bold uppercase tracking-wide flex items-center justify-center gap-2"><span className="material-symbols-outlined text-lg">draw</span>Coletar assinatura</button>
+              <button onClick={() => { setMode('unavailable'); setNote(''); }} className="min-h-[44px] rounded-lg border border-border text-fg-secondary text-[12px] font-bold uppercase hover:border-border-strong">Responsável indisponível</button>
+              <button onClick={() => { setMode('refused'); setNote(''); }} className="min-h-[44px] rounded-lg border border-border text-fg-secondary text-[12px] font-bold uppercase hover:border-border-strong">Cliente recusou assinar</button>
+            </div>
+          )}
+
+          {(mode === 'unavailable' || mode === 'refused') && (
+            <div className="flex flex-col gap-2">
+              <label className="text-[10px] font-bold uppercase text-fg-muted">{mode === 'unavailable' ? 'Motivo (responsável indisponível)' : 'Motivo (recusa)'}</label>
+              <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} autoFocus placeholder="Descreva brevemente…" className="w-full rounded-lg border border-border bg-surface text-fg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25" />
+              <div className="flex gap-2">
+                <button onClick={() => setMode('choose')} className="px-4 py-2.5 rounded-lg bg-surface-3 text-xs font-bold uppercase text-fg-secondary">Voltar</button>
+                <button onClick={() => confirmException(mode === 'unavailable' ? 'UNAVAILABLE' : 'REFUSED')} className="flex-1 min-h-[44px] rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold uppercase">Finalizar sem assinatura</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Reutiliza o SignatureCanvas existente (canvas + nome/cargo) */}
+      <SignatureCanvas
+        open={canvasOpen}
+        papel="cliente"
+        onClose={() => setCanvasOpen(false)}
+        onDone={(signatureId, nome) => {
+          const sig = getSignature(signatureId);
+          setCanvasOpen(false);
+          onConfirm({ status: 'SIGNED', name: nome, role: sig?.cargo, blob: sig?.blob });
+        }}
+      />
     </div>
   );
 };
