@@ -9,6 +9,7 @@ import { fetchContracts } from '@/lib/contracts';
 import { fetchClients } from '@/lib/clients';
 import { fetchScheduledExecutions, generateOsFromExecution } from '@/lib/contractRoutines';
 import { fetchAssignableTechnicians, ManagedUser } from '@/lib/users';
+import { getClientOperationalName } from '@/lib/utils';
 import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 import { useConfirm } from '@/components/ui/Feedback';
 
@@ -115,7 +116,8 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ onOpenOS, userRole, curr
     fetchHolidays().then((rows: Holiday[]) => setHolidays((prev) => { const map = { ...prev }; rows.forEach((h) => { map[h.date] = { name: h.name, type: h.type }; }); return map; })).catch(() => {});
   }, [year, online]);
 
-  const clientName = (id?: string) => clients.find((c) => c.id === id)?.name;
+  // Agenda é interface operacional: nome fantasia (fallback razão). §8/§9
+  const clientName = (id?: string) => { const c = clients.find((x) => x.id === id); return c ? getClientOperationalName(c) : undefined; };
   const contractById = (id: string) => contracts.find((c) => c.id === id);
 
   // Resolve o responsável técnico pelo profile (sem texto duplicado). Se o

@@ -36,7 +36,7 @@ import {
   sortByCapturadoDesc,
 } from '@/lib/fieldPhotosGallery';
 import { signedFieldPhotoUrls } from '@/lib/fieldPhotoStorage';
-import { nomeFantasiaCliente } from '@/lib/utils';
+import { nomeFantasiaCliente, razaoSocialCliente } from '@/lib/utils';
 import { DevicesManager } from '@/components/reports/DevicesManager';
 
 /* ==========================================================================
@@ -78,7 +78,6 @@ interface ClientDossieProps {
 
 const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 const norm = (s: string) => (s || '').trim().toLowerCase();
-const razaoSocialCliente = (name: string) => name.replace(/\s*\([^)]*\)\s*$/, '').trim();
 
 const OS_STATUS_UI: Record<OrdemServico['status'], { label: string; color: 'emerald' | 'amber' | 'blue' | 'red' | 'slate' }> = {
   aberta: { label: 'Aberta', color: 'amber' },

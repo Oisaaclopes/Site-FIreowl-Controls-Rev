@@ -5,6 +5,7 @@ import { Client, OrdemServico, OrdemServicoStatus, Pendencia, PendenciaStatus, U
 import { updatePendenciaStatus } from '@/lib/pendencias';
 import { createOrdemServico, fetchOrdensServico, nextOsNumero } from '@/lib/ordensServico';
 import { fetchAssignableTechnicians, ManagedUser } from '@/lib/users';
+import { getClientOperationalName } from '@/lib/utils';
 import { useToast, showToast } from '@/components/ui/Feedback';
 
 interface PendenciasBoardProps {
@@ -72,7 +73,8 @@ export const PendenciasBoard: React.FC<PendenciasBoardProps> = ({ pendencias, cl
     void carregarOrdens();
   }, []);
 
-  const clientName = (id?: string) => clients.find((c) => c.id === id)?.name || '—';
+  // Pendências é interface operacional: nome fantasia (fallback razão). §8/§9
+  const clientName = (id?: string) => getClientOperationalName(clients.find((c) => c.id === id), '—');
 
   const osPorPendencia = useMemo(() => {
     const mapa = new Map<string, OrdemServico>();

@@ -25,7 +25,7 @@ import { DevicesManager } from '@/components/reports/DevicesManager';
 import { EmptyState } from '@/components/EmptyState';
 import { fetchCnpjData } from '@/lib/cnpj';
 import { uploadClientFachada, uploadClientLogo, removePropostaCapa } from '@/lib/propostaCapa';
-import { nomeFantasiaCliente } from '@/lib/utils';
+import { nomeFantasiaCliente, razaoSocialCliente } from '@/lib/utils';
 import { resolveLogoDataUrls } from '@/lib/institucional';
 import { fetchReports } from '@/lib/reports';
 import { OS_STATUS_ATIVOS } from '@/lib/ordensServico';
@@ -58,7 +58,6 @@ const inputCls =
   'w-full border border-border rounded-lg p-2.5 text-fg bg-surface focus:outline-none focus:ring-2 focus:ring-danger/20 focus:border-danger/40';
 
 const norm = (s: string) => (s || '').trim().toLowerCase();
-const razaoSocialCliente = (name: string) => name.replace(/\s*\([^)]*\)\s*$/, '').trim();
 
 interface ContactForm {
   name: string;

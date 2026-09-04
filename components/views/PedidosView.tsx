@@ -7,7 +7,7 @@ import { StartAttendanceButton, AttendanceHistoryList, OsMissionPanel } from '@/
 import { OS_STATUS_ATIVOS, osHistoryForPedido, isHardDeleteEligible, isCancelable } from '@/lib/ordensServico';
 import { selecionarEmpresas, selecionarMarcas, experienciaAtiva } from '@/lib/experienciaSelecao';
 import { resolveLogoDataUrls } from '@/lib/institucional';
-import { nomeFantasiaCliente } from '@/lib/utils';
+import { nomeFantasiaCliente, razaoSocialCliente, getClientOperationalName } from '@/lib/utils';
 
 type ExperienciaOpt = {
   empresas: { nome: string; logoDataUrl?: string; destaque?: boolean }[];
@@ -140,7 +140,6 @@ const DEFAULT_STATUS_KEY = 'fireowl_pedidos_default_status';
 const pad2 = (n: number) => n.toString().padStart(2, '0');
 const dateKeyOf = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 const brl = (v: number) => `R$ ${(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-const razaoSocialCliente = (name: string) => name.replace(/\s*\([^)]*\)\s*$/, '').trim();
 
 export const PedidosView: React.FC<PedidosViewProps> = ({
   ordensServico,
@@ -1833,7 +1832,7 @@ const OrdemServicoDetailModal: React.FC<{
   onClose: () => void;
 }> = ({ os, clients, contracts, canManage = false, isTecnico = false, currentUserId, currentUserName, currentUserPunches = [], usesTimeClock = false, onCancel, onDelete, onClose }) => {
   // Interface operacional: nome fantasia com fallback à razão (§8/§9).
-  const clienteNome = nomeFantasiaCliente(clients.find((c) => c.id === os.clienteId)?.name) || os.clienteId || '—';
+  const clienteNome = getClientOperationalName(clients.find((c) => c.id === os.clienteId), os.clienteId || '—');
   const contrato = contracts.find((c) => c.id === os.contratoId);
   const st = OS_STATUS_LABEL[os.status] || { label: os.status, color: 'slate' as const };
   const podeCancelar = canManage && !!onCancel && isCancelable(os);

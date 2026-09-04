@@ -43,6 +43,9 @@ import { fetchPedidos } from '@/lib/pedidos';
 import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 import { centralModelsForBrand, centralType, manufacturersForArea } from '@/lib/technicalCatalogSelection';
 import { canHardDeleteReport, filterReports, isLatestReportRefresh } from '@/lib/reportList';
+import { getClientOperationalName } from '@/lib/utils';
+import { resolveLogoDataUrls } from '@/lib/institucional';
+import { ClientLogo } from '@/components/ClientLogo';
 
 /** Template disponível ao motor: o schema + o id no banco (quando veio do DB). */
 interface LoadedTemplate {
@@ -505,8 +508,23 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     }
   };
 
-  const clientName = (id?: string) => clients.find((c) => c.id === id)?.name || '—';
+  // Interface operacional: nome fantasia (fallback razão). Fonte canônica única.
+  const clientName = (id?: string) => getClientOperationalName(clients.find((c) => c.id === id), '—');
   const surveyOrderFor = (reportId: string) => surveyOrders.find((pedido) => pedido.proposal?.surveyOrigin?.reportId === reportId);
+
+  // Logos reais dos clientes (path → data URI) para os cards operacionais (§11).
+  const [clientLogoUrls, setClientLogoUrls] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let alive = true;
+    resolveLogoDataUrls(clients.map((c) => c.logoPath || '').filter(Boolean))
+      .then((map) => { if (alive) setClientLogoUrls(map); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [clients]);
+  const clientLogoUrl = (id?: string) => {
+    const p = clients.find((c) => c.id === id)?.logoPath;
+    return p ? clientLogoUrls[p] : undefined;
+  };
 
   const refresh = () => {
     if (!isSupabaseConfigured()) return;
@@ -1200,8 +1218,9 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                 return (
                   <article key={os.id} className="rounded-xl bg-surface border border-border shadow-sm p-4 flex flex-col gap-3">
                     <div className="flex items-start gap-3">
-                      <div className="w-11 h-11 shrink-0 rounded-xl bg-navy/10 text-primary flex items-center justify-center"><span className="material-symbols-outlined">business</span></div>
-                      <div className="min-w-0 flex-1"><p className="font-bold text-fg truncate">{cliente?.name || 'Cliente não identificado'}</p><p className="text-[11px] text-fg-secondary mt-0.5">{os.numero || os.id.slice(0, 8)} · Corretiva · {os.status.replace('_', ' ')}</p><p className="text-xs text-fg-secondary mt-1 line-clamp-2">{os.titulo || `${os.pendenciaIds.length} pendência(s) vinculada(s)`}</p></div>
+                      {/* Interface operacional: logo real + NOME FANTASIA (§6/§11). */}
+                      <ClientLogo src={clientLogoUrl(os.clienteId)} name={getClientOperationalName(cliente, 'Cliente')} sizeClass="w-11 h-11" rounded="rounded-xl" />
+                      <div className="min-w-0 flex-1"><p className="font-bold text-fg truncate">{cliente ? getClientOperationalName(cliente, 'Cliente') : 'Cliente não identificado'}</p><p className="text-[11px] text-fg-secondary mt-0.5">{os.numero || os.id.slice(0, 8)} · Corretiva · {os.status.replace('_', ' ')}</p><p className="text-xs text-fg-secondary mt-1 line-clamp-2">{os.titulo || `${os.pendenciaIds.length} pendência(s) vinculada(s)`}</p></div>
                     </div>
                     <div className="flex items-center gap-2 text-[11px] border-t border-border pt-2">
                       <span className="material-symbols-outlined text-[16px] text-fg-muted">engineering</span>

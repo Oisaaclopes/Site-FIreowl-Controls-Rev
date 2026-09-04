@@ -28,6 +28,7 @@ import { fetchReports } from '@/lib/reports';
 import { fetchOrdensServico } from '@/lib/ordensServico';
 import { fetchPendencias } from '@/lib/pendencias';
 import { fetchAssignableTechnicians } from '@/lib/users';
+import { nomeFantasiaCliente, getClientOperationalName } from '@/lib/utils';
 import { QuickFieldPhotoModal } from './QuickFieldPhotoModal';
 import { gpsLabel } from '@/lib/fieldPhotoGeo';
 import { shareEvidence } from '@/lib/fieldPhotoShare';
@@ -177,7 +178,7 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole, technicia
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined rounded-xl bg-navy p-2 text-white">photo_library</span>
           <div>
-            <h1 className="text-lg font-bold tracking-tight text-fg sm:text-xl">{selectedGroup ? selectedGroup.clientName : 'Fotos de Campo'}</h1>
+            <h1 className="text-lg font-bold tracking-tight text-fg sm:text-xl">{selectedGroup ? nomeFantasiaCliente(selectedGroup.clientName) : 'Fotos de Campo'}</h1>
             <p className="text-xs text-fg-secondary">{selectedGroup ? `${selectedGroup.photoCount} evidência(s) deste cliente` : 'Selecione um cliente para abrir a galeria.'}</p>
           </div>
           {selectedClientId&&<button onClick={()=>{setSelectedClientId(null);setTab('todas');setSelection(new Set())}} className="ml-auto min-h-10 rounded-lg border border-border-strong bg-surface px-3 text-xs font-bold uppercase text-fg-secondary">← Clientes</button>}
@@ -243,7 +244,7 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole, technicia
         loading ? <div className="py-20 text-center text-sm text-fg-muted">Carregando clientes…</div> : clientGroups.length===0 ? <div className="py-20 text-center text-sm text-fg-muted">Nenhum cliente possui fotos de campo.</div> :
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{clientGroups.map(group=>{const cover=group.photos[0];return <button key={group.clientId} onClick={()=>setSelectedClientId(group.clientId)} className="flex min-h-24 items-center gap-3 rounded-xl border border-border bg-surface p-3 text-left shadow-sm hover:border-primary/40">
           <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-surface-3">{thumbs[cover.clientUuid]?<img src={thumbs[cover.clientUuid]} alt="Última evidência" className="h-full w-full object-cover"/>:<span className="material-symbols-outlined flex h-full items-center justify-center text-fg-muted">photo_library</span>}</div>
-          <div className="min-w-0"><p className="truncate text-sm font-bold text-fg">{group.clientName}</p><p className="mt-1 text-[11px] text-fg-secondary">{group.photoCount} foto(s) · última {fmtDate(group.lastEvidenceAt)}</p><div className="mt-2 flex flex-wrap gap-1">{group.pendingCount>0&&<span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">{group.pendingCount} pendente(s)</span>}{group.comparisonCount>0&&<span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">{group.comparisonCount} Antes×Depois</span>}</div></div>
+          <div className="min-w-0"><p className="truncate text-sm font-bold text-fg">{nomeFantasiaCliente(group.clientName)}</p><p className="mt-1 text-[11px] text-fg-secondary">{group.photoCount} foto(s) · última {fmtDate(group.lastEvidenceAt)}</p><div className="mt-2 flex flex-wrap gap-1">{group.pendingCount>0&&<span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">{group.pendingCount} pendente(s)</span>}{group.comparisonCount>0&&<span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">{group.comparisonCount} Antes×Depois</span>}</div></div>
         </button>})}</div>
       ) : tab === 'comparacoes' ? (
         <ComparisonsPanel comparisons={clientComparisons} photoById={photoById} thumbs={thumbs} onReload={reloadComparisons} onGenerateSheet={(items) => setSheetComparisons(items)} />
@@ -382,7 +383,7 @@ const FiltersSheet: React.FC<{ filters: FieldPhotoFilters; onChange: (f: FieldPh
           <label className="block text-xs font-bold uppercase text-fg-secondary">Cliente
             <select value={filters.clientId || ''} onChange={(e) => set({ clientId: e.target.value || undefined })} className="mt-1 min-h-11 w-full rounded-xl border border-border-strong bg-surface px-3 text-sm font-normal normal-case text-fg">
               <option value="">Todos</option>
-              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {clients.map((c) => <option key={c.id} value={c.id}>{getClientOperationalName(c)}</option>)}
             </select>
           </label>
           {showTechFilter && (

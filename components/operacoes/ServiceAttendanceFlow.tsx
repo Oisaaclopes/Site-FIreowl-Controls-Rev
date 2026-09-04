@@ -24,7 +24,7 @@ import { fetchOrdensServico, updateOrdemServicoStatus } from '@/lib/ordensServic
 import { capturePosition } from '@/lib/fieldPhotoGeo';
 import { fetchOsMission, missionHasContent, OsMission } from '@/lib/osMission';
 import { resolveLogoDataUrls } from '@/lib/institucional';
-import { nomeFantasiaCliente } from '@/lib/utils';
+import { getClientOperationalName } from '@/lib/utils';
 import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 import { useConfirm, useToast } from '@/components/ui/Feedback';
 import { QuickFieldPhotoModal } from '@/components/field-photos/QuickFieldPhotoModal';
@@ -41,7 +41,7 @@ import { ClientLogo } from '@/components/ClientLogo';
 
 /** Nome operacional do cliente: nome fantasia com fallback à razão (§8/§9). */
 const clientNameOf = (clients: Client[], id?: string) =>
-  nomeFantasiaCliente(clients.find((c) => c.id === id)?.name) || 'Cliente';
+  getClientOperationalName(clients.find((c) => c.id === id), 'Cliente');
 
 /** Hook: resolve a logo (data URI) do cliente de uma OS, quando cadastrada. */
 function useClientLogo(clients: Client[], clientId?: string): string | undefined {
