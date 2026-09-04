@@ -1,7 +1,8 @@
 import React from 'react';
 import { Document, Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer';
 import { C, nv, Logo, BlueprintBg, PdfFooter } from './pdfKit';
-import { OsDocumentData, DocEvidencePhoto, DocAttendance, attendanceResultLabel } from '@/lib/osDocuments';
+import { OsDocumentData, attendanceResultLabel } from '@/lib/osDocuments';
+import { EvidenceComparison, SignaturePair, InstitutionalBlock } from './AtendimentoDocParts';
 
 /* Relatório Técnico de Atendimento (React-PDF). Apresenta OS + Pedido +
  * Atendimentos + Itens de Evidência + fotos + assinaturas. Sem dado comercial. */
@@ -43,48 +44,8 @@ const Section = ({ title, children }: { title: string; children: React.ReactNode
   <View minPresenceAhead={40}><View style={s.secTitle}><Text style={s.secTitleTx}>{title}</Text></View>{children}</View>
 );
 
-const PhotoStrip = ({ label, photos }: { label: string; photos: DocEvidencePhoto[] }) => {
-  const withImg = photos.filter((p) => p.dataUrl);
-  if (withImg.length === 0) return null;
-  return (
-    <View wrap={false}>
-      <Text style={s.photoRowLabel}>{label}</Text>
-      <View style={s.photoRow}>
-        {withImg.map((p) => (
-          <View key={p.id}>
-            {/* eslint-disable-next-line jsx-a11y/alt-text */}
-            <Image src={p.dataUrl!} style={s.photo} />
-            {(p.note || p.brand || p.model) ? <Text style={s.photoCap}>{[p.brand, p.model].filter(Boolean).join(' ')}{p.note ? (p.brand || p.model ? ` — ${p.note}` : p.note) : ''}</Text> : null}
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-};
-
 const fmtDate = (s2?: string) => (s2 ? new Date(s2).toLocaleDateString('pt-BR') : '—');
 const fmtTime = (s2?: string) => (s2 ? new Date(s2).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—');
-
-const SignatureBlock = ({ att, techName }: { att: DocAttendance; techName?: string }) => (
-  <View style={s.signBox} wrap={false}>
-    <View style={s.signCell}>
-      <Text style={s.infoLabel}>Responsável do cliente</Text>
-      {att.signature?.status === 'SIGNED' ? (
-        <>
-          {att.signature.dataUrl ? <Image src={att.signature.dataUrl} style={s.signImg} /> : null}
-          <View style={s.signLine}><Text style={{ fontSize: 9, fontWeight: 700, color: C.ink }}>{att.signature.name || '—'}</Text>{nv(att.signature.role) ? <Text style={{ fontSize: 7.5, color: C.s600 }}>{att.signature.role}</Text> : null}<Text style={{ fontSize: 7, color: C.s600, marginTop: 1 }}>{fmtDate(att.signature.signedAt)} {fmtTime(att.signature.signedAt)}</Text></View>
-        </>
-      ) : (
-        <Text style={{ fontSize: 8.5, color: C.s700, marginTop: 6 }}>{att.signature?.status === 'REFUSED' ? 'Cliente recusou assinar.' : 'Responsável indisponível.'}{att.signature?.note ? ` ${att.signature.note}` : ''}</Text>
-      )}
-    </View>
-    <View style={s.signCell}>
-      <Text style={s.infoLabel}>Técnico Fireowl</Text>
-      <View style={{ height: 54 }} />
-      <View style={s.signLine}><Text style={{ fontSize: 9, fontWeight: 700, color: C.ink }}>{techName || att.technicianName}</Text><Text style={{ fontSize: 7.5, color: C.s600 }}>Fireowl Controls</Text></View>
-    </View>
-  </View>
-);
 
 export function RelatorioAtendimentoDocument({ data }: { data: OsDocumentData }) {
   const razao = data.company?.razaoSocial || 'Fireowl Controls';
@@ -164,28 +125,33 @@ export function RelatorioAtendimentoDocument({ data }: { data: OsDocumentData })
               {nv(att.diagnosis) ? <View><Text style={s.photoRowLabel}>Diagnóstico</Text><Text style={s.para}>{att.diagnosis}</Text></View> : null}
               {nv(att.executionNotes) ? <View><Text style={s.photoRowLabel}>Serviço executado</Text><Text style={s.para}>{att.executionNotes}</Text></View> : null}
 
-              {(nv(att.centralConditionInitial) || att.centralAntes.length > 0) && (
-                <View><Text style={s.photoRowLabel}>Condição inicial da central</Text>{nv(att.centralConditionInitial) ? <Text style={s.para}>{att.centralConditionInitial}</Text> : null}<PhotoStrip label="Central — chegada" photos={att.centralAntes} /></View>
+              {/* Condição da central: chegada × saída lado a lado quando houver (§21M) */}
+              {(nv(att.centralConditionInitial) || nv(att.centralConditionFinal) || att.centralAntes.length > 0 || att.centralDepois.length > 0) && (
+                <View minPresenceAhead={60}>
+                  <Text style={s.photoRowLabel}>Condição da central</Text>
+                  {(nv(att.centralConditionInitial) || nv(att.centralConditionFinal)) && (
+                    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 2 }}>
+                      {nv(att.centralConditionInitial) ? <Text style={{ ...s.para, flex: 1 }}><Text style={{ fontWeight: 700 }}>Inicial: </Text>{att.centralConditionInitial}</Text> : null}
+                      {nv(att.centralConditionFinal) ? <Text style={{ ...s.para, flex: 1 }}><Text style={{ fontWeight: 700 }}>Final: </Text>{att.centralConditionFinal}</Text> : null}
+                    </View>
+                  )}
+                  <EvidenceComparison columns={[{ label: 'Condição inicial', photos: att.centralAntes }, { label: 'Condição final', photos: att.centralDepois }]} />
+                </View>
               )}
 
               {att.items.map((it) => (
-                <View key={it.id} style={s.itemBox} minPresenceAhead={60}>
+                <View key={it.id} style={s.itemBox} minPresenceAhead={110}>
                   <Text style={s.itemTitle}>{it.title}</Text>
                   <Text style={s.itemSub}>{[it.equipmentType || it.category, [it.manufacturer, it.model].filter(Boolean).join(' '), it.deviceAddress ? `Endereço ${it.deviceAddress}` : '', it.location].filter(Boolean).join(' · ')}</Text>
                   {nv(it.notes) ? <Text style={{ ...s.para, marginTop: 2 }}>{it.notes}</Text> : null}
-                  <PhotoStrip label="Antes" photos={it.antes} />
-                  <PhotoStrip label="Durante" photos={it.durante} />
-                  <PhotoStrip label="Depois" photos={it.depois} />
+                  {/* Antes | Durante | Depois lado a lado (§21A–§21F) */}
+                  <EvidenceComparison columns={[{ label: 'Antes', photos: it.antes }, { label: 'Durante', photos: it.durante }, { label: 'Depois', photos: it.depois }]} />
                 </View>
               ))}
 
-              {(nv(att.centralConditionFinal) || att.centralDepois.length > 0) && (
-                <View><Text style={s.photoRowLabel}>Condição final da central</Text>{nv(att.centralConditionFinal) ? <Text style={s.para}>{att.centralConditionFinal}</Text> : null}<PhotoStrip label="Central — saída" photos={att.centralDepois} /></View>
-              )}
-
               <View wrap={false}><Text style={s.photoRowLabel}>Resultado</Text><Text style={s.para}>{attendanceResultLabel(att.result)}</Text></View>
 
-              <SignatureBlock att={att} />
+              <SignaturePair att={att} clientCompany={data.clientOperational} />
             </View>
           ))}
         </Section>
@@ -195,6 +161,8 @@ export function RelatorioAtendimentoDocument({ data }: { data: OsDocumentData })
             <Text style={s.para}>{data.conclusao || `Foram realizados ${data.attendances.length} atendimento(s). Último resultado: ${attendanceResultLabel(data.attendances[data.attendances.length - 1]?.result)}. Status atual da OS: ${os.status.replace('_', ' ')}.`}</Text>
           </Section>
         )}
+
+        <InstitutionalBlock company={data.company} />
 
         <PdfFooter numero={numero} data={dataDoc} cliente={data.clientOperational} />
       </Page>

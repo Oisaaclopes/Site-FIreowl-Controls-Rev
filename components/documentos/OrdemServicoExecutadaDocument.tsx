@@ -1,7 +1,8 @@
 import React from 'react';
-import { Document, Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer';
+import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { C, nv, PdfHeader, PdfFooter } from './pdfKit';
 import { OsDocumentData, attendanceResultLabel } from '@/lib/osDocuments';
+import { SignaturePair, InstitutionalBlock } from './AtendimentoDocParts';
 
 /* Ordem de Serviço executada (React-PDF): comprovante formal, curto e
  * operacional, do serviço executado + aceite/assinatura por atendimento. */
@@ -9,6 +10,8 @@ import { OsDocumentData, attendanceResultLabel } from '@/lib/osDocuments';
 const s = StyleSheet.create({
   page: { paddingTop: 30, paddingBottom: 44, paddingHorizontal: 34, fontSize: 9, fontFamily: 'Roboto', color: C.ink },
   secTitle: { flexDirection: 'row', alignItems: 'center', borderLeftWidth: 3, borderLeftColor: C.red, paddingLeft: 8, marginTop: 12, marginBottom: 5 },
+  // Espaço claro entre o cabeçalho institucional e a 1ª seção (§1).
+  firstSec: { marginTop: 22 },
   secTitleTx: { color: C.navy, fontSize: 10.5, fontFamily: 'Poppins', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4 },
   row: { flexDirection: 'row', gap: 8 },
   cell: { flex: 1, backgroundColor: C.s50, borderWidth: 1, borderColor: C.s200, borderRadius: 5, padding: 7, marginBottom: 6 },
@@ -40,7 +43,7 @@ export function OrdemServicoExecutadaDocument({ data }: { data: OsDocumentData }
       <Page size="A4" style={s.page}>
         <PdfHeader razao={razao} label="Ordem de Serviço Executada" showLogo logoUrl={data.companyLogoDataUrl} />
 
-        <View style={s.secTitle}><Text style={s.secTitleTx}>Identificação</Text></View>
+        <View style={[s.secTitle, s.firstSec]}><Text style={s.secTitleTx}>Identificação</Text></View>
         <View style={s.row}>{cell('Cliente', data.clientOperational)}{cell('OS', numero)}</View>
         <View style={s.row}>{cell('Título', os.titulo || data.mission.osTitulo)}{cell('Tipo', os.tipo)}{cell('Prioridade', os.prioridade)}</View>
         <View style={s.row}>{cell('Abertura', os.dataAbertura ? fmtDate(os.dataAbertura) : undefined)}{cell('Status', os.status.replace('_', ' '))}{cell('Área', (data.mission.area[0] || '').toUpperCase() || undefined)}</View>
@@ -62,24 +65,11 @@ export function OrdemServicoExecutadaDocument({ data }: { data: OsDocumentData }
             {nv(att.diagnosis) ? <><Text style={s.sub}>Diagnóstico</Text><Text style={s.para}>{att.diagnosis}</Text></> : null}
             {nv(att.executionNotes) ? <><Text style={s.sub}>Serviço executado</Text><Text style={s.para}>{att.executionNotes}</Text></> : null}
             {nv(att.centralConditionFinal) ? <><Text style={s.sub}>Condição final da central</Text><Text style={s.para}>{att.centralConditionFinal}</Text></> : null}
-            <View style={s.signRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.label}>Responsável do cliente</Text>
-                {att.signature?.status === 'SIGNED' ? (
-                  <View>
-                    {att.signature.dataUrl ? <Image src={att.signature.dataUrl} style={s.signImg} /> : null}
-                    <View style={s.signCell}><Text style={{ fontSize: 9, fontWeight: 700 }}>{att.signature.name || '—'}</Text>{nv(att.signature.role) ? <Text style={{ fontSize: 7.5, color: C.s600 }}>{att.signature.role}</Text> : null}<Text style={{ fontSize: 7, color: C.s600 }}>{fmtDate(att.signature.signedAt)} {fmtTime(att.signature.signedAt)}</Text></View>
-                  </View>
-                ) : <Text style={{ ...s.para, marginTop: 4 }}>{att.signature?.status === 'REFUSED' ? 'Cliente recusou assinar.' : att.signature?.status === 'UNAVAILABLE' ? 'Responsável indisponível.' : 'Sem assinatura.'}{att.signature?.note ? ` ${att.signature.note}` : ''}</Text>}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.label}>Técnico Fireowl</Text>
-                <View style={{ height: 40 }} />
-                <View style={s.signCell}><Text style={{ fontSize: 9, fontWeight: 700 }}>{att.technicianName}</Text><Text style={{ fontSize: 7.5, color: C.s600 }}>Fireowl Controls</Text></View>
-              </View>
-            </View>
+            <SignaturePair att={att} clientCompany={data.clientOperational} />
           </View>
         ))}
+
+        <InstitutionalBlock company={data.company} compact />
 
         <PdfFooter numero={numero} data={dataDoc} cliente={data.clientOperational} />
       </Page>

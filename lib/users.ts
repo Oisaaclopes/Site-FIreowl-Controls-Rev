@@ -82,16 +82,23 @@ const profileFields = (u: Partial<NewUserInput>) => ({
   ...(u.usesTimeClock !== undefined ? { uses_time_clock: u.usesTimeClock } : {}),
 });
 
-export interface TimeClockParticipant { id: string; name: string; usesTimeClock: boolean; schedule?: WorkSchedule }
+export interface TimeClockParticipant { id: string; name: string; usesTimeClock: boolean; schedule?: WorkSchedule; fullName?: string; cargo?: string }
 
 export async function fetchTimeClockParticipants(): Promise<TimeClockParticipant[]> {
   try {
     const supabase = getSupabaseClient() as any;
     const { data, error } = await supabase.rpc('get_time_clock_participants');
     if (error) throw error;
-    // `schedule` só existe após a migração 0090; ausente = undefined (degrada seguro).
-    return (data || []).map((r: any) => ({ id: String(r.id), name: r.name || '', usesTimeClock: r.uses_time_clock !== false, schedule: r.schedule ? normalizeSchedule(r.schedule) : undefined }));
+    // `schedule` (0090) e `full_name`/`cargo` (0092) só existem após as migrações;
+    // ausentes = undefined (degrada seguro).
+    return (data || []).map((r: any) => ({ id: String(r.id), name: r.name || '', usesTimeClock: r.uses_time_clock !== false, schedule: r.schedule ? normalizeSchedule(r.schedule) : undefined, fullName: r.full_name ?? undefined, cargo: r.cargo ?? undefined }));
   } catch { return []; }
+}
+
+/** Nome COMPLETO canônico para documentos formais: full_name > name. Nunca
+ *  primeiro nome nem derivado de e-mail. */
+export function getUserFullName(u: { fullName?: string; name?: string } | undefined, fallback = ''): string {
+  return (u?.fullName && u.fullName.trim()) || (u?.name && u.name.trim()) || fallback;
 }
 
 // Trilha de auditoria (best-effort; nunca bloqueia; sem senha). user_id (actor)

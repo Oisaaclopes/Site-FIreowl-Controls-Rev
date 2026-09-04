@@ -48,7 +48,7 @@ export default function OsDocumentsPdfInner({ os, company, client, pedido, initi
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = osDocumentFileName(kind === 'os' ? 'OS' : 'RELATORIO-TECNICO-OS', os, data.clientOperational);
+      a.download = osDocumentFileName(kind, os, data.clientOperational);
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch (e) {

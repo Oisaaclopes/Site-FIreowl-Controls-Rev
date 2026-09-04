@@ -3,7 +3,7 @@ import { fetchServiceAttendances } from './serviceAttendances';
 import { fetchEvidenceItems } from './evidenceItems';
 import { listFieldPhotosForOs, FieldPhoto, FieldPhotoMoment } from './fieldPhotos';
 import { fetchOsMission, OsMission } from './osMission';
-import { fetchTimeClockParticipants } from './users';
+import { fetchTimeClockParticipants, getUserFullName } from './users';
 import { resolveLogoDataUrls } from './institucional';
 import { resolveFieldPhotoDataUrls } from './fieldPhotoStorage';
 import { getClientOperationalName, getClientLegalName } from './utils';
@@ -23,7 +23,7 @@ export interface DocEvidenceItem {
   antes: DocEvidencePhoto[]; durante: DocEvidencePhoto[]; depois: DocEvidencePhoto[];
 }
 export interface DocAttendance {
-  id: string; index: number; technicianName: string;
+  id: string; index: number; technicianName: string; technicianRole?: string;
   startedAt?: string; finishedAt?: string; result?: string;
   diagnosis?: string; executionNotes?: string;
   centralConditionInitial?: string; centralConditionFinal?: string; centralNotApplicable?: boolean; centralNaReason?: string;
@@ -81,7 +81,7 @@ export async function buildOsDocumentData(
   // Atendimentos em ordem cronológica (mais antigo primeiro) para o relatório.
   const attendances = [...attendancesRaw].sort((a, b) => (a.startedAt || '').localeCompare(b.startedAt || ''));
 
-  const nameById = new Map(participants.map((p) => [p.id, p.name]));
+  const techById = new Map(participants.map((p) => [p.id, p]));
 
   const [items, photos] = await Promise.all([
     Promise.all(attendances.map((a) => fetchEvidenceItems(a.id).catch(() => [] as ServiceAttendanceEvidenceItem[]))),
@@ -106,9 +106,11 @@ export async function buildOsDocumentData(
       manufacturer: it.manufacturer, model: it.model, deviceAddress: it.deviceAddress, location: it.location, notes: it.notes,
       antes: photosOf(a.id, it.id, 'ANTES'), durante: photosOf(a.id, it.id, 'DURANTE'), depois: photosOf(a.id, it.id, 'DEPOIS'),
     }));
+    const tech = a.technicianId ? techById.get(a.technicianId) : undefined;
     return {
       id: a.id, index: idx + 1,
-      technicianName: (a.technicianId && nameById.get(a.technicianId)) || 'Técnico',
+      technicianName: getUserFullName(tech, 'Técnico'),
+      technicianRole: tech?.cargo,
       startedAt: a.startedAt, finishedAt: a.finishedAt, result: a.result,
       diagnosis: a.diagnosis, executionNotes: a.executionNotes,
       centralConditionInitial: a.centralConditionInitial, centralConditionFinal: a.centralConditionFinal,
@@ -140,12 +142,17 @@ export async function buildOsDocumentData(
   };
 }
 
-/** Nome de arquivo saneado para os PDFs (§47). */
-export function osDocumentFileName(prefix: 'OS' | 'RELATORIO-TECNICO-OS', os: OrdemServico, clientOperational: string): string {
+/**
+ * Nome de arquivo saneado (§21/§47). O número da OS já contém "OS-2026-0003";
+ * não duplicar o prefixo "OS". Ex.: OS-2026-0003-MUFFATO-FOODS.pdf e
+ * RELATORIO-TECNICO-OS-2026-0003-MUFFATO-FOODS.pdf.
+ */
+export function osDocumentFileName(kind: 'os' | 'relatorio', os: OrdemServico, clientOperational: string): string {
   const slug = (s: string) => (s || '')
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').toUpperCase().slice(0, 40);
-  const numero = os.numero || os.id.slice(0, 8);
+  const numero = slug(os.numero || `OS-${os.id.slice(0, 8)}`);
   const cli = slug(clientOperational);
-  return `${prefix}-${slug(numero)}${cli ? `-${cli}` : ''}.pdf`;
+  const base = kind === 'relatorio' ? `RELATORIO-TECNICO-${numero}` : numero;
+  return `${base}${cli ? `-${cli}` : ''}.pdf`;
 }
