@@ -12,6 +12,8 @@ import { ClientSelector } from '@/components/clients/ClientSelector';
 import type { GalleryPhoto } from '@/lib/fieldPhotosGallery';
 import type { ComparisonResult } from '@/lib/fieldPhotoComparisons';
 import { capturePosition, reverseGeocode } from '@/lib/fieldPhotoGeo';
+import { fetchTechnicalCatalog, TechnicalCatalogItem } from '@/lib/technicalCatalog';
+import { EquipmentIdentifier, EquipmentIdentification } from '@/components/catalog/EquipmentIdentifier';
 
 type SavedPhoto = { photo: FieldPhoto; original: Blob; evidence?: Blob; previewUrl: string; evidenceUrl?: string; synced: boolean };
 const MARKERS: { value: FieldPhotoMarker; label: string; tone: string }[] = [
@@ -54,6 +56,10 @@ export const QuickFieldPhotoModal: React.FC<Props> = ({ isOpen, clients, technic
   const [opened, setOpened] = useState<SavedPhoto | null>(null);
   const [geo,setGeo]=useState<Awaited<ReturnType<typeof capturePosition>>>();
   const [comparisonResult,setComparisonResult]=useState<ComparisonResult>('corrigido');
+  // Catálogo técnico (view segura, sem preço/saldo) para identificar equipamento.
+  const [equipment, setEquipment] = useState<EquipmentIdentification | undefined>();
+  const [catalog, setCatalog] = useState<TechnicalCatalogItem[]>([]);
+  useEffect(() => { if (isOpen) fetchTechnicalCatalog().then(setCatalog).catch(() => setCatalog([])); }, [isOpen]);
   const client = useMemo(() => clients.find((item) => item.id === clientId), [clients, clientId]);
   const pending = photos.filter((photo) => !photo.synced).length;
 
@@ -63,7 +69,7 @@ export const QuickFieldPhotoModal: React.FC<Props> = ({ isOpen, clients, technic
   const reset = React.useCallback(() => {
     releaseCurrent();
     setPhotos((items) => { items.forEach((photo) => { URL.revokeObjectURL(photo.previewUrl); if (photo.evidenceUrl) URL.revokeObjectURL(photo.evidenceUrl); }); return []; });
-    setClientId(''); setSector(''); setSession(null); setMarker('falha'); setNote(''); setSummary(false); setShowPhotos(false); setOpened(null);
+    setClientId(''); setSector(''); setSession(null); setMarker('falha'); setNote(''); setSummary(false); setShowPhotos(false); setOpened(null); setEquipment(undefined);
   }, [releaseCurrent]);
   useEffect(() => () => { releaseCurrent(); }, [releaseCurrent]);
   useEffect(() => { if (!isOpen) reset(); }, [isOpen, reset]);
@@ -116,7 +122,7 @@ export const QuickFieldPhotoModal: React.FC<Props> = ({ isOpen, clients, technic
     if (!session || !client || !current || busy) return;
     setBusy(true);
     const captured = current;
-    const basePhoto = newFieldPhoto({ sessionId: session.id, clientId: client.id, storagePathOriginal: '', notaRapida: note.trim() || undefined, marcador: afterReference?'depois':marker, geo, osId: afterReference?.osId ?? osId, serviceAttendanceId }, captured.capturedAt);
+    const basePhoto = newFieldPhoto({ sessionId: session.id, clientId: client.id, storagePathOriginal: '', notaRapida: note.trim() || undefined, marcador: afterReference?'depois':marker, geo, osId: afterReference?.osId ?? osId, serviceAttendanceId, equipmentCatalogItemId: equipment?.catalogItemId, equipmentBrand: equipment?.brand?.trim() || undefined, equipmentModel: equipment?.model?.trim() || undefined }, captured.capturedAt);
     const pathBase = { technicianId: session.tecnicoId, sessionClientUuid: session.clientUuid, photoClientUuid: basePhoto.clientUuid };
     const photo = {
       ...basePhoto,
@@ -134,7 +140,7 @@ export const QuickFieldPhotoModal: React.FC<Props> = ({ isOpen, clients, technic
       if(afterReference&&technicianId){await enqueueFieldPhotoComparison({ownerUserId:technicianId,comparison:{beforePhotoId:afterReference.id,afterPhotoId:photo.id,clientId:client.id,reportId:afterReference.reportId,osId:afterReference.osId,pendenciaId:afterReference.pendenciaId,resultado:comparisonResult}});onComparisonCreated?.();}
       setPhotos((items) => [...items, { photo, original: captured.file, evidence, previewUrl: captured.url, evidenceUrl, synced: false }]);
       setCurrent(null); // a URL passa a pertencer ao card salvo e será liberada no reset.
-      setNote(''); setMarker('falha');
+      setNote(''); setMarker('falha'); setEquipment(undefined);
       void sync();
       if (finishAfter) await finalize(false);
     } catch {
@@ -175,7 +181,7 @@ export const QuickFieldPhotoModal: React.FC<Props> = ({ isOpen, clients, technic
           <button onClick={start} disabled={!clientId || !technicianId} className="min-h-14 w-full rounded-xl bg-navy px-4 text-sm font-bold uppercase tracking-wide text-white disabled:opacity-50">Iniciar registro</button>
         </div> : summary ? <div className="mx-auto max-w-md space-y-5 py-7 text-center"><span className="material-symbols-outlined rounded-full bg-emerald-100 p-4 text-4xl text-emerald-600">task_alt</span><div><h2 className="text-xl font-bold text-fg">Registro concluído</h2><p className="mt-1 text-sm text-fg-secondary">{client?.name}{session.localSetor ? ` · ${session.localSetor}` : ''}</p></div><div className="grid grid-cols-2 gap-3 text-left"><div className="rounded-xl bg-surface p-3"><p className="text-[10px] font-bold uppercase text-fg-muted">Fotos</p><p className="text-xl font-bold">{photos.length}</p></div><div className="rounded-xl bg-surface p-3"><p className="text-[10px] font-bold uppercase text-fg-muted">Pendentes</p><p className="text-xl font-bold">{pending}</p></div></div><button onClick={() => setShowPhotos(true)} className="min-h-12 w-full rounded-xl border border-primary text-sm font-bold uppercase text-primary">Ver fotos</button><button onClick={close} className="min-h-12 w-full rounded-xl bg-navy text-sm font-bold uppercase text-white">Voltar ao painel</button></div> : <>
           <div className="mb-4 rounded-xl bg-surface p-3 shadow-sm"><p className="truncate text-sm font-bold text-fg">{client?.name}</p><p className="mt-0.5 text-[11px] text-fg-secondary">{session.localSetor || 'Sem local definido'} · Fotos: {photos.length}</p><p className={`mt-2 text-[10px] font-bold uppercase ${isOnline() && pending === 0 ? 'text-emerald-600' : 'text-amber-600'}`}>{isOnline() && pending === 0 ? 'Sincronizado' : `${pending || photos.length} pendente(s) de sincronização`}</p></div>
-          {!current ? <button onClick={() => inputRef.current?.click()} className="flex min-h-56 w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-primary/30 bg-navy/5 text-primary"><span className="material-symbols-outlined text-5xl">photo_camera</span><span className="mt-3 text-sm font-bold uppercase">Tirar foto</span><span className="mt-1 text-xs text-fg-secondary">Câmera traseira no celular</span></button> : <div className="space-y-4"><img src={current.url} alt="Prévia da foto capturada" className="max-h-[46vh] w-full rounded-2xl bg-slate-900 object-contain" />{afterReference?<div><p className="mb-2 text-xs font-bold uppercase text-fg-secondary">Resultado</p><div className="grid grid-cols-1 gap-2">{([['corrigido','Corrigido'],['parcial','Parcialmente corrigido'],['pendente','Continua pendente']] as [ComparisonResult,string][]).map(([v,l])=><button key={v} onClick={()=>setComparisonResult(v)} className={`min-h-11 rounded-xl border text-xs font-bold ${comparisonResult===v?'border-primary bg-navy/5 text-primary':'border-border'}`}>{l}</button>)}</div></div>:<div><p className="mb-2 text-xs font-bold uppercase text-fg-secondary">Marcador</p><div className="flex flex-wrap gap-2">{MARKERS.map((item) => <button key={item.value} onClick={() => setMarker(item.value)} className={`min-h-10 rounded-full border px-3 text-xs font-bold ${marker === item.value ? item.tone + ' ring-2 ring-offset-1 ring-primary/30' : 'border-border bg-surface text-fg-secondary'}`}>{item.label}</button>)}</div></div>}<textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Nota rápida (opcional)" className="min-h-24 w-full rounded-xl border border-border-strong bg-surface p-3 text-sm" /></div>}
+          {!current ? <button onClick={() => inputRef.current?.click()} className="flex min-h-56 w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-primary/30 bg-navy/5 text-primary"><span className="material-symbols-outlined text-5xl">photo_camera</span><span className="mt-3 text-sm font-bold uppercase">Tirar foto</span><span className="mt-1 text-xs text-fg-secondary">Câmera traseira no celular</span></button> : <div className="space-y-4"><img src={current.url} alt="Prévia da foto capturada" className="max-h-[46vh] w-full rounded-2xl bg-slate-900 object-contain" />{afterReference?<div><p className="mb-2 text-xs font-bold uppercase text-fg-secondary">Resultado</p><div className="grid grid-cols-1 gap-2">{([['corrigido','Corrigido'],['parcial','Parcialmente corrigido'],['pendente','Continua pendente']] as [ComparisonResult,string][]).map(([v,l])=><button key={v} onClick={()=>setComparisonResult(v)} className={`min-h-11 rounded-xl border text-xs font-bold ${comparisonResult===v?'border-primary bg-navy/5 text-primary':'border-border'}`}>{l}</button>)}</div></div>:<div><p className="mb-2 text-xs font-bold uppercase text-fg-secondary">Marcador</p><div className="flex flex-wrap gap-2">{MARKERS.map((item) => <button key={item.value} onClick={() => setMarker(item.value)} className={`min-h-10 rounded-full border px-3 text-xs font-bold ${marker === item.value ? item.tone + ' ring-2 ring-offset-1 ring-primary/30' : 'border-border bg-surface text-fg-secondary'}`}>{item.label}</button>)}</div></div>}<textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Nota rápida (opcional)" className="min-h-24 w-full rounded-xl border border-border-strong bg-surface p-3 text-sm" />{!afterReference && <EquipmentIdentifier value={equipment} onChange={setEquipment} catalog={catalog} />}</div>}
           <input ref={inputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={capture} />
           <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">{current && <button onClick={releaseCurrent} disabled={busy} className="min-h-12 rounded-xl border border-border-strong bg-surface text-xs font-bold uppercase text-fg-secondary">Descartar</button>}{current && <button onClick={() => savePhoto(false)} disabled={busy} className="min-h-12 rounded-xl bg-navy px-3 text-xs font-bold uppercase text-white disabled:opacity-60">{busy ? 'Preparando foto…' : 'Salvar e tirar outra'}</button>}<button onClick={() => finalize()} disabled={busy} className="min-h-12 rounded-xl bg-slate-800 px-3 text-xs font-bold uppercase text-white disabled:opacity-60">Finalizar</button></div>
           {photos.length > 0 && <button onClick={() => setShowPhotos(true)} className="mt-3 w-full text-xs font-bold uppercase text-primary">Ver fotos desta sessão ({photos.length})</button>}

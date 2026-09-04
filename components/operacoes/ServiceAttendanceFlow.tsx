@@ -244,6 +244,57 @@ export const StartAttendanceButton: React.FC<{
 };
 
 /* -------------------------------------------------------------------------- */
+/* CTA operacional da OS (§6/§41) — Iniciar OU Continuar atendimento           */
+/* Fluxo canônico de execução: OS → service_attendance → ServiceAttendanceFlow */
+/* (NÃO abre o relatório corretivo). Usado em "Meus Atendimentos" e na OS.     */
+/* -------------------------------------------------------------------------- */
+export const OsAttendanceCta: React.FC<{
+  os: OrdemServico;
+  technicianId?: string;
+  technicianName?: string;
+  clients: Client[];
+  usesTimeClock?: boolean;
+  punches?: TimePunch[];
+}> = ({ os, technicianId, technicianName, clients, usesTimeClock = false, punches = [] }) => {
+  const { attendance } = useActiveAttendance(technicianId);
+  const [screen, setScreen] = useState<ServiceAttendance | null>(null);
+  const osTerminal = os.status === 'concluida' || os.status === 'cancelada';
+
+  // Já existe atendimento EM_EXECUCAO deste técnico NESTA OS → Continuar.
+  const activeHere = attendance && attendance.workOrderId === os.id ? attendance : null;
+
+  if (!technicianId || osTerminal) return null;
+
+  if (activeHere) {
+    return (
+      <>
+        <button
+          onClick={() => setScreen(activeHere)}
+          className="w-full min-h-[52px] rounded-xl bg-primary hover:bg-primary-hover text-white text-sm font-bold uppercase tracking-wide flex items-center justify-center gap-2 transition-colors"
+        >
+          <span className="material-symbols-outlined text-xl">arrow_forward</span>
+          Continuar atendimento
+        </button>
+        {screen && (
+          <AttendanceScreen attendance={screen} os={os} clients={clients} technicianId={technicianId} technicianName={technicianName} onClose={() => setScreen(null)} />
+        )}
+      </>
+    );
+  }
+
+  return (
+    <StartAttendanceButton
+      os={os}
+      technicianId={technicianId}
+      technicianName={technicianName}
+      clients={clients}
+      usesTimeClock={usesTimeClock}
+      punches={punches}
+    />
+  );
+};
+
+/* -------------------------------------------------------------------------- */
 /* Card ATENDIMENTO ATUAL (§8/§23) — dashboards do técnico                     */
 /* -------------------------------------------------------------------------- */
 export const ActiveAttendanceCard: React.FC<{

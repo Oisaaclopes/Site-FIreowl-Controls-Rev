@@ -15,6 +15,7 @@ import {
   CompanyProfile,
   Supplier,
   Pedido,
+  TimePunch,
 } from '@/lib/types';
 import { ALL_TEMPLATES, seedReportTemplates } from '@/lib/reportTemplatesData';
 import { TemplateSchema } from '@/lib/reportSchema';
@@ -27,6 +28,7 @@ import { fetchDevices } from '@/lib/devices';
 import { fetchOrdensServico, updateOrdemServico } from '@/lib/ordensServico';
 import { fetchAssignableTechnicians, ManagedUser } from '@/lib/users';
 import { ResponsibleSelect } from '@/components/ui/ResponsibleSelect';
+import { OsAttendanceCta } from '@/components/operacoes/ServiceAttendanceFlow';
 import { useToast, useConfirm, showToast, requestConfirm } from '@/components/ui/Feedback';
 import { ClientSelector } from '@/components/clients/ClientSelector';
 import { fetchCicloAtivo, quotaPorVisita } from '@/lib/ciclos';
@@ -62,6 +64,12 @@ interface RelatoriosViewProps {
   userRole: UserRole;
   companyProfile?: CompanyProfile;
   currentUserName?: string;
+  /** UUID autenticado — CTA operacional de atendimento em "Meus Atendimentos". */
+  userId?: string;
+  /** profiles.uses_time_clock — aviso de jornada ao iniciar atendimento (§6). */
+  usesTimeClock?: boolean;
+  /** Ponto do usuário — usado no aviso de jornada. */
+  currentUserPunches?: TimePunch[];
   /** Atalho vindo do Dashboard: 'wizard' abre o Novo Relatório direto. */
   initialAction?: 'wizard' | null;
   onInitialActionConsumed?: () => void;
@@ -171,6 +179,9 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   userRole,
   companyProfile,
   currentUserName = '',
+  userId,
+  usesTimeClock = false,
+  currentUserPunches = [],
   initialAction,
   onInitialActionConsumed,
   onAddClient,
@@ -1239,10 +1250,21 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                         <span className="font-semibold text-fg-secondary truncate">{responsavelLabel(os)}</span>
                       )}
                     </div>
-                    {/* §16/§39 — este botão abre o RELATÓRIO técnico (FormEngine),
-                        não o ATENDIMENTO operacional (3B, iniciado na OS/painel).
-                        Rótulo explícito evita a colisão semântica. */}
-                    <button onClick={() => iniciarAtendimentoDaOs(os)} className="min-h-12 rounded-lg bg-danger hover:bg-danger-hover text-white text-xs font-bold uppercase tracking-wide flex items-center justify-center gap-2"><span className="material-symbols-outlined text-base">description</span>Abrir relatório corretivo</button>
+                    {/* CTA PRINCIPAL (§6/§8/§41): fluxo canônico OS → atendimento
+                        operacional (ServiceAttendanceFlow). NÃO abre o relatório. */}
+                    {userId ? (
+                      <OsAttendanceCta
+                        os={os}
+                        technicianId={userId}
+                        technicianName={currentUserName}
+                        clients={clients}
+                        usesTimeClock={usesTimeClock}
+                        punches={currentUserPunches}
+                      />
+                    ) : null}
+                    {/* Ação SECUNDÁRIA (§7/§41): o relatório corretivo (FormEngine)
+                        continua acessível, mas não é o CTA de execução da OS. */}
+                    <button onClick={() => iniciarAtendimentoDaOs(os)} className="min-h-10 rounded-lg border border-border text-fg-secondary hover:border-border-strong text-[11px] font-bold uppercase tracking-wide flex items-center justify-center gap-2"><span className="material-symbols-outlined text-sm">description</span>Abrir relatório corretivo</button>
                   </article>
                 );
               })}

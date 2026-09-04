@@ -24,6 +24,10 @@ export interface FieldPhoto {
   /** Atendimento (service_attendances) em que a evidência foi capturada (0084). */
   serviceAttendanceId?: string;
   pendenciaId?: string;
+  /** Identificação de equipamento (3B.2/0086): catálogo OU manual. NUNCA move estoque. */
+  equipmentCatalogItemId?: string;
+  equipmentBrand?: string;
+  equipmentModel?: string;
   storagePathOriginal: string;
   storagePathMarkup?: string;
   storagePathEvidencia?: string;
@@ -43,12 +47,12 @@ const uuid = () => {
   });
 };
 const sessionRow = (s: FieldPhotoSession) => ({ id: s.id, client_id: s.clientId, local_setor: s.localSetor ?? null, tecnico_id: s.tecnicoId, tecnico_nome: s.tecnicoNome ?? null, iniciado_em: s.iniciadoEm, finalizado_em: s.finalizadoEm ?? null, client_uuid: s.clientUuid, sync_status: s.syncStatus });
-const photoRow = (p: FieldPhoto) => ({ id: p.id, session_id: p.sessionId, client_id: p.clientId, report_id: p.reportId ?? null, os_id: p.osId ?? null, service_attendance_id: p.serviceAttendanceId ?? null, pendencia_id: p.pendenciaId ?? null, storage_path_original: p.storagePathOriginal, storage_path_markup: p.storagePathMarkup ?? null, storage_path_evidencia: p.storagePathEvidencia ?? null, nota_rapida: p.notaRapida ?? null, marcador: p.marcador ?? null, capturado_em: p.capturadoEm, geo: p.geo ?? null, client_uuid: p.clientUuid, sync_status: p.syncStatus });
-const fromPhoto = (r: any): FieldPhoto => ({ id: r.id, sessionId: r.session_id, clientId: r.client_id, reportId: r.report_id ?? undefined, osId: r.os_id ?? undefined, serviceAttendanceId: r.service_attendance_id ?? undefined, pendenciaId: r.pendencia_id ?? undefined, storagePathOriginal: r.storage_path_original, storagePathMarkup: r.storage_path_markup ?? undefined, storagePathEvidencia: r.storage_path_evidencia ?? undefined, notaRapida: r.nota_rapida ?? undefined, marcador: r.marcador ?? undefined, capturadoEm: r.capturado_em, geo: r.geo ?? undefined, clientUuid: r.client_uuid, syncStatus: r.sync_status });
+const photoRow = (p: FieldPhoto) => ({ id: p.id, session_id: p.sessionId, client_id: p.clientId, report_id: p.reportId ?? null, os_id: p.osId ?? null, service_attendance_id: p.serviceAttendanceId ?? null, pendencia_id: p.pendenciaId ?? null, storage_path_original: p.storagePathOriginal, storage_path_markup: p.storagePathMarkup ?? null, storage_path_evidencia: p.storagePathEvidencia ?? null, nota_rapida: p.notaRapida ?? null, marcador: p.marcador ?? null, capturado_em: p.capturadoEm, geo: p.geo ?? null, client_uuid: p.clientUuid, sync_status: p.syncStatus, equipment_catalog_item_id: p.equipmentCatalogItemId ?? null, equipment_brand: p.equipmentBrand ?? null, equipment_model: p.equipmentModel ?? null });
+const fromPhoto = (r: any): FieldPhoto => ({ id: r.id, sessionId: r.session_id, clientId: r.client_id, reportId: r.report_id ?? undefined, osId: r.os_id ?? undefined, serviceAttendanceId: r.service_attendance_id ?? undefined, pendenciaId: r.pendencia_id ?? undefined, storagePathOriginal: r.storage_path_original, storagePathMarkup: r.storage_path_markup ?? undefined, storagePathEvidencia: r.storage_path_evidencia ?? undefined, notaRapida: r.nota_rapida ?? undefined, marcador: r.marcador ?? undefined, capturadoEm: r.capturado_em, geo: r.geo ?? undefined, clientUuid: r.client_uuid, syncStatus: r.sync_status, equipmentCatalogItemId: r.equipment_catalog_item_id ?? undefined, equipmentBrand: r.equipment_brand ?? undefined, equipmentModel: r.equipment_model ?? undefined });
 const fromSession = (r: any): FieldPhotoSession => ({ id: r.id, clientId: r.client_id, localSetor: r.local_setor ?? undefined, tecnicoId: r.tecnico_id, tecnicoNome: r.tecnico_nome ?? undefined, iniciadoEm: r.iniciado_em, finalizadoEm: r.finalizado_em ?? undefined, clientUuid: r.client_uuid, syncStatus: r.sync_status });
 
 export const newFieldPhotoSession = (input: Pick<FieldPhotoSession, 'clientId' | 'tecnicoId' | 'tecnicoNome' | 'localSetor'>, capturedAt = new Date().toISOString()): FieldPhotoSession => ({ id: uuid(), clientUuid: uuid(), syncStatus: 'pendente', iniciadoEm: capturedAt, ...input });
-export const newFieldPhoto = (input: Pick<FieldPhoto, 'sessionId' | 'clientId' | 'storagePathOriginal' | 'notaRapida' | 'marcador' | 'geo'> & Partial<Pick<FieldPhoto, 'osId' | 'serviceAttendanceId'>>, capturedAt = new Date().toISOString()): FieldPhoto => ({ id: uuid(), clientUuid: uuid(), syncStatus: 'pendente', capturadoEm: capturedAt, ...input });
+export const newFieldPhoto = (input: Pick<FieldPhoto, 'sessionId' | 'clientId' | 'storagePathOriginal' | 'notaRapida' | 'marcador' | 'geo'> & Partial<Pick<FieldPhoto, 'osId' | 'serviceAttendanceId' | 'equipmentCatalogItemId' | 'equipmentBrand' | 'equipmentModel'>>, capturedAt = new Date().toISOString()): FieldPhoto => ({ id: uuid(), clientUuid: uuid(), syncStatus: 'pendente', capturadoEm: capturedAt, ...input });
 export const isUnclassifiedFieldPhoto = (p: Pick<FieldPhoto, 'reportId' | 'osId' | 'pendenciaId'>) => !p.reportId && !p.osId && !p.pendenciaId;
 export const evidenceLines = (p: Pick<FieldPhoto, 'capturadoEm' | 'notaRapida'>, session: Pick<FieldPhotoSession, 'localSetor' | 'tecnicoNome'>, clientName: string) => {
   const date = new Date(p.capturadoEm);
