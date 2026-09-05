@@ -2,9 +2,13 @@
 import { requestConfirm } from '@/components/ui/Feedback';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { SupplyOrder, InventoryItem, SupplyReceipt, RejectionReason } from '@/lib/types';
+import { SupplyOrder, InventoryItem, SupplyReceipt, RejectionReason, Supplier } from '@/lib/types';
 import { fetchReceipts, createReceipt, postReceiptToStock, syncSupplyOrderStatus, recebidoPorChave, keyOf, validaConferencia, excedente, PostItemResult } from '@/lib/supplyReceipts';
+import { fetchSuppliers, upsertSupplier } from '@/lib/suppliers';
+import { PickerField } from '@/components/ui/PickerField';
 import { isSupabaseConfigured } from '@/lib/inventory';
+
+const newId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `sup_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`);
 
 interface Props {
   order: SupplyOrder;
@@ -47,11 +51,33 @@ export const SupplyReceivingModal: React.FC<Props> = ({ order, inventory, curren
   const online = isSupabaseConfigured();
   const [step, setStep] = useState<'receber' | 'conferencia' | 'entrada' | 'done'>('receber');
   const [receipts, setReceipts] = useState<SupplyReceipt[] | null>(null);
-  const [fornecedor, setFornecedor] = useState(order.supplier || '');
+  // Fornecedor ESTRUTURADO deste recebimento (mesma base canônica da tela de
+  // Fornecedores). Guarda o id (vínculo) e usa o nome como snapshot histórico (§7).
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [supplierId, setSupplierId] = useState<string>('');
+  const [newSupplierOpen, setNewSupplierOpen] = useState(false);
+  const [newSupplier, setNewSupplier] = useState({ name: '', cnpj: '', tradeName: '' });
+  const [savingSupplier, setSavingSupplier] = useState(false);
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<PostItemResult[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+
+  // Fornecedores cadastrados (base canônica). Pré-seleciona o do pedido (§8).
+  useEffect(() => {
+    if (!online) return;
+    let alive = true;
+    fetchSuppliers().then((list) => {
+      if (!alive) return;
+      setSuppliers(list);
+      // O pedido guarda o fornecedor como texto (§8): pré-seleciona casando o nome.
+      if (order.supplier) {
+        const match = list.find((s) => s.name.trim().toLowerCase() === (order.supplier || '').trim().toLowerCase());
+        if (match) setSupplierId(match.id);
+      }
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [online, order.id, order.supplier]);
 
   // Carrega recebimentos anteriores e monta as linhas dos materiais.
   useEffect(() => {
@@ -108,6 +134,33 @@ export const SupplyReceivingModal: React.FC<Props> = ({ order, inventory, curren
     setStep('conferencia');
   };
 
+  const selectedSupplier = suppliers.find((s) => s.id === supplierId);
+  // Snapshot histórico: nome do fornecedor no momento do recebimento (§7).
+  const supplierSnapshot = selectedSupplier?.name || order.supplier || undefined;
+
+  // Cadastro inline reutilizando a base canônica (upsertSupplier). Não perde os
+  // dados do recebimento já digitados: só adiciona/seleciona o fornecedor.
+  const criarFornecedor = async () => {
+    const nome = newSupplier.name.trim();
+    if (!nome) { setErro('Informe o nome/razão social do fornecedor.'); return; }
+    if (!online) { setErro('Conecte-se à internet para cadastrar fornecedor.'); return; }
+    setSavingSupplier(true);
+    setErro(null);
+    try {
+      const created = await upsertSupplier({
+        id: newId(), code: '', name: nome, cnpj: newSupplier.cnpj.trim(), category: '',
+        contactName: '', phone: '', email: '', city: '', rating: 0, leadTimeDays: 0,
+        activeStatus: 'EM AVALIACAO', brands: [], tradeName: newSupplier.tradeName.trim() || undefined,
+      } as Supplier);
+      setSuppliers((prev) => [created, ...prev.filter((s) => s.id !== created.id)]);
+      setSupplierId(created.id);
+      setNewSupplier({ name: '', cnpj: '', tradeName: '' });
+      setNewSupplierOpen(false);
+    } catch (e: any) {
+      setErro(e?.message || 'Não foi possível cadastrar o fornecedor.');
+    } finally { setSavingSupplier(false); }
+  };
+
   const confirmarEntrada = async () => {
     if (!online) { setErro('Conecte-se à internet para confirmar a entrada no estoque.'); return; }
     if (busy) return;
@@ -115,7 +168,7 @@ export const SupplyReceivingModal: React.FC<Props> = ({ order, inventory, curren
     setErro(null);
     try {
       const receipt = await createReceipt(
-        { supplyOrderId: order.id, supplier: fornecedor || undefined, receivedAt: new Date().toISOString(), receivedBy: currentUserName, status: 'conferido' },
+        { supplyOrderId: order.id, supplier: supplierSnapshot, supplierId: supplierId || undefined, receivedAt: new Date().toISOString(), receivedBy: currentUserName, status: 'conferido' },
         receberRows.map((r) => ({
           orderItemKey: r.key,
           inventoryItemId: r.vinculado ? r.inventoryItemId : undefined,
@@ -170,7 +223,43 @@ export const SupplyReceivingModal: React.FC<Props> = ({ order, inventory, curren
             <>
               <div className="mb-3">
                 <label className="block text-[10px] font-bold uppercase text-fg-secondary mb-1">Fornecedor (deste recebimento)</label>
-                <input value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} placeholder="Nome do fornecedor" className="w-full border border-border-strong rounded-lg px-3 py-2 text-sm" />
+                {suppliers.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border-strong bg-surface-2 p-3 text-center">
+                    <p className="text-[11px] text-fg-muted">Nenhum fornecedor cadastrado.</p>
+                    <button type="button" onClick={() => setNewSupplierOpen(true)} className="mt-1 text-xs font-bold text-primary hover:underline">+ Cadastrar primeiro fornecedor</button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <PickerField
+                      ariaLabel="Fornecedor do recebimento"
+                      sheetTitle="Selecionar fornecedor"
+                      placeholder="Selecionar fornecedor"
+                      searchPlaceholder="Buscar fornecedor..."
+                      emptyLabel="Nenhum fornecedor encontrado."
+                      value={supplierId}
+                      onChange={setSupplierId}
+                      options={suppliers.map((s) => ({ id: s.id, name: s.tradeName ? `${s.name} (${s.tradeName})` : s.name }))}
+                      triggerClassName="flex-1 flex items-center justify-between gap-2 rounded-lg border border-border-strong bg-surface px-3 py-2 text-sm text-fg-secondary"
+                    />
+                    <button type="button" onClick={() => setNewSupplierOpen(true)} className="shrink-0 rounded-lg border border-primary px-3 py-2 text-xs font-bold text-primary hover:bg-navy hover:text-white">+ Novo</button>
+                  </div>
+                )}
+                {selectedSupplier?.cnpj && <p className="mt-1 text-[10px] text-fg-muted">CNPJ: {selectedSupplier.cnpj}</p>}
+
+                {newSupplierOpen && (
+                  <div className="mt-2 rounded-lg border border-border bg-surface-2 p-3">
+                    <p className="mb-2 text-[10px] font-bold uppercase text-fg-secondary">Novo fornecedor</p>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <input value={newSupplier.name} onChange={(e) => setNewSupplier((p) => ({ ...p, name: e.target.value }))} placeholder="Nome / Razão social *" className="w-full rounded-lg border border-border-strong px-3 py-2 text-sm sm:col-span-2" />
+                      <input value={newSupplier.tradeName} onChange={(e) => setNewSupplier((p) => ({ ...p, tradeName: e.target.value }))} placeholder="Nome fantasia" className="w-full rounded-lg border border-border-strong px-3 py-2 text-sm" />
+                      <input value={newSupplier.cnpj} onChange={(e) => setNewSupplier((p) => ({ ...p, cnpj: e.target.value }))} placeholder="CNPJ" className="w-full rounded-lg border border-border-strong px-3 py-2 text-sm" />
+                    </div>
+                    <div className="mt-2 flex justify-end gap-2">
+                      <button type="button" onClick={() => { setNewSupplierOpen(false); setNewSupplier({ name: '', cnpj: '', tradeName: '' }); }} className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-fg-secondary hover:bg-surface">Cancelar</button>
+                      <button type="button" onClick={criarFornecedor} disabled={savingSupplier} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-navy disabled:opacity-50">{savingSupplier ? 'Salvando…' : 'Cadastrar e selecionar'}</button>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[520px]">
