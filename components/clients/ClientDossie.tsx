@@ -37,7 +37,6 @@ import {
 } from '@/lib/fieldPhotosGallery';
 import { signedFieldPhotoUrls } from '@/lib/fieldPhotoStorage';
 import { nomeFantasiaCliente, razaoSocialCliente } from '@/lib/utils';
-import { DevicesManager } from '@/components/reports/DevicesManager';
 import { ClientTechnicalBase } from '@/components/clients/ClientTechnicalBase';
 
 /* ==========================================================================
@@ -55,7 +54,6 @@ type DossieTab =
   | 'relatorios'
   | 'pendencias'
   | 'fotos'
-  | 'dispositivos'
   | 'base_tecnica'
   | 'contratos'
   | 'historico';
@@ -190,7 +188,6 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
   const [photosLoading, setPhotosLoading] = useState(false);
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const [techs, setTechs] = useState<ManagedUser[]>([]);
-  const [showDevicesManager, setShowDevicesManager] = useState(false);
 
   // Carga leve inicial: relatórios, pendências, dispositivos e eventos são
   // queries filtradas por cliente no servidor (baratas) e alimentam a Visão Geral.
@@ -315,7 +312,6 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
     { id: 'relatorios', label: 'Relatórios', icon: 'assignment', badge: reports?.length || undefined },
     { id: 'pendencias', label: 'Pendências', icon: 'flag', badge: pendAbertas.length || undefined },
     { id: 'fotos', label: 'Fotos', icon: 'photo_library', badge: photos?.length || undefined },
-    { id: 'dispositivos', label: 'Dispositivos', icon: 'memory', badge: devices?.length || undefined },
     { id: 'base_tecnica', label: 'Base Técnica', icon: 'lan', badge: devices?.length || undefined },
     { id: 'contratos', label: 'Contratos', icon: 'handshake', badge: contratosAtivos.length || undefined },
     { id: 'historico', label: 'Histórico', icon: 'history' },
@@ -438,7 +434,7 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
               <OverviewCard icon="assignment" label="Relatórios" value={reports === null ? '…' : reports.length} tone="violet" onClick={() => goTab('relatorios')} />
               <OverviewCard icon="photo_library" label="Fotos de campo" value={photos === null ? (photosLoading ? '…' : '·') : photos.length} tone="sky" onClick={() => goTab('fotos')} />
               <OverviewCard icon="handshake" label="Contratos ativos" value={contratosAtivos.length} tone="emerald" onClick={() => goTab('contratos')} />
-              <OverviewCard icon="memory" label="Dispositivos" value={devices === null ? '…' : devices.length} tone="brand" onClick={() => goTab('dispositivos')} />
+              <OverviewCard icon="lan" label="Base Técnica" value={devices === null ? '…' : devices.length} tone="brand" onClick={() => goTab('base_tecnica')} />
               <OverviewCard icon="history" label="Eventos no histórico" value={timeline.length} tone="slate" onClick={() => goTab('historico')} />
             </div>
 
@@ -580,16 +576,6 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
           </SectionWrap>
         )}
 
-        {tab === 'dispositivos' && (
-          <SectionWrap
-            title={`Dispositivos instalados (${devices?.length ?? '…'})`}
-            actionLabel="Gerenciar dispositivos"
-            onAction={() => setShowDevicesManager(true)}
-          >
-            <DevicesTab devices={devices} inventory={inventory} onManage={() => setShowDevicesManager(true)} />
-          </SectionWrap>
-        )}
-
         {tab === 'base_tecnica' && (
           <SectionWrap title="Base Técnica do cliente">
             <ClientTechnicalBase
@@ -677,21 +663,6 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
         )}
       </div>
 
-      {/* CRUD de dispositivos: reaproveita o gerenciador existente (fonte única). */}
-      <DevicesManager
-        open={showDevicesManager}
-        onClose={() => {
-          setShowDevicesManager(false);
-          // Recarrega a lista após edições (mantém a Visão Geral coerente).
-          if (isSupabaseConfigured()) fetchDevices(client.id).then(setDevices).catch(() => {});
-        }}
-        clienteId={client.id}
-        clienteNome={client.name}
-        fabricantes={fabricantes}
-        suppliers={suppliers}
-        inventory={inventory}
-        onAddFabricante={onAddFabricante}
-      />
     </div>
   );
 };
@@ -882,89 +853,6 @@ const PhotosTab: React.FC<{
           ))}
         </div>
       )}
-    </div>
-  );
-};
-
-/* ----------------------------- Aba Dispositivos ----------------------------- */
-
-const DevicesTab: React.FC<{ devices: Device[] | null; inventory: InventoryItem[]; onManage: () => void }> = ({ devices, inventory, onManage }) => {
-  if (devices === null) return <EmptyLine text="Carregando dispositivos…" />;
-  if (devices.length === 0) {
-    return (
-      <EmptyState
-        variant="estoque"
-        title="Nenhum dispositivo instalado"
-        description="Cadastre os dispositivos físicos instalados neste cliente."
-        actionLabel="Gerenciar dispositivos"
-        onAction={onManage}
-      />
-    );
-  }
-
-  const catalogById = (id?: string) => (id ? inventory.find((i) => i.id === id) : undefined);
-
-  // Agrupa por sistema → central (hierarquia: cliente → sistema → central → dispositivo).
-  const bySistema = new Map<string, Device[]>();
-  for (const d of devices) {
-    const key = d.sistema || 'SDAI';
-    if (!bySistema.has(key)) bySistema.set(key, []);
-    bySistema.get(key)!.push(d);
-  }
-
-  return (
-    <div className="flex flex-col gap-5">
-      {Array.from(bySistema.entries()).map(([sistema, list]) => (
-        <div key={sistema}>
-          <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-fg-muted">{sistema} · {list.length} dispositivo(s)</p>
-          <div className="grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(20rem,1fr))]">
-            {list.map((d) => {
-              const cat = catalogById(d.itemCatalogoId);
-              const identificado = !!cat || !!(d.fabricante || d.modelo);
-              return (
-                <div key={d.id} className="rounded-xl border border-border bg-surface p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-fg">
-                        {d.tipoDispositivo || cat?.category || 'Dispositivo'}
-                      </p>
-                      <p className="truncate text-[11px] text-fg-secondary">
-                        {cat ? `${cat.brand || d.fabricante || ''} ${cat.model || d.modelo || ''}`.trim() : `${d.fabricante || ''} ${d.modelo || ''}`.trim() || 'Produto não identificado'}
-                      </p>
-                    </div>
-                    <Badge color={DEVICE_STATUS_COLOR[d.status]}>{d.status}</Badge>
-                  </div>
-
-                  {/* Atributos do produto canônico (catálogo) */}
-                  {cat && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {cat.productLine && <span className="rounded bg-navy/5 px-1.5 py-0.5 text-[9px] font-semibold text-primary">{cat.productLine}</span>}
-                      {cat.productType && <span className="rounded bg-surface-3 px-1.5 py-0.5 text-[9px] font-semibold text-fg-secondary">{cat.productType}</span>}
-                      {(cat.technologies || []).slice(0, 2).map((t) => <span key={t} className="rounded bg-surface-3 px-1.5 py-0.5 text-[9px] font-semibold text-fg-secondary">{t}</span>)}
-                    </div>
-                  )}
-                  {!identificado && (
-                    <p className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-amber-600">
-                      <span className="material-symbols-outlined text-[13px]">help</span> Produto não identificado — vincular ao catálogo depois
-                    </p>
-                  )}
-
-                  {/* Atributos físicos da unidade instalada */}
-                  <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 font-data-mono text-[10px] text-fg-secondary">
-                    {d.central && <span>Central: {d.central}</span>}
-                    {d.laco && <span>Laço: {d.laco}</span>}
-                    {d.endereco && <span>Endereço: {d.endereco}</span>}
-                    {d.pavimento && <span>Pavimento: {d.pavimento}</span>}
-                    {d.localizacao && <span className="col-span-2">Local: {d.localizacao}</span>}
-                    {d.dataInstalacao && <span>Instalado: {fmtDate(d.dataInstalacao)}</span>}
-                    {d.ultimoTesteFuncional && <span>Últ. teste: {fmtDate(d.ultimoTesteFuncional)}</span>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
     </div>
   );
 };

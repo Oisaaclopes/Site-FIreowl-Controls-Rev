@@ -35,6 +35,66 @@ export async function ensureAttendanceSession(input: {
   return session;
 }
 
+/** Sessão de fotos por LEVANTAMENTO (uma por survey). Reaproveita o pipeline. */
+export async function ensureSurveySession(input: {
+  clientId: string;
+  technicianId: string;
+  technicianName?: string;
+  localSetor?: string;
+}): Promise<FieldPhotoSession> {
+  const session = newFieldPhotoSession({
+    clientId: input.clientId,
+    tecnicoId: input.technicianId,
+    tecnicoNome: input.technicianName,
+    localSetor: input.localSetor,
+  });
+  await enqueueFieldPhotoSession(session);
+  return session;
+}
+
+/**
+ * Captura de evidência do LEVANTAMENTO ligada ao ATIVO (device) e ao survey.
+ * EXATAMENTE o mesmo caminho (field_photos + storage privado + outbox + evidência
+ * derivada) de captureAttendanceEvidence — só muda o contexto (device/survey em
+ * vez de atendimento). NÃO cria nova arquitetura de fotos (§25). captured_at é o
+ * momento real do arquivo (§33). Idempotente pelo client_uuid da foto.
+ */
+export async function captureSurveyEvidence(input: {
+  file: File;
+  session: FieldPhotoSession;
+  clientId: string;
+  clientName: string;
+  deviceId: string;
+  technicalSurveyId?: string;
+  note?: string;
+}): Promise<CapturedEvidence> {
+  const capturedAt = evidenceCapturedAt(input.file);
+  const geo = await capturePosition().then((p) => (p ? reverseGeocode(p) : undefined)).catch(() => undefined);
+  const base = newFieldPhoto(
+    {
+      sessionId: input.session.id,
+      clientId: input.clientId,
+      storagePathOriginal: '',
+      notaRapida: input.note?.trim() || undefined,
+      geo,
+      deviceId: input.deviceId,
+      technicalSurveyId: input.technicalSurveyId,
+    },
+    capturedAt,
+  );
+  const pathBase = { technicianId: input.session.tecnicoId, sessionClientUuid: input.session.clientUuid, photoClientUuid: base.clientUuid };
+  const photo: FieldPhoto = {
+    ...base,
+    storagePathOriginal: buildFieldPhotoPath({ ...pathBase, asset: 'original' }),
+    storagePathEvidencia: buildFieldPhotoPath({ ...pathBase, asset: 'evidence' }),
+  };
+  let evidence: Blob | undefined;
+  try { evidence = await createFireowlEvidence(input.file, photo, input.session, input.clientName); }
+  catch { /* a evidência derivada é regerada na sincronização */ }
+  await enqueueFieldPhoto({ photo, session: input.session, original: input.file, evidence, clientName: input.clientName });
+  return { photo, original: input.file, evidence, previewUrl: URL.createObjectURL(input.file) };
+}
+
 /**
  * timestamp de captura HONESTO (§11): usa o `lastModified` do arquivo — que o
  * navegador define como o momento real de captura tanto para foto tirada na hora

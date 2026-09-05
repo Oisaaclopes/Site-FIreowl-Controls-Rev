@@ -21,7 +21,6 @@ import {
 import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow';
 import { ClientLogo } from '@/components/ClientLogo';
 import { usePrivacy } from '@/lib/privacy';
-import { DevicesManager } from '@/components/reports/DevicesManager';
 import { EmptyState } from '@/components/EmptyState';
 import { fetchCnpjData } from '@/lib/cnpj';
 import { uploadClientFachada, uploadClientLogo, removePropostaCapa } from '@/lib/propostaCapa';

@@ -211,7 +211,14 @@ const COMMON_TARGETS: ImportTarget[] = [
   { key: 'fabricante', label: 'Fabricante', store: 'field', deviceField: 'fabricante', aliases: ['fabricante', 'marca', 'brand', 'manufacturer', 'maker', 'fornecedor'] },
   { key: 'modelo', label: 'Modelo', store: 'field', deviceField: 'modelo', aliases: ['modelo', 'model', 'mod'] },
   { key: 'serial', label: 'Nº de série', store: 'field', deviceField: 'serial', aliases: ['serial', 'serie', 'n serie', 'sn', 's n', 'numero de serie'] },
+  { key: 'observacao', label: 'Observação', store: 'attr', attrKey: 'observacao', aliases: ['observacao', 'obs', 'nota', 'notas', 'comentario', 'comentarios'] },
 ];
+
+/** Extras por área presentes no modelo oficial, sem ser identificador do motor. */
+const EXTRA_TARGETS_BY_AREA: Partial<Record<TechArea, ImportTarget[]>> = {
+  CFTV: [{ key: 'tecnologia', label: 'Tecnologia', store: 'attr', attrKey: 'tecnologia', aliases: ['tecnologia', 'technology', 'tech'] }],
+  CONTROLE_ACESSO: [{ key: 'canal', label: 'Canal', store: 'attr', attrKey: 'canal', aliases: ['canal', 'channel', 'ch'] }],
+};
 
 const IDENT_ALIASES: Record<string, string[]> = {
   central: ['central', 'painel', 'panel'],
@@ -244,7 +251,7 @@ export function importTargets(area: TechArea): ImportTarget[] {
     kind: f.kind,
     aliases: IDENT_ALIASES[f.key] || [normalizeHeader(f.label)],
   }));
-  return [...idents, ...COMMON_TARGETS];
+  return [...idents, ...(EXTRA_TARGETS_BY_AREA[area] || []), ...COMMON_TARGETS];
 }
 
 /** Auto-mapeia cabeçalhos → chaves de alvo (assistido; usuário confirma depois). */

@@ -18,6 +18,9 @@ import { showToast, requestConfirm } from '@/components/ui/Feedback';
 import { isSupabaseConfigured } from '@/lib/inventory';
 import { TechnicalSurveyFlow } from '@/components/clients/TechnicalSurveyFlow';
 import { TechnicalBaseImport } from '@/components/clients/TechnicalBaseImport';
+import { AssetDetailDrawer } from '@/components/clients/AssetDetailDrawer';
+import { EquipmentIdentifier, EquipmentIdentification } from '@/components/catalog/EquipmentIdentifier';
+import { fetchTechnicalCatalog, TechnicalCatalogItem } from '@/lib/technicalCatalog';
 
 /* ==========================================================================
  * ETAPA 3D — BASE TÉCNICA PERMANENTE (Cliente 360).
@@ -48,6 +51,16 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
   const [showSurvey, setShowSurvey] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [verifDevice, setVerifDevice] = useState<Device | null>(null);
+  const [detailDevice, setDetailDevice] = useState<Device | null>(null);
+  const [catalog, setCatalog] = useState<TechnicalCatalogItem[]>([]);
+
+  // Catálogo técnico (só identificação: área/família/fabricante/modelo — sem preço).
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    let alive = true;
+    fetchTechnicalCatalog().then((c) => { if (alive) setCatalog(c); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   const countsByArea = useMemo(() => {
     const m: Record<string, number> = {};
@@ -124,7 +137,7 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
       </div>
 
       {/* Tabela adaptativa por disciplina */}
-      <AdaptiveAssetTable area={area} devices={areaDevices} onVerify={setVerifDevice} />
+      <AdaptiveAssetTable area={area} devices={areaDevices} onVerify={setVerifDevice} onOpen={setDetailDevice} />
 
       {/* Credenciais protegidas + Backups técnicos */}
       <CredentialsPanel client={client} userRole={userRole} devices={devices} />
@@ -134,6 +147,7 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
         <AddAssetModal
           area={area}
           clienteId={client.id}
+          catalog={catalog}
           onClose={() => setShowAdd(false)}
           onSaved={() => { setShowAdd(false); onDevicesChanged(); }}
         />
@@ -151,10 +165,23 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
         <TechnicalSurveyFlow
           area={area}
           clienteId={client.id}
+          clientName={client.name}
           existingDevices={devices || []}
           userRole={userRole}
+          catalog={catalog}
           onClose={() => setShowSurvey(false)}
           onChanged={onDevicesChanged}
+        />
+      )}
+      {detailDevice && (
+        <AssetDetailDrawer
+          area={area}
+          device={detailDevice}
+          client={client}
+          userRole={userRole}
+          onClose={() => setDetailDevice(null)}
+          onChanged={onDevicesChanged}
+          onVerify={(d) => { setDetailDevice(null); setVerifDevice(d); }}
         />
       )}
       {showImport && (
@@ -171,7 +198,7 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
 };
 
 /* ------------------------- Tabela adaptativa ------------------------- */
-const AdaptiveAssetTable: React.FC<{ area: TechArea; devices: Device[]; onVerify: (d: Device) => void }> = ({ area, devices, onVerify }) => {
+const AdaptiveAssetTable: React.FC<{ area: TechArea; devices: Device[]; onVerify: (d: Device) => void; onOpen: (d: Device) => void }> = ({ area, devices, onVerify, onOpen }) => {
   if (devices.length === 0) {
     return <EmptyState variant="generico" title={`Sem ativos de ${AREA_LABEL[area]}`} description="Nenhum ativo desta disciplina na base técnica deste cliente. Cadastre manualmente ou registre um levantamento." />;
   }
@@ -193,15 +220,15 @@ const AdaptiveAssetTable: React.FC<{ area: TechArea; devices: Device[]; onVerify
           {devices.map((d) => {
             const ident = assetDisplayIdentifier(area, { central: d.central, laco: d.laco, endereco: d.endereco, technicalAttributes: d.technicalAttributes });
             return (
-              <tr key={d.id} className="bg-surface hover:bg-surface-2">
-                <td className="px-3 py-2 font-data-mono font-semibold text-fg">{ident || <span className="italic text-fg-muted">sem identificador</span>}</td>
+              <tr key={d.id} className="cursor-pointer bg-surface hover:bg-surface-2" onClick={() => onOpen(d)}>
+                <td className="px-3 py-2 font-data-mono font-semibold text-primary">{ident || <span className="italic text-fg-muted">sem identificador</span>}</td>
                 <td className="px-3 py-2 text-fg-secondary">{[d.grupo, d.tipoAtivo || d.tipoDispositivo].filter(Boolean).join(' · ') || '—'}</td>
                 <td className="px-3 py-2 text-fg-secondary">{[d.fabricante, d.modelo].filter(Boolean).join(' ') || '—'}</td>
                 <td className="px-3 py-2 text-fg-secondary">{d.localizacao || d.pavimento || '—'}</td>
                 <td className="px-3 py-2">{d.condicao ? <Badge color={CONDITION_COLOR[d.condicao]}>{CONDITION_LABEL[d.condicao]}</Badge> : <span className="text-fg-muted">—</span>}</td>
                 <td className="px-3 py-2 text-[10px] uppercase tracking-wide text-fg-muted">{d.source ? SOURCE_LABEL[d.source] : '—'}</td>
                 <td className="px-3 py-2 text-right">
-                  <button onClick={() => onVerify(d)} className="rounded-lg border border-border-strong px-2.5 py-1 text-[11px] font-semibold text-primary transition-colors hover:border-primary hover:bg-navy hover:text-white">
+                  <button onClick={(e) => { e.stopPropagation(); onVerify(d); }} className="rounded-lg border border-border-strong px-2.5 py-1 text-[11px] font-semibold text-primary transition-colors hover:border-primary hover:bg-navy hover:text-white">
                     Verificar
                   </button>
                 </td>
@@ -223,12 +250,11 @@ const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, 
 );
 const inputCls = 'rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:border-primary focus:outline-none';
 
-const AddAssetModal: React.FC<{ area: TechArea; clienteId: string; onClose: () => void; onSaved: () => void }> = ({ area, clienteId, onClose, onSaved }) => {
+const AddAssetModal: React.FC<{ area: TechArea; clienteId: string; catalog: TechnicalCatalogItem[]; onClose: () => void; onSaved: () => void }> = ({ area, clienteId, catalog, onClose, onSaved }) => {
   const fields = identifierFields(area);
   const [grupo, setGrupo] = useState('');
   const [tipoAtivo, setTipoAtivo] = useState('');
-  const [fabricante, setFabricante] = useState('');
-  const [modelo, setModelo] = useState('');
+  const [equip, setEquip] = useState<EquipmentIdentification | undefined>(undefined);
   const [serial, setSerial] = useState('');
   const [localizacao, setLocalizacao] = useState('');
   const [condicao, setCondicao] = useState<AssetConditionValue | ''>('');
@@ -248,7 +274,9 @@ const AddAssetModal: React.FC<{ area: TechArea; clienteId: string; onClose: () =
       const device: Partial<Device> & { clienteId: string; sistema: Device['sistema']; status: Device['status'] } = {
         clienteId, sistema: area, status: 'ativo',
         grupo: grupo || undefined, tipoAtivo: tipoAtivo || undefined,
-        fabricante: fabricante || undefined, modelo: modelo || undefined,
+        // Catálogo é só identificação; nunca cria produto/estoque (§10).
+        fabricante: equip?.brand || undefined, modelo: equip?.model || undefined,
+        itemCatalogoId: equip?.catalogItemId || undefined,
         serial: serial || undefined, localizacao: localizacao || undefined,
         condicao: condicao || undefined, source: 'MANUAL',
       };
@@ -287,8 +315,10 @@ const AddAssetModal: React.FC<{ area: TechArea; clienteId: string; onClose: () =
             />
           </Field>
         ))}
-        <Field label="Fabricante"><input value={fabricante} onChange={(e) => setFabricante(e.target.value)} className={inputCls} /></Field>
-        <Field label="Modelo"><input value={modelo} onChange={(e) => setModelo(e.target.value)} className={inputCls} /></Field>
+        <div className="sm:col-span-2">
+          {/* Fabricante/Modelo do catálogo técnico (§6/§7); fallback manual sempre disponível (§9). */}
+          <EquipmentIdentifier value={equip} onChange={setEquip} catalog={catalog} area={area} subcategory={grupo || undefined} />
+        </div>
         <Field label="Nº de série"><input value={serial} onChange={(e) => setSerial(e.target.value)} className={inputCls} /></Field>
         <Field label="Localização"><input value={localizacao} onChange={(e) => setLocalizacao(e.target.value)} className={inputCls} /></Field>
         <Field label="Condição">

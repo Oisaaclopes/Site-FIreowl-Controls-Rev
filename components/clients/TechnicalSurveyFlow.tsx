@@ -12,6 +12,16 @@ import { reconcile, summarizeOpenSurvey, ReconRecord, ReconStatus } from '@/lib/
 import { Badge } from '@/components/DataListRow';
 import { showToast } from '@/components/ui/Feedback';
 import { isSupabaseConfigured } from '@/lib/inventory';
+import { EquipmentIdentifier, EquipmentIdentification } from '@/components/catalog/EquipmentIdentifier';
+import { TechnicalCatalogItem } from '@/lib/technicalCatalog';
+import { CameraCapture } from '@/components/ui/CameraCapture';
+import { ensureSurveySession, captureSurveyEvidence } from '@/lib/fieldPhotoCapture';
+import { FieldPhotoSession } from '@/lib/fieldPhotos';
+import { getOutboxOwner } from '@/lib/offline/outbox';
+import dynamic from 'next/dynamic';
+import type { Client } from '@/lib/types';
+
+const LevantamentoPdfInner = dynamic(() => import('@/components/documentos/LevantamentoPdfInner'), { ssr: false });
 
 /* ==========================================================================
  * ETAPA 3D.2 — Fluxo de Levantamento Técnico que ALIMENTA a Base em tempo real.
@@ -28,25 +38,32 @@ const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, 
 interface Props {
   area: TechArea;
   clienteId: string;
+  clientName?: string;
   existingDevices: Device[];
   userRole: UserRole;
   currentUserId?: string;
+  catalog?: TechnicalCatalogItem[];
   onClose: () => void;
   onChanged: () => void;   // recarrega a base no pai
 }
 
 interface Draft {
-  grupo: string; tipoAtivo: string; fabricante: string; modelo: string; serial: string;
+  assetId: string;         // pré-gerado p/ vincular fotos antes de salvar
+  grupo: string; tipoAtivo: string; equip?: EquipmentIdentification; serial: string;
   localizacao: string; condicao: AssetConditionValue; values: Record<string, string>;
+  photos: number;          // fotos já capturadas para este rascunho
 }
-const emptyDraft = (): Draft => ({ grupo: '', tipoAtivo: '', fabricante: '', modelo: '', serial: '', localizacao: '', condicao: 'NORMAL', values: {} });
+const emptyDraft = (): Draft => ({ assetId: newAssetId(), grupo: '', tipoAtivo: '', equip: undefined, serial: '', localizacao: '', condicao: 'NORMAL', values: {}, photos: 0 });
 
-export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, existingDevices, userRole, currentUserId, onClose, onChanged }) => {
+export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientName, existingDevices, userRole, currentUserId, catalog = [], onClose, onChanged }) => {
   const [phase, setPhase] = useState<'config' | 'capture' | 'finish'>('config');
   const [mode, setMode] = useState<SurveyMode>('PONTUAL');
   const [scopeText, setScopeText] = useState('');
   const [expectedCount, setExpectedCount] = useState('');
   const [survey, setSurvey] = useState<TechnicalSurvey | null>(null);
+  const [session, setSession] = useState<FieldPhotoSession | null>(null);
+  const [showCamera, setShowCamera] = useState(false);
+  const [showPdf, setShowPdf] = useState(false);
 
   const baseInArea = useMemo(() => existingDevices.filter((d) => d.sistema === area), [existingDevices, area]);
 
@@ -72,6 +89,12 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, existing
         expectedCount: exp, verifiedCount: 0,
       });
       setSurvey(s);
+      // Sessão de fotos do levantamento (best-effort; sem técnico, segue sem foto).
+      const techId = currentUserId || getOutboxOwner();
+      if (techId) {
+        try { setSession(await ensureSurveySession({ clientId: clienteId, technicianId: techId, localSetor: scopeText || undefined })); }
+        catch { /* segue sem captura de foto */ }
+      }
       setPhase('capture');
     } catch (e: any) { showToast(`Falha ao iniciar: ${e?.message || e}`); }
   };
@@ -81,7 +104,8 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, existing
     const dev: any = {
       id, clienteId, sistema: area, status: 'ativo',
       grupo: draft.grupo || undefined, tipoAtivo: draft.tipoAtivo || undefined,
-      fabricante: draft.fabricante || undefined, modelo: draft.modelo || undefined,
+      fabricante: draft.equip?.brand || undefined, modelo: draft.equip?.model || undefined,
+      itemCatalogoId: draft.equip?.catalogItemId || undefined,
       serial: draft.serial || undefined, localizacao: draft.localizacao || undefined,
       condicao: draft.condicao, source: 'LEVANTAMENTO', sourceSurveyId: survey?.id,
     };
@@ -104,10 +128,23 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, existing
 
   const invalidField = fields.find((f) => !validateIdentifier(f.kind, draft.values[f.key] || ''));
 
+  const onCapture = async (file: File) => {
+    setShowCamera(false);
+    if (!session) { showToast('Foto indisponível nesta sessão.'); return; }
+    try {
+      await captureSurveyEvidence({
+        file, session, clientId: clienteId, clientName: clientName || 'Cliente',
+        deviceId: draft.assetId, technicalSurveyId: survey?.id,
+      });
+      setDraft((p) => ({ ...p, photos: p.photos + 1 }));
+      showToast('Foto anexada ao ativo.');
+    } catch (e: any) { showToast(`Falha na foto: ${e?.message || e}`); }
+  };
+
   const doSaveNew = async (goNext: boolean) => {
     setSaving(true);
     try {
-      const id = newAssetId();
+      const id = draft.assetId;           // mesmo id das fotos já capturadas
       const dev = buildDeviceFromDraft(id);
       const reconciliation: ReconStatus | undefined = mode === 'COMPLETO' ? 'NOVO' : undefined;
       const res = await persistSurveyAsset({
@@ -231,6 +268,13 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, existing
 
           {phase === 'capture' && (
             <div className="flex flex-col gap-4">
+              {/* Câmera como ação de topo (§26/§27): captura rápida, faz parte do cadastro. */}
+              {session && (
+                <button onClick={() => setShowCamera(true)} className="flex items-center justify-center gap-2 rounded-lg border border-primary bg-navy/5 px-3 py-3 text-sm font-bold text-primary">
+                  <span className="material-symbols-outlined text-lg">photo_camera</span>
+                  {draft.photos > 0 ? `Foto anexada (${draft.photos}) · adicionar outra` : 'Abrir câmera'}
+                </button>
+              )}
               {/* Formulário adaptativo à disciplina */}
               <div className="grid grid-cols-1 gap-3">
                 <Field label="Grupo">
@@ -247,10 +291,8 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, existing
                   </Field>
                 ))}
                 <Field label="Localização"><input value={draft.localizacao} onChange={(e) => setDraft((p) => ({ ...p, localizacao: e.target.value }))} className={inputCls} /></Field>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Fabricante"><input value={draft.fabricante} onChange={(e) => setDraft((p) => ({ ...p, fabricante: e.target.value }))} className={inputCls} /></Field>
-                  <Field label="Modelo"><input value={draft.modelo} onChange={(e) => setDraft((p) => ({ ...p, modelo: e.target.value }))} className={inputCls} /></Field>
-                </div>
+                {/* Fabricante/Modelo do catálogo técnico (§6/§7) + fallback manual (§9). */}
+                <EquipmentIdentifier value={draft.equip} onChange={(v) => setDraft((p) => ({ ...p, equip: v }))} catalog={catalog} area={area} subcategory={draft.grupo || undefined} />
                 <Field label="Condição constatada">
                   <select value={draft.condicao} onChange={(e) => setDraft((p) => ({ ...p, condicao: e.target.value as AssetConditionValue }))} className={inputCls}>
                     {CONDITIONS.map((c) => <option key={c} value={c}>{CONDITION_LABEL[c]}</option>)}
@@ -322,13 +364,34 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, existing
             </div>
           )}
           {phase === 'finish' && (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button onClick={() => setPhase('capture')} className="flex-1 rounded-lg border border-border px-3 py-3 text-sm font-semibold text-fg-secondary hover:bg-surface-2">Voltar</button>
-              <button onClick={finish} className="flex-1 rounded-lg bg-primary px-3 py-3 text-sm font-bold text-white hover:bg-navy">Finalizar levantamento</button>
+              <button onClick={() => setShowPdf(true)} className="flex-1 rounded-lg border border-primary px-3 py-3 text-sm font-bold text-primary hover:bg-navy hover:text-white">PDF do levantamento</button>
+              <button onClick={finish} className="flex-1 rounded-lg bg-primary px-3 py-3 text-sm font-bold text-white hover:bg-navy">Finalizar</button>
             </div>
           )}
         </footer>
       </div>
+
+      {showCamera && <CameraCapture onCapture={onCapture} onClose={() => setShowCamera(false)} title="Foto do ativo" />}
+
+      {showPdf && (
+        <LevantamentoPdfInner
+          client={{ id: clienteId, name: clientName || 'Cliente' } as Client}
+          area={area}
+          mode={mode}
+          scopeText={scopeText || undefined}
+          deviceIds={Array.from(new Set([
+            ...createdThisVisit.map((d) => d.id),
+            ...records.map((r) => r.deviceId),
+            ...(mode === 'COMPLETO' ? baseInArea.map((d) => d.id) : []),
+          ]))}
+          resumo={mode === 'COMPLETO' && summary
+            ? { expected: summary.expected, verified: summary.verified, naoLocalizado: summary.naoLocalizado, novo: summary.novo, alterado: summary.alterado, pendente: summary.pendente, coveragePct: summary.coveragePct }
+            : { expected: expectedCount ? Number(expectedCount) : undefined, verified: createdThisVisit.length, coveragePct: openSummary.coveragePct }}
+          onClose={() => setShowPdf(false)}
+        />
+      )}
 
       {/* Confirmação de duplicidade / ambiguidade (§5) */}
       {pendingMatch && (

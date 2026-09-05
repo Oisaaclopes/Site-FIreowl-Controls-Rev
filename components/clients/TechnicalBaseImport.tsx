@@ -9,6 +9,7 @@ import { upsertDevice } from '@/lib/devices';
 import { newAssetId } from '@/lib/surveyCapture';
 import { showToast } from '@/components/ui/Feedback';
 import { isSupabaseConfigured } from '@/lib/inventory';
+import { buildTemplateXlsxBlob, templateFileName } from '@/lib/technicalImportTemplate';
 
 /* ==========================================================================
  * ETAPA 3D.2 — Importação assistida de Base Técnica (XLSX/CSV, §9–§12).
@@ -46,6 +47,17 @@ export const TechnicalBaseImport: React.FC<Props> = ({ clienteId, area: initialA
     () => (matrix.length > 1 ? buildImportPreview(matrix, mapping, area, baseAssets) : null),
     [matrix, mapping, area, baseAssets],
   );
+
+  const downloadTemplate = () => {
+    try {
+      const blob = buildTemplateXlsxBlob(area);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = templateFileName(area);
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch (e: any) { showToast(`Falha ao gerar modelo: ${e?.message || e}`); }
+  };
 
   const onFile = async (file: File | null) => {
     if (!file) return;
@@ -110,6 +122,10 @@ export const TechnicalBaseImport: React.FC<Props> = ({ clienteId, area: initialA
                 <label className="flex flex-col gap-1"><span className="text-xs font-semibold text-fg-secondary">Arquivo (XLSX ou CSV)</span>
                   <input type="file" accept=".xlsx,.csv,text/csv" onChange={(e) => onFile(e.target.files?.[0] || null)} className={inputCls} />
                 </label>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/40 bg-navy/5 px-3 py-2">
+                <span className="text-[11px] text-fg-secondary">Sem uma planilha pronta? Baixe o modelo oficial de <b>{AREA_LABEL[area]}</b> e preencha.</span>
+                <button onClick={downloadTemplate} className="shrink-0 rounded-lg border border-primary px-3 py-1.5 text-xs font-bold text-primary hover:bg-navy hover:text-white">⬇ Baixar modelo</button>
               </div>
               <p className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-[11px] text-fg-muted">
                 Aceita cabeçalhos livres — na próxima etapa você confirma o mapeamento das colunas. Nada é importado sem sua confirmação. Ativos importados entram como <b>não verificados em campo</b> (§12).
