@@ -16,6 +16,8 @@ import { Badge } from '@/components/DataListRow';
 import { EmptyState } from '@/components/EmptyState';
 import { showToast, requestConfirm } from '@/components/ui/Feedback';
 import { isSupabaseConfigured } from '@/lib/inventory';
+import { TechnicalSurveyFlow } from '@/components/clients/TechnicalSurveyFlow';
+import { TechnicalBaseImport } from '@/components/clients/TechnicalBaseImport';
 
 /* ==========================================================================
  * ETAPA 3D — BASE TÉCNICA PERMANENTE (Cliente 360).
@@ -43,6 +45,8 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
   const [area, setArea] = useState<TechArea>('SDAI');
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
+  const [showSurvey, setShowSurvey] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [verifDevice, setVerifDevice] = useState<Device | null>(null);
 
   const countsByArea = useMemo(() => {
@@ -57,7 +61,11 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
     if (!q) return list;
     return list.filter((d) => {
       const ident = assetDisplayIdentifier(area, { central: d.central, laco: d.laco, endereco: d.endereco, technicalAttributes: d.technicalAttributes }).toLowerCase();
-      return [ident, d.grupo, d.tipoAtivo, d.tipoDispositivo, d.fabricante, d.modelo, d.localizacao, d.serial]
+      // §14: busca por identificadores da disciplina — inclui colunas canônicas e
+      // TODOS os atributos técnicos (ip, canal, mac, zona, device instance, ponto,
+      // controladora, descrição programada…), além dos campos comuns.
+      const attrValues = Object.values(d.technicalAttributes || {}).map((v) => String(v ?? ''));
+      return [ident, d.central, d.laco, d.endereco, d.grupo, d.tipoAtivo, d.tipoDispositivo, d.fabricante, d.modelo, d.localizacao, d.serial, ...attrValues]
         .some((v) => (v || '').toLowerCase().includes(q));
     });
   }, [devices, area, search]);
@@ -95,6 +103,18 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
             className="w-64 max-w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-fg placeholder:text-fg-muted focus:border-primary focus:outline-none"
           />
           <button
+            onClick={() => setShowSurvey(true)}
+            className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-navy"
+          >
+            Novo levantamento
+          </button>
+          <button
+            onClick={() => setShowImport(true)}
+            className="shrink-0 rounded-lg border border-border-strong px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:border-primary hover:bg-navy hover:text-white"
+          >
+            Importar base
+          </button>
+          <button
             onClick={() => setShowAdd(true)}
             className="shrink-0 rounded-lg border border-primary px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-navy hover:text-white"
           >
@@ -125,6 +145,25 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
           clienteId={client.id}
           onClose={() => setVerifDevice(null)}
           onSaved={() => { setVerifDevice(null); onDevicesChanged(); }}
+        />
+      )}
+      {showSurvey && (
+        <TechnicalSurveyFlow
+          area={area}
+          clienteId={client.id}
+          existingDevices={devices || []}
+          userRole={userRole}
+          onClose={() => setShowSurvey(false)}
+          onChanged={onDevicesChanged}
+        />
+      )}
+      {showImport && (
+        <TechnicalBaseImport
+          clienteId={client.id}
+          area={area}
+          existingDevices={devices || []}
+          onClose={() => setShowImport(false)}
+          onImported={onDevicesChanged}
         />
       )}
     </div>

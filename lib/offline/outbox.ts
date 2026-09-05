@@ -1,7 +1,7 @@
 import { idbDelete, idbGetAll, idbUpdate, STORE_OFFLINE_JOBS } from './idb';
 
 export type OfflineJobStatus = 'PENDING' | 'SYNCING' | 'ERROR';
-export type OfflineDomain = 'REPORT' | 'FIELD_PHOTO_SESSION' | 'FIELD_PHOTO' | 'FIELD_PHOTO_COMPARISON';
+export type OfflineDomain = 'REPORT' | 'FIELD_PHOTO_SESSION' | 'FIELD_PHOTO' | 'FIELD_PHOTO_COMPARISON' | 'TECH_ASSET';
 
 export interface OfflineJob<T = unknown> {
   id: string;

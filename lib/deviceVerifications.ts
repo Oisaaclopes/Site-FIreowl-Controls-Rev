@@ -23,8 +23,12 @@ function rowToVerification(r: any): DeviceVerification {
   };
 }
 
-/** Registra uma verificação (histórico) e atualiza a condição atual do ativo. */
-export async function addVerification(v: Omit<DeviceVerification, 'id'>): Promise<DeviceVerification> {
+/**
+ * Registra uma verificação (histórico) e atualiza a condição atual do ativo.
+ * Um `id` opcional (gerado no cliente) torna o replay offline idempotente:
+ * repetir a mesma verificação faz upsert na MESMA linha (sem duplicar histórico).
+ */
+export async function addVerification(v: Omit<DeviceVerification, 'id'> & { id?: string }): Promise<DeviceVerification> {
   const supabase = getSupabaseClient() as any;
   const row: Record<string, unknown> = {
     device_id: v.deviceId,
@@ -34,7 +38,10 @@ export async function addVerification(v: Omit<DeviceVerification, 'id'>): Promis
     reconciliation: v.reconciliation ?? null,
     notes: v.notes ?? null,
   };
-  const { data, error } = await supabase.from(TABLE).insert(row).select().single();
+  if (v.id) row.id = v.id;
+  const { data, error } = v.id
+    ? await supabase.from(TABLE).upsert(row, { onConflict: 'id' }).select().single()
+    : await supabase.from(TABLE).insert(row).select().single();
   if (error) throw error;
   // Sincroniza a fotografia atual no ativo (histórico continua imutável nesta tabela).
   await supabase.from('devices').update({

@@ -148,6 +148,17 @@ export function assetIdentityKey(area: TechArea, asset: AssetLike): string | nul
   return `${area}:${key}`;
 }
 
+/**
+ * Ativos do POOL cuja identidade técnica bate com `asset` (§5). Vazio quando não
+ * há identificador suficiente (não deduplica às cegas) ou nenhum bate. Mais de um
+ * resultado = AMBÍGUO → a UI deve pedir confirmação (nunca merge silencioso).
+ */
+export function findIdentityMatches<T extends AssetLike & { id?: string }>(area: TechArea, asset: AssetLike, pool: T[]): T[] {
+  const key = assetIdentityKey(area, asset);
+  if (!key) return [];
+  return pool.filter((p) => assetIdentityKey(area, p) === key);
+}
+
 /** Validação de valor por tipo de campo (§91). Vazio é válido (campos opcionais). */
 export function validateIdentifier(kind: FieldKind | undefined, value: string): boolean {
   const v = (value || '').trim();

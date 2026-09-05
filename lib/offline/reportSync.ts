@@ -13,6 +13,7 @@ import { idbGet, idbGetAll, idbDelete, idbAvailable, idbPut, STORE_OUTBOX, STORE
 import { canProcessJob, enqueueOfflineJob, flushOfflineJobs, getOutboxOwner, listOfflineJobs, registerOfflineHandler, removeOfflineJob } from './outbox';
 // Registra o handler de Fotos de Campo no mesmo núcleo; não cria uma segunda fila.
 import './fieldPhotoSync';
+import './technicalBaseSync';
 
 /* ---------------------------------------------------------------------------
  * Offline-first do relatório de campo (Parte 4.1). A finalização vira um
