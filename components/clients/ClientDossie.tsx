@@ -38,6 +38,7 @@ import {
 import { signedFieldPhotoUrls } from '@/lib/fieldPhotoStorage';
 import { nomeFantasiaCliente, razaoSocialCliente } from '@/lib/utils';
 import { DevicesManager } from '@/components/reports/DevicesManager';
+import { ClientTechnicalBase } from '@/components/clients/ClientTechnicalBase';
 
 /* ==========================================================================
  * CLIENT 360 — Dossiê operacional do cliente (página cheia).
@@ -55,6 +56,7 @@ type DossieTab =
   | 'pendencias'
   | 'fotos'
   | 'dispositivos'
+  | 'base_tecnica'
   | 'contratos'
   | 'historico';
 
@@ -314,6 +316,7 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
     { id: 'pendencias', label: 'Pendências', icon: 'flag', badge: pendAbertas.length || undefined },
     { id: 'fotos', label: 'Fotos', icon: 'photo_library', badge: photos?.length || undefined },
     { id: 'dispositivos', label: 'Dispositivos', icon: 'memory', badge: devices?.length || undefined },
+    { id: 'base_tecnica', label: 'Base Técnica', icon: 'lan', badge: devices?.length || undefined },
     { id: 'contratos', label: 'Contratos', icon: 'handshake', badge: contratosAtivos.length || undefined },
     { id: 'historico', label: 'Histórico', icon: 'history' },
   ];
@@ -584,6 +587,17 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
             onAction={() => setShowDevicesManager(true)}
           >
             <DevicesTab devices={devices} inventory={inventory} onManage={() => setShowDevicesManager(true)} />
+          </SectionWrap>
+        )}
+
+        {tab === 'base_tecnica' && (
+          <SectionWrap title="Base Técnica do cliente">
+            <ClientTechnicalBase
+              client={client}
+              userRole={userRole}
+              devices={devices}
+              onDevicesChanged={() => { if (isSupabaseConfigured()) fetchDevices(client.id).then(setDevices).catch(() => {}); }}
+            />
           </SectionWrap>
         )}
 

@@ -965,7 +965,7 @@ export type PendenciaStatus =
 export interface Device {
   id: string;
   clienteId: string;
-  sistema: 'SDAI' | 'CFTV' | 'CONTROLE_ACESSO' | 'BMS';
+  sistema: 'SDAI' | 'CFTV' | 'CONTROLE_ACESSO' | 'BMS' | 'ALARME';
   central?: string;
   laco?: string;
   endereco?: string;
@@ -980,6 +980,89 @@ export interface Device {
   ultimoTesteFuncional?: string;
   cicloAmostragemId?: string;
   itemCatalogoId?: string;
+  // ===== ETAPA 3D — Base Técnica multidisciplinar (0094) =====
+  grupo?: string;
+  tipoAtivo?: string;
+  parentDeviceId?: string;
+  technicalIdentifier?: string;
+  /** Atributos estruturados por área (ip, canal, zona, device_instance…). */
+  technicalAttributes?: Record<string, unknown>;
+  condicao?: AssetConditionValue;
+  serial?: string;
+  source?: AssetSourceValue;
+  sourceSurveyId?: string;
+  replacedByDeviceId?: string;
+  removedAt?: string;
+  lastVerifiedAt?: string;
+  createdBy?: string;
+}
+
+export type AssetConditionValue = 'NORMAL' | 'COM_AVARIA' | 'INOPERANTE' | 'NAO_TESTADO' | 'NAO_LOCALIZADO' | 'INADEQUADO';
+export type AssetSourceValue = 'LEVANTAMENTO' | 'IMPORTACAO' | 'MANUAL' | 'ATENDIMENTO';
+
+/** Levantamento técnico (technical_surveys, 0095). */
+export interface TechnicalSurvey {
+  id: string;
+  clienteId: string;
+  area: Device['sistema'];
+  mode: 'PONTUAL' | 'PARCIAL' | 'COMPLETO';
+  scope?: Record<string, unknown>;
+  status: 'EM_ANDAMENTO' | 'FINALIZADO' | 'CANCELADO';
+  expectedCount?: number;
+  verifiedCount: number;
+  notes?: string;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  finishedAt?: string;
+}
+
+/** Verificação de condição de um ativo (device_verifications, 0095). */
+export interface DeviceVerification {
+  id: string;
+  deviceId: string;
+  clienteId?: string;
+  surveyId?: string;
+  condicao: AssetConditionValue;
+  reconciliation?: 'VERIFICADO' | 'NAO_LOCALIZADO' | 'NOVO' | 'DUPLICADO' | 'ALTERADO';
+  notes?: string;
+  verifiedBy?: string;
+  verifiedAt?: string;
+}
+
+/** Credencial técnica (metadata; segredo em tabela isolada, 0096). */
+export interface ClientTechnicalCredential {
+  id: string;
+  clienteId: string;
+  deviceId?: string;
+  area?: string;
+  label: string;
+  username?: string;
+  notes?: string;
+  createdBy?: string;
+  createdAt?: string;
+}
+
+/** Backup técnico de equipamento (technical_backups, 0097). */
+export interface TechnicalBackup {
+  id: string;
+  clienteId: string;
+  area?: string;
+  deviceId?: string;
+  manufacturer?: string;
+  model?: string;
+  backupType?: string;
+  originalFilename: string;
+  fileExtension?: string;
+  mimeType?: string;
+  fileSize?: number;
+  storagePath: string;
+  fileHash?: string;
+  notes?: string;
+  backupDate?: string;
+  isCurrent: boolean;
+  uploadedBy?: string;
+  createdAt?: string;
 }
 
 /** Template de relatório (schema JSON consumido pelo motor de formulários). */

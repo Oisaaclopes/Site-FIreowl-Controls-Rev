@@ -22,6 +22,19 @@ function rowToDevice(r: any): Device {
     ultimoTesteFuncional: r.ultimo_teste_funcional ?? undefined,
     cicloAmostragemId: r.ciclo_amostragem_id ?? undefined,
     itemCatalogoId: r.item_catalogo_id ?? undefined,
+    grupo: r.grupo ?? undefined,
+    tipoAtivo: r.tipo_ativo ?? undefined,
+    parentDeviceId: r.parent_device_id ?? undefined,
+    technicalIdentifier: r.technical_identifier ?? undefined,
+    technicalAttributes: (r.technical_attributes && typeof r.technical_attributes === 'object') ? r.technical_attributes : undefined,
+    condicao: r.condicao ?? undefined,
+    serial: r.serial ?? undefined,
+    source: r.source ?? undefined,
+    sourceSurveyId: r.source_survey_id ?? undefined,
+    replacedByDeviceId: r.replaced_by_device_id ?? undefined,
+    removedAt: r.removed_at ?? undefined,
+    lastVerifiedAt: r.last_verified_at ?? undefined,
+    createdBy: r.created_by ?? undefined,
   };
 }
 
@@ -45,6 +58,19 @@ function deviceToRow(d: Device): Record<string, unknown> {
     item_catalogo_id: d.itemCatalogoId ?? null,
     updated_at: new Date().toISOString(),
   };
+  // Campos 3D só são enviados quando presentes (compat. com bancos sem a 0094).
+  if (d.grupo !== undefined) row.grupo = d.grupo || null;
+  if (d.tipoAtivo !== undefined) row.tipo_ativo = d.tipoAtivo || null;
+  if (d.parentDeviceId !== undefined) row.parent_device_id = d.parentDeviceId || null;
+  if (d.technicalIdentifier !== undefined) row.technical_identifier = d.technicalIdentifier || null;
+  if (d.technicalAttributes !== undefined) row.technical_attributes = d.technicalAttributes || {};
+  if (d.condicao !== undefined) row.condicao = d.condicao || null;
+  if (d.serial !== undefined) row.serial = d.serial || null;
+  if (d.source !== undefined) row.source = d.source || null;
+  if (d.sourceSurveyId !== undefined) row.source_survey_id = d.sourceSurveyId || null;
+  if (d.replacedByDeviceId !== undefined) row.replaced_by_device_id = d.replacedByDeviceId || null;
+  if (d.removedAt !== undefined) row.removed_at = d.removedAt || null;
+  if (d.lastVerifiedAt !== undefined) row.last_verified_at = d.lastVerifiedAt || null;
   if (d.id) row.id = d.id;
   return row;
 }
