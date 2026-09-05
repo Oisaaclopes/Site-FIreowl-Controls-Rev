@@ -26,6 +26,7 @@ import { AssetDetailDrawer } from '@/components/clients/AssetDetailDrawer';
 import { fetchTechnicalCatalog, TechnicalCatalogItem } from '@/lib/technicalCatalog';
 import { TechnicalAssetFields } from '@/components/clients/TechnicalAssetFields';
 import { AssetFormValues, emptyAssetValues, firstInvalidField, buildDevicePatch, deviceToAssetValues } from '@/lib/technicalAssetForm';
+import { FILE_TYPES, fileTypeLabel, fileTypeIcon, fmtFileSize, deviceOptionLabel } from '@/lib/technicalFiles';
 
 /* ==========================================================================
  * ETAPA 3D — BASE TÉCNICA PERMANENTE (Cliente 360).
@@ -286,7 +287,7 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
 
       {/* Credenciais protegidas + Backups técnicos */}
       <CredentialsPanel client={client} userRole={userRole} devices={devices} />
-      <BackupsPanel client={client} userRole={userRole} devices={devices} />
+      <BackupsPanel client={client} userRole={userRole} devices={devices} currentArea={area} />
 
       {showAdd && (
         <AddAssetModal
@@ -808,10 +809,11 @@ const AddCredentialModal: React.FC<{ client: Client; devices: Device[] | null; o
 };
 
 /* ------------------------- Backups técnicos ------------------------- */
-const BackupsPanel: React.FC<{ client: Client; userRole: UserRole; devices: Device[] | null }> = ({ client, userRole, devices }) => {
+const BackupsPanel: React.FC<{ client: Client; userRole: UserRole; devices: Device[] | null; currentArea?: TechArea }> = ({ client, userRole, devices, currentArea }) => {
   const [backups, setBackups] = useState<TechnicalBackup[] | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [menu, setMenu] = useState<string | null>(null);
 
   const load = () => {
     if (!isSupabaseConfigured()) { setBackups([]); return; }
@@ -830,60 +832,93 @@ const BackupsPanel: React.FC<{ client: Client; userRole: UserRole; devices: Devi
     try { await markBackupCurrent(client.id, b.id); load(); } catch (e: any) { showToast(`Falha: ${e?.message || e}`); }
   };
   const remove = async (b: TechnicalBackup) => {
-    if (!await requestConfirm(`Excluir o backup "${b.originalFilename}"?`)) return;
+    if (!await requestConfirm(`Excluir o arquivo "${b.originalFilename}"? Esta ação não pode ser desfeita.`)) return;
     try { await deleteBackup(b); load(); } catch (e: any) { showToast(`Falha: ${e?.message || e}`); }
   };
 
-  const fmtSize = (n?: number) => (n == null ? '' : n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1048576).toFixed(1)} MB`);
+  const deviceById = (id?: string) => (devices || []).find((d) => d.id === id);
 
   return (
     <div className="rounded-xl border border-border bg-surface p-4">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-1 flex items-center justify-between">
         <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-fg-secondary">
-          <span className="material-symbols-outlined text-base text-fg-muted">backup</span>Backups técnicos de equipamentos
+          <span className="material-symbols-outlined text-base text-fg-muted">folder</span>Arquivos técnicos
         </h3>
-        <button onClick={() => setShowAdd(true)} className="text-[10px] font-semibold uppercase tracking-wider text-primary hover:text-danger">+ Enviar backup</button>
+        <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-1 rounded-lg border border-primary px-2.5 py-1 text-[11px] font-bold text-primary transition-colors hover:bg-navy hover:text-white">
+          <span className="material-symbols-outlined text-[16px] leading-none">upload_file</span>Adicionar arquivo
+        </button>
       </div>
-      <p className="mb-3 rounded-lg border border-border bg-surface-2 px-3 py-2 text-[11px] italic text-fg-muted">{BACKUP_DISCLAIMER}</p>
+      <p className="mb-3 text-[11px] text-fg-muted">Backups, programações e configurações dos equipamentos.</p>
       {backups === null ? <p className="text-xs italic text-fg-muted">Carregando…</p>
-        : backups.length === 0 ? <p className="text-xs italic text-fg-muted">Nenhum backup armazenado.</p>
+        : backups.length === 0 ? <p className="text-xs italic text-fg-muted">Nenhum arquivo técnico armazenado.</p>
         : (
           <div className="flex flex-col gap-2">
-            {backups.map((b) => (
-              <div key={b.id} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-2 px-3 py-2">
-                <div className="min-w-0">
-                  <p className="flex items-center gap-2 truncate text-sm font-semibold text-fg">
-                    {b.originalFilename}
-                    {b.isCurrent && <Badge color="emerald">Atual</Badge>}
-                  </p>
-                  <p className="truncate text-[11px] text-fg-secondary">
-                    {[b.area, b.manufacturer, b.model, b.backupType].filter(Boolean).join(' · ') || 'Equipamento não especificado'}
-                    {b.fileSize ? ` · ${fmtSize(b.fileSize)}` : ''}{b.createdAt ? ` · ${new Date(b.createdAt).toLocaleDateString('pt-BR')}` : ''}
-                  </p>
+            {backups.map((b) => {
+              const dev = deviceById(b.deviceId);
+              const context = dev ? deviceOptionLabel(dev) : [b.area, b.manufacturer, b.model].filter(Boolean).join(' · ');
+              return (
+                <div key={b.id} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-2 px-3 py-2">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-3"><span className="material-symbols-outlined text-[20px] text-fg-secondary">{fileTypeIcon(b.backupType)}</span></span>
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-fg-muted">{fileTypeLabel(b.backupType)}{b.isCurrent && <Badge color="emerald">Atual</Badge>}</p>
+                    <p className="truncate text-sm font-semibold text-fg">{b.originalFilename}</p>
+                    <p className="truncate text-[11px] text-fg-secondary">
+                      {context || 'Sem equipamento vinculado'}
+                      {b.fileSize ? ` · ${fmtFileSize(b.fileSize)}` : ''}{b.createdAt ? ` · ${new Date(b.createdAt).toLocaleDateString('pt-BR')}` : ''}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button onClick={() => download(b)} disabled={busy === b.id} className="rounded-lg border border-border-strong px-2.5 py-1 text-[11px] font-semibold text-primary hover:border-primary hover:bg-navy hover:text-white disabled:opacity-50">{busy === b.id ? '…' : 'Baixar'}</button>
+                    <div className="relative">
+                      <button onClick={() => setMenu(menu === b.id ? null : b.id)} className="rounded-lg border border-border-strong px-1.5 py-1 text-fg-muted hover:text-fg-secondary" title="Mais"><span className="material-symbols-outlined text-[16px] leading-none">more_vert</span></button>
+                      {menu === b.id && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setMenu(null)} />
+                          <div className="absolute right-0 top-8 z-20 w-40 rounded-lg border border-border bg-surface py-1 text-[11px] shadow-lg">
+                            <button onClick={() => { setMenu(null); download(b); }} className="block w-full px-3 py-2 text-left text-fg-secondary hover:bg-surface-2">Baixar arquivo</button>
+                            {!b.isCurrent && <button onClick={() => { setMenu(null); mark(b); }} className="block w-full px-3 py-2 text-left text-fg-secondary hover:bg-surface-2">Marcar como atual</button>}
+                            {isGestao(userRole) && <button onClick={() => { setMenu(null); remove(b); }} className="block w-full px-3 py-2 text-left text-danger hover:bg-danger/10">Excluir</button>}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <button onClick={() => download(b)} disabled={busy === b.id} className="rounded-lg border border-border-strong px-2.5 py-1 text-[11px] font-semibold text-primary hover:border-primary hover:bg-navy hover:text-white disabled:opacity-50">{busy === b.id ? '…' : 'Baixar'}</button>
-                  {!b.isCurrent && <button onClick={() => mark(b)} className="rounded-lg border border-border-strong px-2.5 py-1 text-[11px] font-semibold text-fg-secondary hover:bg-surface">Marcar atual</button>}
-                  {isGestao(userRole) && <button onClick={() => remove(b)} className="rounded-lg border border-border px-2.5 py-1 text-[11px] font-semibold text-danger hover:bg-danger/10">Excluir</button>}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
-      {showAdd && <AddBackupModal client={client} devices={devices} onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); load(); }} />}
+      {showAdd && <AddBackupModal client={client} devices={devices} currentArea={currentArea} onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); load(); }} />}
     </div>
   );
 };
 
-const AddBackupModal: React.FC<{ client: Client; devices: Device[] | null; onClose: () => void; onSaved: () => void }> = ({ client, devices, onClose, onSaved }) => {
+const AddBackupModal: React.FC<{ client: Client; devices: Device[] | null; currentArea?: TechArea; onClose: () => void; onSaved: () => void }> = ({ client, devices, currentArea, onClose, onSaved }) => {
   const [file, setFile] = useState<File | null>(null);
-  const [area, setArea] = useState('');
+  const [area, setArea] = useState<string>(currentArea || '');
   const [deviceId, setDeviceId] = useState('');
   const [manufacturer, setManufacturer] = useState('');
   const [model, setModel] = useState('');
   const [backupType, setBackupType] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const fileRef = React.useRef<HTMLInputElement>(null);
+
+  // §7 — só os equipamentos da disciplina selecionada (quando houver).
+  const deviceOptions = useMemo(() => (devices || []).filter((d) => !area || d.sistema === area), [devices, area]);
+
+  // §9 — vincular equipamento preenche fabricante/modelo a partir do device.
+  const pickDevice = (id: string) => {
+    setDeviceId(id);
+    const d = (devices || []).find((x) => x.id === id);
+    if (d) {
+      if (d.fabricante) setManufacturer(d.fabricante);
+      if (d.modelo) setModel(d.modelo);
+      if (d.sistema && !area) setArea(d.sistema);
+    }
+  };
+  // Trocar disciplina limpa vínculo incompatível.
+  const changeArea = (a: string) => { setArea(a); if (deviceId && (devices || []).find((d) => d.id === deviceId)?.sistema !== a) setDeviceId(''); };
 
   const save = async () => {
     if (!file) { showToast('Selecione um arquivo.'); return; }
@@ -896,41 +931,65 @@ const AddBackupModal: React.FC<{ client: Client; devices: Device[] | null; onClo
         manufacturer: manufacturer || undefined, model: model || undefined,
         backupType: backupType || undefined, notes: notes || undefined,
       });
-      showToast('Backup armazenado com segurança.');
+      showToast('Arquivo técnico armazenado com segurança.');
       onSaved();
-    } catch (e: any) { showToast(`Falha no upload: ${e?.message || e}`); } finally { setSaving(false); }
+    } catch (e: any) { showToast(`Falha ao salvar: ${e?.message || e}`); } finally { setSaving(false); }
   };
 
   return (
-    <Modal title="Enviar backup técnico" onClose={onClose}>
-      <p className="mb-3 rounded-lg border border-border bg-surface-2 px-3 py-2 text-[11px] italic text-fg-muted">{BACKUP_DISCLAIMER} O arquivo é preservado exatamente como enviado; o sistema não interpreta, executa nem converte o conteúdo.</p>
+    <Modal title="Adicionar arquivo técnico" onClose={onClose}>
+      {/* Dropzone/card de seleção (§4) — input nativo oculto */}
+      <input ref={fileRef} type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+      {!file ? (
+        <button type="button" onClick={() => fileRef.current?.click()}
+          className="mb-3 flex w-full flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-border-strong bg-surface-2 px-4 py-6 text-center transition-colors hover:border-primary">
+          <span className="material-symbols-outlined text-3xl text-primary">upload_file</span>
+          <span className="text-sm font-bold text-fg">Selecionar arquivo técnico</span>
+          <span className="text-[11px] text-fg-muted">Backup, programação, configuração ou outro arquivo técnico</span>
+        </button>
+      ) : (
+        <div className="mb-3 flex items-center gap-3 rounded-xl border border-border bg-surface-2 px-3 py-2.5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-3"><span className="material-symbols-outlined text-[20px] text-fg-secondary">{fileTypeIcon(backupType)}</span></span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-fg">{file.name}</p>
+            <p className="text-[11px] text-fg-muted">{fmtFileSize(file.size)}</p>
+          </div>
+          <button type="button" onClick={() => fileRef.current?.click()} className="shrink-0 rounded-lg border border-border-strong px-2.5 py-1 text-[11px] font-semibold text-primary hover:border-primary">Alterar</button>
+          <button type="button" onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = ''; }} className="shrink-0 rounded-lg border border-border px-2.5 py-1 text-[11px] font-semibold text-danger hover:bg-danger/10">Remover</button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Field label="Arquivo *"><input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} className={inputCls} /></Field>
-        <Field label="Tipo de backup">
+        <Field label="Tipo de arquivo">
           <select value={backupType} onChange={(e) => setBackupType(e.target.value)} className={inputCls}>
             <option value="">—</option>
-            {['BACKUP_COMPLETO', 'PROGRAMACAO', 'BASE_DISPOSITIVOS', 'CONFIGURACAO', 'EXPORTACAO', 'OUTRO'].map((t) => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
+            {FILE_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
         </Field>
         <Field label="Disciplina">
-          <select value={area} onChange={(e) => setArea(e.target.value)} className={inputCls}>
+          <select value={area} onChange={(e) => changeArea(e.target.value)} className={inputCls}>
             <option value="">—</option>
             {AREAS.map((a) => <option key={a} value={a}>{AREA_LABEL[a]}</option>)}
           </select>
         </Field>
-        <Field label="Equipamento vinculado">
-          <select value={deviceId} onChange={(e) => setDeviceId(e.target.value)} className={inputCls}>
-            <option value="">—</option>
-            {(devices || []).map((d) => <option key={d.id} value={d.id}>{[d.grupo, d.fabricante, d.modelo].filter(Boolean).join(' ') || d.id}</option>)}
+        <Field label="Equipamento vinculado (opcional)">
+          <select value={deviceId} onChange={(e) => pickDevice(e.target.value)} className={`${inputCls} sm:col-span-2`}>
+            <option value="">— Sem equipamento específico</option>
+            {deviceOptions.map((d) => <option key={d.id} value={d.id}>{deviceOptionLabel(d)}</option>)}
           </select>
         </Field>
-        <Field label="Fabricante"><input value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} className={inputCls} /></Field>
-        <Field label="Modelo"><input value={model} onChange={(e) => setModel(e.target.value)} className={inputCls} /></Field>
-        <Field label="Observação"><input value={notes} onChange={(e) => setNotes(e.target.value)} className={inputCls} /></Field>
+        <Field label="Fabricante"><input value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder={deviceId ? 'Preenchido pelo equipamento' : ''} className={inputCls} /></Field>
+        <Field label="Modelo"><input value={model} onChange={(e) => setModel(e.target.value)} placeholder={deviceId ? 'Preenchido pelo equipamento' : ''} className={inputCls} /></Field>
+        <Field label="Observação"><input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ex.: backup após alteração do Laço 1" className={inputCls} /></Field>
       </div>
+
+      <p className="mt-3 flex items-start gap-1.5 text-[11px] text-fg-muted">
+        <span className="material-symbols-outlined text-[15px] leading-none">info</span>
+        <span>{BACKUP_DISCLAIMER}</span>
+      </p>
       <ModalActions>
         <button onClick={onClose} className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-fg-secondary hover:bg-surface-2">Cancelar</button>
-        <button onClick={save} disabled={saving} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-navy disabled:opacity-50">{saving ? 'Enviando…' : 'Enviar backup'}</button>
+        <button onClick={save} disabled={saving || !file} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-navy disabled:opacity-50">{saving ? 'Salvando…' : 'Adicionar arquivo'}</button>
       </ModalActions>
     </Modal>
   );
