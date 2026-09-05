@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { buildXlsx } from './xlsxWriter';
-import { parseXlsx, guessMapping, importTargets } from './technicalImport';
+import { parseXlsx, guessMapping, importTargets, buildImportPreview, isExampleRow } from './technicalImport';
 import { AREAS } from './technicalBase';
 import {
-  TEMPLATE_COLUMNS, templateHeaders, templateColumnKeys, buildTemplateXlsx, templateFileName, buildTemplateSheets,
+  TEMPLATE_COLUMNS, templateHeaders, templateColumnKeys, buildTemplateXlsx, templateFileName, buildTemplateSheets, EXAMPLE_ROW_MARKER,
 } from './technicalImportTemplate';
 
 describe('xlsxWriter — round-trip com o parser da 3D.2', () => {
@@ -44,20 +44,36 @@ describe('modelo oficial por área (§14–§23)', () => {
     }
   });
 
-  it('SDAI/CFTV têm as colunas do enunciado', () => {
-    expect(templateHeaders('SDAI')).toEqual(['GRUPO', 'TIPO', 'FABRICANTE', 'MODELO', 'CENTRAL', 'LAÇO', 'ENDEREÇO', 'DESCRIÇÃO PROGRAMADA', 'LOCALIZAÇÃO', 'SERIAL', 'OBSERVAÇÃO']);
-    expect(templateHeaders('CFTV')).toContain('IP');
-    expect(templateHeaders('CFTV')).toContain('CANAL');
-    expect(templateHeaders('CFTV')).toContain('TECNOLOGIA');
+  it('SDAI usa rótulos numéricos (§42); CFTV mantém IP/Canal/Tecnologia', () => {
+    expect(templateHeaders('SDAI')).toEqual(['GRUPO', 'TIPO', 'FABRICANTE', 'MODELO', 'Nº DA CENTRAL', 'Nº DO LAÇO', 'Nº DO ENDEREÇO', 'DESCRIÇÃO PROGRAMADA', 'LOCALIZAÇÃO', 'Nº DE SÉRIE', 'OBSERVAÇÃO']);
+    expect(templateHeaders('CFTV')).toEqual(expect.arrayContaining(['IP', 'CANAL', 'TECNOLOGIA', 'Nº DE SÉRIE']));
   });
 
-  it('aba IMPORTACAO (sheet1) só tem cabeçalhos — exemplos NÃO importáveis (§20)', async () => {
+  it('rótulos legados ainda mapeiam (retrocompat §42)', () => {
+    const legacy = guessMapping(['GRUPO', 'CENTRAL', 'LAÇO', 'ENDEREÇO', 'SERIAL'], 'SDAI');
+    const keys = Object.values(legacy);
+    expect(keys).toEqual(expect.arrayContaining(['grupo', 'central', 'laco', 'endereco', 'serial']));
+  });
+
+  it('aba IMPORTACAO traz cabeçalho + 1 linha de exemplo marcada e ignorável (§39)', async () => {
     const sheets = buildTemplateSheets('SDAI');
     expect(sheets[0].name).toBe('IMPORTACAO');
-    expect(sheets[0].rows.length).toBe(1);               // só o cabeçalho
+    expect(sheets[0].rows.length).toBe(2);               // cabeçalho + exemplo
     const bytes = buildTemplateXlsx('SDAI');
     const matrix = await parseXlsx(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
-    expect(matrix.length).toBe(1);                        // parser lê só a sheet1 → nenhuma linha de dado
+    expect(matrix.length).toBe(2);
+    // a linha de exemplo é reconhecida e NÃO importada
+    expect(isExampleRow(matrix[1])).toBe(true);
+    const mapping = guessMapping(matrix[0], 'SDAI');
+    const preview = buildImportPreview(matrix, mapping, 'SDAI', []);
+    expect(preview.examples).toBe(1);
+    expect(preview.total).toBe(0);                        // nenhuma linha real
+    expect(preview.results.find((r) => r.example)).toBeTruthy();
+  });
+
+  it('EXAMPLE_ROW_MARKER é detectado por isExampleRow', () => {
+    expect(isExampleRow(['Acionador', '', EXAMPLE_ROW_MARKER])).toBe(true);
+    expect(isExampleRow(['Acionador', '1', 'Corredor'])).toBe(false);
   });
 
   it('nome de arquivo por área', () => {

@@ -64,7 +64,7 @@ export async function captureSurveyEvidence(input: {
   session: FieldPhotoSession;
   clientId: string;
   clientName: string;
-  deviceId: string;
+  deviceId?: string;              // ausente em "observação geral" (§17): foto do survey sem ativo
   technicalSurveyId?: string;
   note?: string;
 }): Promise<CapturedEvidence> {

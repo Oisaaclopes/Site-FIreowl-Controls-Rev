@@ -210,7 +210,7 @@ const COMMON_TARGETS: ImportTarget[] = [
   { key: 'localizacao', label: 'Localização', store: 'field', deviceField: 'localizacao', aliases: ['local', 'localizacao', 'location', 'ambiente', 'setor', 'area', 'sala', 'place', 'localidade'] },
   { key: 'fabricante', label: 'Fabricante', store: 'field', deviceField: 'fabricante', aliases: ['fabricante', 'marca', 'brand', 'manufacturer', 'maker', 'fornecedor'] },
   { key: 'modelo', label: 'Modelo', store: 'field', deviceField: 'modelo', aliases: ['modelo', 'model', 'mod'] },
-  { key: 'serial', label: 'Nº de série', store: 'field', deviceField: 'serial', aliases: ['serial', 'serie', 'n serie', 'sn', 's n', 'numero de serie'] },
+  { key: 'serial', label: 'Nº de série', store: 'field', deviceField: 'serial', aliases: ['serial', 'serie', 'n serie', 'sn', 's n', 'numero de serie', 'n de serie', 'no de serie'] },
   { key: 'observacao', label: 'Observação', store: 'attr', attrKey: 'observacao', aliases: ['observacao', 'obs', 'nota', 'notas', 'comentario', 'comentarios'] },
 ];
 
@@ -221,9 +221,10 @@ const EXTRA_TARGETS_BY_AREA: Partial<Record<TechArea, ImportTarget[]>> = {
 };
 
 const IDENT_ALIASES: Record<string, string[]> = {
-  central: ['central', 'painel', 'panel'],
-  laco: ['laco', 'loop', 'la'],
-  endereco: ['endereco', 'end', 'address', 'addr', 'end nr', 'endereco nr'],
+  // inclui rótulos oficiais 3D.5 ("Nº da Central"→"n da central") e legados (§42)
+  central: ['central', 'painel', 'panel', 'n da central', 'no da central', 'numero da central', 'num central'],
+  laco: ['laco', 'loop', 'la', 'n do laco', 'no do laco', 'numero do laco', 'num laco'],
+  endereco: ['endereco', 'end', 'address', 'addr', 'end nr', 'endereco nr', 'n do endereco', 'no do endereco', 'numero do endereco', 'num endereco'],
   descricao_programada: ['descricao', 'descricao programada', 'label', 'texto', 'description', 'desc'],
   nvr: ['nvr', 'dvr', 'xvr', 'gravador', 'recorder'],
   ip: ['ip', 'ip camera', 'ip cam', 'endereco ip', 'ip address'],
@@ -300,17 +301,27 @@ export interface ImportRowResult {
   errors: string[];
   duplicateInFile: boolean; // repete outra linha do arquivo
   duplicateInBase: boolean; // já existe na Base Técnica
+  example: boolean;         // linha de exemplo do modelo (§39) — nunca importada
 }
 
 export interface ImportPreview {
   headers: string[];
-  total: number;
+  total: number;            // não conta linhas de exemplo
   valid: number;
   invalid: number;
   duplicatesInFile: number;
   duplicatesInBase: number;
+  examples: number;
   unmappedColumns: string[];
   results: ImportRowResult[];
+}
+
+/** Detecta a LINHA DE EXEMPLO do modelo oficial (§39), independentemente do mapeamento. */
+export function isExampleRow(cells: string[]): boolean {
+  return cells.some((c) => {
+    const n = normalizeHeader(String(c ?? ''));
+    return n.includes('nao importar') || n.includes('apague esta linha');
+  });
 }
 
 /**
@@ -335,6 +346,11 @@ export function buildImportPreview(
   const results: ImportRowResult[] = [];
 
   bodyRows.forEach((cells, r) => {
+    // Linha de exemplo do modelo (§39): reconhecida com segurança e nunca importada.
+    if (isExampleRow(cells)) {
+      results.push({ row: r, draft: { technicalAttributes: {} }, identityKey: null, valid: false, errors: [], duplicateInFile: false, duplicateInBase: false, example: true });
+      return;
+    }
     const draft: DeviceDraft = { technicalAttributes: {} };
     const errors: string[] = [];
     for (const [colStr, key] of Object.entries(mapping)) {
@@ -369,16 +385,19 @@ export function buildImportPreview(
       errors,
       duplicateInFile,
       duplicateInBase,
+      example: false,
     });
   });
 
+  const real = results.filter((x) => !x.example);
   return {
     headers,
-    total: results.length,
-    valid: results.filter((x) => x.valid).length,
-    invalid: results.filter((x) => !x.valid).length,
-    duplicatesInFile: results.filter((x) => x.duplicateInFile).length,
-    duplicatesInBase: results.filter((x) => x.duplicateInBase).length,
+    total: real.length,
+    valid: real.filter((x) => x.valid).length,
+    invalid: real.filter((x) => !x.valid).length,
+    duplicatesInFile: real.filter((x) => x.duplicateInFile).length,
+    duplicatesInBase: real.filter((x) => x.duplicateInBase).length,
+    examples: results.filter((x) => x.example).length,
     unmappedColumns,
     results,
   };

@@ -3,8 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Client, Device, UserRole, ClientTechnicalCredential, TechnicalBackup, DeviceVerification, AssetConditionValue } from '@/lib/types';
 import {
   TechArea, AREAS, AREA_LABEL, CONDITIONS, CONDITION_LABEL, SOURCE_LABEL,
-  groupsForArea, identifierFields, assetDisplayIdentifier, validateIdentifier,
-  IdentifierField,
+  groupsForArea, assetDisplayIdentifier, legacyGroupLabel,
 } from '@/lib/technicalBase';
 import { upsertDevice } from '@/lib/devices';
 import { addVerification, fetchVerificationsForDevice } from '@/lib/deviceVerifications';
@@ -19,8 +18,9 @@ import { isSupabaseConfigured } from '@/lib/inventory';
 import { TechnicalSurveyFlow } from '@/components/clients/TechnicalSurveyFlow';
 import { TechnicalBaseImport } from '@/components/clients/TechnicalBaseImport';
 import { AssetDetailDrawer } from '@/components/clients/AssetDetailDrawer';
-import { EquipmentIdentifier, EquipmentIdentification } from '@/components/catalog/EquipmentIdentifier';
 import { fetchTechnicalCatalog, TechnicalCatalogItem } from '@/lib/technicalCatalog';
+import { TechnicalAssetFields } from '@/components/clients/TechnicalAssetFields';
+import { AssetFormValues, emptyAssetValues, firstInvalidField, buildDevicePatch } from '@/lib/technicalAssetForm';
 
 /* ==========================================================================
  * ETAPA 3D — BASE TÉCNICA PERMANENTE (Cliente 360).
@@ -247,7 +247,7 @@ const AdaptiveAssetTable: React.FC<{ area: TechArea; devices: Device[]; onVerify
             return (
               <tr key={d.id} className="cursor-pointer bg-surface hover:bg-surface-2" onClick={() => onOpen(d)}>
                 <td className="px-3 py-2 font-data-mono font-semibold text-primary">{ident || <span className="italic text-fg-muted">sem identificador</span>}</td>
-                <td className="px-3 py-2 text-fg-secondary">{[d.grupo, d.tipoAtivo || d.tipoDispositivo].filter(Boolean).join(' · ') || '—'}</td>
+                <td className="px-3 py-2 text-fg-secondary">{[legacyGroupLabel(area, d.grupo), d.tipoAtivo || d.tipoDispositivo].filter(Boolean).join(' · ') || '—'}</td>
                 <td className="px-3 py-2 text-fg-secondary">{[d.fabricante, d.modelo].filter(Boolean).join(' ') || '—'}</td>
                 <td className="px-3 py-2 text-fg-secondary">{d.localizacao || d.pavimento || '—'}</td>
                 <td className="px-3 py-2">{d.condicao ? <Badge color={CONDITION_COLOR[d.condicao]}>{CONDITION_LABEL[d.condicao]}</Badge> : <span className="text-fg-muted">—</span>}</td>
@@ -276,43 +276,20 @@ const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, 
 const inputCls = 'rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:border-primary focus:outline-none';
 
 const AddAssetModal: React.FC<{ area: TechArea; clienteId: string; catalog: TechnicalCatalogItem[]; onClose: () => void; onSaved: () => void }> = ({ area, clienteId, catalog, onClose, onSaved }) => {
-  const fields = identifierFields(area);
+  // Mesmo motor/config do Levantamento (§36/§54): escolhe grupo → campos contextuais.
   const [grupo, setGrupo] = useState('');
-  const [tipoAtivo, setTipoAtivo] = useState('');
-  const [equip, setEquip] = useState<EquipmentIdentification | undefined>(undefined);
-  const [serial, setSerial] = useState('');
-  const [localizacao, setLocalizacao] = useState('');
-  const [condicao, setCondicao] = useState<AssetConditionValue | ''>('');
-  const [values, setValues] = useState<Record<string, string>>({});
+  const [vals, setVals] = useState<AssetFormValues>(emptyAssetValues());
   const [saving, setSaving] = useState(false);
 
-  const setF = (k: string, v: string) => setValues((p) => ({ ...p, [k]: v }));
-
-  const invalidField = fields.find((f) => !validateIdentifier(f.kind, values[f.key] || ''));
-
   const save = async () => {
-    if (invalidField) { showToast(`Valor inválido em "${invalidField.label}".`); return; }
+    if (!grupo) { showToast('Selecione o grupo do ativo.'); return; }
+    const invalid = firstInvalidField(area, grupo, vals);
+    if (invalid) { showToast(`Valor inválido em "${invalid.label}".`); return; }
     if (!isSupabaseConfigured()) { showToast('Supabase não configurado.'); return; }
     setSaving(true);
     try {
-      const technicalAttributes: Record<string, unknown> = {};
-      const device: Partial<Device> & { clienteId: string; sistema: Device['sistema']; status: Device['status'] } = {
-        clienteId, sistema: area, status: 'ativo',
-        grupo: grupo || undefined, tipoAtivo: tipoAtivo || undefined,
-        // Catálogo é só identificação; nunca cria produto/estoque (§10).
-        fabricante: equip?.brand || undefined, modelo: equip?.model || undefined,
-        itemCatalogoId: equip?.catalogItemId || undefined,
-        serial: serial || undefined, localizacao: localizacao || undefined,
-        condicao: condicao || undefined, source: 'MANUAL',
-      };
-      for (const f of fields) {
-        const v = (values[f.key] || '').trim();
-        if (!v) continue;
-        if (f.store === 'attr') technicalAttributes[f.key] = v;
-        else (device as any)[f.store] = v;
-      }
-      device.technicalAttributes = technicalAttributes;
-      await upsertDevice(device as Device);
+      const patch = buildDevicePatch(area, grupo, vals);
+      await upsertDevice({ ...patch, clienteId, status: 'ativo', source: 'MANUAL' } as Device);
       showToast('Ativo adicionado à base técnica.');
       onSaved();
     } catch (e: any) {
@@ -322,40 +299,19 @@ const AddAssetModal: React.FC<{ area: TechArea; clienteId: string; catalog: Tech
 
   return (
     <Modal title={`Novo ativo — ${AREA_LABEL[area]}`} onClose={onClose}>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Field label="Grupo">
+      <div className="mb-3">
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] font-semibold text-fg-secondary">Grupo</span>
           <select value={grupo} onChange={(e) => setGrupo(e.target.value)} className={inputCls}>
-            <option value="">Selecione…</option>
+            <option value="">Selecione o que está registrando…</option>
             {groupsForArea(area).map((g) => <option key={g} value={g}>{g}</option>)}
           </select>
-        </Field>
-        <Field label="Tipo do ativo (livre)"><input value={tipoAtivo} onChange={(e) => setTipoAtivo(e.target.value)} className={inputCls} /></Field>
-        {fields.map((f) => (
-          <Field key={f.key} label={f.label + (f.optional ? '' : ' *')}>
-            <input
-              value={values[f.key] || ''}
-              onChange={(e) => setF(f.key, e.target.value)}
-              placeholder={f.placeholder}
-              className={`${inputCls} ${!validateIdentifier(f.kind, values[f.key] || '') ? 'border-danger' : ''}`}
-            />
-          </Field>
-        ))}
-        <div className="sm:col-span-2">
-          {/* Fabricante/Modelo do catálogo técnico (§6/§7); fallback manual sempre disponível (§9). */}
-          <EquipmentIdentifier value={equip} onChange={setEquip} catalog={catalog} area={area} subcategory={grupo || undefined} />
-        </div>
-        <Field label="Nº de série"><input value={serial} onChange={(e) => setSerial(e.target.value)} className={inputCls} /></Field>
-        <Field label="Localização"><input value={localizacao} onChange={(e) => setLocalizacao(e.target.value)} className={inputCls} /></Field>
-        <Field label="Condição">
-          <select value={condicao} onChange={(e) => setCondicao(e.target.value as AssetConditionValue | '')} className={inputCls}>
-            <option value="">Não informada</option>
-            {CONDITIONS.map((c) => <option key={c} value={c}>{CONDITION_LABEL[c]}</option>)}
-          </select>
-        </Field>
+        </label>
       </div>
+      {grupo && <TechnicalAssetFields area={area} group={grupo} catalog={catalog} value={vals} onChange={setVals} />}
       <ModalActions>
         <button onClick={onClose} className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-fg-secondary hover:bg-surface-2">Cancelar</button>
-        <button onClick={save} disabled={saving} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-navy disabled:opacity-50">{saving ? 'Salvando…' : 'Adicionar ativo'}</button>
+        <button onClick={save} disabled={saving || !grupo} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-navy disabled:opacity-50">{saving ? 'Salvando…' : 'Adicionar ativo'}</button>
       </ModalActions>
     </Modal>
   );

@@ -44,7 +44,9 @@ export interface IdentifierField {
 
 /** Grupos (taxonomia) por área — §27/§29/§32/§34/§36. */
 export const GROUPS_BY_AREA: Record<TechArea, string[]> = {
-  SDAI: ['Central', 'Repetidora', 'Acionador Manual', 'Sirene / Sinalizador', 'Detector de Fumaça', 'Detector de Temperatura', 'Detector Multicritério', 'Detector Linear', 'Módulo', 'Fonte / Alimentação', 'Infraestrutura', 'Cabeamento', 'Outro'],
+  // §5/§6 — "Central SDAI"/"Repetidora de SDAI" desfazem a ambiguidade multidisciplinar
+  // com "Central de Alarme". Valores legados ('Central'/'Repetidora') são lidos via legacyGroupLabel().
+  SDAI: ['Central SDAI', 'Repetidora de SDAI', 'Acionador Manual', 'Sirene / Sinalizador', 'Detector de Fumaça', 'Detector de Temperatura', 'Detector Multicritério', 'Detector Linear', 'Módulo', 'Fonte / Alimentação', 'Infraestrutura', 'Cabeamento', 'Outro'],
   CFTV: ['DVR', 'NVR', 'XVR', 'Câmera', 'Switch / PoE', 'Fonte', 'Armazenamento', 'Rack', 'Monitor', 'Estação de Monitoramento', 'Rede', 'Cabeamento', 'Infraestrutura', 'Outro'],
   ALARME: ['Central', 'Teclado', 'Sensor PIR', 'Sensor Magnético', 'Sensor Perimetral', 'Sensor de Barreira', 'Sirene', 'Módulo', 'Comunicador', 'Fonte', 'Bateria', 'Infraestrutura', 'Cabeamento', 'Outro'],
   BMS: ['Controlador', 'CLP', 'Módulo I/O', 'Sensor', 'Atuador', 'Inversor', 'Medidor', 'Gateway', 'Painel', 'Rede', 'Fonte', 'Equipamento Monitorado', 'Infraestrutura', 'Outro'],
@@ -54,9 +56,9 @@ export const GROUPS_BY_AREA: Record<TechArea, string[]> = {
 /** Campos identificadores por área (§18–§23). Não são universais. */
 const IDENTIFIERS_BY_AREA: Record<TechArea, IdentifierField[]> = {
   SDAI: [
-    { key: 'central', label: 'Central', store: 'central', optional: true },
-    { key: 'laco', label: 'Laço', store: 'laco', optional: true },
-    { key: 'endereco', label: 'Endereço', store: 'endereco', optional: true },
+    { key: 'central', label: 'Nº da Central', store: 'central', kind: 'number', optional: true },
+    { key: 'laco', label: 'Nº do Laço', store: 'laco', kind: 'number', optional: true },
+    { key: 'endereco', label: 'Nº do Endereço', store: 'endereco', kind: 'number', optional: true },
     { key: 'descricao_programada', label: 'Descrição programada', store: 'attr', optional: true, placeholder: 'Texto EXATO da central (ex.: L2 DF 125 SALA CPD)' },
   ],
   CFTV: [
@@ -66,10 +68,10 @@ const IDENTIFIERS_BY_AREA: Record<TechArea, IdentifierField[]> = {
     { key: 'mac', label: 'MAC', store: 'attr', kind: 'mac', optional: true },
   ],
   ALARME: [
-    { key: 'central', label: 'Central', store: 'central', optional: true },
+    { key: 'central', label: 'Nº da Central', store: 'central', kind: 'number', optional: true },
     { key: 'particao', label: 'Partição', store: 'attr', optional: true },
-    { key: 'zona', label: 'Zona', store: 'attr', optional: true },
-    { key: 'endereco', label: 'Endereço (barramento)', store: 'endereco', optional: true },
+    { key: 'zona', label: 'Zona', store: 'attr', kind: 'number', optional: true },
+    { key: 'endereco', label: 'Nº do Endereço (barramento)', store: 'endereco', kind: 'number', optional: true },
     { key: 'descricao_programada', label: 'Descrição programada', store: 'attr', optional: true },
   ],
   BMS: [
@@ -91,6 +93,96 @@ const IDENTIFIERS_BY_AREA: Record<TechArea, IdentifierField[]> = {
 export const areaLabel = (a?: string) => (a && AREA_LABEL[a as TechArea]) || a || '';
 export const groupsForArea = (area: TechArea): string[] => GROUPS_BY_AREA[area] || [];
 export const identifierFields = (area: TechArea): IdentifierField[] => IDENTIFIERS_BY_AREA[area] || [];
+
+/**
+ * Normaliza rótulos de grupo LEGADOS para a taxonomia canônica atual (§45).
+ * Só toca o que é inequívoco POR ÁREA — NUNCA renomeia "Central" de ALARME.
+ * Usado na leitura (frontend) para que devices gravados antes da 3D.5 continuem
+ * coerentes mesmo antes de aplicar a migration de normalização.
+ */
+export function legacyGroupLabel(area: string | undefined, grupo: string | undefined): string {
+  const g = (grupo || '').trim();
+  if (!g) return g;
+  if (area === 'SDAI') {
+    if (g === 'Central') return 'Central SDAI';
+    if (g === 'Repetidora') return 'Repetidora de SDAI';
+  }
+  return g;
+}
+
+/**
+ * Identificadores APLICÁVEIS a um grupo (§7/§12). Uma Central SDAI não é um ativo
+ * de laço/endereço; um NVR não tem "Canal". Retorna o subconjunto de chaves de
+ * IDENTIFIERS_BY_AREA que faz sentido para o grupo. Grupos não mapeados usam o
+ * conjunto completo da área (comportamento anterior, seguro).
+ */
+export function identifierKeysForGroup(area: TechArea, grupo?: string): string[] {
+  const all = identifierFields(area).map((f) => f.key);
+  const g = legacyGroupLabel(area, grupo);
+  const rules = GROUP_IDENTIFIER_RULES[area];
+  if (!g || !rules) return all;
+  const only = rules[g];
+  return only ? only.filter((k) => all.includes(k)) : all;
+}
+
+export function identifierFieldsForGroup(area: TechArea, grupo?: string): IdentifierField[] {
+  const keys = new Set(identifierKeysForGroup(area, grupo));
+  return identifierFields(area).filter((f) => keys.has(f.key));
+}
+
+/** Grupos de INFRAESTRUTURA/observação onde fabricante/modelo são opcionais (§16). */
+export const INFRA_GROUPS = new Set(['Infraestrutura', 'Cabeamento']);
+export const isInfraGroup = (grupo?: string): boolean => INFRA_GROUPS.has((grupo || '').trim());
+
+/**
+ * Regras de aplicabilidade de identificadores por grupo (§10–§13/§27–§30).
+ * Só definimos exceções; o que não estiver aqui herda o conjunto completo da área.
+ */
+const GROUP_IDENTIFIER_RULES: Partial<Record<TechArea, Record<string, string[]>>> = {
+  SDAI: {
+    'Central SDAI': ['central'],                       // central não é endereço de laço
+    'Repetidora de SDAI': ['central'],
+    'Fonte / Alimentação': ['central'],
+    'Infraestrutura': [],
+    'Cabeamento': [],
+    'Outro': ['central', 'laco', 'endereco', 'descricao_programada'],
+    // endereçáveis (Acionador/Sirene/Detectores/Módulo) herdam o conjunto completo
+  },
+  CFTV: {
+    'DVR': ['nvr', 'ip', 'mac'], 'NVR': ['nvr', 'ip', 'mac'], 'XVR': ['nvr', 'ip', 'mac'],
+    'Câmera': ['nvr', 'ip', 'canal', 'mac'],
+    'Switch / PoE': ['ip', 'mac'], 'Rede': ['ip', 'mac'], 'Monitor': [], 'Rack': [], 'Fonte': [],
+    'Armazenamento': ['ip'], 'Estação de Monitoramento': ['ip', 'mac'],
+    'Infraestrutura': [], 'Cabeamento': [],
+  },
+  ALARME: {
+    'Central de Alarme': ['central'], 'Central': ['central'],
+    'Teclado': ['central', 'particao'],
+    'Sensor PIR': ['central', 'particao', 'zona', 'endereco', 'descricao_programada'],
+    'Sensor Magnético': ['central', 'particao', 'zona', 'endereco', 'descricao_programada'],
+    'Sensor Perimetral': ['central', 'particao', 'zona', 'endereco', 'descricao_programada'],
+    'Sensor de Barreira': ['central', 'particao', 'zona', 'endereco', 'descricao_programada'],
+    'Sirene': ['central', 'particao', 'zona'], 'Comunicador': ['central'],
+    'Fonte': [], 'Bateria': [], 'Infraestrutura': [], 'Cabeamento': [],
+  },
+  BMS: {
+    'Controlador': ['controlador', 'protocolo', 'ip', 'device_instance', 'modbus_id'],
+    'CLP': ['controlador', 'protocolo', 'ip', 'device_instance', 'modbus_id'],
+    'Gateway': ['controlador', 'protocolo', 'ip'],
+    'Módulo I/O': ['controlador', 'device_instance', 'modbus_id', 'ponto'],
+    'Sensor': ['controlador', 'ponto'], 'Atuador': ['controlador', 'ponto'], 'Medidor': ['controlador', 'ponto', 'modbus_id'],
+    'Inversor': ['controlador', 'modbus_id'], 'Painel': [], 'Rede': ['ip'], 'Fonte': [],
+    'Equipamento Monitorado': ['ponto'], 'Infraestrutura': [],
+  },
+  CONTROLE_ACESSO: {
+    'Controladora': ['controladora', 'ip'],
+    'Leitora': ['controladora', 'porta', 'porta_controladora'],
+    'Fechadura': ['controladora', 'porta'], 'Eletroímã': ['controladora', 'porta'],
+    'Botoeira': ['controladora', 'porta'], 'Sensor de Porta': ['controladora', 'porta'],
+    'Catraca': ['controladora', 'porta', 'ip'], 'Gateway': ['controladora', 'ip'],
+    'Fonte': [], 'Rede': ['ip'], 'Infraestrutura': [],
+  },
+};
 
 /** Objeto mínimo de ativo que o motor entende (subset do Device). */
 export interface AssetLike {

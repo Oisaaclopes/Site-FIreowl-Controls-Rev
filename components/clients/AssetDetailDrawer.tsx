@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Client, Device, UserRole, DeviceVerification, AssetConditionValue, Pendencia } from '@/lib/types';
 import {
-  TechArea, AREA_LABEL, CONDITION_LABEL, SOURCE_LABEL, identifierFields, fieldValue, assetDisplayIdentifier,
+  TechArea, AREA_LABEL, CONDITION_LABEL, SOURCE_LABEL, identifierFields, fieldValue, assetDisplayIdentifier, legacyGroupLabel,
 } from '@/lib/technicalBase';
 import { fetchVerificationsForDevice } from '@/lib/deviceVerifications';
 import { listFieldPhotosByDevice, FieldPhoto } from '@/lib/fieldPhotos';
@@ -75,7 +75,7 @@ export const AssetDetailDrawer: React.FC<Props> = ({ area, device, client, allDe
       <div className="flex h-full w-full max-w-md flex-col overflow-hidden border-l border-border bg-surface" onClick={(e) => e.stopPropagation()}>
         <header className="flex shrink-0 items-start justify-between gap-2 border-b border-border px-4 py-3">
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-fg-muted">{AREA_LABEL[area]} · {device.grupo || 'Ativo'}</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-fg-muted">{AREA_LABEL[area]} · {legacyGroupLabel(area, device.grupo) || 'Ativo'}</p>
             <h3 className="truncate text-base font-bold text-fg">{device.tipoAtivo || device.tipoDispositivo || device.modelo || 'Ativo técnico'}</h3>
             <p className="truncate font-data-mono text-xs text-primary">{ident || 'sem identificador'}</p>
           </div>

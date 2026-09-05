@@ -20,12 +20,12 @@ export const TEMPLATE_COLUMNS: Record<TechArea, TemplateColumn[]> = {
     { label: 'TIPO', key: 'tipoAtivo', example: 'Acionador Manual Endereçável' },
     { label: 'FABRICANTE', key: 'fabricante', example: 'Tecnohold' },
     { label: 'MODELO', key: 'modelo', example: 'AMET' },
-    { label: 'CENTRAL', key: 'central', example: '1' },
-    { label: 'LAÇO', key: 'laco', example: '2' },
-    { label: 'ENDEREÇO', key: 'endereco', example: '45' },
-    { label: 'DESCRIÇÃO PROGRAMADA', key: 'descricao_programada', example: 'L2 AM 45 RECEPCAO' },
+    { label: 'Nº DA CENTRAL', key: 'central', example: '1' },
+    { label: 'Nº DO LAÇO', key: 'laco', example: '1' },
+    { label: 'Nº DO ENDEREÇO', key: 'endereco', example: '45' },
+    { label: 'DESCRIÇÃO PROGRAMADA', key: 'descricao_programada', example: 'AM PADARIA' },
     { label: 'LOCALIZAÇÃO', key: 'localizacao', example: 'Corredor próximo à padaria' },
-    { label: 'SERIAL', key: 'serial', example: '' },
+    { label: 'Nº DE SÉRIE', key: 'serial', example: 'TH-AM-0001' },
     { label: 'OBSERVAÇÃO', key: 'observacao', example: '' },
   ],
   CFTV: [
@@ -39,7 +39,7 @@ export const TEMPLATE_COLUMNS: Record<TechArea, TemplateColumn[]> = {
     { label: 'CANAL', key: 'canal', example: '08' },
     { label: 'MAC', key: 'mac', example: '' },
     { label: 'LOCALIZAÇÃO', key: 'localizacao', example: 'Estacionamento' },
-    { label: 'SERIAL', key: 'serial', example: '' },
+    { label: 'Nº DE SÉRIE', key: 'serial', example: 'ITB-CAM-0001' },
     { label: 'OBSERVAÇÃO', key: 'observacao', example: '' },
   ],
   ALARME: [
@@ -47,13 +47,13 @@ export const TEMPLATE_COLUMNS: Record<TechArea, TemplateColumn[]> = {
     { label: 'TIPO', key: 'tipoAtivo', example: 'Sensor de presença' },
     { label: 'FABRICANTE', key: 'fabricante', example: 'JFL' },
     { label: 'MODELO', key: 'modelo', example: 'IRPET-520' },
-    { label: 'CENTRAL', key: 'central', example: '1' },
+    { label: 'Nº DA CENTRAL', key: 'central', example: '1' },
     { label: 'ZONA', key: 'zona', example: '12' },
     { label: 'PARTIÇÃO', key: 'particao', example: 'A' },
-    { label: 'ENDEREÇO', key: 'endereco', example: '' },
+    { label: 'Nº DO ENDEREÇO', key: 'endereco', example: '' },
     { label: 'DESCRIÇÃO PROGRAMADA', key: 'descricao_programada', example: 'ZONA 12 DEPOSITO' },
     { label: 'LOCALIZAÇÃO', key: 'localizacao', example: 'Depósito' },
-    { label: 'SERIAL', key: 'serial', example: '' },
+    { label: 'Nº DE SÉRIE', key: 'serial', example: '' },
     { label: 'OBSERVAÇÃO', key: 'observacao', example: '' },
   ],
   BMS: [
@@ -68,7 +68,7 @@ export const TEMPLATE_COLUMNS: Record<TechArea, TemplateColumn[]> = {
     { label: 'MODBUS ID', key: 'modbus_id', example: '' },
     { label: 'PONTO', key: 'ponto', example: 'AHU-01/SUP-TEMP' },
     { label: 'LOCALIZAÇÃO', key: 'localizacao', example: 'Casa de máquinas' },
-    { label: 'SERIAL', key: 'serial', example: '' },
+    { label: 'Nº DE SÉRIE', key: 'serial', example: '' },
     { label: 'OBSERVAÇÃO', key: 'observacao', example: '' },
   ],
   CONTROLE_ACESSO: [
@@ -81,20 +81,28 @@ export const TEMPLATE_COLUMNS: Record<TechArea, TemplateColumn[]> = {
     { label: 'CANAL', key: 'canal', example: '1' },
     { label: 'IP', key: 'ip', example: '192.168.30.10' },
     { label: 'LOCALIZAÇÃO', key: 'localizacao', example: 'Recepção' },
-    { label: 'SERIAL', key: 'serial', example: '' },
+    { label: 'Nº DE SÉRIE', key: 'serial', example: '' },
     { label: 'OBSERVAÇÃO', key: 'observacao', example: '' },
   ],
 };
+
+/**
+ * Marcador da LINHA DE EXEMPLO (§39). Vai na coluna OBSERVAÇÃO da linha exemplo
+ * na aba IMPORTACAO. O importador (buildImportPreview) reconhece esse token e
+ * NUNCA transforma a linha em ativo — independentemente do usuário apagá-la.
+ */
+export const EXAMPLE_ROW_MARKER = 'EXEMPLO — NÃO IMPORTAR (apague esta linha)';
 
 const INSTRUCTIONS: string[] = [
   'INSTRUÇÕES — MODELO DE IMPORTAÇÃO DA BASE TÉCNICA (FIREOWL GUARDIAN)',
   '',
   '1. Preencha os ativos na aba "IMPORTACAO" (uma linha = um ativo).',
-  '2. NÃO altere o significado nem a ordem das colunas.',
-  '3. Campos opcionais podem ficar vazios.',
-  '4. Não duplique identificadores (ex.: mesmo Laço + Endereço) no mesmo cliente.',
-  '5. Importar NÃO significa verificação em campo — os ativos entram como "não verificados".',
-  '6. Abaixo, um exemplo de preenchimento (NÃO copie para a aba IMPORTACAO como está).',
+  '2. A 1ª linha de dados é um EXEMPLO (coluna OBSERVAÇÃO diz "não importar"). Apague-a ou deixe: o sistema a ignora automaticamente.',
+  '3. NÃO altere o significado nem a ordem das colunas.',
+  '4. Campos opcionais podem ficar vazios.',
+  '5. Nº da Central / Nº do Laço / Nº do Endereço: somente números. Nº de Série: aceita letras e números.',
+  '6. Não duplique identificadores (ex.: mesmo Laço + Endereço) no mesmo cliente.',
+  '7. Importar NÃO significa verificação em campo — os ativos entram como "não verificados".',
   '',
 ];
 
@@ -111,7 +119,10 @@ export function templateHeaders(area: TechArea): string[] {
 /** Monta as abas do modelo: IMPORTACAO (só cabeçalhos) + INSTRUCOES (com exemplo). */
 export function buildTemplateSheets(area: TechArea): SheetSpec[] {
   const cols = TEMPLATE_COLUMNS[area];
-  const importSheet: SheetSpec = { name: 'IMPORTACAO', rows: [cols.map((c) => c.label)] };
+  // Linha de exemplo VISÍVEL na aba IMPORTACAO (§39), com marcador na OBSERVAÇÃO
+  // para ser IGNORADA com segurança pelo importador (não vira ativo real).
+  const exampleRow = cols.map((c) => (c.key === 'observacao' ? EXAMPLE_ROW_MARKER : (c.example || '')));
+  const importSheet: SheetSpec = { name: 'IMPORTACAO', rows: [cols.map((c) => c.label), exampleRow] };
   const instr: (string | number)[][] = INSTRUCTIONS.map((l) => [l]);
   instr.push(['COLUNA', 'SIGNIFICADO / EXEMPLO']);
   for (const c of cols) instr.push([c.label, c.example ? `Ex.: ${c.example}` : '(opcional)']);

@@ -85,7 +85,7 @@ export const TechnicalBaseImport: React.FC<Props> = ({ clienteId, area: initialA
 
   const runImport = async () => {
     if (!preview || !isSupabaseConfigured()) { showToast('Supabase não configurado.'); return; }
-    const toImport = preview.results.filter((r) => r.valid && !r.duplicateInFile && (includeBaseDupes || !r.duplicateInBase));
+    const toImport = preview.results.filter((r) => !r.example && r.valid && !r.duplicateInFile && (includeBaseDupes || !r.duplicateInBase));
     if (toImport.length === 0) { showToast('Nenhuma linha elegível para importar.'); return; }
     setImporting(true);
     let ok = 0;
@@ -100,7 +100,7 @@ export const TechnicalBaseImport: React.FC<Props> = ({ clienteId, area: initialA
     } finally { setImporting(false); }
   };
 
-  const eligible = preview ? preview.results.filter((r) => r.valid && !r.duplicateInFile && (includeBaseDupes || !r.duplicateInBase)).length : 0;
+  const eligible = preview ? preview.results.filter((r) => !r.example && r.valid && !r.duplicateInFile && (includeBaseDupes || !r.duplicateInBase)).length : 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
@@ -202,7 +202,8 @@ export const TechnicalBaseImport: React.FC<Props> = ({ clienteId, area: initialA
                           <td className="px-3 py-1.5 font-data-mono text-fg">{ident || '—'}</td>
                           <td className="px-3 py-1.5 text-fg-secondary">{[r.draft.tipoAtivo, r.draft.fabricante].filter(Boolean).join(' · ') || '—'}</td>
                           <td className="px-3 py-1.5">
-                            {!r.valid ? <span className="text-danger">{r.errors[0] || 'inválida'}</span>
+                            {r.example ? <span className="text-fg-muted">linha de exemplo (ignorada)</span>
+                              : !r.valid ? <span className="text-danger">{r.errors[0] || 'inválida'}</span>
                               : r.duplicateInFile ? <span className="text-amber-600">duplicada no arquivo</span>
                               : r.duplicateInBase ? <span className="text-amber-600">já existe na base</span>
                               : <span className="text-emerald-600">ok</span>}

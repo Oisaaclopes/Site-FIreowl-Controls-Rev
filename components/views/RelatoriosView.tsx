@@ -165,7 +165,7 @@ const STATUS_COLOR: Record<string, string> = {
   cancelado: 'bg-red-100 text-red-700',
 };
 const TIPO_LABEL: Record<string, string> = {
-  LEVANTAMENTO: 'Levantamento',
+  LEVANTAMENTO: 'Visita para Orçamento', // 3D.5: reclassificado (o Levantamento Técnico é a Base Técnica)
   CORRETIVA: 'Corretiva',
   PREVENTIVA: 'Preventiva',
 };
@@ -1461,7 +1461,11 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                       {[
                         { id: 'CORRETIVA', label: 'Manutenção Corretiva', icon: 'build' },
-                        { id: 'LEVANTAMENTO', label: 'Levantamento Técnico', icon: 'search' },
+                        // ETAPA 3D.5 (§2/§61): o Levantamento Técnico OPERACIONAL migrou para
+                        // Cliente 360 → Base Técnica (motor 3D). Este fluxo de relatório
+                        // permanece como VISITA PARA ORÇAMENTO (comercial: logística/necessidades/
+                        // medições → Pedido). Código do tipo segue 'LEVANTAMENTO' (histórico intacto).
+                        { id: 'LEVANTAMENTO', label: 'Visita para Orçamento', icon: 'request_quote' },
                         { id: 'PREVENTIVA', label: 'Manutenção Preventiva', icon: 'fact_check' },
                         { id: 'AUDITORIA', label: 'Auditoria Técnica', icon: 'policy' },
                       ].map((t) => {
