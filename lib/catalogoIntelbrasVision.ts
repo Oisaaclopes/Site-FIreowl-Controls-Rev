@@ -17,6 +17,12 @@ export interface CatalogoProduto {
   costPrice: number;
   /** Indisponível no fornecedor no momento (importado com estoque zerado). */
   indisponivel?: boolean;
+  /** Linha comercial oficial (ex.: 'Avalon Evolution', 'Safira'). */
+  productLine?: string;
+  /** Tecnologia estruturada (autopreenchimento no levantamento): Convencional/Endereçável/Analógica. */
+  technology?: 'Convencional' | 'Endereçável' | 'Analógica';
+  /** Grau de proteção (ex.: 'IP55'), quando documentado. */
+  ip?: string;
 }
 
 export const MARCA_PADRAO = 'Intelbras';
