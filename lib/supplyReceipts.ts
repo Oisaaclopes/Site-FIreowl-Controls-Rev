@@ -17,6 +17,8 @@ function receiptFromRow(r: any): SupplyReceipt {
     supplyOrderId: String(r.supply_order_id),
     supplier: r.supplier || undefined,
     supplierId: r.supplier_id || undefined,
+    freight: r.freight === null || r.freight === undefined ? undefined : Number(r.freight),
+    otherCosts: r.other_costs === null || r.other_costs === undefined ? undefined : Number(r.other_costs),
     receivedAt: r.received_at || '',
     receivedBy: r.received_by || undefined,
     notes: r.notes || undefined,
@@ -39,6 +41,9 @@ function itemFromRow(r: any): SupplyReceiptItem {
     quantityRejected: Number(r.quantity_rejected || 0),
     rejectionReason: r.rejection_reason || undefined,
     unitCost: r.unit_cost === null || r.unit_cost === undefined ? undefined : Number(r.unit_cost),
+    freightAlloc: r.freight_alloc === null || r.freight_alloc === undefined ? undefined : Number(r.freight_alloc),
+    otherCostsAlloc: r.other_costs_alloc === null || r.other_costs_alloc === undefined ? undefined : Number(r.other_costs_alloc),
+    finalUnitCost: r.final_unit_cost === null || r.final_unit_cost === undefined ? undefined : Number(r.final_unit_cost),
     stockMovementId: r.stock_movement_id || undefined,
     postedAt: r.posted_at || undefined,
     reversedAt: r.reversed_at || undefined,
@@ -71,6 +76,8 @@ export async function createReceipt(
       supply_order_id: receipt.supplyOrderId,
       supplier: receipt.supplier || null,
       supplier_id: receipt.supplierId || null,
+      freight: receipt.freight ?? null,
+      other_costs: receipt.otherCosts ?? null,
       received_at: receipt.receivedAt || new Date().toISOString(),
       received_by: receipt.receivedBy || null,
       notes: receipt.notes || null,
@@ -89,6 +96,9 @@ export async function createReceipt(
     quantity_rejected: it.quantityRejected ?? 0,
     rejection_reason: it.rejectionReason || null,
     unit_cost: it.unitCost ?? null,
+    freight_alloc: it.freightAlloc ?? null,
+    other_costs_alloc: it.otherCostsAlloc ?? null,
+    final_unit_cost: it.finalUnitCost ?? null,
   }));
   if (rows.length > 0) {
     const { error: e2 } = await supabase.from(ITEMS).insert(rows);

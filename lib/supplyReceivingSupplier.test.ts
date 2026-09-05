@@ -3,17 +3,20 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /* CORREÇÃO — Recebimento de materiais usa a base CANÔNICA de fornecedores.
- * Testes estruturais (§16) — sem render/browser. */
+ * O seletor + cadastro inline vivem no componente compartilhado SupplierPickerField
+ * (reutilizado no Recebimento e no Registro de Compra). Testes estruturais (§16). */
 
 const modal = readFileSync(resolve(process.cwd(), 'components/fornecimento/SupplyReceivingModal.tsx'), 'utf8');
+const picker = readFileSync(resolve(process.cwd(), 'components/fornecimento/SupplierPickerField.tsx'), 'utf8');
 
 describe('Recebimento: fornecedor estruturado (não texto livre)', () => {
-  it('A) consome a base canônica (fetchSuppliers) e não um input de texto', () => {
+  it('A) consome a base canônica (fetchSuppliers) via SupplierPickerField', () => {
     expect(modal).toContain("from '@/lib/suppliers'");
     expect(modal).toContain('fetchSuppliers');
-    expect(modal).toContain('<PickerField');
-    // não deve mais existir o input de texto "Nome do fornecedor"
+    expect(modal).toContain('<SupplierPickerField');
     expect(modal).not.toContain('Nome do fornecedor');
+    // o seletor real está no componente compartilhado
+    expect(picker).toContain('<PickerField');
   });
 
   it('C) persiste o vínculo por id + snapshot do nome (§5/§7)', () => {
@@ -22,20 +25,20 @@ describe('Recebimento: fornecedor estruturado (não texto livre)', () => {
     expect(modal).toContain('order.supplier'); // snapshot cai para o nome do pedido quando não selecionado
   });
 
-  it('D) pré-seleciona o fornecedor do pedido casando o nome (§8)', () => {
-    expect(modal).toMatch(/order\.supplier[\s\S]{0,160}s\.name\.trim\(\)\.toLowerCase\(\)/);
+  it('D) pré-seleciona o fornecedor do pedido (id, com fallback por nome §8/§31)', () => {
+    expect(modal).toContain('order.supplierId');
+    expect(modal).toMatch(/s\.name\.trim\(\)\.toLowerCase\(\)/);
   });
 
-  it('E/F) cadastro inline reutiliza upsertSupplier e seleciona o novo', () => {
-    expect(modal).toContain('upsertSupplier');
-    expect(modal).toContain('setSupplierId(created.id)');
-    expect(modal).toContain('Cadastrar primeiro fornecedor'); // estado vazio (§12)
+  it('E/F) cadastro inline reutiliza upsertSupplier e seleciona o novo (no componente compartilhado)', () => {
+    expect(picker).toContain('upsertSupplier');
+    expect(picker).toContain('onChange(created.id)');
+    expect(picker).toContain('Cadastrar primeiro fornecedor'); // estado vazio (§12)
   });
 
-  it('G) criar fornecedor NÃO reseta as linhas/quantidades do recebimento', () => {
-    // criarFornecedor só mexe em suppliers/supplierId/newSupplier — nunca em setRows.
-    const fn = modal.slice(modal.indexOf('const criarFornecedor'), modal.indexOf('const confirmarEntrada'));
-    expect(fn).not.toContain('setRows');
-    expect(fn).not.toContain('setReceipts');
+  it('G) cadastro inline NÃO reseta as linhas/quantidades do recebimento', () => {
+    // o SupplierPickerField só mexe em suppliers/valor selecionado; nunca no formulário pai.
+    expect(picker).not.toContain('setRows');
+    expect(picker).not.toContain('setReceipts');
   });
 });

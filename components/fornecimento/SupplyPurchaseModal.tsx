@@ -1,8 +1,11 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { SupplyOrder, InventoryItem, SupplyPurchase } from '@/lib/types';
+import { SupplyOrder, InventoryItem, SupplyPurchase, Supplier } from '@/lib/types';
 import { fetchPurchases, createPurchase } from '@/lib/supplyPurchases';
+import { fetchSuppliers } from '@/lib/suppliers';
+import { updateSupplyOrder } from '@/lib/supplyOrders';
+import { SupplierPickerField } from '@/components/fornecimento/SupplierPickerField';
 import { syncSupplyOrderStatus, keyOf, sugestaoCompra, totalCompra } from '@/lib/supplyReceipts';
 import { isSupabaseConfigured } from '@/lib/inventory';
 
@@ -29,7 +32,8 @@ const money = (n: number) => `R$ ${(n || 0).toLocaleString('pt-BR', { minimumFra
 export const SupplyPurchaseModal: React.FC<Props> = ({ order, inventory, onClose, onSaved }) => {
   const online = isSupabaseConfigured();
   const [purchases, setPurchases] = useState<SupplyPurchase[] | null>(null);
-  const [fornecedor, setFornecedor] = useState(order.supplier || '');
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [supplierId, setSupplierId] = useState<string>('');
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().slice(0, 10));
   const [expectedDate, setExpectedDate] = useState('');
   const [notes, setNotes] = useState('');
@@ -61,8 +65,25 @@ export const SupplyPurchaseModal: React.FC<Props> = ({ order, inventory, onClose
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order.id]);
 
+  // Fornecedores cadastrados (base canônica) + pré-seleção do pedido (§31/§8).
+  useEffect(() => {
+    if (!online) return;
+    let alive = true;
+    fetchSuppliers().then((list) => {
+      if (!alive) return;
+      setSuppliers(list);
+      if (order.supplierId && list.some((s) => s.id === order.supplierId)) setSupplierId(order.supplierId);
+      else if (order.supplier) {
+        const m = list.find((s) => s.name.trim().toLowerCase() === (order.supplier || '').trim().toLowerCase());
+        if (m) setSupplierId(m.id);
+      }
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [online, order.id, order.supplier, order.supplierId]);
+
   const set = (key: string, patch: Partial<Row>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   const comprarRows = useMemo(() => rows.filter((r) => r.comprar > 0), [rows]);
+  const selectedSupplier = suppliers.find((s) => s.id === supplierId);
   const total = useMemo(() => totalCompra(comprarRows.map((r) => ({ quantity: r.comprar, unitCost: r.custo }))), [comprarRows]);
 
   const salvar = async () => {
@@ -70,10 +91,15 @@ export const SupplyPurchaseModal: React.FC<Props> = ({ order, inventory, onClose
     if (busy || comprarRows.length === 0) return;
     setBusy(true); setErro(null);
     try {
+      const supplierSnapshot = selectedSupplier?.name || order.supplier || undefined;
       await createPurchase(
-        { supplyOrderId: order.id, supplier: fornecedor || undefined, status: 'registrada', purchaseDate, expectedDate: expectedDate || undefined, notes: notes || undefined },
+        { supplyOrderId: order.id, supplier: supplierSnapshot, supplierId: supplierId || undefined, status: 'registrada', purchaseDate, expectedDate: expectedDate || undefined, notes: notes || undefined },
         comprarRows.map((r) => ({ orderItemKey: r.key, inventoryItemId: r.inventoryItemId, descricao: r.descricao, quantity: r.comprar, unitCost: r.custo }))
       );
+      // Propaga o fornecedor estruturado ao pedido, para o recebimento pré-selecionar por id (§31).
+      if (supplierId && supplierId !== order.supplierId) {
+        try { await updateSupplyOrder({ ...order, supplierId, supplier: supplierSnapshot }); } catch { /* não bloqueia a compra */ }
+      }
       await syncSupplyOrderStatus(order);
       onSaved?.();
       onClose();
@@ -94,7 +120,7 @@ export const SupplyPurchaseModal: React.FC<Props> = ({ order, inventory, onClose
         <div className="p-5 overflow-y-auto">
           {erro && <div className="mb-3 text-xs bg-red-50 border border-red-200 text-red-700 rounded-lg p-2.5">{erro}</div>}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-            <div className="sm:col-span-1"><label className="block text-[10px] font-bold uppercase text-fg-secondary mb-1">Fornecedor</label><input value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} placeholder="Nome" className="w-full border border-border-strong rounded-lg px-3 py-2 text-sm" /></div>
+            <div className="sm:col-span-1"><label className="block text-[10px] font-bold uppercase text-fg-secondary mb-1">Fornecedor</label><SupplierPickerField suppliers={suppliers} value={supplierId} onChange={setSupplierId} onCreated={(s) => setSuppliers((prev) => [s, ...prev.filter((x) => x.id !== s.id)])} online={online} onError={setErro} /></div>
             <div><label className="block text-[10px] font-bold uppercase text-fg-secondary mb-1">Data da compra</label><input type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} className="w-full border border-border-strong rounded-lg px-3 py-2 text-sm" /></div>
             <div><label className="block text-[10px] font-bold uppercase text-fg-secondary mb-1">Previsão de entrega</label><input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className="w-full border border-border-strong rounded-lg px-3 py-2 text-sm" /></div>
           </div>

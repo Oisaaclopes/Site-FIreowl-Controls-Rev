@@ -4,11 +4,10 @@ import { requestConfirm } from '@/components/ui/Feedback';
 import React, { useEffect, useMemo, useState } from 'react';
 import { SupplyOrder, InventoryItem, SupplyReceipt, RejectionReason, Supplier } from '@/lib/types';
 import { fetchReceipts, createReceipt, postReceiptToStock, syncSupplyOrderStatus, recebidoPorChave, keyOf, validaConferencia, excedente, PostItemResult } from '@/lib/supplyReceipts';
-import { fetchSuppliers, upsertSupplier } from '@/lib/suppliers';
-import { PickerField } from '@/components/ui/PickerField';
+import { fetchSuppliers } from '@/lib/suppliers';
+import { allocateProportional, finalUnitCost } from '@/lib/supplyCost';
+import { SupplierPickerField } from '@/components/fornecimento/SupplierPickerField';
 import { isSupabaseConfigured } from '@/lib/inventory';
-
-const newId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `sup_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`);
 
 interface Props {
   order: SupplyOrder;
@@ -55,9 +54,8 @@ export const SupplyReceivingModal: React.FC<Props> = ({ order, inventory, curren
   // Fornecedores). Guarda o id (vínculo) e usa o nome como snapshot histórico (§7).
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [supplierId, setSupplierId] = useState<string>('');
-  const [newSupplierOpen, setNewSupplierOpen] = useState(false);
-  const [newSupplier, setNewSupplier] = useState({ name: '', cnpj: '', tradeName: '' });
-  const [savingSupplier, setSavingSupplier] = useState(false);
+  const [freightTotal, setFreightTotal] = useState<number | undefined>(undefined);
+  const [otherTotal, setOtherTotal] = useState<number | undefined>(undefined);
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<PostItemResult[] | null>(null);
@@ -70,14 +68,15 @@ export const SupplyReceivingModal: React.FC<Props> = ({ order, inventory, curren
     fetchSuppliers().then((list) => {
       if (!alive) return;
       setSuppliers(list);
-      // O pedido guarda o fornecedor como texto (§8): pré-seleciona casando o nome.
-      if (order.supplier) {
+      // Pré-seleção: por supplier_id do pedido (novos, §31); fallback por nome (legados §8).
+      if (order.supplierId && list.some((s) => s.id === order.supplierId)) setSupplierId(order.supplierId);
+      else if (order.supplier) {
         const match = list.find((s) => s.name.trim().toLowerCase() === (order.supplier || '').trim().toLowerCase());
         if (match) setSupplierId(match.id);
       }
     }).catch(() => {});
     return () => { alive = false; };
-  }, [online, order.id, order.supplier]);
+  }, [online, order.id, order.supplier, order.supplierId]);
 
   // Carrega recebimentos anteriores e monta as linhas dos materiais.
   useEffect(() => {
@@ -127,6 +126,25 @@ export const SupplyReceivingModal: React.FC<Props> = ({ order, inventory, curren
   const excedentes = useMemo(() => rows.filter((r) => excedente(r.pendente, r.receberAgora) > 0), [rows]);
   const conferenciaOk = receberRows.every((r) => validaConferencia(r.receberAgora, r.aceito, r.rejeitado) && (r.rejeitado === 0 || !!r.motivo));
 
+  // Itens que ENTRAM no estoque = aceitos (§9: rejeitado não entra).
+  const aceitosRows = useMemo(() => receberRows.filter((r) => r.aceito > 0), [receberRows]);
+  // Rateio de frete/outros proporcional ao valor da mercadoria aceita (§5/§8).
+  const custoCalc = useMemo(() => {
+    const values = aceitosRows.map((r) => (r.aceito || 0) * (r.custo || 0));
+    const freightAllocs = allocateProportional(values, freightTotal || 0);
+    const otherAllocs = allocateProportional(values, otherTotal || 0);
+    const map: Record<string, { merch: number; freightAlloc: number; otherAlloc: number; finalUnit: number }> = {};
+    aceitosRows.forEach((r, i) => {
+      const fa = freightAllocs[i] || 0;
+      const oa = otherAllocs[i] || 0;
+      map[r.key] = { merch: values[i], freightAlloc: fa, otherAlloc: oa, finalUnit: finalUnitCost(r.custo || 0, fa, oa, r.aceito || 1) };
+    });
+    return map;
+  }, [aceitosRows, freightTotal, otherTotal]);
+  const custoDefinidoOk = aceitosRows.every((r) => typeof r.custo === 'number' && r.custo >= 0);
+  const totalMercadoria = aceitosRows.reduce((a, r) => a + (r.aceito || 0) * (r.custo || 0), 0);
+  const money2 = (n: number) => `R$ ${(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
   const avancarReceber = async () => {
     if (excedentes.length > 0 && !await requestConfirm(`Alguns itens excedem o previsto (${excedentes.map((r) => r.descricao).join(', ')}). Deseja continuar mesmo assim?`)) return;
     // sincroniza aceito = receberAgora ao entrar na conferência
@@ -138,47 +156,32 @@ export const SupplyReceivingModal: React.FC<Props> = ({ order, inventory, curren
   // Snapshot histórico: nome do fornecedor no momento do recebimento (§7).
   const supplierSnapshot = selectedSupplier?.name || order.supplier || undefined;
 
-  // Cadastro inline reutilizando a base canônica (upsertSupplier). Não perde os
-  // dados do recebimento já digitados: só adiciona/seleciona o fornecedor.
-  const criarFornecedor = async () => {
-    const nome = newSupplier.name.trim();
-    if (!nome) { setErro('Informe o nome/razão social do fornecedor.'); return; }
-    if (!online) { setErro('Conecte-se à internet para cadastrar fornecedor.'); return; }
-    setSavingSupplier(true);
-    setErro(null);
-    try {
-      const created = await upsertSupplier({
-        id: newId(), code: '', name: nome, cnpj: newSupplier.cnpj.trim(), category: '',
-        contactName: '', phone: '', email: '', city: '', rating: 0, leadTimeDays: 0,
-        activeStatus: 'EM AVALIACAO', brands: [], tradeName: newSupplier.tradeName.trim() || undefined,
-      } as Supplier);
-      setSuppliers((prev) => [created, ...prev.filter((s) => s.id !== created.id)]);
-      setSupplierId(created.id);
-      setNewSupplier({ name: '', cnpj: '', tradeName: '' });
-      setNewSupplierOpen(false);
-    } catch (e: any) {
-      setErro(e?.message || 'Não foi possível cadastrar o fornecedor.');
-    } finally { setSavingSupplier(false); }
-  };
-
   const confirmarEntrada = async () => {
     if (!online) { setErro('Conecte-se à internet para confirmar a entrada no estoque.'); return; }
     if (busy) return;
+    // §19 — não confirmar com custo desconhecido (nunca inventar).
+    if (!custoDefinidoOk) { setErro('Informe o custo unitário da compra de todos os itens aceitos antes de dar entrada.'); return; }
     setBusy(true);
     setErro(null);
     try {
       const receipt = await createReceipt(
-        { supplyOrderId: order.id, supplier: supplierSnapshot, supplierId: supplierId || undefined, receivedAt: new Date().toISOString(), receivedBy: currentUserName, status: 'conferido' },
-        receberRows.map((r) => ({
-          orderItemKey: r.key,
-          inventoryItemId: r.vinculado ? r.inventoryItemId : undefined,
-          descricao: r.descricao,
-          quantityReceived: r.receberAgora,
-          quantityAccepted: r.aceito,
-          quantityRejected: r.rejeitado,
-          rejectionReason: r.rejeitado > 0 ? r.motivo : undefined,
-          unitCost: r.custo,
-        }))
+        { supplyOrderId: order.id, supplier: supplierSnapshot, supplierId: supplierId || undefined, freight: freightTotal ?? undefined, otherCosts: otherTotal ?? undefined, receivedAt: new Date().toISOString(), receivedBy: currentUserName, status: 'conferido' },
+        receberRows.map((r) => {
+          const c = custoCalc[r.key];
+          return {
+            orderItemKey: r.key,
+            inventoryItemId: r.vinculado ? r.inventoryItemId : undefined,
+            descricao: r.descricao,
+            quantityReceived: r.receberAgora,
+            quantityAccepted: r.aceito,
+            quantityRejected: r.rejeitado,
+            rejectionReason: r.rejeitado > 0 ? r.motivo : undefined,
+            unitCost: r.custo,
+            freightAlloc: c?.freightAlloc,
+            otherCostsAlloc: c?.otherAlloc,
+            finalUnitCost: c ? c.finalUnit : r.custo,   // sem rateio → custo da mercadoria
+          };
+        })
       );
       const res = await postReceiptToStock(receipt, currentUserName);
       try { await syncSupplyOrderStatus(order); } catch { /* status derivado é best-effort */ }
@@ -223,43 +226,14 @@ export const SupplyReceivingModal: React.FC<Props> = ({ order, inventory, curren
             <>
               <div className="mb-3">
                 <label className="block text-[10px] font-bold uppercase text-fg-secondary mb-1">Fornecedor (deste recebimento)</label>
-                {suppliers.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border-strong bg-surface-2 p-3 text-center">
-                    <p className="text-[11px] text-fg-muted">Nenhum fornecedor cadastrado.</p>
-                    <button type="button" onClick={() => setNewSupplierOpen(true)} className="mt-1 text-xs font-bold text-primary hover:underline">+ Cadastrar primeiro fornecedor</button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <PickerField
-                      ariaLabel="Fornecedor do recebimento"
-                      sheetTitle="Selecionar fornecedor"
-                      placeholder="Selecionar fornecedor"
-                      searchPlaceholder="Buscar fornecedor..."
-                      emptyLabel="Nenhum fornecedor encontrado."
-                      value={supplierId}
-                      onChange={setSupplierId}
-                      options={suppliers.map((s) => ({ id: s.id, name: s.tradeName ? `${s.name} (${s.tradeName})` : s.name }))}
-                      triggerClassName="flex-1 flex items-center justify-between gap-2 rounded-lg border border-border-strong bg-surface px-3 py-2 text-sm text-fg-secondary"
-                    />
-                    <button type="button" onClick={() => setNewSupplierOpen(true)} className="shrink-0 rounded-lg border border-primary px-3 py-2 text-xs font-bold text-primary hover:bg-navy hover:text-white">+ Novo</button>
-                  </div>
-                )}
-                {selectedSupplier?.cnpj && <p className="mt-1 text-[10px] text-fg-muted">CNPJ: {selectedSupplier.cnpj}</p>}
-
-                {newSupplierOpen && (
-                  <div className="mt-2 rounded-lg border border-border bg-surface-2 p-3">
-                    <p className="mb-2 text-[10px] font-bold uppercase text-fg-secondary">Novo fornecedor</p>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      <input value={newSupplier.name} onChange={(e) => setNewSupplier((p) => ({ ...p, name: e.target.value }))} placeholder="Nome / Razão social *" className="w-full rounded-lg border border-border-strong px-3 py-2 text-sm sm:col-span-2" />
-                      <input value={newSupplier.tradeName} onChange={(e) => setNewSupplier((p) => ({ ...p, tradeName: e.target.value }))} placeholder="Nome fantasia" className="w-full rounded-lg border border-border-strong px-3 py-2 text-sm" />
-                      <input value={newSupplier.cnpj} onChange={(e) => setNewSupplier((p) => ({ ...p, cnpj: e.target.value }))} placeholder="CNPJ" className="w-full rounded-lg border border-border-strong px-3 py-2 text-sm" />
-                    </div>
-                    <div className="mt-2 flex justify-end gap-2">
-                      <button type="button" onClick={() => { setNewSupplierOpen(false); setNewSupplier({ name: '', cnpj: '', tradeName: '' }); }} className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-fg-secondary hover:bg-surface">Cancelar</button>
-                      <button type="button" onClick={criarFornecedor} disabled={savingSupplier} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-navy disabled:opacity-50">{savingSupplier ? 'Salvando…' : 'Cadastrar e selecionar'}</button>
-                    </div>
-                  </div>
-                )}
+                <SupplierPickerField
+                  suppliers={suppliers}
+                  value={supplierId}
+                  onChange={setSupplierId}
+                  onCreated={(s) => setSuppliers((prev) => [s, ...prev.filter((x) => x.id !== s.id)])}
+                  online={online}
+                  onError={setErro}
+                />
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[520px]">
@@ -282,9 +256,15 @@ export const SupplyReceivingModal: React.FC<Props> = ({ order, inventory, curren
             </>
           ) : step === 'conferencia' ? (
             <div className="space-y-3">
-              <p className="text-[11px] text-fg-secondary">Confira o que foi aceito e o que foi rejeitado. <b>Aceito + Rejeitado = Recebido.</b></p>
+              <p className="text-[11px] text-fg-secondary">Confira o que foi aceito e o que foi rejeitado. <b>Aceito + Rejeitado = Recebido.</b> O custo é o da COMPRA (nunca o preço de venda).</p>
+              {/* Frete e outros custos do recebimento — rateados por valor da mercadoria (§4/§5/§6). */}
+              <div className="grid grid-cols-2 gap-2 rounded-lg border border-border bg-surface-2 p-3">
+                <div><label className="block text-[9px] uppercase text-fg-muted mb-0.5">Frete total (R$)</label><input type="number" min={0} step="0.01" value={freightTotal ?? ''} onChange={(e) => setFreightTotal(e.target.value === '' ? undefined : Number(e.target.value))} className={`${inputMini} w-full`} /></div>
+                <div><label className="block text-[9px] uppercase text-fg-muted mb-0.5">Outros custos (R$)</label><input type="number" min={0} step="0.01" value={otherTotal ?? ''} onChange={(e) => setOtherTotal(e.target.value === '' ? undefined : Number(e.target.value))} className={`${inputMini} w-full`} /></div>
+              </div>
               {receberRows.map((r) => {
                 const ok = validaConferencia(r.receberAgora, r.aceito, r.rejeitado);
+                const c = custoCalc[r.key];
                 return (
                   <div key={r.key} className="rounded-lg border border-border p-3">
                     <div className="flex items-center justify-between">
@@ -295,9 +275,18 @@ export const SupplyReceivingModal: React.FC<Props> = ({ order, inventory, curren
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 items-end">
                       <div><label className="block text-[9px] uppercase text-fg-muted mb-0.5">Aceito</label><input type="number" min={0} value={r.aceito} onChange={(e) => set(r.key, { aceito: Math.max(0, Number(e.target.value) || 0) })} className={`${inputMini} w-full`} /></div>
                       <div><label className="block text-[9px] uppercase text-fg-muted mb-0.5">Rejeitado</label><input type="number" min={0} value={r.rejeitado} onChange={(e) => set(r.key, { rejeitado: Math.max(0, Number(e.target.value) || 0) })} className={`${inputMini} w-full`} /></div>
-                      <div><label className="block text-[9px] uppercase text-fg-muted mb-0.5">Custo un.</label><input type="number" min={0} step="0.01" value={r.custo ?? ''} onChange={(e) => set(r.key, { custo: e.target.value === '' ? undefined : Number(e.target.value) })} className={`${inputMini} w-full`} /></div>
+                      <div><label className="block text-[9px] uppercase text-fg-muted mb-0.5">Custo un. compra</label><input type="number" min={0} step="0.01" value={r.custo ?? ''} onChange={(e) => set(r.key, { custo: e.target.value === '' ? undefined : Number(e.target.value) })} className={`${inputMini} w-full`} /></div>
                       {r.rejeitado > 0 && <div><label className="block text-[9px] uppercase text-fg-muted mb-0.5">Motivo</label><select value={r.motivo || ''} onChange={(e) => set(r.key, { motivo: (e.target.value || undefined) as RejectionReason })} className="w-full border border-border-strong rounded px-1 py-1 text-xs"><option value="">—</option>{REJEITO_MOTIVOS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select></div>}
                     </div>
+                    {/* Composição do custo final por unidade (§8) */}
+                    {c && r.aceito > 0 && (
+                      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 rounded bg-surface-2 px-2 py-1.5 text-[10px] text-fg-secondary sm:grid-cols-4">
+                        <span>Custo produto: <b className="font-data-mono text-fg">{money2(r.custo || 0)}</b></span>
+                        <span>Frete rateado: <b className="font-data-mono text-fg">{money2(c.freightAlloc / r.aceito)}</b></span>
+                        <span>Outros: <b className="font-data-mono text-fg">{money2(c.otherAlloc / r.aceito)}</b></span>
+                        <span>Custo final un.: <b className="font-data-mono text-emerald-700">{money2(c.finalUnit)}</b></span>
+                      </div>
+                    )}
                     {!ok && <p className="text-[10px] text-red-600 mt-1">Aceito + Rejeitado deve somar {r.receberAgora}.</p>}
                   </div>
                 );
@@ -305,15 +294,25 @@ export const SupplyReceivingModal: React.FC<Props> = ({ order, inventory, curren
             </div>
           ) : step === 'entrada' ? (
             <div className="space-y-2">
-              <p className="text-xs text-fg-secondary">Você está prestes a adicionar ao estoque:</p>
-              {receberRows.filter((r) => r.vinculado && r.aceito > 0).map((r) => (
-                <div key={r.key} className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-                  <span className="text-xs font-bold text-fg">{r.descricao}</span>
-                  <span className="text-sm font-data-mono font-bold text-emerald-700">+{r.aceito}</span>
-                </div>
-              ))}
+              <p className="text-xs text-fg-secondary">Resumo financeiro da entrada:</p>
+              <div className="grid grid-cols-2 gap-2 rounded-lg border border-border bg-surface-2 p-3 text-xs">
+                <span>Mercadorias: <b className="font-data-mono">{money2(totalMercadoria)}</b></span>
+                <span>Frete: <b className="font-data-mono">{money2(freightTotal || 0)}</b></span>
+                <span>Outros custos: <b className="font-data-mono">{money2(otherTotal || 0)}</b></span>
+                <span>Total da entrada: <b className="font-data-mono text-emerald-700">{money2(totalMercadoria + (freightTotal || 0) + (otherTotal || 0))}</b></span>
+              </div>
+              {receberRows.filter((r) => r.vinculado && r.aceito > 0).map((r) => {
+                const c = custoCalc[r.key];
+                return (
+                  <div key={r.key} className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 dark:bg-emerald-950/20">
+                    <div className="min-w-0"><span className="text-xs font-bold text-fg">{r.descricao}</span>{c && <span className="ml-2 text-[10px] text-fg-secondary">un. {money2(c.finalUnit)}</span>}</div>
+                    <span className="text-sm font-data-mono font-bold text-emerald-700">+{r.aceito}{c ? ` · ${money2(c.finalUnit * r.aceito)}` : ''}</span>
+                  </div>
+                );
+              })}
               {receberRows.some((r) => !r.vinculado) && <p className="text-[11px] text-amber-700">Itens não vinculados serão registrados no recebimento, mas não entram no estoque agora.</p>}
-              <p className="text-[11px] text-fg-secondary mt-1">Esta operação ficará registrada no histórico de estoque e é <b>idempotente</b> (não duplica).</p>
+              {!custoDefinidoOk && <p className="text-[11px] text-red-600">Informe o custo unitário de todos os itens aceitos (etapa anterior).</p>}
+              <p className="text-[11px] text-fg-secondary mt-1">O custo do estoque será atualizado por <b>média ponderada</b>; o preço de venda não é alterado. Operação <b>idempotente</b>.</p>
             </div>
           ) : (
             <div className="text-center py-4">
@@ -338,7 +337,7 @@ export const SupplyReceivingModal: React.FC<Props> = ({ order, inventory, curren
               <div className="flex-1" />
               {step === 'receber' && <button disabled={receberRows.length === 0} onClick={avancarReceber} className="bg-navy-3 disabled:opacity-40 text-white py-2.5 px-5 rounded-lg text-xs font-bold uppercase tracking-wider">Conferir ({receberRows.length})</button>}
               {step === 'conferencia' && <button disabled={!conferenciaOk} onClick={() => setStep('entrada')} className="bg-navy-3 disabled:opacity-40 text-white py-2.5 px-5 rounded-lg text-xs font-bold uppercase tracking-wider">Revisar entrada</button>}
-              {step === 'entrada' && <button disabled={busy || !online} onClick={confirmarEntrada} className="bg-danger hover:bg-danger-hover disabled:opacity-40 text-white py-2.5 px-5 rounded-lg text-xs font-bold uppercase tracking-wider">{busy ? 'Processando…' : 'Confirmar entrada'}</button>}
+              {step === 'entrada' && <button disabled={busy || !online || !custoDefinidoOk} onClick={confirmarEntrada} className="bg-danger hover:bg-danger-hover disabled:opacity-40 text-white py-2.5 px-5 rounded-lg text-xs font-bold uppercase tracking-wider">{busy ? 'Processando…' : 'Confirmar entrada'}</button>}
             </>
           )}
         </div>

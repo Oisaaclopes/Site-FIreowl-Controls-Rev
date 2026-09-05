@@ -516,6 +516,8 @@ export interface SupplyOrder {
     | 'CONCLUIDO'
     | 'CANCELADO';
   supplier?: string;
+  /** Vínculo estruturado ao fornecedor cadastrado (0101); supplier = snapshot textual. */
+  supplierId?: string;
   purchaseDate?: string;
   receivedAt?: string;
   /** @deprecated fluxo simples antigo (0051). A verdade agora é supply_receipts + supply_receipt_items.stock_movement_id. Não usar como fonte de verdade. */
@@ -580,6 +582,10 @@ export interface SupplyReceiptItem {
   quantityRejected: number;
   rejectionReason?: RejectionReason;
   unitCost?: number;
+  /** Rateio (0101): frete/outros em R$ do item + custo unitário FINAL (mercadoria + rateio/un). */
+  freightAlloc?: number;
+  otherCostsAlloc?: number;
+  finalUnitCost?: number;
   /** Preenchido quando lançado no estoque — impede lançar duas vezes. */
   stockMovementId?: string;
   postedAt?: string;
@@ -596,6 +602,9 @@ export interface SupplyReceipt {
   supplyOrderId: string;
   supplier?: string;
   supplierId?: string;
+  /** Custo do evento (0101): frete e outros custos totais do recebimento. */
+  freight?: number;
+  otherCosts?: number;
   purchaseId?: string;
   receivedAt: string;
   receivedBy?: string;
