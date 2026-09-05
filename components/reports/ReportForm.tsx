@@ -320,7 +320,15 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   const [sectionErr, setSectionErr] = useState<string | null>(null);
   const camInputRef = React.useRef<HTMLInputElement>(null);
 
-  const surveyMode = template.tipo === 'LEVANTAMENTO' ? values[SURVEY_MODE_KEY] as SurveyMode | undefined : undefined;
+  // CORREÇÃO pós-3D.5: o Levantamento Técnico OPERACIONAL é o motor 3D
+  // (Cliente 360 → Base Técnica → TechnicalSurveyFlow). Este ReportForm é o fluxo
+  // COMERCIAL "Visita para Orçamento": não expõe mais Pontual/Parcial/Completo
+  // (herança do surveyMode legado). Novos relatórios entram como 'completo'
+  // (template integral); rascunhos ANTIGOS com modo salvo continuam abrindo no
+  // modo gravado (compatibilidade), sem oferecer o seletor.
+  const storedSurveyMode = values[SURVEY_MODE_KEY] as SurveyMode | undefined;
+  const isLegacySurveyDraft = storedSurveyMode === 'pontual' || storedSurveyMode === 'parcial';
+  const surveyMode = template.tipo === 'LEVANTAMENTO' ? (storedSurveyMode || 'completo') : undefined;
   const selectedSurveyBlocks = useMemo(
     () => Array.isArray(values[SURVEY_BLOCKS_KEY]) ? values[SURVEY_BLOCKS_KEY] as string[] : [],
     [values]
@@ -900,9 +908,12 @@ export const ReportForm: React.FC<ReportFormProps> = ({
 
       {/* Conteúdo: uma seção por vez */}
       <div className="flex-1 p-4 md:p-8 pb-28">
-        {template.tipo === 'LEVANTAMENTO' && (
+        {/* Seletor Pontual/Parcial/Completo: só para rascunhos LEGADOS já salvos
+            nesses modos (compat.). Novas "Visitas para Orçamento" não o exibem
+            — o Levantamento Técnico com modos vive no motor 3D (Base Técnica). */}
+        {template.tipo === 'LEVANTAMENTO' && isLegacySurveyDraft && (
           <div className="mb-5 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-primary">Modo do levantamento</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-primary">Modo do levantamento (rascunho legado)</p>
             <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
               {([
                 ['pontual', 'Pontual', 'Foto, constatação e observação'],

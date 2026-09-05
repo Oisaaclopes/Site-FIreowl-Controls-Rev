@@ -1495,6 +1495,9 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                         );
                       })}
                     </div>
+                    <p className="mt-2 text-[10px] text-fg-muted">
+                      O <b>Levantamento Técnico</b> (Base Técnica do cliente) fica em <b>Clientes → Cliente 360 → Base Técnica → Novo levantamento</b>. Aqui, a <b>Visita para Orçamento</b> é o relatório comercial (logística, necessidades, medições → proposta).
+                    </p>
                   </div>
 
                   <div>
