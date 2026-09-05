@@ -1,6 +1,8 @@
 import type { InventoryItem } from './types';
 import { areaMatches, groupMatchesSubcategory } from './technicalCatalog';
 
+export { areaMatches } from './technicalCatalog';
+
 // =====================================================================
 // SELEÇÃO DE CATÁLOGO COMERCIAL (Área → Grupo → Fabricante → Produto).
 //
@@ -83,6 +85,80 @@ export function allManufacturers(items: InventoryItem[], brandNames: string[]): 
 /** Chave de deduplicação de marca (trim + caixa + acento). */
 export function normalizeBrand(name: string): string {
   return norm(name);
+}
+
+// ---------------------------------------------------------------------
+// SELETOR DE MATERIAIS DA PROPOSTA (Área → Grupo/Família → Fabricante →
+// Produto). Agrupa por SUBCATEGORIA EXATA (não por tokens) para o passo a
+// passo comercial ser preciso; itens sem subcategoria caem num bucket
+// "Não classificados" visível (§18) — nunca ocultados. Nunca filtra saldo.
+// ---------------------------------------------------------------------
+
+export const UNCLASSIFIED_GROUP = '__unclassified__';
+export const NO_BRAND = '__no_brand__';
+
+export interface CatalogGroup { key: string; label: string; count: number; }
+
+const inArea = (items: InventoryItem[], area?: string) => items.filter((i) => areaMatches(i.category, area));
+
+/** Grupos (subcategoria exata) presentes na área, com contagem. Ordena com
+ * "Não classificados" por último. */
+export function groupsInArea(items: InventoryItem[], area?: string): CatalogGroup[] {
+  const map = new Map<string, { label: string; count: number }>();
+  for (const i of inArea(items, area)) {
+    const sub = (i.subcategory || '').trim();
+    const key = sub ? norm(sub) : UNCLASSIFIED_GROUP;
+    const label = sub || 'Outros / Não classificados';
+    const cur = map.get(key);
+    if (cur) cur.count += 1;
+    else map.set(key, { label, count: 1 });
+  }
+  return [...map.entries()]
+    .map(([key, v]) => ({ key, label: v.label, count: v.count }))
+    .sort((a, b) =>
+      a.key === UNCLASSIFIED_GROUP ? 1 : b.key === UNCLASSIFIED_GROUP ? -1 : a.label.localeCompare(b.label, 'pt-BR'));
+}
+
+/** Itens de um grupo exato (ou bucket "Não classificados") dentro da área. */
+export function itemsInAreaGroup(items: InventoryItem[], area: string | undefined, groupKey?: string): InventoryItem[] {
+  const scope = inArea(items, area);
+  if (!groupKey) return scope;
+  if (groupKey === UNCLASSIFIED_GROUP) return scope.filter((i) => !(i.subcategory || '').trim());
+  return scope.filter((i) => norm(i.subcategory) === groupKey);
+}
+
+/** Fabricantes de um grupo. Inclui o sentinela NO_BRAND se houver itens sem marca. */
+export function brandsInAreaGroup(items: InventoryItem[], area: string | undefined, groupKey?: string): string[] {
+  const scope = itemsInAreaGroup(items, area, groupKey);
+  const named = uniqCI(scope.map((i) => i.brand || ''));
+  const hasBrandless = scope.some((i) => !(i.brand || '').trim());
+  return hasBrandless ? [...named, NO_BRAND] : named;
+}
+
+/** Produtos de um grupo + fabricante (NO_BRAND = sem marca). Ordena por modelo/nome. */
+export function productsInAreaGroup(items: InventoryItem[], area: string | undefined, groupKey?: string, brand?: string): InventoryItem[] {
+  const scope = itemsInAreaGroup(items, area, groupKey);
+  const b = norm(brand);
+  const filtered = !brand
+    ? scope
+    : brand === NO_BRAND
+      ? scope.filter((i) => !(i.brand || '').trim())
+      : scope.filter((i) => norm(i.brand) === b);
+  return filtered.sort((a, b2) => (a.model || a.name).localeCompare(b2.model || b2.name, 'pt-BR'));
+}
+
+/** Busca direta por código/SKU/modelo/nome/fabricante, restrita à área por padrão. */
+export function searchCatalogItems(items: InventoryItem[], term: string, area?: string): InventoryItem[] {
+  const q = norm(term);
+  if (!q) return [];
+  const tokens = q.split(' ').filter(Boolean);
+  return inArea(items, area)
+    .filter((i) => {
+      const hay = norm([i.code, i.serialBP, i.model, i.name, i.brand].filter(Boolean).join(' '));
+      return tokens.every((t) => hay.includes(t));
+    })
+    .sort((a, b2) => (a.model || a.name).localeCompare(b2.model || b2.name, 'pt-BR'))
+    .slice(0, 50);
 }
 
 export interface ModelAttrs { productLine?: string; systemType?: string; technologies?: string[]; }

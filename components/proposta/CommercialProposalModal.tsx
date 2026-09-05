@@ -1,7 +1,7 @@
 'use client';
 import { showToast, requestConfirm, requestText } from '@/components/ui/Feedback';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Pedido,
   Client,
@@ -593,6 +593,13 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   // original de cada um no array para os handlers de edição/remoção.
   const materiaisRows = equipmentItems.map((it, idx) => ({ it, idx })).filter((x) => x.it.tipo !== 'servico');
   const servicosRows = equipmentItems.map((it, idx) => ({ it, idx })).filter((x) => x.it.tipo === 'servico');
+
+  // Área(s) da proposta → código(s) de categoria do estoque (para o seletor
+  // inteligente de materiais). Áreas sem mapeamento não restringem o catálogo.
+  const materialAreaCodes = useMemo(() => {
+    const MAP: Record<string, string> = { sdai: 'SDAI', cftv: 'CFTV', alarme: 'ALARME', bms: 'BMS', acesso: 'CONTROLE_ACESSO' };
+    return Array.from(new Set(areaPrincipal.map((id) => MAP[id]).filter(Boolean)));
+  }, [areaPrincipal]);
 
   // ----------------- helpers de lista -----------------
   const addStr = (setter: React.Dispatch<React.SetStateAction<string[]>>, def = '') => setter((p) => [...p, def]);
@@ -1241,7 +1248,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               tipo="material"
               accent="red"
               itens={materiaisRows}
-              catalogo={inventory.map((inv) => ({ id: inv.id, label: `${inv.code} - ${inv.name}` }))}
+              smartCatalog={{ items: inventory, areaCodes: materialAreaCodes }}
               resolveCatalogo={(id) => {
                 const inv = inventory.find((i) => i.id === id);
                 if (!inv) return undefined;

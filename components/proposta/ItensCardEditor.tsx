@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { PedidoEquipmentItem } from '@/lib/types';
+import { PedidoEquipmentItem, InventoryItem } from '@/lib/types';
 import { normalizeSearch } from '@/lib/stockStatus';
+import { MaterialCatalogPicker } from '@/components/proposta/MaterialCatalogPicker';
 import { normalizeQuantity, normalizeUnitCode, quantityUnitError, unitAllowsDecimals } from '@/lib/commercialUnits';
 import { UnitSelector } from '@/components/ui/UnitSelector';
 import { lineTotal } from '@/lib/commercialTotals';
@@ -32,6 +33,9 @@ interface Props {
   catalogo?: { id: string; label: string }[];
   /** Resolve os campos a preencher ao escolher um item do catálogo. */
   resolveCatalogo?: (id: string) => Partial<PedidoEquipmentItem> | undefined;
+  /** Seletor inteligente de materiais (Área → Grupo → Fabricante → Produto).
+   * Quando presente, substitui a lista plana. `areaCodes` = área(s) da proposta. */
+  smartCatalog?: { items: InventoryItem[]; areaCodes: string[] };
   onAdd: (item: Partial<PedidoEquipmentItem>) => void;
   onUpdate: (idx: number, patch: Partial<PedidoEquipmentItem>) => void;
   onRemove: (idx: number) => void;
@@ -49,7 +53,7 @@ const emptyDraft = (tipo: 'material' | 'servico'): Draft => ({
   vinculoId: '',
 });
 
-export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo, resolveCatalogo, onAdd, onUpdate, onRemove, onMove }) => {
+export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo, resolveCatalogo, smartCatalog, onAdd, onUpdate, onRemove, onMove }) => {
   const [draft, setDraft] = useState<Draft>(emptyDraft(tipo));
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [openMenu, setOpenMenu] = useState<number | null>(null);
@@ -218,7 +222,9 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
           )}
         </div>
 
-        {catalogo && catalogo.length > 0 && (
+        {smartCatalog ? (
+          <MaterialCatalogPicker items={smartCatalog.items} areaCodes={smartCatalog.areaCodes} value={draft.vinculoId} onPick={pickCatalogo} />
+        ) : catalogo && catalogo.length > 0 && (
           <div className="mb-3 space-y-1">
             <div className="flex items-center justify-between">
               <label className={miniLabel}>Vincular do {isServico ? 'catálogo de serviços' : 'estoque'} (opcional)</label>
