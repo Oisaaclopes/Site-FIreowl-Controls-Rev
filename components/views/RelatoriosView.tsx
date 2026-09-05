@@ -31,6 +31,9 @@ import { ResponsibleSelect } from '@/components/ui/ResponsibleSelect';
 import { OsAttendanceCta } from '@/components/operacoes/ServiceAttendanceFlow';
 import { useToast, useConfirm, showToast, requestConfirm } from '@/components/ui/Feedback';
 import { ClientSelector } from '@/components/clients/ClientSelector';
+import { TechnicalSurveyFlow } from '@/components/clients/TechnicalSurveyFlow';
+import { fetchTechnicalCatalog, TechnicalCatalogItem } from '@/lib/technicalCatalog';
+import { TechArea } from '@/lib/technicalBase';
 import { fetchCicloAtivo, quotaPorVisita } from '@/lib/ciclos';
 import { cancelReportBundle, flushOutbox, pendingCount, isOnline, purgeDeletedLegacyReportBundles } from '@/lib/offline/reportSync';
 import { removeReportPhoto } from '@/lib/reportMedia';
@@ -165,7 +168,8 @@ const STATUS_COLOR: Record<string, string> = {
   cancelado: 'bg-red-100 text-red-700',
 };
 const TIPO_LABEL: Record<string, string> = {
-  LEVANTAMENTO: 'Visita para Orçamento', // 3D.5: reclassificado (o Levantamento Técnico é a Base Técnica)
+  LEVANTAMENTO_TECNICO: 'Levantamento Técnico', // motor 3D (não gera 'reports')
+  LEVANTAMENTO: 'Levantamento (legado)', // só rótulo de fallback p/ eventuais registros históricos
   CORRETIVA: 'Corretiva',
   PREVENTIVA: 'Preventiva',
 };
@@ -277,6 +281,8 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const [wClienteId, setWClienteId] = useState<string>('');
   const [wContratoId, setWContratoId] = useState<string>('');
   const [wOsId, setWOsId] = useState<string>('');
+  // Levantamento Técnico (motor 3D) lançado do wizard — mesmo componente do Cliente 360.
+  const [survey, setSurvey] = useState<{ area: TechArea; clienteId: string; clientName: string; devices: Device[]; catalog: TechnicalCatalogItem[] } | null>(null);
 
   // Estado do cadastro provisório em campo (§6.3 / §9.1)
   const [provNome, setProvNome] = useState('');
@@ -704,10 +710,28 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialAction]);
+  // Abre o Levantamento Técnico 3D (mesmo motor do Cliente 360) para o cliente/área.
+  const launchTechnicalSurvey = async (area: TechArea, clienteId: string) => {
+    if (!clienteId || !area) { showToast('Selecione o cliente e a área.'); return; }
+    const clientName = clients.find((c) => c.id === clienteId)?.name || 'Cliente';
+    let devices: Device[] = [];
+    let catalog: TechnicalCatalogItem[] = [];
+    try { [devices, catalog] = await Promise.all([fetchDevices(clienteId), fetchTechnicalCatalog().catch(() => [])]); }
+    catch { /* segue com listas vazias — a Base carrega o que puder */ }
+    setSurvey({ area, clienteId, clientName, devices, catalog });
+    setWizardStep(0);
+  };
+
   const startForm = (preset?: { tipo: string; area: string; clienteId: string; osId?: string; contratoId?: string }) => {
     const tipo = preset?.tipo || wTipo;
     const area = preset?.area || wArea;
     const clienteId = preset?.clienteId || wClienteId;
+    // CORREÇÃO DEFINITIVA: "Levantamento Técnico" abre o motor 3D (TechnicalSurveyFlow),
+    // nunca o ReportForm. O fluxo legado de relatório de levantamento foi removido.
+    if (tipo === 'LEVANTAMENTO_TECNICO') {
+      launchTechnicalSurvey(area as TechArea, clienteId);
+      return;
+    }
     const osId = preset?.osId || wOsId;
     const contratoId = preset?.contratoId || wContratoId;
     // Resolve o template pela combinação Tipo + Área.
@@ -1294,7 +1318,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
           <fieldset className="min-w-0">
             <legend className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-fg-secondary">Tipo</legend>
             <div className="flex gap-1.5 overflow-x-auto pb-1">
-          {['TODOS', 'LEVANTAMENTO', 'CORRETIVA', 'PREVENTIVA'].map((t) => (
+          {['TODOS', 'CORRETIVA', 'PREVENTIVA'].map((t) => (
             <button
               key={t}
               onClick={() => setFTipo(t)}
@@ -1461,11 +1485,11 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                       {[
                         { id: 'CORRETIVA', label: 'Manutenção Corretiva', icon: 'build' },
-                        // ETAPA 3D.5 (§2/§61): o Levantamento Técnico OPERACIONAL migrou para
-                        // Cliente 360 → Base Técnica (motor 3D). Este fluxo de relatório
-                        // permanece como VISITA PARA ORÇAMENTO (comercial: logística/necessidades/
-                        // medições → Pedido). Código do tipo segue 'LEVANTAMENTO' (histórico intacto).
-                        { id: 'LEVANTAMENTO', label: 'Visita para Orçamento', icon: 'request_quote' },
+                        // CORREÇÃO DEFINITIVA: "Levantamento Técnico" abre o MOTOR 3D
+                        // (TechnicalSurveyFlow → Base Técnica). O fluxo legado "Visita para
+                        // Orçamento" (ReportForm/LEVANTAMENTO) foi REMOVIDO. Id próprio p/ não
+                        // reutilizar o código legado LEVANTAMENTO (§12).
+                        { id: 'LEVANTAMENTO_TECNICO', label: 'Levantamento Técnico', icon: 'lan' },
                         { id: 'PREVENTIVA', label: 'Manutenção Preventiva', icon: 'fact_check' },
                         { id: 'AUDITORIA', label: 'Auditoria Técnica', icon: 'policy' },
                       ].map((t) => {
@@ -1496,7 +1520,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                       })}
                     </div>
                     <p className="mt-2 text-[10px] text-fg-muted">
-                      O <b>Levantamento Técnico</b> (Base Técnica do cliente) fica em <b>Clientes → Cliente 360 → Base Técnica → Novo levantamento</b>. Aqui, a <b>Visita para Orçamento</b> é o relatório comercial (logística, necessidades, medições → proposta).
+                      <b>Levantamento Técnico</b> abre a Base Técnica do cliente (motor 3D): registra ativos, infraestrutura e observações que alimentam o Cliente 360 em tempo real.
                     </p>
                   </div>
 
@@ -1685,6 +1709,20 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* ===== Levantamento Técnico (motor 3D) — mesmo componente do Cliente 360 ===== */}
+      {survey && (
+        <TechnicalSurveyFlow
+          area={survey.area}
+          clienteId={survey.clienteId}
+          clientName={survey.clientName}
+          existingDevices={survey.devices}
+          userRole={userRole}
+          catalog={survey.catalog}
+          onClose={() => setSurvey(null)}
+          onChanged={() => { if (isSupabaseConfigured()) fetchDevices(survey.clienteId).then((d) => setSurvey((s) => (s ? { ...s, devices: d } : s))).catch(() => {}); }}
+        />
       )}
 
       {/* ===== Editar dados do relatório ===== */}

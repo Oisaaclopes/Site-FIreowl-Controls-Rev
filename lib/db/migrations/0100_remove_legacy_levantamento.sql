@@ -1,0 +1,59 @@
+-- CORREÇÃO DEFINITIVA — remoção do fluxo LEGADO "Levantamento / Visita para Orçamento".
+--
+-- Decisão de produto: o Levantamento Técnico operacional é APENAS o motor 3D
+-- (TechnicalSurveyFlow → devices/technical_surveys/device_verifications/field_photos).
+-- O fluxo antigo baseado em ReportForm + template LEVANTAMENTO_* + reports.tipo
+-- 'LEVANTAMENTO' foi removido da interface; aqui removemos os DADOS legados.
+--
+-- SEGURANÇA (destrutiva porém FILTRADA):
+--   • Só remove `reports` com tipo='LEVANTAMENTO' (e seus templates legados).
+--   • Sem comando de limpeza total, sem DELETE não-filtrado e sem CASCADE global.
+--   • As dependências são resolvidas pelas FKs JÁ existentes (0025-0044):
+--       - report_answers.report_id            → ON DELETE CASCADE  (removidas)
+--       - report_media.report_id              → ON DELETE CASCADE  (linhas removidas;
+--         objetos físicos no bucket 'report-media' NÃO são apagados por SQL — ver nota)
+--       - report_survey_* / report_order_links.report_id → ON DELETE CASCADE
+--         (o LINK some; o Pedido/Proposta é PRESERVADO — §7)
+--       - pendencias.report_origem_id / report_execucao_id → ON DELETE SET NULL
+--         (a pendência é PRESERVADA, só perde a referência de origem — §8)
+--       - ordens_servico.report_id / field_photos.report_id / contracts.report_id
+--         / field_photo_comparisons.report_id → ON DELETE SET NULL (preservados)
+--   • NÃO toca: technical_surveys, devices, device_verifications, field_photos do 3D,
+--     technical_catalog, technical_backups, credenciais, Pedidos/OS/Atendimentos.
+--
+-- Idempotente: reexecutar não remove nada novo. NÃO edita migrações aplicadas.
+-- Requer: 0029 (reports/pendencias/media), 0044 (report_order_links), 0024 (report_templates).
+--
+-- ================== AUDITORIA (rode ANTES, read-only, e guarde os números) =========
+--   select count(*) as reports_levantamento         from public.reports where tipo='LEVANTAMENTO';
+--   select count(*) as answers_levantamento          from public.report_answers a
+--     join public.reports r on r.id=a.report_id where r.tipo='LEVANTAMENTO';
+--   select count(*) as media_levantamento            from public.report_media m
+--     join public.reports r on r.id=m.report_id where r.tipo='LEVANTAMENTO';
+--   select count(*) as pendencias_com_origem_legado  from public.pendencias p
+--     join public.reports r on r.id=p.report_origem_id where r.tipo='LEVANTAMENTO';
+--   select count(*) as pedidos_vinculados            from public.report_order_links l
+--     join public.reports r on r.id=l.report_id where r.tipo='LEVANTAMENTO';
+--   select count(*) as os_com_report_legado          from public.ordens_servico o
+--     join public.reports r on r.id=o.report_id where r.tipo='LEVANTAMENTO';
+--   select count(*) as storage_paths_legado          from public.report_media m
+--     join public.reports r on r.id=m.report_id where r.tipo='LEVANTAMENTO'
+--     and m.storage_path_original is not null;
+-- (os storage_paths acima devem ser limpos do bucket 'report-media' por API/rotina,
+--  fora do SQL — ver NOTA no final. Guardar a lista se quiser apagar os objetos.)
+-- ==================================================================================
+
+-- 1) Remove os relatórios legados de Levantamento. As FKs cuidam de:
+--    answers/media/links (CASCADE) e pendencias/OS/fotos/contratos (SET NULL).
+delete from public.reports where tipo = 'LEVANTAMENTO';
+
+-- 2) Remove as DEFINIÇÕES de template legadas (não mais oferecidas para criação).
+--    reports.template_id → report_templates(id) é ON DELETE SET NULL; como já
+--    removemos os reports LEVANTAMENTO acima, nenhum relatório válido referencia estes.
+delete from public.report_templates where tipo = 'LEVANTAMENTO';
+
+-- NOTA (objetos físicos): as LINHAS de report_media legadas foram removidas pelo
+-- CASCADE, mas os arquivos no bucket privado 'report-media' permanecem órfãos.
+-- Removê-los exige a API de Storage (não há DELETE físico via SQL). Isso NÃO expõe
+-- dados (bucket privado, sem referência) e pode ser feito depois por rotina segura.
+-- As field_photos do motor 3D (bucket 'field-photos') NÃO são afetadas.

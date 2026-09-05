@@ -703,12 +703,16 @@ export const PREVENTIVA_ALARME: TemplateSchema = {
   ],
 };
 
+// CORREÇÃO DEFINITIVA: os templates LEVANTAMENTO_* NÃO são mais semeados/oferecidos
+// para criação (o Levantamento Técnico é o motor 3D). Os `export const LEVANTAMENTO_*`
+// permanecem apenas como fixtures de teste do motor de formulário (formConditions/
+// versionamento) e NÃO entram em ALL_TEMPLATES → nenhum novo relatório LEVANTAMENTO.
 export const ALL_TEMPLATES: TemplateSchema[] = [
-  LEVANTAMENTO_SDAI, CORRETIVA_SDAI, PREVENTIVA_SDAI,
-  LEVANTAMENTO_CFTV, CORRETIVA_CFTV, PREVENTIVA_CFTV,
-  LEVANTAMENTO_CA, CORRETIVA_CA, PREVENTIVA_CA,
-  LEVANTAMENTO_BMS, CORRETIVA_BMS, PREVENTIVA_BMS,
-  LEVANTAMENTO_ALARME, CORRETIVA_ALARME, PREVENTIVA_ALARME,
+  CORRETIVA_SDAI, PREVENTIVA_SDAI,
+  CORRETIVA_CFTV, PREVENTIVA_CFTV,
+  CORRETIVA_CA, PREVENTIVA_CA,
+  CORRETIVA_BMS, PREVENTIVA_BMS,
+  CORRETIVA_ALARME, PREVENTIVA_ALARME,
 ];
 
 export interface SeedTemplatesSummary {
