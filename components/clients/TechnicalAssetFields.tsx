@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 import { TechArea, CONDITIONS, CONDITION_LABEL } from '@/lib/technicalBase';
-import { assetFormSpec, AssetFormValues, AssetFormField } from '@/lib/technicalAssetForm';
+import { assetFormSpec, AssetFormValues, AssetFormField, applyCatalogAutofill } from '@/lib/technicalAssetForm';
 import { AssetConditionValue } from '@/lib/types';
 import { EquipmentIdentifier, EquipmentIdentification } from '@/components/catalog/EquipmentIdentifier';
 import { TechnicalCatalogItem } from '@/lib/technicalCatalog';
@@ -30,11 +30,17 @@ export const TechnicalAssetFields: React.FC<Props> = ({ area, group, catalog, va
   const setAttr = (k: string, v: string) => onChange({ ...value, attrs: { ...value.attrs, [k]: v } });
   const setCol = (store: 'central' | 'laco' | 'endereco' | 'serial' | 'localizacao', v: string) => onChange({ ...value, [store]: v });
 
-  const equip: EquipmentIdentification | undefined = (value.fabricante || value.modelo || value.catalogItemId)
-    ? { brand: value.fabricante, model: value.modelo, catalogItemId: value.catalogItemId, manual: !value.catalogItemId && !!(value.fabricante || value.modelo) }
+  // `manual` é RASTREADO (equipManual), nunca derivado — derivar fazia o modelo
+  // "sumir" ao escolher o fabricante (catalogItemId ainda vazio) [correção 3D].
+  const equip: EquipmentIdentification | undefined = (value.fabricante || value.modelo || value.catalogItemId || value.equipManual)
+    ? { brand: value.fabricante, model: value.modelo, catalogItemId: value.catalogItemId, manual: !!value.equipManual }
     : undefined;
-  const onEquip = (e?: EquipmentIdentification) =>
-    onChange({ ...value, fabricante: e?.brand, modelo: e?.model, catalogItemId: e?.catalogItemId });
+  const onEquip = (e?: EquipmentIdentification) => {
+    const base: AssetFormValues = { ...value, fabricante: e?.brand, modelo: e?.model, catalogItemId: e?.catalogItemId, equipManual: e?.manual };
+    // Autopreenchimento a partir do modelo do catálogo (§17–§27), respeitando ajustes manuais.
+    const item = e?.catalogItemId ? catalog.find((c) => c.id === e.catalogItemId) : undefined;
+    onChange(applyCatalogAutofill(area, group, base, item));
+  };
 
   const renderField = (f: AssetFormField) => {
     const raw = f.store === 'attr' ? (value.attrs[f.attrKey || f.key] || '') : ((value as any)[f.store] || '');

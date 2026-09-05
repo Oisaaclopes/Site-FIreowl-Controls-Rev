@@ -9,6 +9,9 @@
  * =================================================================== */
 import { TechArea, FieldKind, identifierFieldsForGroup, isInfraGroup, validateIdentifier } from './technicalBase';
 import { AssetConditionValue } from './types';
+import { TechnicalCatalogItem } from './technicalCatalog';
+
+const normAttr = (s?: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 export type AssetFieldStore = 'central' | 'laco' | 'endereco' | 'attr' | 'serial' | 'localizacao';
 export type AssetFieldInput = 'text' | 'number' | 'ip' | 'mac' | 'select' | 'textarea';
@@ -97,10 +100,60 @@ export interface AssetFormValues {
   central?: string; laco?: string; endereco?: string; serial?: string; localizacao?: string;
   condicao?: AssetConditionValue;
   fabricante?: string; modelo?: string; catalogItemId?: string;
+  /** Modo manual do EquipmentIdentifier (não derivar — evita "sumir" o modelo). */
+  equipManual?: boolean;
   attrs: Record<string, string>;   // descricao_programada, ip, canal, tecnologia, subtipo, observacao…
+  /** Atributos preenchidos AUTOMATICAMENTE pelo modelo do catálogo (§23/§27). */
+  autoAttrs?: Record<string, string>;
 }
 
 export const emptyAssetValues = (): AssetFormValues => ({ attrs: {}, condicao: 'NORMAL' });
+
+/**
+ * Atributos técnicos DETERMINÍSTICOS que o modelo do catálogo permite preencher
+ * (§18/§27) — só para campos que o formulário do grupo realmente possui e só a
+ * partir de dados ESTRUTURADOS do catálogo (technologies/system_type/product_type).
+ * Nunca infere pelo nome; capacidade do modelo ≠ configuração instalada (§19).
+ */
+export function deriveCatalogAttributes(area: TechArea, group: string | undefined, item: TechnicalCatalogItem): Record<string, string> {
+  const spec = assetFormSpec(area, group);
+  const hasField = (attrKey: string) => spec.fields.some((f) => (f.attrKey || f.key) === attrKey);
+  const out: Record<string, string> = {};
+  if (hasField('tecnologia')) {
+    const blob = normAttr([...(item.technologies || []), item.systemType, item.productType].filter(Boolean).join(' '));
+    let tec = '';
+    if (/enderec/.test(blob)) tec = 'Endereçável';
+    else if (/convencional/.test(blob)) tec = 'Convencional';
+    else if (/hibrid/.test(blob)) tec = 'Híbrida';
+    else if (/\bip\b/.test(blob)) tec = 'IP';
+    else if (/analog|hdcvi|ahd|tvi/.test(blob)) tec = 'Analógica';
+    if (tec) out['tecnologia'] = tec;
+  }
+  return out;
+}
+
+/**
+ * Aplica o autopreenchimento a partir do modelo do catálogo, preservando o que o
+ * técnico já ajustou manualmente (§23) e recalculando ao trocar de modelo (§21).
+ * `item` ausente (modelo manual/limpo) → remove os valores auto anteriores (§24).
+ */
+export function applyCatalogAutofill(area: TechArea, group: string | undefined, values: AssetFormValues, item?: TechnicalCatalogItem): AssetFormValues {
+  const derived = item ? deriveCatalogAttributes(area, group, item) : {};
+  const prevAuto = values.autoAttrs || {};
+  const attrs = { ...values.attrs };
+  const autoAttrs: Record<string, string> = {};
+  // 1) remove valores auto anteriores que não são mais derivados E que o técnico não alterou
+  for (const k of Object.keys(prevAuto)) {
+    if (!(k in derived) && (attrs[k] ?? '') === prevAuto[k]) delete attrs[k];
+  }
+  // 2) aplica derivados quando o campo está vazio OU ainda contém o valor auto anterior
+  for (const [k, val] of Object.entries(derived)) {
+    const cur = attrs[k] ?? '';
+    if (!cur || cur === prevAuto[k]) { attrs[k] = val; autoAttrs[k] = val; }
+    // senão: valor confirmado manualmente pelo técnico → respeita, não rastreia como auto
+  }
+  return { ...values, attrs, autoAttrs };
+}
 
 /** Valida os campos segundo o tipo (ip/mac/número). Vazio é válido (opcional). */
 export function firstInvalidField(area: TechArea, group: string | undefined, v: AssetFormValues): AssetFormField | null {
