@@ -869,6 +869,9 @@ export interface InventoryItem {
   costPrice?: number;
   profitMargin?: number;
   markup?: number;
+  /** Variável comercial informada no cadastro (PRICE/MARGIN/MARKUP/PROFIT).
+   * Só reabre a edição no mesmo modo; preço/custo continuam a fonte de verdade. */
+  pricingMode?: string;
   stockManaged?: boolean;
   idealQuantity?: number;
   reservedQuantity?: number;

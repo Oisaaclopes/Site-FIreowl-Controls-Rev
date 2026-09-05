@@ -6,6 +6,10 @@ import { PartnerBrand } from './types';
 
 const TABLE = 'brands';
 
+/** Chave de deduplicação de marca (trim + caixa + acento). */
+export const normalizeBrandName = (name: string): string =>
+  (name || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+
 function rowToBrand(r: any): PartnerBrand {
   return {
     id: String(r.id),
@@ -28,16 +32,30 @@ export async function ensureBrand(name: string, category = 'SDAI'): Promise<Part
   return upsertBrand({ id: '', name, category });
 }
 
-/** Cria ou atualiza os dados de uma marca homologada. */
+/** Cria ou atualiza os dados de uma marca homologada. Dedup por nome
+ * normalizado (caixa/espaço/acento): "TECNOHOLD" == "Tecnohold". */
 export async function upsertBrand(brand: PartnerBrand): Promise<PartnerBrand> {
   const nome = brand.name.trim();
+  const normalized = normalizeBrandName(nome);
   const supabase = getSupabaseClient() as any;
-  const { data, error } = await supabase
-    .from(TABLE)
-    .upsert({ name: nome, category: brand.category, logo_url: brand.logoUrl ?? null, segment: brand.segment ?? null }, { onConflict: 'name' })
-    .select()
-    .single();
-  if (error) throw error;
+
+  // Se já existe marca equivalente (por normalized_name), reutiliza a linha.
+  try {
+    const { data: existing } = await supabase.from(TABLE).select('*').eq('normalized_name', normalized).maybeSingle();
+    if (existing) return rowToBrand(existing);
+  } catch { /* coluna pode não existir em ambientes anteriores à 0103 — segue para upsert por nome */ }
+
+  const row: Record<string, unknown> = {
+    name: nome, category: brand.category, logo_url: brand.logoUrl ?? null, segment: brand.segment ?? null, normalized_name: normalized,
+  };
+  const { data, error } = await supabase.from(TABLE).upsert(row, { onConflict: 'name' }).select().single();
+  if (error) {
+    // Retrocompat: se `normalized_name` ainda não existe, tenta sem a coluna.
+    delete row.normalized_name;
+    const retry = await supabase.from(TABLE).upsert(row, { onConflict: 'name' }).select().single();
+    if (retry.error) throw retry.error;
+    return rowToBrand(retry.data);
+  }
   return rowToBrand(data);
 }
 

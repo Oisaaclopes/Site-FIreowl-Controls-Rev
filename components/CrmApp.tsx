@@ -608,6 +608,22 @@ export function CrmApp({
       .catch((err) => console.warn('Marca: falha ao salvar no Supabase.', err));
   };
 
+  // Cadastro inline de fabricante a partir do Cadastro de Produto: persiste
+  // (dedup por nome normalizado no upsertBrand) e devolve o nome canônico para
+  // seleção imediata. Não cria inventory_item fake.
+  const handleCreateBrandInline = async (nome: string): Promise<string> => {
+    const category = 'SDAI';
+    if (!isSupabaseConfigured()) {
+      const local: PartnerBrand = { id: `brand_${Date.now().toString(36)}`, name: nome.trim(), category };
+      handleAddPartnerBrand(local);
+      return local.name;
+    }
+    const saved = await upsertBrand({ id: '', name: nome.trim(), category } as PartnerBrand);
+    setPartnerBrands((prev) => [...prev.filter((b) => b.name !== saved.name), saved]);
+    logAction('Cadastro de Marca', 'Estoque', `Fabricante cadastrado no produto: ${saved.name}`);
+    return saved.name;
+  };
+
   const handleDeletePartnerBrand = (id: string) => {
     setPartnerBrands((prev) => prev.filter((b) => b.id !== id));
     logAction('Exclusão de Marca', 'Conta', `Marca parceira removida do catálogo.`);
@@ -1352,6 +1368,8 @@ export function CrmApp({
               inventoryLoading={inventoryLoading}
               userRole={userRole}
               suppliers={suppliers}
+              brands={partnerBrands.map((b) => b.name).filter(Boolean)}
+              onCreateBrand={handleCreateBrandInline}
               onAddInventoryItem={handleAddInventoryItem}
               onUpdateInventoryItem={handleUpdateInventoryItem}
               onDeleteInventoryItem={handleDeleteInventoryItem}

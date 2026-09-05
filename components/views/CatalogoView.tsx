@@ -44,11 +44,13 @@ function passesStock(item: InventoryItem, mode: StockMode): boolean {
   return true;
 }
 
-export function CatalogoView({ inventory, inventoryLoading = false, userRole, suppliers = [], onAddInventoryItem, onUpdateInventoryItem, onDeleteInventoryItem }: {
+export function CatalogoView({ inventory, inventoryLoading = false, userRole, suppliers = [], brands = [], onCreateBrand, onAddInventoryItem, onUpdateInventoryItem, onDeleteInventoryItem }: {
   inventory: InventoryItem[];
   inventoryLoading?: boolean;
   userRole: UserRole;
   suppliers?: Supplier[];
+  brands?: string[];
+  onCreateBrand?: (name: string) => Promise<string>;
   onAddInventoryItem?: (item: InventoryItem) => void | Promise<void>;
   onUpdateInventoryItem?: (item: InventoryItem) => void | Promise<void>;
   onDeleteInventoryItem?: (id: string) => void | Promise<void>;
@@ -276,8 +278,10 @@ export function CatalogoView({ inventory, inventoryLoading = false, userRole, su
           onDelete={handleDeleteProduct} onMovement={handleMovement} />
       )}
       {editorItem !== null && tree && (
-        <ProductEditor initial={editorItem === 'new' ? null : editorItem} tree={tree}
+        <ProductEditor initial={editorItem === 'new' ? null : editorItem} tree={tree} inventory={inventory}
           suppliers={suppliers.map((s) => s.name).filter(Boolean)}
+          brands={brands}
+          onCreateBrand={onCreateBrand ?? (async (n) => n)}
           onClose={() => setEditorItem(null)} onSave={handleSaveProduct} />
       )}
     </div>
