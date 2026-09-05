@@ -110,6 +110,34 @@ export interface AssetFormValues {
 export const emptyAssetValues = (): AssetFormValues => ({ attrs: {}, condicao: 'NORMAL' });
 
 /**
+ * Converte um Device existente em valores do formulário (edição). Preserva
+ * identificadores (colunas + attrs), fabricante/modelo e condição. Modo manual
+ * do equipamento ligado quando há fabricante/modelo (não "some" o modelo ao
+ * editar um ativo cujo modelo não está no catálogo).
+ */
+export function deviceToAssetValues(d: {
+  central?: string; laco?: string; endereco?: string; serial?: string; localizacao?: string;
+  condicao?: AssetConditionValue; fabricante?: string; modelo?: string; itemCatalogoId?: string;
+  technicalAttributes?: Record<string, unknown>;
+}): AssetFormValues {
+  const attrs: Record<string, string> = {};
+  for (const [k, v] of Object.entries(d.technicalAttributes || {})) if (v != null) attrs[k] = String(v);
+  return {
+    central: d.central || undefined,
+    laco: d.laco || undefined,
+    endereco: d.endereco || undefined,
+    serial: d.serial || undefined,
+    localizacao: d.localizacao || undefined,
+    condicao: d.condicao || 'NORMAL',
+    fabricante: d.fabricante || undefined,
+    modelo: d.modelo || undefined,
+    catalogItemId: d.itemCatalogoId || undefined,
+    equipManual: !!(d.fabricante || d.modelo) && !d.itemCatalogoId,
+    attrs,
+  };
+}
+
+/**
  * Atributos técnicos DETERMINÍSTICOS que o modelo do catálogo permite preencher
  * (§18/§27) — só para campos que o formulário do grupo realmente possui e só a
  * partir de dados ESTRUTURADOS do catálogo (technologies/system_type/product_type).

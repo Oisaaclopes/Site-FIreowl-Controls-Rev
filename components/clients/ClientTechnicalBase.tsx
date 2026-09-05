@@ -7,6 +7,11 @@ import {
 } from '@/lib/technicalBase';
 import { upsertDevice } from '@/lib/devices';
 import { addVerification, fetchVerificationsForDevice } from '@/lib/deviceVerifications';
+import {
+  summarizeCentrals, summarizeGroups, duplicateGroups, centralAddressAnomalies,
+  importReview, sortDevicesForArea, filterDevices, fabricantesInArea,
+  OriginFilter, VerifFilter, GroupSummary,
+} from '@/lib/technicalBaseSummary';
 import { fetchCredentials, createCredential, revealCredentialSecret, deleteCredential } from '@/lib/clientCredentials';
 import {
   fetchBackups, uploadBackup, signedBackupUrl, markBackupCurrent, deleteBackup, BACKUP_DISCLAIMER,
@@ -20,7 +25,7 @@ import { TechnicalBaseImport } from '@/components/clients/TechnicalBaseImport';
 import { AssetDetailDrawer } from '@/components/clients/AssetDetailDrawer';
 import { fetchTechnicalCatalog, TechnicalCatalogItem } from '@/lib/technicalCatalog';
 import { TechnicalAssetFields } from '@/components/clients/TechnicalAssetFields';
-import { AssetFormValues, emptyAssetValues, firstInvalidField, buildDevicePatch } from '@/lib/technicalAssetForm';
+import { AssetFormValues, emptyAssetValues, firstInvalidField, buildDevicePatch, deviceToAssetValues } from '@/lib/technicalAssetForm';
 
 /* ==========================================================================
  * ETAPA 3D — BASE TÉCNICA PERMANENTE (Cliente 360).
@@ -52,9 +57,22 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
   const [showImport, setShowImport] = useState(false);
   const [verifDevice, setVerifDevice] = useState<Device | null>(null);
   const [detailDevice, setDetailDevice] = useState<Device | null>(null);
+  const [editDevice, setEditDevice] = useState<Device | null>(null);
   const [catalog, setCatalog] = useState<TechnicalCatalogItem[]>([]);
   // §33 — filtro de ciclo de vida (padrão: só ativos instalados).
   const [lifecycle, setLifecycle] = useState<'ativos' | 'substituidos' | 'removidos' | 'todos'>('ativos');
+  // Filtros e seleção (§8/§12/§27).
+  const [groupFilter, setGroupFilter] = useState('');
+  const [origem, setOrigem] = useState<OriginFilter>('todos');
+  const [verif, setVerif] = useState<VerifFilter>('todos');
+  const [condFilter, setCondFilter] = useState('');
+  const [fabFilter, setFabFilter] = useState('');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [showDup, setShowDup] = useState(false);
+  const canManage = isGestao(userRole);
+
+  // Ao trocar de área/aba, zera seleção e filtros específicos (evita ids órfãos).
+  useEffect(() => { setSelected(new Set()); setGroupFilter(''); setShowDup(false); }, [area]);
 
   // Catálogo técnico (só identificação: área/família/fabricante/modelo — sem preço).
   useEffect(() => {
@@ -64,13 +82,6 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
     return () => { alive = false; };
   }, []);
 
-  // §34 — cards contam apenas ativos ATUALMENTE instalados (não os substituídos/removidos).
-  const countsByArea = useMemo(() => {
-    const m: Record<string, number> = {};
-    for (const d of devices || []) if (d.status === 'ativo') m[d.sistema] = (m[d.sistema] || 0) + 1;
-    return m;
-  }, [devices]);
-
   const matchesLifecycle = (d: Device): boolean => {
     if (lifecycle === 'todos') return true;
     if (lifecycle === 'ativos') return d.status === 'ativo';
@@ -78,21 +89,88 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
     return d.status === 'removido';
   };
 
-  const areaDevices = useMemo(() => {
-    const list = (devices || []).filter((d) => d.sistema === area && matchesLifecycle(d));
+  // Ativos da área (fonte dos resumos/duplicados — §26/§29).
+  const areaAll = useMemo(() => (devices || []).filter((d) => d.sistema === area), [devices, area]);
+  const centrals = useMemo(() => summarizeCentrals(area, areaAll), [area, areaAll]);
+  const groupSummary = useMemo(() => summarizeGroups(area, areaAll), [area, areaAll]);
+  const centralGroupNames = useMemo(() => new Set(centrals.map((c) => c.group)), [centrals]);
+  const peripheralSummary = useMemo(() => groupSummary.filter((g) => !centralGroupNames.has(g.group)), [groupSummary, centralGroupNames]);
+  const dupGroups = useMemo(() => duplicateGroups(area, areaAll), [area, areaAll]);
+  const anomalies = useMemo(() => centralAddressAnomalies(area, areaAll), [area, areaAll]);
+  const review = useMemo(() => importReview(area, areaAll), [area, areaAll]);
+  const fabricantes = useMemo(() => fabricantesInArea(areaAll), [areaAll]);
+  const dupCandidateCount = useMemo(() => dupGroups.reduce((a, g) => a + g.devices.length, 0) + anomalies.length, [dupGroups, anomalies]);
+
+  const countsByArea = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const d of devices || []) if (d.status === 'ativo' && !d.removedAt) m[d.sistema] = (m[d.sistema] || 0) + 1;
+    return m;
+  }, [devices]);
+
+  const tableDevices = useMemo(() => {
+    let list = (devices || []).filter((d) => d.sistema === area && matchesLifecycle(d));
+    list = filterDevices(area, list, {
+      group: groupFilter || undefined, fabricante: fabFilter || undefined,
+      origem, condicao: condFilter || undefined, verificacao: verif,
+    });
     const q = search.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter((d) => {
+    if (q) list = list.filter((d) => {
       const ident = assetDisplayIdentifier(area, { central: d.central, laco: d.laco, endereco: d.endereco, technicalAttributes: d.technicalAttributes }).toLowerCase();
-      // §14: busca por identificadores da disciplina — inclui colunas canônicas e
-      // TODOS os atributos técnicos (ip, canal, mac, zona, device instance, ponto,
-      // controladora, descrição programada…), além dos campos comuns.
       const attrValues = Object.values(d.technicalAttributes || {}).map((v) => String(v ?? ''));
       return [ident, d.central, d.laco, d.endereco, d.grupo, d.tipoAtivo, d.tipoDispositivo, d.fabricante, d.modelo, d.localizacao, d.serial, ...attrValues]
         .some((v) => (v || '').toLowerCase().includes(q));
     });
+    return sortDevicesForArea(area, list);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [devices, area, search, lifecycle]);
+  }, [devices, area, search, lifecycle, groupFilter, fabFilter, origem, condFilter, verif]);
+
+  // Duplicados (quando o painel está aberto): achata mantendo grupos.
+  const dupDevices = useMemo(() => {
+    const ids = new Set<string>();
+    for (const g of dupGroups) for (const d of g.devices) ids.add(d.id);
+    for (const d of anomalies) ids.add(d.id);
+    return sortDevicesForArea(area, areaAll.filter((d) => ids.has(d.id)));
+  }, [dupGroups, anomalies, areaAll, area]);
+
+  const visible = showDup ? dupDevices : tableDevices;
+  const anyFilter = !!(groupFilter || fabFilter || condFilter || search) || origem !== 'todos' || verif !== 'todos';
+
+  const toggleRow = (id: string) => setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleAll = () => setSelected((prev) => {
+    const allSel = visible.length > 0 && visible.every((d) => prev.has(d.id));
+    return allSel ? new Set() : new Set(visible.map((d) => d.id));
+  });
+  const clearSel = () => setSelected(new Set());
+  const selectedDevices = useMemo(() => (devices || []).filter((d) => selected.has(d.id)), [devices, selected]);
+
+  // Remoção segura (§11/§34): preserva histórico via status/removed_at (soft).
+  const removeDevices = async (list: Device[]) => {
+    if (!isSupabaseConfigured()) { showToast('Supabase não configurado.'); return; }
+    const nowIso = new Date().toISOString();
+    for (const d of list) {
+      await upsertDevice({ ...d, status: 'removido', removedAt: d.removedAt || nowIso });
+    }
+    showToast(list.length === 1 ? 'Ativo removido da base ativa (histórico preservado).' : `${list.length} ativos removidos (histórico preservado).`);
+    clearSel(); onDevicesChanged();
+  };
+  const confirmRemove = async (list: Device[]) => {
+    if (list.length === 0) return;
+    const one = list.length === 1 ? list[0] : null;
+    const msg = one
+      ? `Remover "${assetDisplayIdentifier(area, one) || one.modelo || 'ativo'}" da Base Técnica ativa? O histórico técnico é preservado.`
+      : `Remover ${list.length} ativos da Base Técnica ativa? O histórico técnico de cada um é preservado.`;
+    if (!await requestConfirm(msg)) return;
+    try { await removeDevices(list); } catch (e: any) { showToast(`Falha ao remover: ${e?.message || e}`); }
+  };
+  // Edição em lote de um único campo (§12): condição/grupo/fabricante.
+  const bulkPatch = async (patch: Partial<Device>) => {
+    if (!isSupabaseConfigured()) { showToast('Supabase não configurado.'); return; }
+    try {
+      for (const d of selectedDevices) await upsertDevice({ ...d, ...patch });
+      showToast(`${selectedDevices.length} ativo(s) atualizados.`);
+      clearSel(); onDevicesChanged();
+    } catch (e: any) { showToast(`Falha: ${e?.message || e}`); }
+  };
 
   return (
     <div className="mx-auto flex w-full min-w-0 max-w-[1600px] flex-col gap-5">
@@ -114,53 +192,97 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
         })}
       </div>
 
+      {/* Resumo visual do sistema (centrais + periféricos) — derivado dos ativos (§2/§3) */}
+      <SummaryPanel
+        area={area} centrals={centrals} peripherals={peripheralSummary}
+        activeGroup={groupFilter} onPickGroup={(g) => { setShowDup(false); setGroupFilter((cur) => (cur === g ? '' : g)); }}
+      />
+
+      {/* Revisão pós-importação (§18) */}
+      {review.importados > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface-2 px-3 py-2 text-[11px]">
+          <span className="font-bold uppercase tracking-wider text-fg-muted">Revisar importação</span>
+          <span className="text-fg-secondary">{review.importados} importados</span>
+          {review.duplicados > 0 && <button onClick={() => { setShowDup(true); setGroupFilter(''); }} className="rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-800">{review.duplicados} possíveis duplicados</button>}
+          {review.semModelo > 0 && <span className="rounded-full bg-surface-3 px-2 py-0.5 text-fg-secondary">{review.semModelo} sem modelo</span>}
+          {review.semFabricante > 0 && <span className="rounded-full bg-surface-3 px-2 py-0.5 text-fg-secondary">{review.semFabricante} sem fabricante</span>}
+          {review.naoVerificados > 0 && <button onClick={() => { setShowDup(false); setOrigem('IMPORTACAO'); setVerif('nao_verificados'); }} className="rounded-full bg-surface-3 px-2 py-0.5 font-semibold text-primary">{review.naoVerificados} não verificados</button>}
+        </div>
+      )}
+
       {/* Barra de ação da disciplina selecionada */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-sm font-bold uppercase tracking-wider text-fg-secondary">
-          {AREA_LABEL[area]} — {areaDevices.length} {areaDevices.length === 1 ? 'ativo' : 'ativos'}
+          {AREA_LABEL[area]} — {visible.length} {visible.length === 1 ? 'ativo' : 'ativos'}
         </h2>
-        <div className="flex items-center gap-2">
-          {/* §33 — filtro de ciclo de vida */}
-          <select
-            value={lifecycle}
-            onChange={(e) => setLifecycle(e.target.value as typeof lifecycle)}
-            className="shrink-0 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-fg focus:border-primary focus:outline-none"
-            title="Ciclo de vida"
-          >
+        <div className="flex flex-wrap items-center gap-2">
+          <select value={lifecycle} onChange={(e) => setLifecycle(e.target.value as typeof lifecycle)} className="shrink-0 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-fg focus:border-primary focus:outline-none" title="Ciclo de vida">
             <option value="ativos">Ativos</option>
             <option value="substituidos">Substituídos</option>
             <option value="removidos">Removidos</option>
             <option value="todos">Todos</option>
           </select>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por identificador, grupo, modelo…"
-            className="w-56 max-w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-fg placeholder:text-fg-muted focus:border-primary focus:outline-none"
-          />
-          <button
-            onClick={() => setShowSurvey(true)}
-            className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-navy"
-          >
-            Novo levantamento
+          <select value={origem} onChange={(e) => setOrigem(e.target.value as OriginFilter)} className="shrink-0 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-fg focus:border-primary focus:outline-none" title="Origem">
+            <option value="todos">Origem: todas</option>
+            <option value="MANUAL">Manual</option>
+            <option value="IMPORTACAO">Importação</option>
+            <option value="ATENDIMENTO">Atendimento</option>
+            <option value="LEVANTAMENTO">Levantamento</option>
+          </select>
+          <select value={verif} onChange={(e) => setVerif(e.target.value as VerifFilter)} className="shrink-0 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-fg focus:border-primary focus:outline-none" title="Verificação">
+            <option value="todos">Verificação: todas</option>
+            <option value="verificados">Verificados</option>
+            <option value="nao_verificados">Não verificados</option>
+          </select>
+          <select value={condFilter} onChange={(e) => setCondFilter(e.target.value)} className="shrink-0 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-fg focus:border-primary focus:outline-none" title="Condição">
+            <option value="">Condição: todas</option>
+            {CONDITIONS.map((c) => <option key={c} value={c}>{CONDITION_LABEL[c]}</option>)}
+          </select>
+          {fabricantes.length > 1 && (
+            <select value={fabFilter} onChange={(e) => setFabFilter(e.target.value)} className="shrink-0 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-fg focus:border-primary focus:outline-none" title="Fabricante">
+              <option value="">Fabricante: todos</option>
+              {fabricantes.map((f) => <option key={f} value={f}>{f}</option>)}
+            </select>
+          )}
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar…" className="w-40 max-w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-fg placeholder:text-fg-muted focus:border-primary focus:outline-none" />
+          <button onClick={() => { setShowDup((v) => !v); setGroupFilter(''); }} className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${showDup ? 'border-amber-400 bg-amber-50 text-amber-800' : 'border-border-strong text-fg-secondary hover:border-primary'}`} title="Possíveis duplicados">
+            Duplicados{dupCandidateCount ? ` · ${dupCandidateCount}` : ''}
           </button>
-          <button
-            onClick={() => setShowImport(true)}
-            className="shrink-0 rounded-lg border border-border-strong px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:border-primary hover:bg-navy hover:text-white"
-          >
-            Importar base
-          </button>
-          <button
-            onClick={() => setShowAdd(true)}
-            className="shrink-0 rounded-lg border border-primary px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-navy hover:text-white"
-          >
-            + Ativo manual
-          </button>
+          <button onClick={() => setShowSurvey(true)} className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-navy">Novo levantamento</button>
+          <button onClick={() => setShowImport(true)} className="shrink-0 rounded-lg border border-border-strong px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:border-primary hover:bg-navy hover:text-white">Importar base</button>
+          <button onClick={() => setShowAdd(true)} className="shrink-0 rounded-lg border border-primary px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-navy hover:text-white">+ Ativo manual</button>
         </div>
       </div>
 
+      {/* Filtro ativo (grupo/duplicados) */}
+      {(groupFilter || showDup || anyFilter) && (
+        <div className="flex flex-wrap items-center gap-2 text-[11px]">
+          {showDup && <span className="rounded-full bg-amber-100 px-2.5 py-1 font-semibold text-amber-800">Possíveis duplicados</span>}
+          {groupFilter && <span className="rounded-full bg-navy/10 px-2.5 py-1 font-semibold text-primary">Grupo: {groupFilter}</span>}
+          <button onClick={() => { setGroupFilter(''); setShowDup(false); setOrigem('todos'); setVerif('todos'); setCondFilter(''); setFabFilter(''); setSearch(''); }} className="font-semibold text-fg-muted underline hover:text-fg-secondary">Limpar filtros</button>
+        </div>
+      )}
+
+      {/* Ações em lote (§12) */}
+      {selected.size > 0 && (
+        <BulkBar
+          area={area} count={selected.size} canManage={canManage}
+          onClear={clearSel}
+          onRemove={() => confirmRemove(selectedDevices)}
+          onCondition={(c) => bulkPatch({ condicao: c })}
+          onGroup={(g) => bulkPatch({ grupo: g })}
+          onFabricante={(f) => bulkPatch({ fabricante: f })}
+        />
+      )}
+
       {/* Tabela adaptativa por disciplina */}
-      <AdaptiveAssetTable area={area} devices={areaDevices} onVerify={setVerifDevice} onOpen={setDetailDevice} />
+      <AssetTable
+        area={area} devices={visible} selected={selected} canManage={canManage}
+        onToggleRow={toggleRow} onToggleAll={toggleAll}
+        onVerify={setVerifDevice} onOpen={setDetailDevice} onEdit={setEditDevice}
+        onRemove={(d) => confirmRemove([d])}
+        onHistory={setDetailDevice} onPendencia={setDetailDevice}
+      />
 
       {/* Credenciais protegidas + Backups técnicos */}
       <CredentialsPanel client={client} userRole={userRole} devices={devices} />
@@ -182,6 +304,15 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
           clienteId={client.id}
           onClose={() => setVerifDevice(null)}
           onSaved={() => { setVerifDevice(null); onDevicesChanged(); }}
+        />
+      )}
+      {editDevice && (
+        <EditAssetModal
+          area={area}
+          device={editDevice}
+          catalog={catalog}
+          onClose={() => setEditDevice(null)}
+          onSaved={() => { setEditDevice(null); onDevicesChanged(); }}
         />
       )}
       {showSurvey && (
@@ -222,40 +353,174 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
   );
 };
 
-/* ------------------------- Tabela adaptativa ------------------------- */
-const AdaptiveAssetTable: React.FC<{ area: TechArea; devices: Device[]; onVerify: (d: Device) => void; onOpen: (d: Device) => void }> = ({ area, devices, onVerify, onOpen }) => {
+/* ------------------------- Ícone por grupo (§4, material symbols) ------------------------- */
+function groupIcon(group: string): string {
+  const g = group.toLowerCase();
+  if (g.includes('central')) return 'developer_board';
+  if (g.includes('repetidora') || g.includes('anunciador')) return 'device_hub';
+  if (g.includes('detector')) return 'sensors';
+  if (g.includes('acionador') || g.includes('botoeira')) return 'touch_app';
+  if (g.includes('sirene') || g.includes('sinalizador')) return 'notifications_active';
+  if (g.includes('módulo') || g.includes('modulo')) return 'memory';
+  if (g.includes('fonte') || g.includes('alimenta') || g.includes('bateria')) return 'bolt';
+  if (g.includes('câmera') || g.includes('camera')) return 'videocam';
+  if (g.includes('nvr') || g.includes('dvr') || g.includes('xvr') || g.includes('gravador')) return 'dvr';
+  if (g.includes('switch') || g.includes('rede') || g.includes('poe')) return 'lan';
+  if (g.includes('leitora') || g.includes('controladora') || g.includes('catraca')) return 'badge';
+  if (g.includes('sensor')) return 'radar';
+  if (g.includes('infra') || g.includes('cabea')) return 'cable';
+  return 'category';
+}
+
+/* ------------------------- Resumo visual (§2–§8) ------------------------- */
+const SummaryPanel: React.FC<{
+  area: TechArea; centrals: ReturnType<typeof summarizeCentrals>; peripherals: GroupSummary[];
+  activeGroup: string; onPickGroup: (g: string) => void;
+}> = ({ area, centrals, peripherals, activeGroup, onPickGroup }) => {
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
+  if (centrals.length === 0 && peripherals.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-3">
+      {centrals.length > 0 && (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {centrals.map((c) => (
+            <button key={`${c.group}-${c.fabricante}-${c.modelo}`} onClick={() => onPickGroup(c.group)}
+              className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-colors ${activeGroup === c.group ? 'border-primary bg-navy/5' : 'border-border bg-surface hover:border-border-strong'}`}>
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-navy/10"><span className="material-symbols-outlined text-primary">{groupIcon(c.group)}</span></span>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-fg-muted">{c.group}</p>
+                <p className="truncate text-sm font-bold text-fg">{[c.fabricante !== '—' ? c.fabricante : '', c.modelo !== '—' ? c.modelo : ''].filter(Boolean).join(' ') || 'Sem fabricante/modelo'}</p>
+                <p className="text-[11px] text-fg-secondary">{c.count} un</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+      {peripherals.length > 0 && (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+          {peripherals.map((g) => {
+            const open = openGroup === g.group;
+            const multi = g.brands.length > 1 || (g.brands[0] && g.brands[0].models.length > 1);
+            return (
+              <div key={g.group} className={`rounded-xl border ${activeGroup === g.group ? 'border-primary bg-navy/5' : 'border-border bg-surface'}`}>
+                <button onClick={() => onPickGroup(g.group)} className="flex w-full items-center gap-2 p-2.5 text-left hover:bg-surface-2 rounded-t-xl">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-3"><span className="material-symbols-outlined text-[18px] text-fg-secondary">{groupIcon(g.group)}</span></span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[11px] font-semibold text-fg-secondary">{g.group}</p>
+                    <p className="font-data-mono text-lg font-bold text-fg">{g.count}</p>
+                  </div>
+                </button>
+                {multi && (
+                  <button onClick={() => setOpenGroup(open ? null : g.group)} className="w-full border-t border-border px-2.5 py-1 text-left text-[10px] font-semibold text-primary hover:bg-surface-2">
+                    {open ? 'Ocultar' : 'Detalhar'} ({g.brands.length} fab.)
+                  </button>
+                )}
+                {open && (
+                  <div className="border-t border-border px-2.5 py-1.5 text-[10px] text-fg-secondary">
+                    {g.brands.map((b) => (
+                      <div key={b.brand} className="py-0.5">
+                        <p className="font-semibold text-fg">{b.brand} — {b.count}</p>
+                        {b.models.map((m) => <p key={m.model} className="pl-2 text-fg-muted">{m.model} — {m.count}</p>)}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ------------------------- Ações em lote (§12) ------------------------- */
+const BulkBar: React.FC<{
+  area: TechArea; count: number; canManage: boolean; onClear: () => void;
+  onRemove: () => void; onCondition: (c: AssetConditionValue) => void; onGroup: (g: string) => void; onFabricante: (f: string) => void;
+}> = ({ area, count, canManage, onClear, onRemove, onCondition, onGroup, onFabricante }) => {
+  const [fab, setFab] = useState('');
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/40 bg-navy/5 px-3 py-2 text-xs">
+      <span className="font-bold text-primary">{count} selecionado{count > 1 ? 's' : ''}</span>
+      <select defaultValue="" onChange={(e) => { if (e.target.value) { onCondition(e.target.value as AssetConditionValue); e.target.value = ''; } }} className="rounded-lg border border-border bg-surface px-2 py-1 text-fg">
+        <option value="">Alterar condição…</option>
+        {CONDITIONS.map((c) => <option key={c} value={c}>{CONDITION_LABEL[c]}</option>)}
+      </select>
+      <select defaultValue="" onChange={(e) => { if (e.target.value) { onGroup(e.target.value); e.target.value = ''; } }} className="rounded-lg border border-border bg-surface px-2 py-1 text-fg">
+        <option value="">Alterar grupo…</option>
+        {groupsForArea(area).map((g) => <option key={g} value={g}>{g}</option>)}
+      </select>
+      <div className="flex items-center gap-1">
+        <input value={fab} onChange={(e) => setFab(e.target.value)} placeholder="Fabricante…" className="w-28 rounded-lg border border-border bg-surface px-2 py-1 text-fg" />
+        <button onClick={() => { if (fab.trim()) { onFabricante(fab.trim()); setFab(''); } }} disabled={!fab.trim()} className="rounded-lg border border-border-strong px-2 py-1 font-semibold text-primary disabled:opacity-40">Aplicar</button>
+      </div>
+      {canManage && <button onClick={onRemove} className="rounded-lg border border-danger px-2.5 py-1 font-bold text-danger hover:bg-danger/10">Remover</button>}
+      <button onClick={onClear} className="ml-auto font-semibold text-fg-muted underline hover:text-fg-secondary">Limpar seleção</button>
+    </div>
+  );
+};
+
+/* ------------------------- Tabela adaptativa (seleção + ações) ------------------------- */
+const AssetTable: React.FC<{
+  area: TechArea; devices: Device[]; selected: Set<string>; canManage: boolean;
+  onToggleRow: (id: string) => void; onToggleAll: () => void;
+  onVerify: (d: Device) => void; onOpen: (d: Device) => void; onEdit: (d: Device) => void;
+  onRemove: (d: Device) => void; onHistory: (d: Device) => void; onPendencia: (d: Device) => void;
+}> = ({ area, devices, selected, canManage, onToggleRow, onToggleAll, onVerify, onOpen, onEdit, onRemove, onHistory, onPendencia }) => {
+  const [menu, setMenu] = useState<string | null>(null);
   if (devices.length === 0) {
-    return <EmptyState variant="generico" title={`Sem ativos de ${AREA_LABEL[area]}`} description="Nenhum ativo desta disciplina na base técnica deste cliente. Cadastre manualmente ou registre um levantamento." />;
+    return <EmptyState variant="generico" title={`Sem ativos de ${AREA_LABEL[area]}`} description="Nenhum ativo para os filtros atuais. Ajuste os filtros, cadastre manualmente ou registre um levantamento." />;
   }
+  const allSel = devices.every((d) => selected.has(d.id));
   return (
     <div className="overflow-x-auto rounded-xl border border-border">
-      <table className="w-full min-w-[720px] text-left text-xs">
-        <thead className="bg-surface-2 text-[10px] uppercase tracking-wider text-fg-muted">
+      <table className="w-full min-w-[820px] text-left text-xs">
+        <thead className="sticky top-0 z-10 bg-surface-2 text-[10px] uppercase tracking-wider text-fg-muted">
           <tr>
+            <th className="w-8 px-3 py-2"><input type="checkbox" checked={allSel} onChange={onToggleAll} aria-label="Selecionar todos visíveis" /></th>
             <th className="px-3 py-2">Identificador ({AREA_LABEL[area]})</th>
             <th className="px-3 py-2">Grupo / Tipo</th>
             <th className="px-3 py-2">Fabricante / Modelo</th>
             <th className="px-3 py-2">Local</th>
             <th className="px-3 py-2">Condição</th>
             <th className="px-3 py-2">Origem</th>
-            <th className="px-3 py-2 text-right">Ação</th>
+            <th className="px-3 py-2 text-right">Ações</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
           {devices.map((d) => {
             const ident = assetDisplayIdentifier(area, { central: d.central, laco: d.laco, endereco: d.endereco, technicalAttributes: d.technicalAttributes });
+            const sel = selected.has(d.id);
             return (
-              <tr key={d.id} className="cursor-pointer bg-surface hover:bg-surface-2" onClick={() => onOpen(d)}>
-                <td className="px-3 py-2 font-data-mono font-semibold text-primary">{ident || <span className="italic text-fg-muted">sem identificador</span>}</td>
-                <td className="px-3 py-2 text-fg-secondary">{[legacyGroupLabel(area, d.grupo), d.tipoAtivo || d.tipoDispositivo].filter(Boolean).join(' · ') || '—'}</td>
-                <td className="px-3 py-2 text-fg-secondary">{[d.fabricante, d.modelo].filter(Boolean).join(' ') || '—'}</td>
+              <tr key={d.id} className={`bg-surface hover:bg-surface-2 ${sel ? 'bg-navy/5' : ''}`}>
+                <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={sel} onChange={() => onToggleRow(d.id)} aria-label="Selecionar ativo" /></td>
+                <td className="cursor-pointer px-3 py-2 font-data-mono font-semibold text-primary" onClick={() => onOpen(d)}>{ident || <span className="italic text-fg-muted">sem identificador</span>}</td>
+                <td className="cursor-pointer px-3 py-2 text-fg-secondary" onClick={() => onOpen(d)}>{[legacyGroupLabel(area, d.grupo), d.tipoAtivo || d.tipoDispositivo].filter(Boolean).join(' · ') || '—'}</td>
+                <td className="cursor-pointer px-3 py-2 text-fg-secondary" onClick={() => onOpen(d)}>{[d.fabricante, d.modelo].filter(Boolean).join(' ') || '—'}</td>
                 <td className="px-3 py-2 text-fg-secondary">{d.localizacao || d.pavimento || '—'}</td>
                 <td className="px-3 py-2">{d.condicao ? <Badge color={CONDITION_COLOR[d.condicao]}>{CONDITION_LABEL[d.condicao]}</Badge> : <span className="text-fg-muted">—</span>}</td>
                 <td className="px-3 py-2 text-[10px] uppercase tracking-wide text-fg-muted">{d.source ? SOURCE_LABEL[d.source] : '—'}</td>
-                <td className="px-3 py-2 text-right">
-                  <button onClick={(e) => { e.stopPropagation(); onVerify(d); }} className="rounded-lg border border-border-strong px-2.5 py-1 text-[11px] font-semibold text-primary transition-colors hover:border-primary hover:bg-navy hover:text-white">
-                    Verificar
-                  </button>
+                <td className="px-3 py-2">
+                  <div className="flex items-center justify-end gap-1">
+                    <button onClick={() => onVerify(d)} className="rounded-lg border border-border-strong px-2.5 py-1 text-[11px] font-semibold text-primary transition-colors hover:border-primary hover:bg-navy hover:text-white" title="Verificação técnica">Verificar</button>
+                    <button onClick={() => onEdit(d)} className="rounded-lg border border-border-strong px-2.5 py-1 text-[11px] font-semibold text-fg-secondary transition-colors hover:border-primary hover:text-primary" title="Editar cadastro do ativo">Editar</button>
+                    <div className="relative">
+                      <button onClick={() => setMenu(menu === d.id ? null : d.id)} className="rounded-lg border border-border-strong px-1.5 py-1 text-fg-muted hover:text-fg-secondary" title="Mais">
+                        <span className="material-symbols-outlined text-[16px] leading-none">more_vert</span>
+                      </button>
+                      {menu === d.id && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setMenu(null)} />
+                          <div className="absolute right-0 top-8 z-20 w-40 rounded-lg border border-border bg-surface py-1 text-[11px] shadow-lg">
+                            <button onClick={() => { setMenu(null); onHistory(d); }} className="block w-full px-3 py-2 text-left text-fg-secondary hover:bg-surface-2">Ver histórico</button>
+                            <button onClick={() => { setMenu(null); onPendencia(d); }} className="block w-full px-3 py-2 text-left text-fg-secondary hover:bg-surface-2">Criar pendência</button>
+                            {canManage && <button onClick={() => { setMenu(null); onRemove(d); }} className="block w-full px-3 py-2 text-left text-danger hover:bg-danger/10">Remover</button>}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </td>
               </tr>
             );
@@ -263,6 +528,50 @@ const AdaptiveAssetTable: React.FC<{ area: TechArea; devices: Device[]; onVerify
         </tbody>
       </table>
     </div>
+  );
+};
+
+/* ------------------------- Editar ativo (reutiliza TechnicalAssetFields, §10) ------------------------- */
+const EditAssetModal: React.FC<{ area: TechArea; device: Device; catalog: TechnicalCatalogItem[]; onClose: () => void; onSaved: () => void }> = ({ area, device, catalog, onClose, onSaved }) => {
+  const [grupo, setGrupo] = useState(legacyGroupLabel(area, device.grupo) || '');
+  const [vals, setVals] = useState<AssetFormValues>(() => deviceToAssetValues(device));
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!grupo) { showToast('Selecione o grupo do ativo.'); return; }
+    const invalid = firstInvalidField(area, grupo, vals);
+    if (invalid) { showToast(`Valor inválido em "${invalid.label}".`); return; }
+    if (!isSupabaseConfigured()) { showToast('Supabase não configurado.'); return; }
+    setSaving(true);
+    try {
+      const patch = buildDevicePatch(area, grupo, vals);
+      // Mantém id/cliente/status/origem/histórico (não recria o ativo) — §34.
+      await upsertDevice({ ...device, ...patch } as Device);
+      showToast('Ativo atualizado.');
+      onSaved();
+    } catch (e: any) {
+      showToast(`Falha ao salvar: ${e?.message || e}`);
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <Modal title={`Editar ativo — ${AREA_LABEL[area]}`} onClose={onClose}>
+      <div className="mb-3">
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] font-semibold text-fg-secondary">Grupo</span>
+          <select value={grupo} onChange={(e) => setGrupo(e.target.value)} className={inputCls}>
+            <option value="">Selecione…</option>
+            {[...new Set([...groupsForArea(area), grupo].filter(Boolean))].map((g) => <option key={g} value={g}>{g}</option>)}
+          </select>
+        </label>
+      </div>
+      {grupo && <TechnicalAssetFields area={area} group={grupo} catalog={catalog} value={vals} onChange={setVals} />}
+      <p className="mt-3 text-[11px] text-fg-muted">Editar corrige o cadastro do ativo. O histórico de verificações é preservado.</p>
+      <ModalActions>
+        <button onClick={onClose} className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-fg-secondary hover:bg-surface-2">Cancelar</button>
+        <button onClick={save} disabled={saving || !grupo} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-navy disabled:opacity-50">{saving ? 'Salvando…' : 'Salvar alterações'}</button>
+      </ModalActions>
+    </Modal>
   );
 };
 
