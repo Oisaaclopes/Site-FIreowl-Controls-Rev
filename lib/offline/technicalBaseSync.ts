@@ -7,6 +7,7 @@
 import { Device, DeviceVerification } from '../types';
 import { upsertDevice } from '../devices';
 import { addVerification } from '../deviceVerifications';
+import type { MaterializedLifecycle } from '../assetLifecycle';
 import { enqueueOfflineJob, listOfflineJobs, registerOfflineHandler, canProcessJob, getOutboxOwner } from './outbox';
 
 export interface TechAssetPayload {
@@ -34,4 +35,23 @@ registerOfflineHandler<TechAssetPayload>('TECH_ASSET', async (job) => {
   const { device, verification } = job.payload;
   await upsertDevice(device);                  // upsert por id: replay não duplica
   if (verification) await addVerification(verification); // upsert por id: idem
+});
+
+/* ---------- ETAPA 3D.4 — ciclo de vida do ativo (substituição/reparo) ---------- */
+export interface AssetLifecyclePayload { materialized: MaterializedLifecycle; ownerUserId?: string }
+
+/** Enfileira a atualização da Base pelo Atendimento. Chave = evidence_item (§24). */
+export async function enqueueAssetLifecycle(payload: AssetLifecyclePayload): Promise<string> {
+  return enqueueOfflineJob<AssetLifecyclePayload>({
+    domain: 'ASSET_LIFECYCLE',
+    entityClientUuid: payload.materialized.evidenceItemId, // coalesce + idempotência
+    payload,
+    ownerUserId: payload.ownerUserId,
+  });
+}
+
+// Import dinâmico do aplicador evita ciclo de módulos (apply importa este arquivo).
+registerOfflineHandler<AssetLifecyclePayload>('ASSET_LIFECYCLE', async (job) => {
+  const { applyMaterialized } = await import('../assetLifecycleApply');
+  await applyMaterialized(job.payload.materialized);
 });

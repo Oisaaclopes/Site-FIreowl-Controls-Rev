@@ -53,6 +53,8 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
   const [verifDevice, setVerifDevice] = useState<Device | null>(null);
   const [detailDevice, setDetailDevice] = useState<Device | null>(null);
   const [catalog, setCatalog] = useState<TechnicalCatalogItem[]>([]);
+  // §33 — filtro de ciclo de vida (padrão: só ativos instalados).
+  const [lifecycle, setLifecycle] = useState<'ativos' | 'substituidos' | 'removidos' | 'todos'>('ativos');
 
   // Catálogo técnico (só identificação: área/família/fabricante/modelo — sem preço).
   useEffect(() => {
@@ -62,14 +64,22 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
     return () => { alive = false; };
   }, []);
 
+  // §34 — cards contam apenas ativos ATUALMENTE instalados (não os substituídos/removidos).
   const countsByArea = useMemo(() => {
     const m: Record<string, number> = {};
-    for (const d of devices || []) m[d.sistema] = (m[d.sistema] || 0) + 1;
+    for (const d of devices || []) if (d.status === 'ativo') m[d.sistema] = (m[d.sistema] || 0) + 1;
     return m;
   }, [devices]);
 
+  const matchesLifecycle = (d: Device): boolean => {
+    if (lifecycle === 'todos') return true;
+    if (lifecycle === 'ativos') return d.status === 'ativo';
+    if (lifecycle === 'substituidos') return d.status === 'substituido';
+    return d.status === 'removido';
+  };
+
   const areaDevices = useMemo(() => {
-    const list = (devices || []).filter((d) => d.sistema === area);
+    const list = (devices || []).filter((d) => d.sistema === area && matchesLifecycle(d));
     const q = search.trim().toLowerCase();
     if (!q) return list;
     return list.filter((d) => {
@@ -81,7 +91,8 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
       return [ident, d.central, d.laco, d.endereco, d.grupo, d.tipoAtivo, d.tipoDispositivo, d.fabricante, d.modelo, d.localizacao, d.serial, ...attrValues]
         .some((v) => (v || '').toLowerCase().includes(q));
     });
-  }, [devices, area, search]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [devices, area, search, lifecycle]);
 
   return (
     <div className="mx-auto flex w-full min-w-0 max-w-[1600px] flex-col gap-5">
@@ -109,11 +120,23 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
           {AREA_LABEL[area]} — {areaDevices.length} {areaDevices.length === 1 ? 'ativo' : 'ativos'}
         </h2>
         <div className="flex items-center gap-2">
+          {/* §33 — filtro de ciclo de vida */}
+          <select
+            value={lifecycle}
+            onChange={(e) => setLifecycle(e.target.value as typeof lifecycle)}
+            className="shrink-0 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-fg focus:border-primary focus:outline-none"
+            title="Ciclo de vida"
+          >
+            <option value="ativos">Ativos</option>
+            <option value="substituidos">Substituídos</option>
+            <option value="removidos">Removidos</option>
+            <option value="todos">Todos</option>
+          </select>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por identificador, grupo, modelo…"
-            className="w-64 max-w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-fg placeholder:text-fg-muted focus:border-primary focus:outline-none"
+            className="w-56 max-w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-fg placeholder:text-fg-muted focus:border-primary focus:outline-none"
           />
           <button
             onClick={() => setShowSurvey(true)}
@@ -179,6 +202,8 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
           device={detailDevice}
           client={client}
           userRole={userRole}
+          allDevices={devices || []}
+          onOpenDevice={(d) => setDetailDevice(d)}
           onClose={() => setDetailDevice(null)}
           onChanged={onDevicesChanged}
           onVerify={(d) => { setDetailDevice(null); setVerifDevice(d); }}

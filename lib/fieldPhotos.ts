@@ -91,6 +91,19 @@ export async function insertFieldPhoto(photo: FieldPhoto) {
   if (lookupError) throw lookupError;
   return fromPhoto(existing);
 }
+/**
+ * Revincula as fotos DEPOIS de um Item de Evidência ao novo ativo (§31, 3D.4).
+ * Não copia arquivo: só atualiza field_photos.device_id das fotos "depois" do item.
+ * best-effort; a foto ANTES permanece referenciada ao ativo anterior (§30).
+ */
+export async function relinkAfterPhotosToDevice(evidenceItemId: string, deviceId: string): Promise<void> {
+  const { error } = await (getSupabaseClient() as any).from('field_photos')
+    .update({ device_id: deviceId })
+    .eq('evidence_item_id', evidenceItemId)
+    .in('evidence_moment', ['DEPOIS', 'CENTRAL_DEPOIS']);
+  if (error) throw error;
+}
+
 /** Evidências vinculadas a um ativo da Base Técnica (galeria do ativo, 3D.3). */
 export async function listFieldPhotosByDevice(deviceId: string) {
   const { data, error } = await (getSupabaseClient() as any).from('field_photos').select('*').eq('device_id', deviceId).order('capturado_em', { ascending: false });

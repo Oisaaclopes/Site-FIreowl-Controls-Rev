@@ -30,12 +30,20 @@ interface Props {
   device: Device;
   client: Client;
   userRole: UserRole;
+  allDevices?: Device[];
+  onOpenDevice?: (d: Device) => void;
   onClose: () => void;
   onChanged: () => void;
   onVerify: (d: Device) => void;
 }
 
-export const AssetDetailDrawer: React.FC<Props> = ({ area, device, client, onClose, onChanged, onVerify }) => {
+const STATUS_LABEL: Record<string, string> = { ativo: 'Ativo', inativo: 'Inativo', substituido: 'Substituído', removido: 'Removido' };
+
+export const AssetDetailDrawer: React.FC<Props> = ({ area, device, client, allDevices = [], onOpenDevice, onClose, onChanged, onVerify }) => {
+  // §27/§28 — navegação entre ativo anterior ↔ substituto.
+  const replacement = device.replacedByDeviceId ? allDevices.find((d) => d.id === device.replacedByDeviceId) : undefined;
+  const previous = allDevices.find((d) => d.replacedByDeviceId === device.id);
+  const shortId = (d: Device) => assetDisplayIdentifier(d.sistema as TechArea, { central: d.central, laco: d.laco, endereco: d.endereco, technicalAttributes: d.technicalAttributes }) || d.modelo || 'ativo';
   const [history, setHistory] = useState<DeviceVerification[] | null>(null);
   const [thumbs, setThumbs] = useState<{ id: string; url: string; note?: string; at?: string }[] | null>(null);
   const [showPend, setShowPend] = useState(false);
@@ -88,11 +96,30 @@ export const AssetDetailDrawer: React.FC<Props> = ({ area, device, client, onClo
 
           <Section title="Situação">
             <div className="flex flex-wrap items-center gap-2 text-xs">
+              <Badge color={device.status === 'ativo' ? 'emerald' : device.status === 'substituido' ? 'amber' : device.status === 'removido' ? 'red' : 'slate'}>{STATUS_LABEL[device.status] || device.status}</Badge>
               {device.condicao ? <Badge color={CONDITION_COLOR[device.condicao]}>{CONDITION_LABEL[device.condicao]}</Badge> : <span className="text-fg-muted">Condição não informada</span>}
               {device.source && <span className="rounded bg-surface-2 px-2 py-0.5 text-[10px] uppercase tracking-wide text-fg-muted">Origem: {SOURCE_LABEL[device.source]}</span>}
               {device.lastVerifiedAt && <span className="text-[11px] text-fg-secondary">Últ. verificação: {new Date(device.lastVerifiedAt).toLocaleDateString('pt-BR')}</span>}
               {device.source === 'IMPORTACAO' && !device.lastVerifiedAt && <Badge color="amber">Não verificado em campo</Badge>}
             </div>
+            {/* §27 — vínculos de substituição (navegação) */}
+            {(replacement || previous || device.removedAt) && (
+              <div className="mt-2 space-y-1.5 rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs">
+                {device.removedAt && <p className="text-fg-secondary">{device.status === 'substituido' ? 'Substituído' : 'Removido'} em {new Date(device.removedAt).toLocaleDateString('pt-BR')}</p>}
+                {replacement && onOpenDevice && (
+                  <button onClick={() => onOpenDevice(replacement)} className="flex w-full items-center justify-between gap-2 rounded border border-border px-2 py-1 text-left hover:bg-surface">
+                    <span className="min-w-0 truncate text-fg-secondary">Substituído por: <b className="text-fg">{shortId(replacement)}</b></span>
+                    <span className="shrink-0 font-semibold text-primary">Ver novo →</span>
+                  </button>
+                )}
+                {previous && onOpenDevice && (
+                  <button onClick={() => onOpenDevice(previous)} className="flex w-full items-center justify-between gap-2 rounded border border-border px-2 py-1 text-left hover:bg-surface">
+                    <span className="min-w-0 truncate text-fg-secondary">Substituiu: <b className="text-fg">{shortId(previous)}</b></span>
+                    <span className="shrink-0 font-semibold text-primary">Ver anterior →</span>
+                  </button>
+                )}
+              </div>
+            )}
           </Section>
 
           {/* Galeria (§38) */}
@@ -123,7 +150,11 @@ export const AssetDetailDrawer: React.FC<Props> = ({ area, device, client, onClo
                         <Badge color={CONDITION_COLOR[v.condicao]}>{CONDITION_LABEL[v.condicao]}</Badge>
                         <span className="font-data-mono text-[10px] text-fg-muted">{v.verifiedAt ? new Date(v.verifiedAt).toLocaleString('pt-BR') : ''}</span>
                       </div>
-                      {v.reconciliation && <p className="mt-1 text-[10px] uppercase tracking-wide text-fg-muted">{v.reconciliation}</p>}
+                      <p className="mt-1 flex flex-wrap gap-x-2 text-[10px] uppercase tracking-wide text-fg-muted">
+                        {v.source && <span>{v.source === 'ATENDIMENTO' ? 'Atendimento' : v.source === 'LEVANTAMENTO' ? 'Levantamento' : v.source}</span>}
+                        {v.reconciliation && <span>· {v.reconciliation}</span>}
+                        {v.workOrderId && <span>· OS vinculada</span>}
+                      </p>
                       {v.notes && <p className="mt-0.5 text-fg-secondary">{v.notes}</p>}
                     </div>
                   ))}

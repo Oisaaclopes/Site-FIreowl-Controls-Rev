@@ -1028,6 +1028,12 @@ export interface DeviceVerification {
   notes?: string;
   verifiedBy?: string;
   verifiedAt?: string;
+  // ===== ETAPA 3D.4 — contexto de Atendimento/OS (0098) =====
+  serviceAttendanceId?: string;
+  workOrderId?: string;
+  evidenceItemId?: string;
+  /** Origem do evento no histórico (§29). Deriva ATENDIMENTO/LEVANTAMENTO/etc. */
+  source?: 'LEVANTAMENTO' | 'ATENDIMENTO' | 'MANUAL' | 'IMPORTACAO';
 }
 
 /** Credencial técnica (metadata; segredo em tabela isolada, 0096). */
@@ -1283,6 +1289,15 @@ export interface ServiceAttendanceEvidenceItem {
   equipmentFinalType?: string;
   deviceAddressFinal?: string;
   status?: AttendanceResult | 'PENDENTE';
+  // ===== ETAPA 3D.4 — vínculo canônico ao ativo + ciclo de vida (0098) =====
+  /** Ativo da Base Técnica (devices) que este item representa, quando existir. */
+  deviceId?: string;
+  /** Novo ativo criado quando houve substituição (navegação anterior↔novo). */
+  replacementDeviceId?: string;
+  /** Decisão de atualização da Base confirmada no fechamento (§10). */
+  baseUpdateDecision?: 'MESMO' | 'SUBSTITUIDO' | 'REMOVIDO' | 'NAO_ALTERAR';
+  /** Carimbo de aplicação (idempotência §23): aplicado uma única vez. */
+  baseUpdateAppliedAt?: string;
   createdBy?: string;
   createdAt?: string;
   updatedAt?: string;

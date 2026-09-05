@@ -39,6 +39,10 @@ function rowToItem(r: any): ServiceAttendanceEvidenceItem {
     equipmentFinalModel: r.equipment_final_model ?? undefined,
     equipmentFinalType: r.equipment_final_type ?? undefined,
     deviceAddressFinal: r.device_address_final ?? undefined,
+    deviceId: r.device_id ?? undefined,
+    replacementDeviceId: r.replacement_device_id ?? undefined,
+    baseUpdateDecision: r.base_update_decision ?? undefined,
+    baseUpdateAppliedAt: r.base_update_applied_at ?? undefined,
     status: r.status ?? undefined,
     createdBy: r.created_by ?? undefined,
     createdAt: r.created_at ?? undefined,
@@ -65,6 +69,10 @@ function itemToRow(i: Partial<ServiceAttendanceEvidenceItem>): Record<string, un
   if (i.equipmentFinalModel !== undefined) row.equipment_final_model = i.equipmentFinalModel || null;
   if (i.equipmentFinalType !== undefined) row.equipment_final_type = i.equipmentFinalType || null;
   if (i.deviceAddressFinal !== undefined) row.device_address_final = i.deviceAddressFinal || null;
+  if (i.deviceId !== undefined) row.device_id = i.deviceId || null;
+  if (i.replacementDeviceId !== undefined) row.replacement_device_id = i.replacementDeviceId || null;
+  if (i.baseUpdateDecision !== undefined) row.base_update_decision = i.baseUpdateDecision || null;
+  if (i.baseUpdateAppliedAt !== undefined) row.base_update_applied_at = i.baseUpdateAppliedAt || null;
   if (i.status !== undefined) row.status = i.status || null;
   return row;
 }

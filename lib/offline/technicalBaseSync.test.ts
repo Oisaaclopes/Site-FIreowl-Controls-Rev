@@ -18,11 +18,12 @@ vi.mock('./outbox', () => ({
 vi.mock('../devices', () => ({ upsertDevice: fx.upsertDevice }));
 vi.mock('../deviceVerifications', () => ({ addVerification: fx.addVerification }));
 
-import { enqueueTechAsset } from './technicalBaseSync';
+import { enqueueTechAsset, enqueueAssetLifecycle } from './technicalBaseSync';
 
 // Captura o handler registrado no IMPORT (antes de qualquer reset de mock).
 const techHandlerCall = fx.registerOfflineHandler.mock.calls.find((c) => c[0] === 'TECH_ASSET');
 const techHandler = techHandlerCall?.[1] as (job: any) => Promise<void>;
+const lifecycleRegistered = fx.registerOfflineHandler.mock.calls.some((c) => c[0] === 'ASSET_LIFECYCLE');
 
 const device = (id: string) => ({ id, clienteId: 'c1', sistema: 'SDAI', status: 'ativo', technicalAttributes: {} } as any);
 
@@ -43,6 +44,18 @@ describe('enqueueTechAsset — chave estável para replay idempotente (§16)', (
     await enqueueTechAsset({ device: device('dev-9') });
     const keys = fx.enqueueOfflineJob.mock.calls.map((c) => c[0].entityClientUuid);
     expect(new Set(keys).size).toBe(1);
+  });
+});
+
+describe('enqueueAssetLifecycle — ciclo de vida offline (§24)', () => {
+  it('domínio ASSET_LIFECYCLE com chave = evidence_item (coalesce/idempotência)', async () => {
+    await enqueueAssetLifecycle({ materialized: { evidenceItemId: 'item-7', verifications: [], itemPatch: { id: 'item-7' } } as any });
+    const arg = fx.enqueueOfflineJob.mock.calls[0][0];
+    expect(arg.domain).toBe('ASSET_LIFECYCLE');
+    expect(arg.entityClientUuid).toBe('item-7');
+  });
+  it('handler ASSET_LIFECYCLE está registrado', () => {
+    expect(lifecycleRegistered).toBe(true);
   });
 });
 

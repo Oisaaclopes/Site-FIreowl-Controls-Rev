@@ -37,6 +37,15 @@ import { useConfirm, useToast } from '@/components/ui/Feedback';
 import { ClientLogo } from '@/components/ClientLogo';
 import { SignatureCanvas } from '@/components/reports/SignatureCanvas';
 import { OsDocumentsView, OsDocKind } from '@/components/documentos/OsDocumentsView';
+import { BaseUpdateStep } from '@/components/operacoes/BaseUpdateStep';
+import type { TechArea } from '@/lib/technicalBase';
+
+/** mission.area (ids 'sdai'…) → TechArea canônica da Base Técnica. */
+const MISSION_AREA_TO_TECH: Record<string, TechArea> = { sdai: 'SDAI', cftv: 'CFTV', acesso: 'CONTROLE_ACESSO', alarme: 'ALARME', bms: 'BMS' };
+const missionDefaultArea = (area?: string[]): TechArea | undefined => {
+  for (const a of area || []) { const t = MISSION_AREA_TO_TECH[(a || '').toLowerCase()]; if (t) return t; }
+  return undefined;
+};
 
 /* ===================================================================
  * ETAPA 3B — Fluxo operacional REAL de atendimento de OS.
@@ -408,6 +417,7 @@ export const AttendanceScreen: React.FC<{
   const [saving, setSaving] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [finishing, setFinishing] = useState(false);
   const [signOpen, setSignOpen] = useState(false);         // etapa de assinatura antes de finalizar
+  const [baseUpdateOpen, setBaseUpdateOpen] = useState(false); // 3D.4 — atualização da Base antes da assinatura
   const [finalized, setFinalized] = useState(false);        // pós-finalização (baixar docs)
   const [docKind, setDocKind] = useState<OsDocKind | null>(null);
   const [company, setCompany] = useState<CompanyProfile | null>(null);
@@ -494,8 +504,11 @@ export const AttendanceScreen: React.FC<{
       });
       if (!go) return;
     }
-    setSignOpen(true);
-  }, [blockers, confirm, diagnosis, execution, finishing, result, toast]);
+    // ETAPA 3D.4 — antes da assinatura, confirmar a atualização da Base Técnica
+    // (§10). O passo se auto-encerra quando não há equipamento a decidir (§41).
+    // Sem cliente resolvido, segue direto para a assinatura (fluxo preservado).
+    if (os?.clienteId) setBaseUpdateOpen(true); else setSignOpen(true);
+  }, [blockers, confirm, diagnosis, execution, finishing, result, toast, os]);
 
   // Persiste a assinatura (ou a exceção) e finaliza o atendimento. Ao final,
   // mantém a tela em modo pós-finalização (baixar OS/Relatório).
@@ -659,6 +672,18 @@ export const AttendanceScreen: React.FC<{
           </button>
         </div>
       </div>
+
+      {/* ETAPA 3D.4 — Atualização da Base Técnica antes da assinatura (§10). */}
+      {baseUpdateOpen && os && os.clienteId && (
+        <BaseUpdateStep
+          clienteId={os.clienteId}
+          workOrderId={os.id}
+          serviceAttendanceId={attendance.id}
+          defaultArea={missionDefaultArea(mission?.area)}
+          onCancel={() => setBaseUpdateOpen(false)}
+          onDone={() => { setBaseUpdateOpen(false); setSignOpen(true); }}
+        />
+      )}
 
       {/* Etapa de assinatura (§28–§57): resumo + aceite + assinar/indisponível/recusa */}
       {signOpen && (

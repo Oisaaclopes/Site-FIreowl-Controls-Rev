@@ -20,6 +20,10 @@ function rowToVerification(r: any): DeviceVerification {
     notes: r.notes ?? undefined,
     verifiedBy: r.verified_by ?? undefined,
     verifiedAt: r.verified_at ?? undefined,
+    serviceAttendanceId: r.service_attendance_id ?? undefined,
+    workOrderId: r.work_order_id ?? undefined,
+    evidenceItemId: r.evidence_item_id ?? undefined,
+    source: r.source ?? undefined,
   };
 }
 
@@ -38,6 +42,11 @@ export async function addVerification(v: Omit<DeviceVerification, 'id'> & { id?:
     reconciliation: v.reconciliation ?? null,
     notes: v.notes ?? null,
   };
+  // Contexto de atendimento (0098) — só enviado quando presente (compat. bancos sem a coluna).
+  if (v.serviceAttendanceId !== undefined) row.service_attendance_id = v.serviceAttendanceId ?? null;
+  if (v.workOrderId !== undefined) row.work_order_id = v.workOrderId ?? null;
+  if (v.evidenceItemId !== undefined) row.evidence_item_id = v.evidenceItemId ?? null;
+  if (v.source !== undefined) row.source = v.source ?? null;
   if (v.id) row.id = v.id;
   const { data, error } = v.id
     ? await supabase.from(TABLE).upsert(row, { onConflict: 'id' }).select().single()

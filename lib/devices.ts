@@ -91,8 +91,21 @@ export async function upsertDevice(d: Device): Promise<Device> {
   return rowToDevice(data);
 }
 
-export async function deleteDevice(id: string): Promise<void> {
+/**
+ * ETAPA 3D.4 (§47) — não permite hard-delete de ativo com HISTÓRICO técnico
+ * (verificações/substituição). O ciclo de vida usa status (substituido/removido)
+ * preservando o passado; exclusão física só é permitida para ativos sem histórico
+ * ou com `force` explícito (política de gestão).
+ */
+export async function deleteDevice(id: string, opts?: { force?: boolean }): Promise<void> {
   const supabase = getSupabaseClient() as any;
+  if (!opts?.force) {
+    const { count } = await supabase.from('device_verifications').select('id', { count: 'exact', head: true }).eq('device_id', id);
+    const { count: replaced } = await supabase.from(TABLE).select('id', { count: 'exact', head: true }).eq('replaced_by_device_id', id);
+    if ((count || 0) > 0 || (replaced || 0) > 0) {
+      throw new Error('Este ativo possui histórico técnico e não pode ser excluído. Use "Removido sem substituição" para preservar o histórico.');
+    }
+  }
   const { error } = await supabase.from(TABLE).delete().eq('id', id);
   if (error) throw error;
 }
