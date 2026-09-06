@@ -37,6 +37,8 @@ import {
 } from '@/lib/fieldPhotosGallery';
 import { signedFieldPhotoUrls } from '@/lib/fieldPhotoStorage';
 import { nomeFantasiaCliente, razaoSocialCliente } from '@/lib/utils';
+import { usePagination } from '@/lib/usePagination';
+import { PaginatedListControls } from '@/components/ui/PaginatedListControls';
 import { ClientTechnicalBase } from '@/components/clients/ClientTechnicalBase';
 
 /* ==========================================================================
@@ -185,6 +187,13 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
     () => pedidos.filter((p) => p.clienteId === client.id || norm(p.clienteNome) === norm(client.name)),
     [pedidos, client.id, client.name]
   );
+  // Pedidos do cliente ordenados por emissão desc + paginação reutilizável
+  // (mesmo helper/UI de Clientes/Pedidos); só mostra controles se passar de 1 pág.
+  const clientPedidosSorted = useMemo(
+    () => [...clientPedidos].sort((a, b) => toTime(b.dataEmissao) - toTime(a.dataEmissao)),
+    [clientPedidos]
+  );
+  const pedidosPagination = usePagination(clientPedidosSorted, { resetKey: client.id });
   const clientOS = useMemo(
     () => ordensServico.filter((o) => o.clienteId === client.id),
     [ordensServico, client.id]
@@ -528,7 +537,7 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
               <EmptyState variant="generico" title="Nenhum pedido" description="Este cliente ainda não possui pedidos comerciais registrados." />
             ) : (
               <div className="flex flex-col gap-2">
-                {[...clientPedidos].sort((a, b) => toTime(b.dataEmissao) - toTime(a.dataEmissao)).map((p) => {
+                {pedidosPagination.pageItems.map((p) => {
                   const osVinculadas = clientOS.filter((o) => o.sourcePedidoId === p.id);
                   const ui = PEDIDO_STATUS_UI[p.status] || { label: p.status, color: 'slate' as const };
                   return (
@@ -559,6 +568,19 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
                     </div>
                   );
                 })}
+                {clientPedidosSorted.length > pedidosPagination.pageSize && (
+                  <PaginatedListControls
+                    page={pedidosPagination.page}
+                    totalPages={pedidosPagination.totalPages}
+                    pageSize={pedidosPagination.pageSize}
+                    from={pedidosPagination.from}
+                    to={pedidosPagination.to}
+                    total={pedidosPagination.total}
+                    onPageChange={pedidosPagination.setPage}
+                    onPageSizeChange={pedidosPagination.setPageSize}
+                    itemLabel="pedidos"
+                  />
+                )}
               </div>
             )}
           </SectionWrap>

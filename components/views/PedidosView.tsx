@@ -2,6 +2,8 @@
 import { showToast, requestConfirm, requestText } from '@/components/ui/Feedback';
 
 import React, { useMemo, useRef, useState, useEffect } from 'react';
+import { usePagination } from '@/lib/usePagination';
+import { PaginatedListControls } from '@/components/ui/PaginatedListControls';
 import { SupplyOrder, Client, Pedido, Contract, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem, DocumentosPadrao, DocumentType, FinancialTransaction, RecebimentoProposta, EmpresaAtendida, MarcaTecnologia, OrdemServico, TimePunch } from '@/lib/types';
 import { StartAttendanceButton, AttendanceHistoryList, OsMissionPanel } from '@/components/operacoes/ServiceAttendanceFlow';
 import { OsDocumentsView, OsDocKind } from '@/components/documentos/OsDocumentsView';
@@ -616,12 +618,22 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pedidos, filterClient, filterFrom, filterTo, searchTerm]);
 
-  // Propostas filtradas (todas as regras)
+  // Propostas filtradas (todas as regras) — pipeline: dados→busca/filtros→
+  // ordenação (data desc)→PAGINAÇÃO→render. A ordenação estável garante que a
+  // fatia de página e o agrupamento por data sejam coerentes.
   const filteredPedidos = useMemo(
-    () => pedidos.filter((p) => passesBase(p) && (filterStatus === 'TODOS' || p.status === filterStatus)),
+    () => pedidos
+      .filter((p) => passesBase(p) && (filterStatus === 'TODOS' || p.status === filterStatus))
+      .sort((a, b) => (pedDate(b)?.getTime() ?? 0) - (pedDate(a)?.getTime() ?? 0)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [pedidos, filterClient, filterFrom, filterTo, searchTerm, filterStatus]
   );
+  // Paginação canônica (mesmo helper/UI de Clientes). Volta à página 1 ao mudar
+  // busca/filtros/status/modo. A paginação é sempre o último passo.
+  const pedidosPagination = usePagination(filteredPedidos, {
+    resetKey: `${filterClient}|${filterFrom}|${filterTo}|${searchTerm}|${filterStatus}|${displayMode}`,
+  });
+  const pagedPedidos = pedidosPagination.pageItems;
 
   const volumeFiltrado = useMemo(
     () => filteredPedidos.reduce((acc, p) => acc + (p.proposal.valorTotal || 0), 0),
@@ -654,7 +666,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   // Agrupamento por data (timeline)
   const groupedByDate = useMemo(() => {
     const groups = new Map<string, { label: string; items: Pedido[] }>();
-    filteredPedidos.forEach((p) => {
+    pagedPedidos.forEach((p) => {
       const d = pedDate(p);
       const key = d ? dateKeyOf(d) : 'sem-data';
       const label = d
@@ -664,7 +676,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
       groups.get(key)!.items.push(p);
     });
     return Array.from(groups.entries()).sort((a, b) => b[0].localeCompare(a[0]));
-  }, [filteredPedidos]);
+  }, [pagedPedidos]);
 
   const clientNameById = useMemo(() => {
     const m: Record<string, string> = {};
@@ -1240,7 +1252,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
             </div>
           ) : displayMode === 'lista' ? (
             <div className="flex flex-col gap-3">
-              {filteredPedidos.map((ped) => (
+              {pagedPedidos.map((ped) => (
                 <ProposalRow key={ped.id} ped={ped} />
               ))}
             </div>
@@ -1262,6 +1274,19 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                 </div>
               ))}
             </div>
+          )}
+          {filteredPedidos.length > 0 && (
+            <PaginatedListControls
+              page={pedidosPagination.page}
+              totalPages={pedidosPagination.totalPages}
+              pageSize={pedidosPagination.pageSize}
+              from={pedidosPagination.from}
+              to={pedidosPagination.to}
+              total={pedidosPagination.total}
+              onPageChange={pedidosPagination.setPage}
+              onPageSizeChange={pedidosPagination.setPageSize}
+              itemLabel="pedidos"
+            />
           )}
         </>
       )}
