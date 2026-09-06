@@ -1,5 +1,5 @@
 import type { Device } from './types';
-import { TechArea, legacyGroupLabel, assetIdentityKey } from './technicalBase';
+import { TechArea, legacyGroupLabel, assetIdentityKey, assetDisplayIdentifier, CONDITION_LABEL, SOURCE_LABEL, AssetCondition, AssetSource } from './technicalBase';
 
 /* ===================================================================
  * RESUMO DA BASE TÉCNICA — helpers PUROS e testáveis (§31).
@@ -26,6 +26,40 @@ export const CENTRAL_GROUPS: Record<TechArea, string[]> = {
 export function displayGroup(area: TechArea, d: Device): string {
   const g = legacyGroupLabel(area, d.grupo);
   return (g || d.tipoAtivo || d.tipoDispositivo || 'Outros').trim() || 'Outros';
+}
+
+export interface AssetCardView {
+  identifier: string;
+  group: string;
+  brandModel: string;
+  local: string;
+  condition: AssetCondition | null;
+  conditionLabel: string;    // "" quando não informada (§13/§20 — não vira NORMAL)
+  origin: AssetSource | null;
+  originLabel: string;
+  verified: boolean;
+  verifiedLabel: string;     // "Verificado" | "Não verificado"
+}
+
+/**
+ * Apresentação PRIORITÁRIA de um ativo para o card mobile (§3/§4). Mesma fonte
+ * do desktop; nunca interpreta condição ausente como NORMAL.
+ */
+export function assetCardView(area: TechArea, d: Device): AssetCardView {
+  const cond = (d.condicao || null) as AssetCondition | null;
+  const src = (d.source || null) as AssetSource | null;
+  return {
+    identifier: assetDisplayIdentifier(area, { central: d.central, laco: d.laco, endereco: d.endereco, technicalAttributes: d.technicalAttributes }),
+    group: displayGroup(area, d),
+    brandModel: [d.fabricante, d.modelo].filter(Boolean).join(' · '),
+    local: d.localizacao || d.pavimento || '',
+    condition: cond,
+    conditionLabel: cond ? CONDITION_LABEL[cond] : '',
+    origin: src,
+    originLabel: src ? SOURCE_LABEL[src] : '',
+    verified: !!d.lastVerifiedAt,
+    verifiedLabel: d.lastVerifiedAt ? 'Verificado' : 'Não verificado',
+  };
 }
 
 const brandModel = (d: Device) => ({ brand: (d.fabricante || '').trim() || '—', model: (d.modelo || '').trim() || '—' });

@@ -9,7 +9,7 @@ import { upsertDevice } from '@/lib/devices';
 import { addVerification, fetchVerificationsForDevice } from '@/lib/deviceVerifications';
 import {
   summarizeCentrals, summarizeGroups, duplicateGroups, centralAddressAnomalies,
-  importReview, sortDevicesForArea, filterDevices, fabricantesInArea,
+  importReview, sortDevicesForArea, filterDevices, fabricantesInArea, assetCardView,
   OriginFilter, VerifFilter, GroupSummary,
 } from '@/lib/technicalBaseSummary';
 import { fetchCredentials, createCredential, revealCredentialSecret, deleteCredential } from '@/lib/clientCredentials';
@@ -70,6 +70,7 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
   const [fabFilter, setFabFilter] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showDup, setShowDup] = useState(false);
+  const [showFiltersMobile, setShowFiltersMobile] = useState(false);
   const canManage = isGestao(userRole);
 
   // Ao trocar de área/aba, zera seleção e filtros específicos (evita ids órfãos).
@@ -216,39 +217,45 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
         <h2 className="text-sm font-bold uppercase tracking-wider text-fg-secondary">
           {AREA_LABEL[area]} — {visible.length} {visible.length === 1 ? 'ativo' : 'ativos'}
         </h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <select value={lifecycle} onChange={(e) => setLifecycle(e.target.value as typeof lifecycle)} className="shrink-0 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-fg focus:border-primary focus:outline-none" title="Ciclo de vida">
-            <option value="ativos">Ativos</option>
-            <option value="substituidos">Substituídos</option>
-            <option value="removidos">Removidos</option>
-            <option value="todos">Todos</option>
-          </select>
-          <select value={origem} onChange={(e) => setOrigem(e.target.value as OriginFilter)} className="shrink-0 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-fg focus:border-primary focus:outline-none" title="Origem">
-            <option value="todos">Origem: todas</option>
-            <option value="MANUAL">Manual</option>
-            <option value="IMPORTACAO">Importação</option>
-            <option value="ATENDIMENTO">Atendimento</option>
-            <option value="LEVANTAMENTO">Levantamento</option>
-          </select>
-          <select value={verif} onChange={(e) => setVerif(e.target.value as VerifFilter)} className="shrink-0 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-fg focus:border-primary focus:outline-none" title="Verificação">
-            <option value="todos">Verificação: todas</option>
-            <option value="verificados">Verificados</option>
-            <option value="nao_verificados">Não verificados</option>
-          </select>
-          <select value={condFilter} onChange={(e) => setCondFilter(e.target.value)} className="shrink-0 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-fg focus:border-primary focus:outline-none" title="Condição">
-            <option value="">Condição: todas</option>
-            {CONDITIONS.map((c) => <option key={c} value={c}>{CONDITION_LABEL[c]}</option>)}
-          </select>
-          {fabricantes.length > 1 && (
-            <select value={fabFilter} onChange={(e) => setFabFilter(e.target.value)} className="shrink-0 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-fg focus:border-primary focus:outline-none" title="Fabricante">
-              <option value="">Fabricante: todos</option>
-              {fabricantes.map((f) => <option key={f} value={f}>{f}</option>)}
-            </select>
-          )}
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar…" className="w-40 max-w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-fg placeholder:text-fg-muted focus:border-primary focus:outline-none" />
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          {/* Busca sempre visível */}
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar…" className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-fg placeholder:text-fg-muted focus:border-primary focus:outline-none sm:w-40 sm:flex-none" />
+          {/* Botão Filtros — só mobile */}
+          <button onClick={() => setShowFiltersMobile((v) => !v)} className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold sm:hidden ${anyFilter ? 'border-primary text-primary' : 'border-border-strong text-fg-secondary'}`}>Filtros{anyFilter ? ' •' : ''}</button>
           <button onClick={() => { setShowDup((v) => !v); setGroupFilter(''); }} className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${showDup ? 'border-amber-400 bg-amber-50 text-amber-800' : 'border-border-strong text-fg-secondary hover:border-primary'}`} title="Possíveis duplicados">
             Duplicados{dupCandidateCount ? ` · ${dupCandidateCount}` : ''}
           </button>
+          {/* Grupo de filtros — inline no desktop, drawer no mobile (§8) */}
+          <div className={`${showFiltersMobile ? 'flex' : 'hidden'} w-full flex-col gap-2 rounded-lg border border-border bg-surface-2 p-2 sm:flex sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:border-0 sm:bg-transparent sm:p-0`}>
+            <select value={lifecycle} onChange={(e) => setLifecycle(e.target.value as typeof lifecycle)} className="shrink-0 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-fg focus:border-primary focus:outline-none" title="Ciclo de vida">
+              <option value="ativos">Ativos</option>
+              <option value="substituidos">Substituídos</option>
+              <option value="removidos">Removidos</option>
+              <option value="todos">Todos</option>
+            </select>
+            <select value={origem} onChange={(e) => setOrigem(e.target.value as OriginFilter)} className="shrink-0 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-fg focus:border-primary focus:outline-none" title="Origem">
+              <option value="todos">Origem: todas</option>
+              <option value="MANUAL">Manual</option>
+              <option value="IMPORTACAO">Importação</option>
+              <option value="ATENDIMENTO">Atendimento</option>
+              <option value="LEVANTAMENTO">Levantamento</option>
+            </select>
+            <select value={verif} onChange={(e) => setVerif(e.target.value as VerifFilter)} className="shrink-0 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-fg focus:border-primary focus:outline-none" title="Verificação">
+              <option value="todos">Verificação: todas</option>
+              <option value="verificados">Verificados</option>
+              <option value="nao_verificados">Não verificados</option>
+            </select>
+            <select value={condFilter} onChange={(e) => setCondFilter(e.target.value)} className="shrink-0 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-fg focus:border-primary focus:outline-none" title="Condição">
+              <option value="">Condição: todas</option>
+              {CONDITIONS.map((c) => <option key={c} value={c}>{CONDITION_LABEL[c]}</option>)}
+            </select>
+            {fabricantes.length > 1 && (
+              <select value={fabFilter} onChange={(e) => setFabFilter(e.target.value)} className="shrink-0 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs text-fg focus:border-primary focus:outline-none" title="Fabricante">
+                <option value="">Fabricante: todos</option>
+                {fabricantes.map((f) => <option key={f} value={f}>{f}</option>)}
+              </select>
+            )}
+          </div>
           <button onClick={() => setShowSurvey(true)} className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-navy">Novo levantamento</button>
           <button onClick={() => setShowImport(true)} className="shrink-0 rounded-lg border border-border-strong px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:border-primary hover:bg-navy hover:text-white">Importar base</button>
           <button onClick={() => setShowAdd(true)} className="shrink-0 rounded-lg border border-primary px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-navy hover:text-white">+ Ativo manual</button>
@@ -474,8 +481,60 @@ const AssetTable: React.FC<{
     return <EmptyState variant="generico" title={`Sem ativos de ${AREA_LABEL[area]}`} description="Nenhum ativo para os filtros atuais. Ajuste os filtros, cadastre manualmente ou registre um levantamento." />;
   }
   const allSel = devices.every((d) => selected.has(d.id));
+
+  const RowMenu = ({ d }: { d: Device }) => (
+    <div className="relative">
+      <button onClick={() => setMenu(menu === d.id ? null : d.id)} className="rounded-lg border border-border-strong px-1.5 py-1 text-fg-muted hover:text-fg-secondary" title="Mais"><span className="material-symbols-outlined text-[16px] leading-none">more_vert</span></button>
+      {menu === d.id && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setMenu(null)} />
+          <div className="absolute right-0 top-8 z-20 w-40 rounded-lg border border-border bg-surface py-1 text-[11px] shadow-lg">
+            <button onClick={() => { setMenu(null); onEdit(d); }} className="block w-full px-3 py-2 text-left text-fg-secondary hover:bg-surface-2 sm:hidden">Editar</button>
+            <button onClick={() => { setMenu(null); onHistory(d); }} className="block w-full px-3 py-2 text-left text-fg-secondary hover:bg-surface-2">Ver histórico</button>
+            <button onClick={() => { setMenu(null); onPendencia(d); }} className="block w-full px-3 py-2 text-left text-fg-secondary hover:bg-surface-2">Criar pendência</button>
+            {canManage && <button onClick={() => { setMenu(null); onRemove(d); }} className="block w-full px-3 py-2 text-left text-danger hover:bg-danger/10">Remover</button>}
+          </div>
+        </>
+      )}
+    </div>
+  );
+
   return (
-    <div className="overflow-x-auto rounded-xl border border-border">
+    <>
+    {/* Mobile — lista/cards verticais (§1/§3). Mesma coleção do desktop. */}
+    <div className="flex flex-col gap-2 sm:hidden">
+      <label className="flex items-center gap-2 px-1 text-[11px] font-semibold text-fg-secondary">
+        <input type="checkbox" checked={allSel} onChange={onToggleAll} aria-label="Selecionar todos visíveis" /> Selecionar todos ({devices.length})
+      </label>
+      {devices.map((d) => {
+        const v = assetCardView(area, d);
+        const sel = selected.has(d.id);
+        return (
+          <div key={d.id} className={`rounded-xl border p-3 ${sel ? 'border-primary bg-navy/5' : 'border-border bg-surface'}`}>
+            <div className="flex items-start gap-2">
+              <input type="checkbox" checked={sel} onChange={() => onToggleRow(d.id)} className="mt-1" aria-label="Selecionar ativo" />
+              <button onClick={() => onOpen(d)} className="min-w-0 flex-1 text-left">
+                <p className="font-data-mono text-sm font-bold text-primary">{v.identifier || <span className="italic text-fg-muted">sem identificador</span>}</p>
+                <p className="text-xs font-semibold text-fg">{v.group}</p>
+                {v.brandModel && <p className="text-[11px] text-fg-secondary">{v.brandModel}</p>}
+                {v.local && <p className="text-[11px] text-fg-muted">{v.local}</p>}
+              </button>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {v.condition ? <Badge color={CONDITION_COLOR[v.condition]}>{v.conditionLabel}</Badge> : <span className="rounded bg-surface-3 px-1.5 py-0.5 text-[10px] text-fg-muted">{v.verifiedLabel}</span>}
+              {v.originLabel && <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-fg-muted">{v.originLabel}</span>}
+            </div>
+            <div className="mt-2 flex items-center gap-2">
+              <button onClick={() => onVerify(d)} className="flex-1 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-navy">Verificar</button>
+              <RowMenu d={d} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+
+    {/* Desktop — tabela (§1) */}
+    <div className="hidden overflow-x-auto rounded-xl border border-border sm:block">
       <table className="w-full min-w-[820px] text-left text-xs">
         <thead className="sticky top-0 z-10 bg-surface-2 text-[10px] uppercase tracking-wider text-fg-muted">
           <tr>
@@ -506,21 +565,7 @@ const AssetTable: React.FC<{
                   <div className="flex items-center justify-end gap-1">
                     <button onClick={() => onVerify(d)} className="rounded-lg border border-border-strong px-2.5 py-1 text-[11px] font-semibold text-primary transition-colors hover:border-primary hover:bg-navy hover:text-white" title="Verificação técnica">Verificar</button>
                     <button onClick={() => onEdit(d)} className="rounded-lg border border-border-strong px-2.5 py-1 text-[11px] font-semibold text-fg-secondary transition-colors hover:border-primary hover:text-primary" title="Editar cadastro do ativo">Editar</button>
-                    <div className="relative">
-                      <button onClick={() => setMenu(menu === d.id ? null : d.id)} className="rounded-lg border border-border-strong px-1.5 py-1 text-fg-muted hover:text-fg-secondary" title="Mais">
-                        <span className="material-symbols-outlined text-[16px] leading-none">more_vert</span>
-                      </button>
-                      {menu === d.id && (
-                        <>
-                          <div className="fixed inset-0 z-10" onClick={() => setMenu(null)} />
-                          <div className="absolute right-0 top-8 z-20 w-40 rounded-lg border border-border bg-surface py-1 text-[11px] shadow-lg">
-                            <button onClick={() => { setMenu(null); onHistory(d); }} className="block w-full px-3 py-2 text-left text-fg-secondary hover:bg-surface-2">Ver histórico</button>
-                            <button onClick={() => { setMenu(null); onPendencia(d); }} className="block w-full px-3 py-2 text-left text-fg-secondary hover:bg-surface-2">Criar pendência</button>
-                            {canManage && <button onClick={() => { setMenu(null); onRemove(d); }} className="block w-full px-3 py-2 text-left text-danger hover:bg-danger/10">Remover</button>}
-                          </div>
-                        </>
-                      )}
-                    </div>
+                    <RowMenu d={d} />
                   </div>
                 </td>
               </tr>
@@ -529,6 +574,7 @@ const AssetTable: React.FC<{
         </tbody>
       </table>
     </div>
+    </>
   );
 };
 

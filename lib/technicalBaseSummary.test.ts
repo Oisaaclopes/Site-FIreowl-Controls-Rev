@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   activeDevices, summarizeGroups, summarizeCentrals, sortDevicesForArea,
-  duplicateGroups, centralAddressAnomalies, filterDevices, importReview, displayGroup,
+  duplicateGroups, centralAddressAnomalies, filterDevices, importReview, displayGroup, assetCardView,
 } from './technicalBaseSummary';
 import type { Device } from './types';
 
@@ -101,6 +101,25 @@ describe('revisão pós-importação (J/§18/§20)', () => {
     expect(r.semModelo).toBe(1);        // i2
     expect(r.semCondicao).toBe(3);      // nenhum verificado/condição
     expect(r.naoVerificados).toBe(3);
+  });
+});
+
+describe('card mobile — campos prioritários (Etapa B)', () => {
+  it('expõe identificador/grupo/fabricante-modelo/local/condição/origem/verificação', () => {
+    const v = assetCardView('SDAI', dev({ grupo: 'Sirene / Sinalizador', fabricante: 'Tecnohold', modelo: 'SAVE485TH', central: '1', laco: '1', endereco: '9', localizacao: 'Hall Escada P1', source: 'IMPORTACAO' }));
+    expect(v.identifier).toContain('End. 9');
+    expect(v.identifier).toContain('Laço 1');
+    expect(v.group).toBe('Sirene / Sinalizador');
+    expect(v.brandModel).toBe('Tecnohold · SAVE485TH');
+    expect(v.local).toBe('Hall Escada P1');
+    expect(v.originLabel).toBe('Importação');
+  });
+  it('importado sem condição NÃO vira NORMAL (§13/§20)', () => {
+    const v = assetCardView('SDAI', dev({ source: 'IMPORTACAO', condicao: undefined, lastVerifiedAt: undefined }));
+    expect(v.condition).toBeNull();
+    expect(v.conditionLabel).toBe('');
+    expect(v.verified).toBe(false);
+    expect(v.verifiedLabel).toBe('Não verificado');
   });
 });
 
