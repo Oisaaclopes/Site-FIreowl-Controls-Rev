@@ -99,6 +99,19 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
   // Ativos da área (fonte dos resumos/duplicados — §26/§29).
   const areaAll = useMemo(() => (devices || []).filter((d) => d.sistema === area), [devices, area]);
   const centrals = useMemo(() => summarizeCentrals(area, areaAll), [area, areaAll]);
+  // §4.2 — Nº de centrais ATIVAS distintas (por central_number). Com uma só
+  // central, o prefixo "Central N" é redundante em cada linha e é omitido na
+  // APRESENTAÇÃO (o dado/identidade não muda). Só se aplica ao SDAI.
+  const hideSingleCentral = useMemo(() => {
+    if (area !== 'SDAI') return false;
+    const nums = new Set<string>();
+    for (const d of areaAll) {
+      if (d.status !== 'ativo' || d.removedAt) continue;
+      const c = (d.central || '').trim();
+      if (c) nums.add(c);
+    }
+    return nums.size <= 1;
+  }, [area, areaAll]);
   const groupSummary = useMemo(() => summarizeGroups(area, areaAll), [area, areaAll]);
   const centralGroupNames = useMemo(() => new Set(centrals.map((c) => c.group)), [centrals]);
   const peripheralSummary = useMemo(() => groupSummary.filter((g) => !centralGroupNames.has(g.group)), [groupSummary, centralGroupNames]);
@@ -333,6 +346,7 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
       ) : (
         <AssetTable
           area={area} devices={visible} selected={selected} canManage={canManage}
+          hideSingleCentral={hideSingleCentral}
           onToggleRow={toggleRow} onToggleAll={toggleAll}
           onVerify={setVerifDevice} onOpen={setDetailDevice} onEdit={setEditDevice}
           onRemove={(d) => confirmRemove([d])}
@@ -412,13 +426,16 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
 /* ------------------------- Ícone por grupo (§4, material symbols) ------------------------- */
 function groupIcon(group: string): string {
   const g = group.toLowerCase();
-  if (g.includes('central')) return 'developer_board';
+  if (g.includes('central')) return 'dvr';
   if (g.includes('repetidora') || g.includes('anunciador')) return 'device_hub';
+  // Detectores: temperatura tem ícone próprio; demais usam o sensor genérico.
+  if (g.includes('temperatura') || g.includes('térmic') || g.includes('termic')) return 'device_thermostat';
   if (g.includes('detector')) return 'sensors';
   if (g.includes('acionador') || g.includes('botoeira')) return 'touch_app';
-  if (g.includes('sirene') || g.includes('sinalizador')) return 'notifications_active';
+  if (g.includes('sirene') || g.includes('sinalizador')) return 'campaign';
   if (g.includes('módulo') || g.includes('modulo')) return 'memory';
-  if (g.includes('fonte') || g.includes('alimenta') || g.includes('bateria')) return 'bolt';
+  if (g.includes('bateria')) return 'battery_charging_full';
+  if (g.includes('fonte') || g.includes('alimenta')) return 'power';
   if (g.includes('câmera') || g.includes('camera')) return 'videocam';
   if (g.includes('nvr') || g.includes('dvr') || g.includes('xvr') || g.includes('gravador')) return 'dvr';
   if (g.includes('switch') || g.includes('rede') || g.includes('poe')) return 'lan';
@@ -520,10 +537,11 @@ const BulkBar: React.FC<{
 /* ------------------------- Tabela adaptativa (seleção + ações) ------------------------- */
 const AssetTable: React.FC<{
   area: TechArea; devices: Device[]; selected: Set<string>; canManage: boolean;
+  hideSingleCentral?: boolean;
   onToggleRow: (id: string) => void; onToggleAll: () => void;
   onVerify: (d: Device) => void; onOpen: (d: Device) => void; onEdit: (d: Device) => void;
   onRemove: (d: Device) => void; onHistory: (d: Device) => void; onPendencia: (d: Device) => void;
-}> = ({ area, devices, selected, canManage, onToggleRow, onToggleAll, onVerify, onOpen, onEdit, onRemove, onHistory, onPendencia }) => {
+}> = ({ area, devices, selected, canManage, hideSingleCentral, onToggleRow, onToggleAll, onVerify, onOpen, onEdit, onRemove, onHistory, onPendencia }) => {
   const [menu, setMenu] = useState<string | null>(null);
   if (devices.length === 0) {
     return <EmptyState variant="generico" title={`Sem ativos de ${AREA_LABEL[area]}`} description="Nenhum ativo para os filtros atuais. Ajuste os filtros, cadastre manualmente ou registre um levantamento." />;
@@ -556,13 +574,14 @@ const AssetTable: React.FC<{
       </label>
       {devices.map((d) => {
         const v = assetCardView(area, d);
+        const ident = assetDisplayIdentifier(area, { central: d.central, laco: d.laco, endereco: d.endereco, technicalAttributes: d.technicalAttributes }, { hideSingleCentral });
         const sel = selected.has(d.id);
         return (
           <div key={d.id} className={`rounded-xl border p-3 ${sel ? 'border-primary bg-navy/5' : 'border-border bg-surface'}`}>
             <div className="flex items-start gap-2">
               <input type="checkbox" checked={sel} onChange={() => onToggleRow(d.id)} className="mt-1" aria-label="Selecionar ativo" />
               <button onClick={() => onOpen(d)} className="min-w-0 flex-1 text-left">
-                <p className="font-data-mono text-sm font-bold text-primary">{v.identifier || <span className="italic text-fg-muted">sem identificador</span>}</p>
+                <p className="font-data-mono text-sm font-bold text-primary">{ident || <span className="italic text-fg-muted">sem identificador</span>}</p>
                 <p className="text-xs font-semibold text-fg">{v.group}</p>
                 {v.brandModel && <p className="text-[11px] text-fg-secondary">{v.brandModel}</p>}
                 {v.local && <p className="text-[11px] text-fg-muted">{v.local}</p>}
@@ -598,7 +617,7 @@ const AssetTable: React.FC<{
         </thead>
         <tbody className="divide-y divide-border">
           {devices.map((d) => {
-            const ident = assetDisplayIdentifier(area, { central: d.central, laco: d.laco, endereco: d.endereco, technicalAttributes: d.technicalAttributes });
+            const ident = assetDisplayIdentifier(area, { central: d.central, laco: d.laco, endereco: d.endereco, technicalAttributes: d.technicalAttributes }, { hideSingleCentral });
             const sel = selected.has(d.id);
             return (
               <tr key={d.id} className={`bg-surface hover:bg-surface-2 ${sel ? 'bg-navy/5' : ''}`}>

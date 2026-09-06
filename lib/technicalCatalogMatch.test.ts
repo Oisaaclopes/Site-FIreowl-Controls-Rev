@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  manufacturersFromCatalog, modelsForManufacturer, areaMatches, groupMatchesSubcategory, subcategoriesForArea, TechnicalCatalogItem,
+  manufacturersFromCatalog, manufacturersForArea, modelsForManufacturer, areaMatches, groupMatchesSubcategory, subcategoriesForArea, TechnicalCatalogItem,
 } from './technicalCatalog';
 
 // Catálogo sintético: subcategory usa a taxonomia LEGADA do estoque ("Central",
@@ -52,6 +52,16 @@ describe('CORREÇÃO 3D — taxonomia Base × catálogo (§3/§7/§8)', () => {
     expect(m.length).toBeGreaterThan(0);    // não fica vazio
     expect(m).toEqual(expect.arrayContaining(['Intelbras', 'Notifier', 'Bosch', 'Tecnohold']));
     expect(m).not.toContain('Hikvision');   // segue restrito à área
+  });
+
+  it('G) BUG QA — picker de Fabricante escopa por ÁREA, nunca por grupo', () => {
+    // Bug real: editar "Sirene/Sinalizador" mostrava só os fabricantes com modelo
+    // de sirene. manufacturersForArea ignora o grupo e traz toda a disciplina.
+    const m = manufacturersForArea(CATALOG, 'SDAI');
+    expect(m).toEqual(expect.arrayContaining(['Intelbras', 'Notifier', 'Bosch', 'Tecnohold']));
+    expect(m).not.toContain('Hikvision'); // CFTV não entra em SDAI
+    // Mesmo para um grupo sem nenhum modelo cadastrado, a lista NÃO encolhe.
+    expect(manufacturersForArea(CATALOG, 'SDAI')).toEqual(manufacturersFromCatalog(CATALOG, 'SDAI'));
   });
 
   it('C) sem filtro de saldo — item existe no catálogo mesmo sem estoque', () => {

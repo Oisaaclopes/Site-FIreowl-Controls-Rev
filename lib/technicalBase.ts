@@ -200,12 +200,21 @@ export function fieldValue(asset: AssetLike, f: IdentifierField): string {
  * Identificador de APRESENTAÇÃO adaptado à área (§17/§19/§24). Ex.: SDAI
  * "Laço 2 · End. 31", CFTV "IP 192.168.10.31 · Canal 08".
  */
-export function assetDisplayIdentifier(area: TechArea, asset: AssetLike): string {
+export function assetDisplayIdentifier(
+  area: TechArea,
+  asset: AssetLike,
+  opts?: { hideSingleCentral?: boolean }
+): string {
   const parts: string[] = [];
   for (const f of identifierFields(area)) {
     const v = fieldValue(asset, f).trim();
     if (!v) continue;
-    if (f.key === 'laco') parts.push(`Laço ${v}`);
+    // §4.2 — quando há UMA só central ativa no cliente, o número da central é
+    // redundante em cada linha e é omitido (SOMENTE apresentação; central_number
+    // e a identidade contextual permanecem intactos no dado).
+    if (f.key === 'central' && opts?.hideSingleCentral) continue;
+    if (f.key === 'central') parts.push(`Central ${v}`);
+    else if (f.key === 'laco') parts.push(`Laço ${v}`);
     else if (f.key === 'endereco') parts.push(`End. ${v}`);
     else if (f.key === 'ip') parts.push(`IP ${v}`);
     else if (f.key === 'canal') parts.push(`Canal ${v}`);

@@ -157,6 +157,17 @@ export function manufacturersFromCatalog(items: TechnicalCatalogItem[], area?: s
   return uniqCI(scope.map((i) => i.brand || ''));
 }
 
+/**
+ * Fabricantes canônicos aplicáveis à DISCIPLINA/ÁREA — SEM estreitar por
+ * grupo/família. Fonte da verdade do picker de Fabricante (§8): um fabricante
+ * não deve desaparecer só porque ainda não há um modelo daquele grupo cadastrado
+ * (bug QA — "Sirene" mostrava só Intelbras/Morey/Tecnohold). A restrição por
+ * grupo permanece apenas no MODELO (modelsForManufacturer). Sem filtro de saldo.
+ */
+export function manufacturersForArea(items: TechnicalCatalogItem[], area?: string): string[] {
+  return uniqCI(items.filter((i) => areaMatches(i.category, area)).map((i) => i.brand || ''));
+}
+
 /** Modelos de um fabricante (área + grupo/família, com o mesmo fallback). */
 export function modelsForManufacturer(
   items: TechnicalCatalogItem[],

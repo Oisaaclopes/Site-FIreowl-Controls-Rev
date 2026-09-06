@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import { PickerField } from '@/components/ui/PickerField';
 import {
-  manufacturersFromCatalog,
+  manufacturersForArea,
   modelsForManufacturer,
   TechnicalCatalogItem,
 } from '@/lib/technicalCatalog';
@@ -43,9 +43,11 @@ export const EquipmentIdentifier: React.FC<Props> = ({ value, onChange, catalog,
   const v = value || {};
   const manual = !!v.manual;
 
+  // Fabricante: escopo por ÁREA (disciplina), nunca por grupo — assim todos os
+  // fabricantes da disciplina aparecem mesmo sem modelo cadastrado no grupo atual.
   const manufacturers = useMemo(
-    () => manufacturersFromCatalog(catalog, area, subcategory),
-    [catalog, area, subcategory]
+    () => manufacturersForArea(catalog, area),
+    [catalog, area]
   );
   const models = useMemo(
     () => (v.brand && !manual ? modelsForManufacturer(catalog, v.brand, area, subcategory) : []),
