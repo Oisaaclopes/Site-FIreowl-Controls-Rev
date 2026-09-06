@@ -25,7 +25,7 @@ export function TaxonomyNavigator({ nodes, counts, onSelect }: {
             className="group flex items-center justify-between gap-3 bg-surface border border-border rounded-xl px-4 py-3.5 text-left hover:border-primary hover:shadow-sm transition-all active:scale-[0.99] min-h-[60px]"
           >
             <div className="min-w-0">
-              <p className="text-sm font-bold text-[#131c28] truncate">{node.name}</p>
+              <p className="text-sm font-bold text-fg truncate">{node.name}</p>
               <p className="text-[11px] font-semibold text-fg-muted mt-0.5">
                 {count} {count === 1 ? 'produto' : 'produtos'}
               </p>

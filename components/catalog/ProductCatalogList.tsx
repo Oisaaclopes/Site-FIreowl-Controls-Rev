@@ -35,7 +35,7 @@ function ProductCard({ item, tree, canSeePrice, dense, onOpen }: { item: Invento
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/70">{item.brand || 'Sem fabricante'}</p>
-          <p className="text-sm font-bold text-[#131c28] truncate">{item.model || item.code || item.name}</p>
+          <p className="text-sm font-bold text-fg truncate">{item.model || item.code || item.name}</p>
         </div>
         <StatusBadge status={item.classificationStatus} />
       </div>

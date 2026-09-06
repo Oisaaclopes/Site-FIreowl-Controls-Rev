@@ -70,6 +70,10 @@ export function CatalogoView({ inventory, inventoryLoading = false, userRole, su
   const [stockMode, setStockMode] = useState<StockMode>('all');
   const [sortMode, setSortMode] = useState<SortMode>('none');
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
+  // §9.3 — filtro GLOBAL de marca/fabricante. Persiste durante toda a navegação
+  // (área → família → produto) escopando o inventário derivado; NÃO colapsa a
+  // navegação (por isso fica fora de `hasFilter`).
+  const [brandFilter, setBrandFilter] = useState('');
 
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [editorItem, setEditorItem] = useState<InventoryItem | null | 'new'>(null);
@@ -85,16 +89,30 @@ export function CatalogoView({ inventory, inventoryLoading = false, userRole, su
     return () => { active = false; };
   }, []);
 
+  // Marcas disponíveis (canônicas do próprio catálogo, A-Z). Não hardcode.
+  const brandOptions = useMemo(
+    () => Array.from(new Set(inventory.map((i) => (i.brand || '').trim()).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [inventory],
+  );
+  const normBrand = (s?: string) => (s || '').trim().toLowerCase();
+  // Inventário escopado pela marca — base de TODOS os derivados (contagens,
+  // listas, busca), para que o filtro seja respeitado em toda a navegação.
+  const scopedInventory = useMemo(
+    () => (brandFilter ? inventory.filter((i) => normBrand(i.brand) === normBrand(brandFilter)) : inventory),
+    [inventory, brandFilter],
+  );
+
   const tree: CatalogTree | null = useMemo(() => (nodes ? buildCatalogTree(nodes) : null), [nodes]);
-  const counts = useMemo(() => (tree ? countsByNode(tree, inventory) : new Map<string, number>()), [tree, inventory]);
-  const areaCounts = useMemo(() => countsByArea(inventory), [inventory]);
-  const revisarCount = useMemo(() => inventory.filter((p) => p.classificationStatus === 'REVISAR').length, [inventory]);
-  const naoClassCount = useMemo(() => inventory.filter((p) => p.classificationStatus === 'NAO_CLASSIFICADO').length, [inventory]);
-  const indic = useMemo(() => stockIndicators(inventory), [inventory]);
+  const counts = useMemo(() => (tree ? countsByNode(tree, scopedInventory) : new Map<string, number>()), [tree, scopedInventory]);
+  const areaCounts = useMemo(() => countsByArea(scopedInventory), [scopedInventory]);
+  const revisarCount = useMemo(() => scopedInventory.filter((p) => p.classificationStatus === 'REVISAR').length, [scopedInventory]);
+  const naoClassCount = useMemo(() => scopedInventory.filter((p) => p.classificationStatus === 'NAO_CLASSIFICADO').length, [scopedInventory]);
+  const indic = useMemo(() => stockIndicators(scopedInventory), [scopedInventory]);
 
   const searchResult = useMemo(
-    () => (tree && query.trim() ? searchCatalog(tree, inventory, aliases, query) : null),
-    [tree, inventory, aliases, query],
+    () => (tree && query.trim() ? searchCatalog(tree, scopedInventory, aliases, query) : null),
+    [tree, scopedInventory, aliases, query],
   );
 
   // Mantém o item aberto sincronizado com o inventário recarregado.
@@ -170,7 +188,7 @@ export function CatalogoView({ inventory, inventoryLoading = false, userRole, su
       ? <EmptyState variant="generico" title="Nenhum resultado" description={`Nada encontrado para "${query}".`} />
       : <div className="flex flex-col gap-3"><p className="text-xs font-semibold text-fg-secondary">{l.length} resultado(s) para “{query}”.</p>{list(l)}</div>;
   } else if (hasFilter) {
-    const base = area ? inventory.filter((p) => (p.category || '').toUpperCase() === area) : inventory;
+    const base = area ? scopedInventory.filter((p) => (p.category || '').toUpperCase() === area) : scopedInventory;
     const l = applyFilters(base);
     body = (
       <div className="flex flex-col gap-3">
@@ -192,7 +210,7 @@ export function CatalogoView({ inventory, inventoryLoading = false, userRole, su
           return (
             <button key={a} type="button" onClick={() => { setArea(a); setNodeId(null); }} className="group flex items-center gap-3 bg-surface border border-border rounded-2xl px-5 py-4 text-left hover:border-primary hover:shadow-sm transition-all active:scale-[0.99]">
               <span className="w-11 h-11 rounded-xl bg-navy/5 flex items-center justify-center shrink-0"><span className="material-symbols-outlined text-primary">{AREA_ICON[a] || 'category'}</span></span>
-              <div className="min-w-0 flex-1"><p className="text-base font-bold text-[#131c28]">{a}</p><p className="text-[11px] font-semibold text-fg-muted">{areaCounts.get(a)} produtos</p></div>
+              <div className="min-w-0 flex-1"><p className="text-base font-bold text-fg">{a}</p><p className="text-[11px] font-semibold text-fg-muted">{areaCounts.get(a)} produtos</p></div>
               {!canonical && <span className="text-[9px] font-bold uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">Em andamento</span>}
               <span className="material-symbols-outlined text-fg-muted group-hover:text-danger">chevron_right</span>
             </button>
@@ -204,12 +222,12 @@ export function CatalogoView({ inventory, inventoryLoading = false, userRole, su
     body = (
       <div className="flex flex-col gap-3">
         <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5"><span className="material-symbols-outlined text-amber-600 text-[19px]">pending</span><p className="text-[12px] text-amber-800"><b>Classificação em andamento.</b> Esta área ainda não tem árvore canônica. Os produtos continuam acessíveis.</p></div>
-        {list(arrange(inventory.filter((p) => (p.category || '').toUpperCase() === area)))}
+        {list(arrange(scopedInventory.filter((p) => (p.category || '').toUpperCase() === area)))}
       </div>
     );
   } else {
     const children = nodeId ? nodeChildren(tree, nodeId) : areaFamilies(tree, area);
-    const nodeProducts = nodeId ? arrange(productsUnderNode(tree, inventory, nodeId)) : [];
+    const nodeProducts = nodeId ? arrange(productsUnderNode(tree, scopedInventory, nodeId)) : [];
     body = (
       <div className="flex flex-col gap-4">
         {children.length > 0 && <TaxonomyNavigator nodes={children} counts={counts} onSelect={(n) => setNodeId(n.id)} />}
@@ -256,6 +274,12 @@ export function CatalogoView({ inventory, inventoryLoading = false, userRole, su
           <button type="button" className={chip(statusFilter === 'all' && !query)} onClick={() => { setStatusFilter('all'); setQuery(''); }}>Navegar</button>
           <button type="button" className={chip(statusFilter === 'REVISAR')} onClick={() => { setStatusFilter(statusFilter === 'REVISAR' ? 'all' : 'REVISAR'); setQuery(''); }}>Revisar{revisarCount ? ` · ${revisarCount}` : ''}</button>
           <button type="button" className={chip(statusFilter === 'NAO_CLASSIFICADO')} onClick={() => { setStatusFilter(statusFilter === 'NAO_CLASSIFICADO' ? 'all' : 'NAO_CLASSIFICADO'); setQuery(''); }}>Não classificados{naoClassCount ? ` · ${naoClassCount}` : ''}</button>
+          {brandOptions.length > 0 && (
+            <select aria-label="Filtro de marca/fabricante" value={brandFilter} onChange={(e) => setBrandFilter(e.target.value)} className={selectCls(brandFilter !== '')}>
+              <option value="" className="text-fg">Marca: todas</option>
+              {brandOptions.map((b) => <option key={b} value={b} className="text-fg">{b}</option>)}
+            </select>
+          )}
           <select aria-label="Filtro de estoque" value={stockMode} onChange={(e) => { setStockMode(e.target.value as StockMode); setQuery(''); }} className={selectCls(stockMode !== 'all')}>
             {STOCK_OPTIONS.map((o) => <option key={o.value} value={o.value} className="text-fg">{o.label}</option>)}
           </select>
@@ -265,6 +289,15 @@ export function CatalogoView({ inventory, inventoryLoading = false, userRole, su
             </select>
           )}
         </div>
+
+        {brandFilter && (
+          <div className="flex items-center gap-2 text-[11px]">
+            <span className="inline-flex items-center gap-1 rounded-full bg-navy/10 px-2.5 py-1 font-bold text-primary">
+              <span className="material-symbols-outlined text-[14px]">sell</span> Marca: {brandFilter}
+            </span>
+            <button type="button" onClick={() => setBrandFilter('')} className="font-semibold text-primary hover:underline">Limpar marca</button>
+          </div>
+        )}
 
         {!query && !hasFilter && <TaxonomyBreadcrumb items={crumbs} />}
       </div>

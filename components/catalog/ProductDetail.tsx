@@ -10,7 +10,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1.5 border-b border-border last:border-0">
       <span className="text-[11px] font-semibold uppercase tracking-wide text-fg-muted">{label}</span>
-      <span className="text-sm font-semibold text-[#131c28] text-right">{value}</span>
+      <span className="text-sm font-semibold text-fg text-right">{value}</span>
     </div>
   );
 }
@@ -67,7 +67,7 @@ export function ProductDetail({ item, tree, canManage, canSeePrice, onClose, onE
         <div className="sticky top-0 bg-surface border-b border-border px-4 py-3 flex items-start justify-between gap-2 z-10">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/70">{item.brand || 'Sem fabricante'}</p>
-            <p className="text-base font-bold text-[#131c28] truncate">{item.model || item.code || item.name}</p>
+            <p className="text-base font-bold text-fg truncate">{item.model || item.code || item.name}</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Fechar" className="h-9 w-9 flex items-center justify-center rounded-md text-fg-muted hover:text-danger hover:bg-surface-2 shrink-0">
             <span className="material-symbols-outlined">close</span>

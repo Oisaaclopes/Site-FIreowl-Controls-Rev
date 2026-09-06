@@ -19,7 +19,7 @@ export function CatalogSearch({ value, onChange, placeholder = 'Buscar por model
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label="Buscar no catálogo"
-        className="w-full bg-surface border border-border rounded-lg py-2.5 pl-10 pr-9 text-sm text-[#131c28] placeholder:text-fg-muted focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-colors"
+        className="w-full bg-surface border border-border rounded-lg py-2.5 pl-10 pr-9 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-colors"
       />
       {value && (
         <button
