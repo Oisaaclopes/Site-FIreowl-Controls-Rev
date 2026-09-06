@@ -3,10 +3,12 @@
  * Fonte: devices (Base) + política efetiva + device_verifications + intervalo.
  * NUNCA números digitados. "Total da Base" ≠ "programados no período".
  *
- * Programado no período = o ativo (com política) era PREVISTO para teste até o
- * fim da janela — vencia até period_end (a partir do último teste ANTES da
- * janela) OU teve alguma verificação DENTRO da janela (foi visitado). Assim,
- * testar cedo/ad-hoc não distorce, e cobertura = testados/programados ≤ 1.
+ * PROGRAMADO ≠ EXTRA (§1). Programado = tinha teste-base conclusivo e VENCIA até
+ * period_end (a partir do último teste conclusivo ANTES da janela). Extra =
+ * testado na janela SEM estar previsto para o período. Cobertura contratual =
+ * testadosProgramados / programados — extras NUNCA entram no denominador. Um
+ * ativo SEM_HISTORICO NÃO entra em programados automaticamente (sem plano que o
+ * situe no período — lacuna documentada); conta em semHistorico/primeiroTestePendente.
  * =================================================================== */
 import type {
   AssetConditionValue,
@@ -79,11 +81,18 @@ export function computeMaintenanceCoverage(
     (d) => (input.includeInactiveAssets || d.status === 'ativo') && (!input.area || d.sistema === input.area)
   );
 
+  const isConclusive = (v: DeviceVerification): boolean => {
+    const r = classifyTestResult(v.condicao);
+    return r === 'APROVADO' || r === 'FALHA';
+  };
+
   let totalComPolitica = 0;
   let semPolitica = 0;
   let semHistorico = 0;
+  let primeiroTestePendente = 0;
   let programados = 0;
-  let testados = 0;
+  let testadosProgramados = 0;
+  let testadosExtras = 0;
   let aprovados = 0;
   let falharam = 0;
 
@@ -95,29 +104,31 @@ export function computeMaintenanceCoverage(
     const verifs = verificationsByDevice.get(d.id) ?? [];
     if (verifs.length === 0) semHistorico++;
 
-    const before = verifs.filter((v) => { const dd = dateOnly(v.verifiedAt); return dd != null && dd < start; });
-    const inPeriod = verifs.filter((v) => { const dd = dateOnly(v.verifiedAt); return dd != null && dd >= start && dd <= end; });
+    // Base do vencimento = último teste CONCLUSIVO antes da janela (NAO_TESTADO
+    // não zera o relógio). Sem base conclusiva até o fim → primeiro teste pendente.
+    const conclusiveBefore = verifs.filter((v) => { const dd = dateOnly(v.verifiedAt); return dd != null && dd < start && isConclusive(v); });
+    const lastBefore = latest(conclusiveBefore);
+    const anyConclusiveUpToEnd = verifs.some((v) => { const dd = dateOnly(v.verifiedAt); return dd != null && dd <= end && isConclusive(v); });
+    if (!anyConclusiveUpToEnd) primeiroTestePendente++;
 
-    // Vencia até o fim do período? (a partir do último teste ANTES da janela;
-    // sem histórico prévio → precisa de teste-base = considerado previsto.)
-    const lastBefore = latest(before);
-    const due = lastBefore
-      ? nextMaintenanceDate(lastBefore.verifiedAt!, effective) <= end
-      : true;
-    const visited = inPeriod.length > 0;
-    const programado = due || visited;
+    // PROGRAMADO = tinha base conclusiva e vencia até o fim da janela. SEM_HISTORICO
+    // NÃO entra automaticamente (§2): sem plano que o coloque no período, não há
+    // como afirmar que era previsto — lacuna registrada (ver entrega).
+    const programado = !!lastBefore && nextMaintenanceDate(lastBefore.verifiedAt!, effective) <= end;
     if (programado) programados++;
 
-    // Resultado conclusivo = última verificação DENTRO da janela com APROVADO/FALHA.
-    const latestIn = latest(inPeriod);
-    const resultado = latestIn ? classifyTestResult(latestIn.condicao) : undefined;
-    if (resultado === 'APROVADO') { testados++; aprovados++; }
-    else if (resultado === 'FALHA') { testados++; falharam++; }
-    // NAO_TESTADO (ou sem verificação na janela) não conta como testado.
+    // Teste conclusivo DENTRO da janela (última verificação conclusiva do período).
+    const inPeriodConclusive = verifs.filter((v) => { const dd = dateOnly(v.verifiedAt); return dd != null && dd >= start && dd <= end && isConclusive(v); });
+    const latestIn = latest(inPeriodConclusive);
+    if (latestIn) {
+      if (programado) testadosProgramados++; else testadosExtras++;   // extra NÃO entra em programados
+      if (classifyTestResult(latestIn.condicao) === 'APROVADO') aprovados++; else falharam++;
+    }
   }
 
   const totalBase = scope.length;
-  const naoTestados = Math.max(0, programados - testados);
+  const naoTestados = Math.max(0, programados - testadosProgramados);
+  const testadosTotais = testadosProgramados + testadosExtras;
   const pct = (num: number, den: number): number | null => (den > 0 ? num / den : null);
 
   return {
@@ -127,14 +138,16 @@ export function computeMaintenanceCoverage(
     totalComPolitica,
     semPolitica,
     semHistorico,
+    primeiroTestePendente,
     programadosPeriodo: programados,
-    testadosPeriodo: testados,
+    testadosProgramadosPeriodo: testadosProgramados,
+    naoTestadosPeriodo: naoTestados,
+    testadosExtrasPeriodo: testadosExtras,
+    testadosTotaisPeriodo: testadosTotais,
     aprovadosPeriodo: aprovados,
     falharamPeriodo: falharam,
-    naoTestadosPeriodo: naoTestados,
-    coberturaProgramadosPct: pct(testados, programados),
-    coberturaBasePct: pct(testados, totalComPolitica),
-    aprovacaoPct: pct(aprovados, testados),
+    coberturaProgramadaPct: pct(testadosProgramados, programados),
+    taxaAprovacaoPct: pct(aprovados, testadosTotais),
   };
 }
 

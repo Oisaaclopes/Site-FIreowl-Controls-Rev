@@ -109,9 +109,11 @@ describe('bucketPendencias — abertas/anteriores/resolvidas (entidade persisten
 
 describe('buildMaintenanceReportSnapshot — congela dados do momento (§5–§9)', () => {
   const coverage: MaintenanceCoverage = {
-    periodStart: '2026-09-01', periodEnd: '2026-09-30', totalBase: 1, totalComPolitica: 1,
-    semPolitica: 0, semHistorico: 0, programadosPeriodo: 1, testadosPeriodo: 1, aprovadosPeriodo: 1,
-    falharamPeriodo: 0, naoTestadosPeriodo: 0, coberturaProgramadosPct: 1, coberturaBasePct: 1, aprovacaoPct: 1,
+    periodStart: '2026-09-01', periodEnd: '2026-09-30', totalBase: 82, totalComPolitica: 82,
+    semPolitica: 0, semHistorico: 0, primeiroTestePendente: 0,
+    programadosPeriodo: 82, testadosProgramadosPeriodo: 79, naoTestadosPeriodo: 3,
+    testadosExtrasPeriodo: 14, testadosTotaisPeriodo: 93, aprovadosPeriodo: 90, falharamPeriodo: 3,
+    coberturaProgramadaPct: 79 / 82, taxaAprovacaoPct: 90 / 93,
   };
   const photo: FieldPhoto = {
     id: 'f1', sessionId: 's1', clientId: 'A', storagePathOriginal: 'field/orig.jpg',
@@ -147,8 +149,20 @@ describe('buildMaintenanceReportSnapshot — congela dados do momento (§5–§9
     expect(snap.ativos[0].resultadoTeste).toBe('APROVADO');
     expect(snap.ativos[0].dataTeste).toBe('2026-09-03');
     expect(snap.testes[0].resultado).toBe('APROVADO');
-    expect(snap.cobertura.testadosPeriodo).toBe(1);
     expect(snap.conclusao).toBeUndefined(); // não inventa conclusão (§5)
+  });
+
+  it('congela programados/testados/extras originais e não recalcula depois (§4)', () => {
+    const cov: MaintenanceCoverage = { ...coverage };
+    const snap = buildMaintenanceReportSnapshot({ consolidation, devices: [device()], coverage: cov, revisao: 'R00', fechadoEm: 'now' });
+    expect(snap.cobertura.programadosPeriodo).toBe(82);
+    expect(snap.cobertura.testadosProgramadosPeriodo).toBe(79);
+    expect(snap.cobertura.testadosExtrasPeriodo).toBe(14);
+    expect(snap.cobertura.testadosTotaisPeriodo).toBe(93);
+    expect(snap.cobertura.coberturaProgramadaPct).toBeCloseTo(79 / 82); // 96,34%, não 93/82
+    // Mutação posterior da cobertura de origem NÃO altera o snapshot.
+    cov.programadosPeriodo = 999;
+    expect(snap.cobertura.programadosPeriodo).toBe(82);
   });
 
   it('preserva as 3 lentes de pendências e a membership', () => {

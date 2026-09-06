@@ -398,7 +398,7 @@ export function buildMaintenanceReportSnapshot(params: {
       deviceVerificationId: t.id, deviceId: t.deviceId, condicao: t.condicao,
       resultado: classifyTestResult(t.condicao), verifiedAt: t.verifiedAt, serviceAttendanceId: t.serviceAttendanceId,
     })),
-    cobertura: coverage,
+    cobertura: { ...coverage },   // cópia → imune a recálculo/mutação posterior (§4/§9)
     pendencias: {
       novasNoPeriodo: c.pendencias.abertasNoPeriodo.map(toPendenciaSnap),
       anterioresAbertas: c.pendencias.anterioresAbertas.map(toPendenciaSnap),
@@ -456,7 +456,8 @@ export async function assembleAndFinalizeMaintenanceReport(input: {
 function emptyCoverage(periodStart: string, periodEnd: string): MaintenanceCoverage {
   return {
     periodStart, periodEnd, totalBase: 0, totalComPolitica: 0, semPolitica: 0, semHistorico: 0,
-    programadosPeriodo: 0, testadosPeriodo: 0, aprovadosPeriodo: 0, falharamPeriodo: 0, naoTestadosPeriodo: 0,
-    coberturaProgramadosPct: null, coberturaBasePct: null, aprovacaoPct: null,
+    primeiroTestePendente: 0, programadosPeriodo: 0, testadosProgramadosPeriodo: 0, naoTestadosPeriodo: 0,
+    testadosExtrasPeriodo: 0, testadosTotaisPeriodo: 0, aprovadosPeriodo: 0, falharamPeriodo: 0,
+    coberturaProgramadaPct: null, taxaAprovacaoPct: null,
   };
 }

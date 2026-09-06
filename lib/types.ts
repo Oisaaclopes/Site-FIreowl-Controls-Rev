@@ -1069,25 +1069,34 @@ export type MaintenanceAssetStatus = 'EM_DIA' | 'PROXIMO' | 'VENCIDO' | 'SEM_HIS
 /** Classe normalizada do resultado de um teste (deriva de device_verifications.condicao). */
 export type TestResultClass = 'APROVADO' | 'FALHA' | 'NAO_TESTADO';
 
-/** Cobertura de manutenção de um intervalo (derivada; nunca digitada — §19). */
+/**
+ * Cobertura de manutenção de um intervalo (derivada; nunca digitada — §19).
+ * PROGRAMADO ≠ EXTRA (§1): programado = previsto pela periodicidade para a janela;
+ * extra = testado embora não previsto para o período. A cobertura contratual é
+ * `testadosProgramados / programados` — testes extras NÃO entram no denominador.
+ */
 export interface MaintenanceCoverage {
   periodStart: string;
   periodEnd: string;
-  totalBase: number;            // ativos na Base (escopo)
-  totalComPolitica: number;     // ativos com política aplicável
+  // --- Base Técnica ---
+  totalBase: number;                  // ativos na Base (escopo)
+  totalComPolitica: number;           // ativos com política aplicável
   semPolitica: number;
-  semHistorico: number;         // com política, mas sem verificação alguma
-  programadosPeriodo: number;   // previstos p/ teste no período (vencia até o fim OU foi testado)
-  testadosPeriodo: number;      // com verificação dentro da janela
+  semHistorico: number;               // com política, mas sem verificação alguma
+  primeiroTestePendente: number;      // com política, sem NENHUM teste conclusivo até period_end
+  // --- Programados x extras ---
+  programadosPeriodo: number;         // previstos p/ teste na janela (vencia até o fim, com base)
+  testadosProgramadosPeriodo: number; // programados que foram testados conclusivamente na janela
+  naoTestadosPeriodo: number;         // programados − testadosProgramados
+  testadosExtrasPeriodo: number;      // testados na janela SEM estarem previstos p/ o período
+  testadosTotaisPeriodo: number;      // testadosProgramados + testadosExtras (conclusivos)
+  // --- Resultados ---
   aprovadosPeriodo: number;
   falharamPeriodo: number;
-  naoTestadosPeriodo: number;   // programados − testados
-  /** testados/programados (cobertura do período). null quando programados=0. */
-  coberturaProgramadosPct: number | null;
-  /** testados/totalComPolitica (breadth da instalação; útil no acumulado). */
-  coberturaBasePct: number | null;
-  /** aprovados/testados. null quando testados=0. */
-  aprovacaoPct: number | null;
+  /** COBERTURA CONTRATUAL: testadosProgramados / programados. null quando programados=0. */
+  coberturaProgramadaPct: number | null;
+  /** aprovados / testadosTotais (dos testes conclusivos realizados). null quando 0. */
+  taxaAprovacaoPct: number | null;
 }
 
 /** Linha de manutenção de um ativo (deriva de devices + policy + verificações). */

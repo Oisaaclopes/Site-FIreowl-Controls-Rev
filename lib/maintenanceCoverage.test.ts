@@ -25,71 +25,117 @@ describe('classifyTestResult (normaliza condicao real da 0095, sem novo enum)', 
   });
 });
 
-describe('computeMaintenanceCoverage — base ≠ programados; cobertura = testados/programados', () => {
+describe('cobertura — programados ≠ extras; base ≠ programados', () => {
   const start = '2026-09-01';
   const end = '2026-09-30';
   const devices = [
-    dev({ id: 'd1' }), // testado aprovado
-    dev({ id: 'd2' }), // testado falha
-    dev({ id: 'd3' }), // vencido, não testado
-    dev({ id: 'd4' }), // em dia (não previsto neste mês)
+    dev({ id: 'd1' }), // programado testado (aprovado)
+    dev({ id: 'd2' }), // programado testado (falha)
+    dev({ id: 'd3' }), // programado NÃO testado
+    dev({ id: 'd4' }), // com base, não vence neste mês → não programado, não testado
     dev({ id: 'd5' }), // sem histórico
     dev({ id: 'd6', tipoAtivo: 'Sirene' }), // sem política
+    dev({ id: 'd7' }), // testado EXTRA (não previsto p/ o período)
   ];
   const verifs = [
     ver('d1', '2025-09-01', 'NORMAL'), ver('d1', '2026-09-05', 'NORMAL'),
     ver('d2', '2025-09-15', 'NORMAL'), ver('d2', '2026-09-20', 'COM_AVARIA'),
-    ver('d3', '2025-08-01', 'NORMAL'), // vence 2026-08-01, não testado em setembro
-    ver('d4', '2026-06-01', 'NORMAL'), // vence 2027-06 → não previsto
+    ver('d3', '2025-08-01', 'NORMAL'),                        // vence 2026-08 → programado, não testado
+    ver('d4', '2026-06-01', 'NORMAL'),                        // vence 2027-06 → não previsto
+    ver('d7', '2026-05-01', 'NORMAL'), ver('d7', '2026-09-08', 'NORMAL'), // vence 2027-05 → extra
   ];
-
   const cov = computeMaintenanceCoverage(devices, [policy], groupVerificationsByDevice(verifs), {
     contractId: null, periodStart: start, periodEnd: end,
   });
 
-  it('contagens', () => {
-    expect(cov.totalBase).toBe(6);
-    expect(cov.totalComPolitica).toBe(5);
+  it('contagens separam programado x extra', () => {
+    expect(cov.totalBase).toBe(7);
+    expect(cov.totalComPolitica).toBe(6);
     expect(cov.semPolitica).toBe(1);
-    expect(cov.semHistorico).toBe(1);           // d5
-    expect(cov.programadosPeriodo).toBe(4);     // d1,d2,d3,d5 (d4 não previsto)
-    expect(cov.testadosPeriodo).toBe(2);        // d1,d2
-    expect(cov.aprovadosPeriodo).toBe(1);       // d1
-    expect(cov.falharamPeriodo).toBe(1);        // d2
-    expect(cov.naoTestadosPeriodo).toBe(2);     // d3,d5
+    expect(cov.semHistorico).toBe(1);            // d5
+    expect(cov.primeiroTestePendente).toBe(1);   // d5
+    expect(cov.programadosPeriodo).toBe(3);      // d1,d2,d3 (d7 é extra; d4/d5 não previstos)
+    expect(cov.testadosProgramadosPeriodo).toBe(2); // d1,d2
+    expect(cov.naoTestadosPeriodo).toBe(1);      // d3
+    expect(cov.testadosExtrasPeriodo).toBe(1);   // d7
+    expect(cov.testadosTotaisPeriodo).toBe(3);   // 2 + 1
+    expect(cov.aprovadosPeriodo).toBe(2);        // d1,d7
+    expect(cov.falharamPeriodo).toBe(1);         // d2
   });
-  it('percentuais e base ≠ programados (2/4, não 2/6)', () => {
-    expect(cov.coberturaProgramadosPct).toBeCloseTo(0.5);   // 2/4
-    expect(cov.coberturaBasePct).toBeCloseTo(0.4);          // 2/5
-    expect(cov.aprovacaoPct).toBeCloseTo(0.5);              // 1/2
-    expect(cov.programadosPeriodo).not.toBe(cov.totalBase); // 4 ≠ 6
+  it('extra NÃO entra no denominador da cobertura contratual', () => {
+    expect(cov.coberturaProgramadaPct).toBeCloseTo(2 / 3); // 2/3, não 3/3
+    expect(cov.taxaAprovacaoPct).toBeCloseTo(2 / 3);       // aprovados/testadosTotais
   });
 });
 
-describe('cobertura mensal vs acumulada (janela explícita, sem hard-code de ano)', () => {
+describe('cenário 80 programados + 76 testados + 20 extras → cobertura 95% (§6)', () => {
+  const start = '2026-09-01';
+  const end = '2026-09-30';
+  const devices: Device[] = [];
+  const verifs: DeviceVerification[] = [];
+  // 80 programados (base conclusiva antiga → vencem dentro da janela); 76 testados.
+  for (let i = 0; i < 80; i++) {
+    const id = `P${i}`;
+    devices.push(dev({ id }));
+    verifs.push(ver(id, '2025-01-01', 'NORMAL')); // vence 2026-01-01 ≤ set → programado
+    if (i < 76) verifs.push(ver(id, '2026-09-10', 'NORMAL')); // testado no período
+  }
+  // 20 extras (base recente → NÃO vencem na janela) mas testados no período.
+  for (let i = 0; i < 20; i++) {
+    const id = `E${i}`;
+    devices.push(dev({ id }));
+    verifs.push(ver(id, '2026-06-01', 'NORMAL')); // vence 2027-06 → não previsto
+    verifs.push(ver(id, '2026-09-10', 'NORMAL')); // testado → extra
+  }
+  const cov = computeMaintenanceCoverage(devices, [policy], groupVerificationsByDevice(verifs), {
+    contractId: null, periodStart: start, periodEnd: end,
+  });
+
+  it('métricas do exemplo', () => {
+    expect(cov.programadosPeriodo).toBe(80);
+    expect(cov.testadosProgramadosPeriodo).toBe(76);
+    expect(cov.naoTestadosPeriodo).toBe(4);
+    expect(cov.testadosExtrasPeriodo).toBe(20);
+    expect(cov.testadosTotaisPeriodo).toBe(96);
+    expect(cov.coberturaProgramadaPct).toBeCloseTo(0.95); // 76/80
+  });
+  it('teste extra NÃO aumenta programadosPeriodo (80, não 100)', () => {
+    expect(cov.programadosPeriodo).toBe(80);
+    expect(cov.programadosPeriodo).not.toBe(100);
+  });
+});
+
+describe('SEM_HISTORICO não vira programado automaticamente (§2)', () => {
+  it('com política, sem teste → semHistorico/primeiroTestePendente, fora de programados', () => {
+    const cov = computeMaintenanceCoverage([dev({ id: 'novo' })], [policy], new Map(), {
+      contractId: null, periodStart: '2026-09-01', periodEnd: '2026-09-30',
+    });
+    expect(cov.semHistorico).toBe(1);
+    expect(cov.primeiroTestePendente).toBe(1);
+    expect(cov.programadosPeriodo).toBe(0);
+    expect(cov.testadosProgramadosPeriodo).toBe(0);
+    expect(cov.coberturaProgramadaPct).toBeNull();
+  });
+});
+
+describe('janela explícita: mensal vs acumulada (sem hard-code de ano)', () => {
   const devices = [dev({ id: 'x' })];
-  const verifs = [
+  const p3: AssetMaintenancePolicy = { ...policy, id: 'p3', periodicidadeValor: 3 };
+  const g = groupVerificationsByDevice([
     ver('x', '2026-02-10', 'NORMAL'),
     ver('x', '2026-05-10', 'NORMAL'),
     ver('x', '2026-08-10', 'COM_AVARIA'),
-  ];
-  const g = groupVerificationsByDevice(verifs);
-  const p3: AssetMaintenancePolicy = { ...policy, id: 'p3', periodicidadeValor: 3 };
+  ]);
 
-  it('acumulado Jan–Set: 1 programado, 1 testado (última = falha)', () => {
-    const cov = computeMaintenanceCoverage(devices, [p3], g, { contractId: null, periodStart: '2026-01-01', periodEnd: '2026-09-30' });
-    expect(cov.programadosPeriodo).toBe(1);
-    expect(cov.testadosPeriodo).toBe(1);
-    expect(cov.falharamPeriodo).toBe(1);
-  });
-  it('mensal Agosto: previsto e testado', () => {
+  it('mensal Agosto: base de maio vence em agosto → programado e testado (falha)', () => {
     const cov = computeMaintenanceCoverage(devices, [p3], g, { contractId: null, periodStart: '2026-08-01', periodEnd: '2026-08-31' });
     expect(cov.programadosPeriodo).toBe(1);
-    expect(cov.testadosPeriodo).toBe(1);
+    expect(cov.testadosProgramadosPeriodo).toBe(1);
+    expect(cov.falharamPeriodo).toBe(1);
   });
-  it('mensal Setembro: NÃO previsto (venceria em novembro) e não testado', () => {
+  it('mensal Setembro: base de agosto vence em novembro → NÃO programado', () => {
     const cov = computeMaintenanceCoverage(devices, [p3], g, { contractId: null, periodStart: '2026-09-01', periodEnd: '2026-09-30' });
     expect(cov.programadosPeriodo).toBe(0);
-    expect(cov.testadosPeriodo).toBe(0);
+    expect(cov.testadosProgramadosPeriodo).toBe(0);
   });
 });
