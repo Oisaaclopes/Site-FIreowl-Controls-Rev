@@ -11,7 +11,11 @@ import { fetchScheduledExecutions, generateOsFromExecution } from '@/lib/contrac
 import { fetchAssignableTechnicians, ManagedUser } from '@/lib/users';
 import { getClientOperationalName } from '@/lib/utils';
 import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
-import { useConfirm } from '@/components/ui/Feedback';
+import { useConfirm, useToast } from '@/components/ui/Feedback';
+import {
+  CalendarEvent, CalendarEventCategory, CALENDAR_CATEGORY_LABEL,
+  fetchCalendarEvents, upsertCalendarEvent, deleteCalendarEvent,
+} from '@/lib/calendarEvents';
 
 interface AgendaViewProps {
   /** Abre a OS no módulo de Pedidos/OS quando o usuário clica num evento real. */
@@ -69,7 +73,12 @@ const KANBAN: { key: string; label: string; match: (e: AgendaEvent) => boolean }
 export const AgendaView: React.FC<AgendaViewProps> = ({ onOpenOS, userRole, currentUserId }) => {
   const online = isSupabaseConfigured();
   const confirm = useConfirm();
+  const toast = useToast();
   const isTecnico = userRole === 'TECNICO';
+  // Eventos livres (agenda corporativa). Editor: 'new' com data pré-selecionada
+  // ou um evento existente para editar.
+  const [manualEvents, setManualEvents] = useState<CalendarEvent[]>([]);
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | { date: string } | null>(null);
   const [viewMode, setViewMode] = useState<'calendar' | 'kanban' | 'map'>('calendar');
   const [technicians, setTechnicians] = useState<ManagedUser[]>([]);
   // Filtro por responsável: 'TODOS' | 'NAO' (não atribuídas) | <profileId>.
@@ -109,6 +118,15 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ onOpenOS, userRole, curr
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
   useDomainRefresh('agenda', load);
   useDomainRefresh('serviceOrders', load);
+
+  // Eventos livres do mês visível (degrada para [] se a tabela não existir).
+  const loadManualEvents = React.useCallback(async () => {
+    if (!online) { setManualEvents([]); return; }
+    const from = dateKey(year, month, 1);
+    const to = dateKey(year, month, new Date(year, month + 1, 0).getDate());
+    setManualEvents(await fetchCalendarEvents(from, to));
+  }, [online, year, month]);
+  useEffect(() => { void loadManualEvents(); }, [loadManualEvents]);
 
   useEffect(() => {
     setHolidays((prev) => ({ ...fixedNationalHolidays(year), ...prev }));
@@ -163,6 +181,42 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ onOpenOS, userRole, curr
     });
     return map;
   }, [filteredEvents, year, month]);
+
+  // Eventos livres por dia (expande intervalos multi-dia dentro do mês).
+  const manualByDay = useMemo(() => {
+    const map: Record<number, CalendarEvent[]> = {};
+    const monthStart = new Date(year, month, 1);
+    const monthEnd = new Date(year, month + 1, 0);
+    for (const ev of manualEvents) {
+      const [sy, sm, sd] = ev.eventDate.split('-').map(Number);
+      const start = new Date(sy, sm - 1, sd);
+      const end = ev.endDate ? (() => { const [ey, em, ed] = ev.endDate.split('-').map(Number); return new Date(ey, em - 1, ed); })() : start;
+      const from = start < monthStart ? monthStart : start;
+      const to = end > monthEnd ? monthEnd : end;
+      for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+        if (d.getFullYear() === year && d.getMonth() === month) (map[d.getDate()] = map[d.getDate()] || []).push(ev);
+      }
+    }
+    return map;
+  }, [manualEvents, year, month]);
+
+  const saveEvent = async (draft: Partial<CalendarEvent>) => {
+    try {
+      await upsertCalendarEvent(draft);
+      setEditingEvent(null);
+      await loadManualEvents();
+      toast.success(draft.id ? 'Evento atualizado.' : 'Evento criado.');
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Falha ao salvar o evento.'); }
+  };
+  const removeEvent = async (id: string) => {
+    if (!await confirm({ title: 'Excluir evento?', message: 'Este compromisso será removido da agenda.', confirmLabel: 'Excluir', danger: true })) return;
+    try {
+      await deleteCalendarEvent(id);
+      setEditingEvent(null);
+      await loadManualEvents();
+      toast.success('Evento excluído.');
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Falha ao excluir.'); }
+  };
 
   const grid = useMemo(() => {
     const firstWeekday = new Date(year, month, 1).getDay();
@@ -243,6 +297,14 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ onOpenOS, userRole, curr
               </button>
             ))}
           </div>
+          {online && (
+            <button
+              onClick={() => setEditingEvent({ date: dateKey(today.getFullYear(), today.getMonth(), today.getDate()) })}
+              className="bg-primary hover:bg-primary-hover text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
+            >
+              <span className="material-symbols-outlined text-base">event</span> Novo evento
+            </button>
+          )}
         </div>
       </div>
 
@@ -262,6 +324,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ onOpenOS, userRole, curr
               {(['previsto', 'agendado', 'em_atendimento', 'concluido'] as AgendaStatus[]).map((s) => (
                 <span key={s} className="flex items-center gap-1.5"><span className={`w-2.5 h-2.5 rounded-full ${STATUS_META[s].dot}`} /> {STATUS_META[s].label}</span>
               ))}
+              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-violet-500" /> Evento manual</span>
             </div>
           </div>
 
@@ -276,11 +339,20 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ onOpenOS, userRole, curr
               const holiday = holidays[key];
               const todayFlag = isToday(day);
               const dayEvents = eventsByDay[day] || [];
+              const dayManual = manualByDay[day] || [];
               const weekend = idx % 7 === 0 || idx % 7 === 6;
               return (
-                <div key={day} title={holiday ? `Feriado: ${holiday.name}` : undefined} className={`min-h-[70px] md:min-h-[92px] rounded-lg p-1.5 md:p-2 flex flex-col gap-1 font-data-mono text-xs border ${holiday ? 'bg-red-50 border-2 border-danger/60' : weekend ? 'bg-surface-2/60 border-border' : 'bg-surface border-border'} ${todayFlag ? 'ring-2 ring-primary ring-offset-1' : ''}`}>
+                <div key={day} className={`min-h-[70px] md:min-h-[92px] rounded-lg p-1.5 md:p-2 flex flex-col gap-1 font-data-mono text-xs border ${holiday ? 'bg-red-50 border-2 border-danger/60' : weekend ? 'bg-surface-2/60 border-border' : 'bg-surface border-border'} ${todayFlag ? 'ring-2 ring-primary ring-offset-1' : ''}`}>
                   <div className="flex justify-between items-center">
-                    <span className={`font-bold ${holiday ? 'text-danger' : todayFlag ? 'text-primary' : 'text-fg-secondary'}`}>{pad2(day)}</span>
+                    {/* Clicar no dia (número) cria um evento livre naquela data (§6). */}
+                    <button
+                      type="button"
+                      onClick={() => setEditingEvent({ date: key })}
+                      title={holiday ? `Feriado: ${holiday.name} · clique p/ novo evento` : 'Clique para novo evento'}
+                      className={`font-bold rounded px-1 -mx-1 hover:bg-navy/10 ${holiday ? 'text-danger' : todayFlag ? 'text-primary' : 'text-fg-secondary'}`}
+                    >
+                      {pad2(day)}
+                    </button>
                     {todayFlag && <span className="text-[9px] bg-navy text-white px-1.5 py-0.5 rounded font-bold">HOJE</span>}
                     {!todayFlag && holiday && <span className="material-symbols-outlined text-[14px] text-danger">flag</span>}
                   </div>
@@ -290,7 +362,13 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ onOpenOS, userRole, curr
                       <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${STATUS_META[e.status].dot}`} />{e.cliente}
                     </button>
                   ))}
-                  {dayEvents.length > 3 && <span className="text-[9px] text-fg-muted font-semibold">+{dayEvents.length - 3}</span>}
+                  {dayManual.slice(0, 2).map((ev) => (
+                    <button key={ev.id} onClick={() => setEditingEvent(ev)} title={`${ev.title}${ev.allDay ? ' · dia inteiro' : ev.startTime ? ` · ${ev.startTime}${ev.endTime ? `–${ev.endTime}` : ''}` : ''}${ev.isPrivate ? ' · privado' : ''} (${CALENDAR_CATEGORY_LABEL[ev.category]})`} className="text-left px-1.5 py-0.5 rounded text-[9px] truncate font-medium border border-violet-200 bg-violet-50 text-violet-700">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full mr-1 bg-violet-500" />
+                      {ev.isPrivate ? '🔒 ' : ''}{!ev.allDay && ev.startTime ? `${ev.startTime} ` : ''}{ev.title}
+                    </button>
+                  ))}
+                  {(dayEvents.length > 3 || dayManual.length > 2) && <span className="text-[9px] text-fg-muted font-semibold">+{(dayEvents.length > 3 ? dayEvents.length - 3 : 0) + (dayManual.length > 2 ? dayManual.length - 2 : 0)}</span>}
                 </div>
               );
             })}
@@ -343,6 +421,159 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ onOpenOS, userRole, curr
           <p className="text-xs text-fg-muted max-w-md">O mapa exibirá técnicos e rotas quando houver atribuição real de equipe e localização autorizada. Nenhuma posição é simulada.</p>
         </div>
       )}
+
+      {editingEvent && (
+        <CalendarEventModal
+          initial={editingEvent}
+          technicians={technicians}
+          clients={clients}
+          onClose={() => setEditingEvent(null)}
+          onSave={saveEvent}
+          onDelete={removeEvent}
+        />
+      )}
+    </div>
+  );
+};
+
+/* ------------------------- Modal de evento livre (§6) ------------------------- */
+const CalendarEventModal: React.FC<{
+  initial: CalendarEvent | { date: string };
+  technicians: ManagedUser[];
+  clients: Client[];
+  onClose: () => void;
+  onSave: (draft: Partial<CalendarEvent>) => void;
+  onDelete: (id: string) => void;
+}> = ({ initial, technicians, clients, onClose, onSave, onDelete }) => {
+  const existing = 'id' in initial ? initial : null;
+  const [title, setTitle] = useState(existing?.title || '');
+  const [category, setCategory] = useState<CalendarEventCategory>(existing?.category || 'reuniao');
+  const [eventDate, setEventDate] = useState(existing?.eventDate || (initial as { date: string }).date);
+  const [endDate, setEndDate] = useState(existing?.endDate || '');
+  const [allDay, setAllDay] = useState(existing?.allDay ?? false);
+  const [startTime, setStartTime] = useState(existing?.startTime || '09:00');
+  const [endTime, setEndTime] = useState(existing?.endTime || '10:00');
+  const [clientId, setClientId] = useState(existing?.clientId || '');
+  const [location, setLocation] = useState(existing?.location || '');
+  const [notes, setNotes] = useState(existing?.notes || '');
+  const [isPrivate, setIsPrivate] = useState(existing?.isPrivate ?? false);
+  const [responsibles, setResponsibles] = useState<string[]>(existing?.responsibles || []);
+
+  const inputCls = 'w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-primary/25';
+  const labelCls = 'block text-[11px] font-semibold uppercase tracking-wide text-fg-secondary mb-1';
+
+  const toggleResp = (id: string) => setResponsibles((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+
+  const submit = () => {
+    if (!title.trim() || !eventDate) return;
+    onSave({
+      id: existing?.id,
+      title: title.trim(),
+      category,
+      eventDate,
+      endDate: endDate || undefined,
+      allDay,
+      startTime: allDay ? undefined : startTime,
+      endTime: allDay ? undefined : endTime,
+      clientId: clientId || undefined,
+      location: location.trim() || undefined,
+      notes: notes.trim() || undefined,
+      isPrivate,
+      responsibles,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/60 p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-surface shadow-2xl">
+        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-surface px-4 py-3">
+          <h3 className="text-sm font-bold text-fg">{existing ? 'Editar evento' : 'Novo evento'}</h3>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-fg-muted hover:bg-surface-3"><span className="material-symbols-outlined">close</span></button>
+        </header>
+        <div className="p-4 space-y-3">
+          <div>
+            <label className={labelCls}>Título *</label>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex.: Reunião de alinhamento" className={inputCls} autoFocus />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Categoria</label>
+              <select value={category} onChange={(e) => setCategory(e.target.value as CalendarEventCategory)} className={inputCls}>
+                {(Object.keys(CALENDAR_CATEGORY_LABEL) as CalendarEventCategory[]).map((c) => <option key={c} value={c}>{CALENDAR_CATEGORY_LABEL[c]}</option>)}
+              </select>
+            </div>
+            <label className="flex items-end gap-2 pb-2">
+              <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} />
+              <span className="text-sm text-fg">Dia inteiro</span>
+            </label>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Data início *</label>
+              <input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Data fim</label>
+              <input type="date" value={endDate} min={eventDate} onChange={(e) => setEndDate(e.target.value)} className={inputCls} />
+            </div>
+          </div>
+          {!allDay && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Início</label>
+                <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Fim</label>
+                <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className={inputCls} />
+              </div>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Cliente (opcional)</label>
+              <select value={clientId} onChange={(e) => setClientId(e.target.value)} className={inputCls}>
+                <option value="">— Sem cliente —</option>
+                {clients.map((c) => <option key={c.id} value={c.id}>{getClientOperationalName(c)}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Local (opcional)</label>
+              <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Ex.: Escritório, sala 2" className={inputCls} />
+            </div>
+          </div>
+          {technicians.length > 0 && (
+            <div>
+              <label className={labelCls}>Responsável(is)</label>
+              <div className="flex flex-wrap gap-1.5">
+                {technicians.map((t) => (
+                  <button key={t.id} type="button" onClick={() => toggleResp(t.id)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${responsibles.includes(t.id) ? 'border-primary bg-navy/5 text-primary' : 'border-border text-fg-secondary'}`}>
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div>
+            <label className={labelCls}>Observação</label>
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className={inputCls} />
+          </div>
+          <label className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-2">
+            <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
+            <span className="text-sm text-fg">Privado</span>
+            <span className="text-[11px] text-fg-muted">— visível só para você e responsáveis. Não exige diagnóstico/detalhe médico.</span>
+          </label>
+        </div>
+        <footer className="sticky bottom-0 flex items-center justify-between gap-2 border-t border-border bg-surface px-4 py-3">
+          {existing ? (
+            <button onClick={() => onDelete(existing.id)} className="rounded-lg border border-danger px-3 py-2 text-xs font-bold uppercase text-danger hover:bg-danger/10">Excluir</button>
+          ) : <span />}
+          <div className="flex gap-2">
+            <button onClick={onClose} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold uppercase text-fg-secondary hover:bg-surface-2">Cancelar</button>
+            <button onClick={submit} disabled={!title.trim() || !eventDate} className="rounded-lg bg-primary px-4 py-2 text-xs font-bold uppercase text-white hover:bg-primary-hover disabled:opacity-50">Salvar</button>
+          </div>
+        </footer>
+      </div>
     </div>
   );
 };
