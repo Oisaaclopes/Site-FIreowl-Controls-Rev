@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Client, OrdemServico, Pendencia, ReportInstance, UserRole } from '@/lib/types';
 import { useConfirm, useToast } from '@/components/ui/Feedback';
-import { FieldPhotoMarker } from '@/lib/fieldPhotos';
+import { FieldPhotoMarker, deleteFieldPhoto } from '@/lib/fieldPhotos';
 import {
   applyFieldPhotoFilters,
   attachClientNames,
@@ -144,6 +144,48 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole, technicia
   const toggleSelect = (uuid: string) => setSelection((prev) => { const n = new Set(prev); n.has(uuid) ? n.delete(uuid) : n.add(uuid); return n; });
   const clearSelection = () => setSelection(new Set());
 
+  // §8.1/§8.2/§8.3 — exclusão individual e em grupo. deleteFieldPhoto remove o
+  // job offline + assets do bucket + registro sob RLS (CASCADE cuida das
+  // referências: comparações, evidence_item, vínculos). O original derivado
+  // some junto; nada de FK/arquivo órfão. Só gestão exclui (RLS reforça).
+  const contextNoun = (list: GalleryPhoto[]): string => {
+    const first = list[0];
+    if (!first) return '';
+    const same = (get: (p: GalleryPhoto) => string | undefined) => {
+      const v = get(first); return !!v && list.every((p) => get(p) === v);
+    };
+    if (same((p) => p.osId)) return ' desta OS';
+    if (same((p) => p.reportId)) return ' deste relatório';
+    if (same((p) => p.pendenciaId)) return ' desta pendência';
+    return '';
+  };
+  const handleDeletePhotos = async (list: GalleryPhoto[]) => {
+    if (list.length === 0) return;
+    const message = list.length === 1
+      ? 'O arquivo e a evidência derivada serão removidos. Esta ação não pode ser desfeita.'
+      : `${list.length} foto(s)${contextNoun(list)} serão removidas (arquivos e evidências derivadas). Esta ação não pode ser desfeita.`;
+    if (!await confirm({ title: list.length === 1 ? 'Excluir foto?' : 'Excluir fotos?', message, confirmLabel: 'Excluir', danger: true })) return;
+    let ok = 0; let fail = 0;
+    for (const p of list) {
+      try {
+        await deleteFieldPhoto({
+          id: p.id,
+          clientUuid: p.clientUuid,
+          storagePathOriginal: p.storagePathOriginal || '',
+          storagePathEvidencia: p.storagePathEvidencia,
+          storagePathMarkup: p.storagePathMarkup,
+        });
+        ok += 1;
+      } catch { fail += 1; }
+    }
+    clearSelection();
+    setDetail(null);
+    await load();
+    await reloadComparisons();
+    if (fail === 0) toast.success(ok === 1 ? 'Foto excluída.' : `${ok} foto(s) excluída(s).`);
+    else toast.error(`${ok} excluída(s), ${fail} falharam.`);
+  };
+
   const retry = async (p?: GalleryPhoto) => {
     if (!isOnline()) { toast.error('Sem conexão para sincronizar agora.'); return; }
     toast.info('Sincronizando…');
@@ -234,6 +276,11 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole, technicia
               <span className="material-symbols-outlined align-middle text-sm">compare</span> Antes × Depois
             </button>
             <button onClick={() => setLinkTarget({ photos: selectedPhotos })} className="min-h-9 rounded-lg bg-navy px-3 text-xs font-bold uppercase text-white">Vincular</button>
+            {isManager && (
+              <button onClick={() => handleDeletePhotos(selectedPhotos)} className="min-h-9 rounded-lg border border-danger bg-surface px-3 text-xs font-bold uppercase text-danger hover:bg-danger/10">
+                <span className="material-symbols-outlined align-middle text-sm">delete</span> Excluir
+              </button>
+            )}
             <button onClick={clearSelection} className="min-h-9 rounded-lg border border-border-strong bg-surface px-3 text-xs font-bold uppercase text-fg-secondary">Limpar</button>
           </div>
         </div>
@@ -297,6 +344,8 @@ export const FotosDeCampoView: React.FC<Props> = ({ clients, userRole, technicia
           onRetry={() => retry(detail)}
           hasComparison={comparisons.some(c=>c.beforePhotoId===detail.id)}
           onRegisterAfter={()=>{setAfterReference(detail);setDetail(null)}}
+          canDelete={isManager}
+          onDelete={() => handleDeletePhotos([detail])}
         />
       )}
       <QuickFieldPhotoModal isOpen={!!afterReference} clients={clients} technicianId={technicianId} technicianName={technicianName} afterReference={afterReference||undefined} onClose={()=>setAfterReference(null)} onComparisonCreated={()=>toast.success('Correção registrada. A relação será sincronizada automaticamente.')} />
@@ -428,7 +477,7 @@ const FiltersSheet: React.FC<{ filters: FieldPhotoFilters; onChange: (f: FieldPh
 
 /* ------------------------------- Detalhe ------------------------------- */
 
-const PhotoDetail: React.FC<{ photo: GalleryPhoto; clients: Client[]; onClose: () => void; onLink: () => void; onRetry: () => void; hasComparison:boolean; onRegisterAfter:()=>void }> = ({ photo, onClose, onLink, onRetry, hasComparison, onRegisterAfter }) => {
+const PhotoDetail: React.FC<{ photo: GalleryPhoto; clients: Client[]; onClose: () => void; onLink: () => void; onRetry: () => void; hasComparison:boolean; onRegisterAfter:()=>void; canDelete?: boolean; onDelete?: () => void }> = ({ photo, onClose, onLink, onRetry, hasComparison, onRegisterAfter, canDelete, onDelete }) => {
   const [view, setView] = useState<'evidence' | 'original' | 'markup'>('evidence');
   const [url, setUrl] = useState<string | undefined>();
   const objs = useRef<string[]>([]);
@@ -506,6 +555,11 @@ const PhotoDetail: React.FC<{ photo: GalleryPhoto; clients: Client[]; onClose: (
           </div>
           {!canLink && photo.source === 'local' && photo.syncStatus === 'pendente' && (
             <button onClick={onRetry} className="mt-3 min-h-10 w-full rounded-lg border border-border-strong bg-surface text-xs font-bold uppercase text-fg-secondary">Sincronizar agora</button>
+          )}
+          {canDelete && onDelete && (
+            <button onClick={onDelete} className="mt-4 min-h-10 w-full rounded-lg border border-danger bg-surface text-xs font-bold uppercase text-danger hover:bg-danger/10">
+              <span className="material-symbols-outlined align-middle text-sm">delete</span> Excluir foto
+            </button>
           )}
         </div>
       </div>
