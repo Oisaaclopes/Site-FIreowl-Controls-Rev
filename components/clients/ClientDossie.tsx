@@ -393,9 +393,9 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
             <button
               onClick={() => onOpenReport(client.name)}
               className="flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-slate-800"
-              title="Iniciar um novo relatório técnico SDAI para este cliente"
+              title="Iniciar um novo atendimento técnico para este cliente"
             >
-              <span className="material-symbols-outlined text-sm">assignment_add</span> Novo relatório
+              <span className="material-symbols-outlined text-sm">assignment_add</span> Novo Atendimento
             </button>
             {onEditClient && (
               <button

@@ -20,14 +20,35 @@ describe('buildFinalizedServiceItems (Bloco 5B)', () => {
     expect(items[0].documentSource).toBe('Documentos da OS');
   });
 
-  it('atendimento + report da MESMA OS não duplica (report é canônico)', () => {
+  it('1 OS + múltiplos atendimentos finalizados = múltiplos documentos (não some por os_id, §9)', () => {
+    const items = buildFinalizedServiceItems({
+      attendances: [
+        att({ id: 'a1', workOrderId: 'os3' }),
+        att({ id: 'a2', workOrderId: 'os3' }),
+        att({ id: 'a3', workOrderId: 'os3' }),
+      ],
+      ordens: [os({ id: 'os3', tipo: 'corretiva', numero: 'OS-2026-0003' })],
+    });
+    expect(items).toHaveLength(3);
+    expect(items.every((i) => i.osNumero === 'OS-2026-0003')).toBe(true);
+    expect(new Set(items.map((i) => i.attendanceId)).size).toBe(3);
+  });
+
+  it('report + atendimentos na MESMA OS: todos aparecem (OS é contexto, não identidade §9)', () => {
     const items = buildFinalizedServiceItems({
       reports: [report({ id: 'r1', osId: 'os1', tipo: 'CORRETIVA' })],
-      attendances: [att({ id: 'a1', workOrderId: 'os1' })],
+      attendances: [att({ id: 'a1', workOrderId: 'os1' }), att({ id: 'a2', workOrderId: 'os1' })],
       ordens: [os({ id: 'os1', tipo: 'corretiva' })],
     });
+    expect(items).toHaveLength(3);
+    expect(items.filter((i) => i.origin === 'report')).toHaveLength(1);
+    expect(items.filter((i) => i.origin === 'attendance')).toHaveLength(2);
+  });
+
+  it('o mesmo registro nunca conta duas vezes (dedupe por id da entidade, §11)', () => {
+    const r = report({ id: 'r1', osId: 'os1' });
+    const items = buildFinalizedServiceItems({ reports: [r, r], ordens: [os({ id: 'os1' })] });
     expect(items).toHaveLength(1);
-    expect(items[0].origin).toBe('report');
   });
 
   it('atendimento em OUTRA OS (sem report) coexiste com o report', () => {

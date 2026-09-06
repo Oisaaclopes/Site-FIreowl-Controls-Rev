@@ -49,7 +49,10 @@ import { createOrderFromSurvey } from '@/lib/surveyOrderConversion';
 import { fetchPedidos } from '@/lib/pedidos';
 import { fetchServiceAttendances } from '@/lib/serviceAttendances';
 import { fetchSurveys } from '@/lib/technicalSurveys';
-import { buildFinalizedServiceItems, countFinalizedServices } from '@/lib/finalizedServices';
+import { buildFinalizedServiceItems, countFinalizedServices, FinalizedServiceItem } from '@/lib/finalizedServices';
+import { OsDocumentsView } from '@/components/documentos/OsDocumentsView';
+import dynamic from 'next/dynamic';
+const LevantamentoPdfInner = dynamic(() => import('@/components/documentos/LevantamentoPdfInner'), { ssr: false });
 import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 import { centralModelsForBrand, centralType, manufacturersForArea } from '@/lib/technicalCatalogSelection';
 import { canHardDeleteReport, filterReports, isLatestReportRefresh } from '@/lib/reportList';
@@ -222,6 +225,10 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   // técnicos concluídos (§5B) — não vivem em `reports`.
   const [attendances, setAttendances] = useState<ServiceAttendance[]>([]);
   const [surveys, setSurveys] = useState<TechnicalSurvey[]>([]);
+  // Documento técnico finalizado aberto na aba Relatórios (§7): atendimento →
+  // Documentos da OS; levantamento → PDF do Levantamento (3D). Nunca vai a Pedidos.
+  const [finalizedDoc, setFinalizedDoc] = useState<FinalizedServiceItem | null>(null);
+  const [finalizedSurveyDevices, setFinalizedSurveyDevices] = useState<Device[]>([]);
   const toast = useToast();
   const confirm = useConfirm();
   const podeAtribuir = userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR';
@@ -698,11 +705,25 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     [reports, attendances, surveys, ordens],
   );
   // Serviços finalizados que NÃO são `reports` (não aparecem na tabela legada):
-  // atendimentos sem report + levantamentos técnicos.
+  // atendimentos + levantamentos técnicos (cada um é um documento próprio).
   const nonReportServices = useMemo(
     () => finalizedServices.filter((s) => s.origin !== 'report'),
     [finalizedServices],
   );
+
+  // Abre o DOCUMENTO técnico do serviço finalizado (§7): atendimento → Documentos
+  // da OS (aba Relatório); levantamento → PDF do Levantamento (carrega os ativos
+  // do cliente/área para o documento). Nunca navega para Pedidos.
+  const openFinalizedDoc = async (item: FinalizedServiceItem) => {
+    if (item.origin === 'survey') {
+      try {
+        const all = await fetchDevices(item.clienteId);
+        setFinalizedSurveyDevices(all.filter((d) => !item.area || d.sistema === item.area));
+      } catch { setFinalizedSurveyDevices([]); }
+    }
+    setFinalizedDoc(item);
+  };
+  const finalizedOs = finalizedDoc?.osId ? ordens.find((o) => o.id === finalizedDoc.osId) : undefined;
 
   // KPIs compactos: contam TODOS os serviços finalizados (não só `reports`).
   const indB = useMemo(() => {
@@ -1210,7 +1231,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
               onClick={openWizard}
               className="bg-danger hover:bg-danger-hover text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
             >
-              <span className="material-symbols-outlined text-base">add</span> Novo relatório
+              <span className="material-symbols-outlined text-base">add</span> Novo atendimento
             </button>
           )}
         </div>
@@ -1398,7 +1419,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
           variant="relatorio"
           title={(search || fTipo !== 'TODOS' || fStatus !== 'TODOS') ? 'Nenhum relatório corresponde aos filtros selecionados.' : 'Nenhum relatório finalizado ainda.'}
           description={(search || fTipo !== 'TODOS' || fStatus !== 'TODOS') ? 'Ajuste a busca ou limpe os filtros para ver outros resultados.' : 'Os relatórios aparecerão aqui após a conclusão e sincronização de um atendimento.'}
-          actionLabel={(search || fTipo !== 'TODOS' || fStatus !== 'TODOS') ? 'Limpar filtros' : canCreate ? 'Novo relatório' : undefined}
+          actionLabel={(search || fTipo !== 'TODOS' || fStatus !== 'TODOS') ? 'Limpar filtros' : canCreate ? 'Novo atendimento' : undefined}
           onAction={(search || fTipo !== 'TODOS' || fStatus !== 'TODOS')
             ? () => { setSearch(''); setFTipo('TODOS'); setFStatus('TODOS'); }
             : canCreate ? openWizard : undefined}
@@ -1520,9 +1541,15 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                     {s.date && <span>{fmtDate(s.date)}</span>}
                   </p>
                 </div>
-                {s.origin === 'attendance' && onNavigateToPedidos && (
-                  <button onClick={onNavigateToPedidos} className="shrink-0 rounded-lg border border-primary px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-navy hover:text-white">Abrir OS</button>
-                )}
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {/* Ação PRINCIPAL: abre o RELATÓRIO/documento técnico do serviço
+                      finalizado — nunca a área de Pedidos (§7). */}
+                  <button onClick={() => openFinalizedDoc(s)} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-navy">Abrir relatório</button>
+                  {/* Ação SECUNDÁRIA: ver a OS de contexto (quando houver). */}
+                  {s.origin === 'attendance' && s.osId && onNavigateToPedidos && (
+                    <button onClick={onNavigateToPedidos} className="rounded-lg border border-border-strong px-3 py-1.5 text-xs font-semibold text-fg-secondary transition-colors hover:border-primary hover:text-primary">Ver OS</button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -1541,7 +1568,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
           <div className="bg-surface w-full max-w-lg rounded-xl shadow-2xl border border-border max-h-[92vh] flex flex-col">
             <div className="flex items-center justify-between p-5 border-b border-border">
               <div>
-                <h3 className="text-base font-bold text-fg uppercase">Novo relatório</h3>
+                <h3 className="text-base font-bold text-fg uppercase">Novo atendimento</h3>
                 <p className="text-[11px] text-fg-secondary">Passo {wizardStep} de 3</p>
               </div>
               <button onClick={closeWizard} className="text-fg-muted hover:text-fg-secondary font-bold text-lg leading-none">✕</button>
@@ -1795,6 +1822,32 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
           onChanged={() => { if (isSupabaseConfigured()) fetchDevices(survey.clienteId).then((d) => setSurvey((s) => (s ? { ...s, devices: d } : s))).catch(() => {}); }}
         />
       )}
+
+      {/* ===== Documento técnico de serviço finalizado (§7) ===== */}
+      {finalizedDoc?.origin === 'attendance' && finalizedOs && (
+        <OsDocumentsView
+          os={finalizedOs}
+          company={companyProfile || null}
+          client={clients.find((c) => c.id === finalizedOs.clienteId)}
+          pedido={surveyOrders.find((p) => p.id === finalizedOs.sourcePedidoId)}
+          initialKind="relatorio"
+          onClose={() => setFinalizedDoc(null)}
+        />
+      )}
+      {finalizedDoc?.origin === 'survey' && (() => {
+        const sv = surveys.find((s) => s.id === finalizedDoc.surveyId);
+        return (
+          <LevantamentoPdfInner
+            client={{ id: finalizedDoc.clienteId || '', name: clientName(finalizedDoc.clienteId) } as Client}
+            area={(finalizedDoc.area || sv?.area || 'SDAI') as TechArea}
+            mode={sv?.mode || 'COMPLETO'}
+            scopeText={sv?.notes || undefined}
+            deviceIds={finalizedSurveyDevices.map((d) => d.id)}
+            resumo={{ expected: sv?.expectedCount, verified: sv?.verifiedCount }}
+            onClose={() => setFinalizedDoc(null)}
+          />
+        );
+      })()}
 
       {/* ===== Editar dados do relatório ===== */}
       {editRep && (

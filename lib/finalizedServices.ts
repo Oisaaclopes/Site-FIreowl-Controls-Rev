@@ -33,7 +33,9 @@ export const FINALIZED_SERVICE_LABEL: Record<FinalizedServiceType, string> = {
 export type FinalizedServiceOrigin = 'report' | 'attendance' | 'survey';
 
 export interface FinalizedServiceItem {
-  /** Chave estável para React (origem + id). */
+  /** Chave estável para React e identidade DOCUMENTAL (origem + id da entidade).
+   *  A identidade é da própria entidade (attendance/report/survey), NUNCA da OS —
+   *  a OS é contexto/pai (1 OS → N atendimentos → N documentos). */
   key: string;
   origin: FinalizedServiceOrigin;
   /** id da entidade de origem (report/attendance/survey). */
@@ -41,10 +43,14 @@ export interface FinalizedServiceItem {
   type: FinalizedServiceType;
   typeLabel: string;
   clienteId?: string;
+  /** OS de CONTEXTO (não identidade). */
   osId?: string;
   osNumero?: string;
   attendanceId?: string;
   surveyId?: string;
+  reportId?: string;
+  /** Área técnica (usada para abrir o documento de Levantamento). */
+  area?: string;
   /** Data de finalização (para ordenação/rótulo). */
   date?: string;
   tecnicoId?: string;
@@ -75,16 +81,18 @@ export interface BuildFinalizedInput {
 }
 
 /**
- * Constrói a lista unificada de serviços FINALIZADOS, ordenada por data desc.
- * Só entra o que está realmente finalizado (serviço em execução NUNCA aparece).
+ * Constrói a lista unificada de DOCUMENTOS técnicos de serviços FINALIZADOS,
+ * ordenada por data desc. Só entra o que está realmente finalizado (serviço em
+ * execução NUNCA aparece).
  *
- * Deduplicação (canônica, documentada — 5B.3): não há FK direta report↔atendimento;
- * a única relação real é a OS. Como a arquitetura documenta uma OS OU por
- * `report` (legado) OU por `service_attendances` (moderno), quando existe um
- * report finalizado para a MESMA OS de um atendimento, o report é o documento
- * canônico e o atendimento é omitido (evita contar o mesmo serviço duas vezes).
- * Atendimentos sem report para a OS entram normalmente. Levantamentos (survey)
- * não têm OS direta e entram sempre — corrige "Levantamentos = 0".
+ * IDENTIDADE DOCUMENTAL (§8/§9): cada documento é identificado pela SUA entidade
+ * — report_id, attendance_id ou technical_survey_id — NUNCA pela OS. A OS é
+ * contexto/pai: 1 OS pode ter N atendimentos finalizados = N documentos, e todos
+ * aparecem. NÃO se esconde atendimento porque existe um `report` com o mesmo
+ * os_id. Como finalizar um atendimento NÃO cria linha em `reports` (fontes
+ * disjuntas — auditado), não há duplicação de um mesmo documento entre origens;
+ * a dedução por id da própria entidade garante que o mesmo registro nunca conta
+ * duas vezes.
  */
 export function buildFinalizedServiceItems(input: BuildFinalizedInput): FinalizedServiceItem[] {
   const reports = input.reports ?? [];
@@ -94,17 +102,19 @@ export function buildFinalizedServiceItems(input: BuildFinalizedInput): Finalize
   const osById = new Map(ordens.map((o) => [o.id, o] as const));
 
   const items: FinalizedServiceItem[] = [];
+  const seen = new Set<string>(); // guarda por identidade da entidade (não OS)
 
-  // 1) Reports finalizados.
-  const reportedOsIds = new Set<string>();
+  // 1) Reports finalizados (documento = Relatório técnico).
   for (const r of reports) {
     if (r.status !== 'finalizado') continue;
-    if (r.osId) reportedOsIds.add(r.osId);
+    if (seen.has(`report-${r.id}`)) continue;
+    seen.add(`report-${r.id}`);
     const type = REPORT_TYPE_MAP[r.tipo] ?? 'OUTRO';
     items.push({
       key: `report-${r.id}`,
       origin: 'report',
       sourceId: r.id,
+      reportId: r.id,
       type,
       typeLabel: FINALIZED_SERVICE_LABEL[type],
       clienteId: r.clienteId,
@@ -117,40 +127,45 @@ export function buildFinalizedServiceItems(input: BuildFinalizedInput): Finalize
     });
   }
 
-  // 2) Atendimentos finalizados — classificados pela OS; dedup contra report da mesma OS.
+  // 2) Atendimentos finalizados — CADA UM é um documento (classificado pela OS).
+  //    Múltiplos atendimentos da mesma OS geram múltiplos documentos (§9).
   for (const a of attendances) {
     if (a.status !== 'FINALIZADO') continue;
-    if (a.workOrderId && reportedOsIds.has(a.workOrderId)) continue; // report é o documento canônico
+    if (seen.has(`attendance-${a.id}`)) continue;
+    seen.add(`attendance-${a.id}`);
     const os = a.workOrderId ? osById.get(a.workOrderId) : undefined;
     const type = os ? (OS_TYPE_MAP[os.tipo] ?? 'OUTRO') : 'OUTRO';
     items.push({
       key: `attendance-${a.id}`,
       origin: 'attendance',
       sourceId: a.id,
+      attendanceId: a.id,
       type,
       typeLabel: FINALIZED_SERVICE_LABEL[type],
       clienteId: os?.clienteId,
       osId: a.workOrderId,
       osNumero: os?.numero,
-      attendanceId: a.id,
       date: a.finishedAt || a.updatedAt,
       tecnicoId: a.technicianId,
-      hasDocument: true, // Documentos da OS (relatório de atendimento/OS executada)
+      hasDocument: true, // documento técnico do atendimento (Documentos da OS)
       documentSource: 'Documentos da OS',
     });
   }
 
-  // 3) Levantamentos técnicos finalizados (motor 3D).
+  // 3) Levantamentos técnicos finalizados (motor 3D → documento de Levantamento).
   for (const s of surveys) {
     if (s.status !== 'FINALIZADO') continue;
+    if (seen.has(`survey-${s.id}`)) continue;
+    seen.add(`survey-${s.id}`);
     items.push({
       key: `survey-${s.id}`,
       origin: 'survey',
       sourceId: s.id,
+      surveyId: s.id,
       type: 'LEVANTAMENTO_TECNICO',
       typeLabel: FINALIZED_SERVICE_LABEL.LEVANTAMENTO_TECNICO,
       clienteId: s.clienteId,
-      surveyId: s.id,
+      area: s.area,
       date: s.finishedAt || s.updatedAt,
       tecnicoId: s.createdBy,
       hasDocument: true, // PDF do levantamento (3D)
