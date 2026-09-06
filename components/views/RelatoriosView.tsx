@@ -16,6 +16,8 @@ import {
   Supplier,
   Pedido,
   TimePunch,
+  ServiceAttendance,
+  TechnicalSurvey,
 } from '@/lib/types';
 import { ALL_TEMPLATES, seedReportTemplates } from '@/lib/reportTemplatesData';
 import { TemplateSchema } from '@/lib/reportSchema';
@@ -45,6 +47,9 @@ import { ReportTechnicalPDFView } from '@/components/documentos/ReportTechnicalP
 import { PendenciasBoard } from '@/components/reports/PendenciasBoard';
 import { createOrderFromSurvey } from '@/lib/surveyOrderConversion';
 import { fetchPedidos } from '@/lib/pedidos';
+import { fetchServiceAttendances } from '@/lib/serviceAttendances';
+import { fetchSurveys } from '@/lib/technicalSurveys';
+import { buildFinalizedServiceItems, countFinalizedServices } from '@/lib/finalizedServices';
 import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 import { centralModelsForBrand, centralType, manufacturersForArea } from '@/lib/technicalCatalogSelection';
 import { canHardDeleteReport, filterReports, isLatestReportRefresh } from '@/lib/reportList';
@@ -213,6 +218,10 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const [surveyOrders, setSurveyOrders] = useState<Pedido[]>([]);
   const [pendencias, setPendencias] = useState<Pendencia[]>([]);
   const [ordens, setOrdens] = useState<OrdemServico[]>([]);
+  // Fluxo moderno: atendimentos e levantamentos finalizados também são serviços
+  // técnicos concluídos (§5B) — não vivem em `reports`.
+  const [attendances, setAttendances] = useState<ServiceAttendance[]>([]);
+  const [surveys, setSurveys] = useState<TechnicalSurvey[]>([]);
   const toast = useToast();
   const confirm = useConfirm();
   const podeAtribuir = userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR';
@@ -547,13 +556,18 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     if (!isSupabaseConfigured()) return;
     const generation = ++refreshGeneration.current;
     setLoading(true);
-    Promise.all([fetchReports(), fetchPendencias(userRole), fetchOrdensServico(), fetchPedidos().catch(() => [])])
-      .then(([rs, ps, os, pedidos]) => {
+    Promise.all([
+      fetchReports(), fetchPendencias(userRole), fetchOrdensServico(), fetchPedidos().catch(() => []),
+      fetchServiceAttendances().catch(() => []), fetchSurveys().catch(() => []),
+    ])
+      .then(([rs, ps, os, pedidos, atts, svs]) => {
         if (!isLatestReportRefresh(refreshGeneration.current, generation)) return;
         setReports(rs);
         setPendencias(ps);
         setOrdens(os);
         setSurveyOrders(pedidos);
+        setAttendances(atts as ServiceAttendance[]);
+        setSurveys(svs as TechnicalSurvey[]);
       })
       .catch((err) => { if (isLatestReportRefresh(refreshGeneration.current, generation)) console.warn('Relatórios: falha ao carregar.', err); })
       .finally(() => { if (isLatestReportRefresh(refreshGeneration.current, generation)) setLoading(false); });
@@ -676,14 +690,37 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     return m;
   }, [pendencias]);
 
-  // KPIs compactos da fonte canônica remota; não incluem drafts locais.
+  // §5B — serviços técnicos FINALIZADOS de TODAS as fontes canônicas (reports +
+  // atendimentos finalizados + levantamentos 3D), com dedup por OS. Corrige
+  // "Levantamentos = 0" e faz os contadores refletirem serviços reais.
+  const finalizedServices = useMemo(
+    () => buildFinalizedServiceItems({ reports, attendances, surveys, ordens }),
+    [reports, attendances, surveys, ordens],
+  );
+  // Serviços finalizados que NÃO são `reports` (não aparecem na tabela legada):
+  // atendimentos sem report + levantamentos técnicos.
+  const nonReportServices = useMemo(
+    () => finalizedServices.filter((s) => s.origin !== 'report'),
+    [finalizedServices],
+  );
+
+  // KPIs compactos: contam TODOS os serviços finalizados (não só `reports`).
   const indB = useMemo(() => {
-    const porTipo: Record<string, number> = { LEVANTAMENTO: 0, CORRETIVA: 0, PREVENTIVA: 0 };
-    reports.forEach((r) => (porTipo[r.tipo] = (porTipo[r.tipo] || 0) + 1));
+    const counts = countFinalizedServices(finalizedServices);
     const detectadas = pendencias.length;
     const convertidas = pendencias.filter((p) => p.propostaId).length;
-    return { total: reports.length, porTipo, detectadas, convertidas };
-  }, [reports, pendencias]);
+    return {
+      total: counts.total,
+      porTipo: {
+        LEVANTAMENTO: counts.byType.LEVANTAMENTO_TECNICO,
+        CORRETIVA: counts.byType.CORRETIVA,
+        PREVENTIVA: counts.byType.PREVENTIVA,
+        INSTALACAO: counts.byType.INSTALACAO,
+      } as Record<string, number>,
+      detectadas,
+      convertidas,
+    };
+  }, [finalizedServices, pendencias]);
 
   // ---- Lista filtrada ----
   const filtered = useMemo(() => {
@@ -1293,11 +1330,12 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 
       {board === 'relatorios' && (
       <>
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2" aria-label="Indicadores de relatórios">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-7 gap-2" aria-label="Indicadores de relatórios">
         <VolCard label="Total" value={indB.total} />
-        <VolCard label="Levantamentos" value={indB.porTipo.LEVANTAMENTO} />
+        <VolCard label="Instalações" value={indB.porTipo.INSTALACAO} />
         <VolCard label="Preventivas" value={indB.porTipo.PREVENTIVA} />
         <VolCard label="Corretivas" value={indB.porTipo.CORRETIVA} />
+        <VolCard label="Levantamentos" value={indB.porTipo.LEVANTAMENTO} />
         <VolCard label="Pendências" value={indB.detectadas} />
         {!isTecnico && <VolCard label="Convertidas" value={indB.convertidas} />}
       </div>
@@ -1456,6 +1494,39 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
           ))}
         </div>
         </>
+      )}
+
+      {/* §5B — serviços finalizados do fluxo moderno que NÃO vivem em `reports`:
+          atendimentos finalizados (documento = Documentos da OS) e levantamentos
+          técnicos (3D). Dedup já removeu atendimentos cuja OS tem report. */}
+      {nonReportServices.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px] text-primary">engineering</span>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-fg-secondary">Atendimentos e levantamentos finalizados</h3>
+            <span className="text-[11px] text-fg-muted">· {nonReportServices.length}</span>
+          </div>
+          <div className="flex flex-col gap-2">
+            {nonReportServices.map((s) => (
+              <div key={s.key} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-navy/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">{s.typeLabel}</span>
+                    {s.osNumero && <span className="font-data-mono text-xs font-bold text-fg">{s.osNumero}</span>}
+                  </div>
+                  <p className="mt-0.5 truncate text-sm font-semibold text-fg">{clientName(s.clienteId)}</p>
+                  <p className="mt-0.5 flex flex-wrap gap-x-3 text-[11px] text-fg-secondary">
+                    <span>{s.documentSource}</span>
+                    {s.date && <span>{fmtDate(s.date)}</span>}
+                  </p>
+                </div>
+                {s.origin === 'attendance' && onNavigateToPedidos && (
+                  <button onClick={onNavigateToPedidos} className="shrink-0 rounded-lg border border-primary px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-navy hover:text-white">Abrir OS</button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {!isSupabaseConfigured() && (
