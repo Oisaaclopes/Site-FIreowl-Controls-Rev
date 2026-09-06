@@ -1056,7 +1056,39 @@ export interface EffectiveMaintenancePolicy {
   especificidade: number;
 }
 
-export type MaintenanceAssetStatus = 'EM_DIA' | 'PROXIMO' | 'VENCIDO' | 'SEM_POLITICA';
+/**
+ * Status de manutenção do ativo:
+ * - EM_DIA/PROXIMO/VENCIDO: há política E histórico (último teste) → vencimento real.
+ * - SEM_HISTORICO: há política aplicável, mas NENHUMA verificação registrada — não
+ *   dá para afirmar "vencido" sem data-base; precisa de um primeiro teste.
+ * - SEM_POLITICA: nenhuma política de manutenção aplicável ao ativo.
+ * (SEM_HISTORICO espelha SEM_POLITICA: ambos = falta um pré-requisito para calcular.)
+ */
+export type MaintenanceAssetStatus = 'EM_DIA' | 'PROXIMO' | 'VENCIDO' | 'SEM_HISTORICO' | 'SEM_POLITICA';
+
+/** Classe normalizada do resultado de um teste (deriva de device_verifications.condicao). */
+export type TestResultClass = 'APROVADO' | 'FALHA' | 'NAO_TESTADO';
+
+/** Cobertura de manutenção de um intervalo (derivada; nunca digitada — §19). */
+export interface MaintenanceCoverage {
+  periodStart: string;
+  periodEnd: string;
+  totalBase: number;            // ativos na Base (escopo)
+  totalComPolitica: number;     // ativos com política aplicável
+  semPolitica: number;
+  semHistorico: number;         // com política, mas sem verificação alguma
+  programadosPeriodo: number;   // previstos p/ teste no período (vencia até o fim OU foi testado)
+  testadosPeriodo: number;      // com verificação dentro da janela
+  aprovadosPeriodo: number;
+  falharamPeriodo: number;
+  naoTestadosPeriodo: number;   // programados − testados
+  /** testados/programados (cobertura do período). null quando programados=0. */
+  coberturaProgramadosPct: number | null;
+  /** testados/totalComPolitica (breadth da instalação; útil no acumulado). */
+  coberturaBasePct: number | null;
+  /** aprovados/testados. null quando testados=0. */
+  aprovacaoPct: number | null;
+}
 
 /** Linha de manutenção de um ativo (deriva de devices + policy + verificações). */
 export interface MaintenanceAssetRow {
@@ -1070,30 +1102,100 @@ export interface MaintenanceAssetRow {
   diasParaVencer?: number;
 }
 
-/** Snapshot documental congelado do consolidado MANUTENCAO (reports.snapshot). */
+/* ---- Sub-estruturas CONGELADAS do snapshot (dados do momento da emissão) ---- */
+
+/** Ativo congelado: preserva nome/localização/condição do MOMENTO (§6). */
+export interface MaintenanceAssetSnapshot {
+  deviceId: string;
+  sistema: string;
+  central?: string;
+  laco?: string;          // laço/canal/zona (devices.laco + technicalAttributes quando houver)
+  endereco?: string;
+  codigo?: string;        // technical_identifier
+  tipo?: string;          // tipo_ativo || tipo_dispositivo
+  fabricante?: string;
+  modelo?: string;
+  descricao?: string;     // localizacao
+  condicao?: string;
+  resultadoTeste?: TestResultClass;
+  dataTeste?: string;
+}
+
+export interface MaintenanceTestSnapshot {
+  deviceVerificationId: string;
+  deviceId: string;
+  condicao: string;
+  resultado: TestResultClass;
+  verifiedAt?: string;
+  serviceAttendanceId?: string;
+}
+
+export interface MaintenancePhotoSnapshot {
+  fieldPhotoId: string;
+  storagePath?: string;      // original (não duplica arquivo — só referência §7)
+  storagePathEvidencia?: string;
+  capturadoEm?: string;
+  deviceId?: string;
+  attendanceId?: string;
+  pendenciaId?: string;
+  momento?: string;          // evidence_moment
+  descricao?: string;        // nota_rapida
+}
+
+export interface MaintenancePendenciaSnapshot {
+  id: string;
+  descricao?: string;
+  grupo?: string;
+  local?: string;
+  acaoRecomendada?: string;
+  deviceId?: string;
+  status: string;
+  criadaEm?: string;
+  resolvidaEm?: string;
+}
+
+export interface MaintenanceAttendanceSnapshot {
+  id: string;
+  tecnicoId?: string;
+  data?: string;
+  resultado?: string;
+  osId?: string;
+}
+
+/** Snapshot documental congelado do consolidado MANUTENCAO (reports.snapshot).
+ *  Suficiente para reproduzir o documento mesmo que a Base mude depois (§5/§9). */
 export interface MaintenanceReportSnapshot {
   contratoId: string;
   clienteId?: string;
   periodStart: string;
   periodEnd: string;
   competencia?: string;
-  sistemas: string[];
-  atendimentos: Array<{ id: string; tecnicoId?: string; data?: string; resultado?: string; osNumero?: string }>;
-  routineExecutions: Array<{ id: string; competencia: string; routineId: string; dataProgramada?: string; status: string }>;
-  testes: Array<{ deviceId: string; condicao: string; verifiedAt?: string; local?: string; endereco?: string }>;
-  pendencias: {
-    abertasNoPeriodo: string[];
-    anterioresAbertas: string[];
-    resolvidasNoPeriodo: string[];
-  };
-  fotos: Array<{ id: string; storagePath: string; ativo?: string; atendimentoId?: string; momento?: string; capturadoEm?: string }>;
-  alteracoesBase: Array<{ deviceId: string; tipo: string; antes?: string; depois?: string; em?: string }>;
-  cobertura?: { previstos: number; testados: number; aprovados: number; reprovados: number };
-  conclusao?: string;
-  fechadoEm: string;
   revisao: string;
-  /** Membership congelada: ids incluídos (evita recontagem/ambiguidade futura). */
-  membership: { attendanceIds: string[]; executionIds: string[] };
+  fechadoEm: string;
+  sistemas: string[];
+  atendimentos: MaintenanceAttendanceSnapshot[];
+  routineExecutions: Array<{ id: string; competencia: string; routineId: string; dataProgramada?: string; status: string }>;
+  ativos: MaintenanceAssetSnapshot[];
+  testes: MaintenanceTestSnapshot[];
+  cobertura: MaintenanceCoverage;
+  pendencias: {
+    novasNoPeriodo: MaintenancePendenciaSnapshot[];
+    anterioresAbertas: MaintenancePendenciaSnapshot[];
+    resolvidasNoPeriodo: MaintenancePendenciaSnapshot[];
+  };
+  fotos: MaintenancePhotoSnapshot[];
+  alteracoesBase: Array<{ deviceId: string; tipo: string; antes?: string; depois?: string; em?: string }>;
+  /** Conclusão técnica — só quando fornecida/revisada por humano (§5: não inventar). */
+  conclusao?: string;
+  /** Membership congelada: exatamente o que participou da emissão (§9). */
+  membership: {
+    attendanceIds: string[];
+    executionIds: string[];
+    deviceVerificationIds: string[];
+    pendenciaIds: string[];
+    fieldPhotoIds: string[];
+    deviceIds: string[];
+  };
 }
 
 /** Levantamento técnico (technical_surveys, 0095). */

@@ -112,6 +112,26 @@ export async function fetchVerificationsInWindow(
   return (data || []).map(rowToVerification);
 }
 
+/**
+ * Todas as verificações de uma lista de ativos com verified_at ≤ periodEnd
+ * (inclui histórico ANTES e DENTRO do período). Base da cobertura: precisa do
+ * último teste antes da janela para saber se o ativo era "previsto" no período.
+ */
+export async function fetchVerificationsForDevicesUpTo(
+  deviceIds: string[],
+  periodEnd: string
+): Promise<DeviceVerification[]> {
+  const ids = Array.from(new Set(deviceIds.filter(Boolean)));
+  if (ids.length === 0) return [];
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase.from(TABLE).select('*')
+    .in('device_id', ids)
+    .lte('verified_at', `${periodEnd}T23:59:59.999Z`)
+    .order('verified_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(rowToVerification);
+}
+
 /** Verificações de um levantamento (para cobertura/reconciliação). */
 export async function fetchVerificationsForSurvey(surveyId: string): Promise<DeviceVerification[]> {
   const supabase = getSupabaseClient() as any;

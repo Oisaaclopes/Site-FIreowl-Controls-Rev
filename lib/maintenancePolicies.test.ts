@@ -113,7 +113,4 @@ describe('maintenanceStatus', () => {
   it('carência mantém PROXIMO logo após o vencimento', () => {
     expect(maintenanceStatus('2026-05-10', '2026-05-12', 5, 30)).toBe('PROXIMO');
   });
-  it('sem próximo teste (nunca testado) → VENCIDO', () => {
-    expect(maintenanceStatus(undefined, '2026-05-01')).toBe('VENCIDO');
-  });
 });

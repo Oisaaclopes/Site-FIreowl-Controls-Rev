@@ -14,7 +14,6 @@ import type {
   AssetMaintenancePolicy,
   Device,
   EffectiveMaintenancePolicy,
-  MaintenanceAssetStatus,
   MaintenancePeriodicityUnit,
 } from './types';
 
@@ -182,19 +181,20 @@ export function nextMaintenanceDate(
 export const DEFAULT_PROXIMO_WINDOW_DAYS = 30;
 
 /**
- * Classifica o status de manutenção na data de referência.
+ * Classifica o status de manutenção na data de referência, DADA a próxima data
+ * de teste (exige histórico — o caso "sem próximo teste conhecido" é resolvido
+ * como SEM_HISTORICO na camada de seleção, não aqui).
  * - VENCIDO: passou do vencimento + carência (janela_tolerancia_dias).
  * - PROXIMO: dentro de [vencimento - janela, vencimento + carência].
  * - EM_DIA: ainda antes da janela de aproximação.
- * Sem próximo teste (ativo nunca testado, mas com política) → VENCIDO (a fazer).
+ * Retorno é sempre EM_DIA/PROXIMO/VENCIDO.
  */
 export function maintenanceStatus(
-  nextTest: string | undefined,
+  nextTest: string,
   referenceDate: string,
   toleranceDays = 0,
   proximoWindowDays = DEFAULT_PROXIMO_WINDOW_DAYS
-): MaintenanceAssetStatus {
-  if (!nextTest) return 'VENCIDO';
+): 'EM_DIA' | 'PROXIMO' | 'VENCIDO' {
   const ref = parseDateUTC(referenceDate);
   const due = parseDateUTC(nextTest);
   const daysToDue = diffDays(ref, due); // >0 futuro, <0 vencido

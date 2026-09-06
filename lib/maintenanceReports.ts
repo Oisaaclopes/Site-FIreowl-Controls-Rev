@@ -16,9 +16,16 @@ import { fetchRoutineExecutions } from './contractRoutines';
 import { fetchPendencias } from './pendencias';
 import { fetchVerificationsInWindow } from './deviceVerifications';
 import { fetchDevices } from './devices';
-import { listFieldPhotosForOs } from './fieldPhotos';
+import { listFieldPhotosForOs, type FieldPhoto } from './fieldPhotos';
+import { classifyTestResult, fetchMaintenanceCoverage } from './maintenanceCoverage';
 import type {
   ContractRoutineExecution,
+  Device,
+  DeviceVerification,
+  MaintenanceAssetSnapshot,
+  MaintenanceCoverage,
+  MaintenancePendenciaSnapshot,
+  MaintenancePhotoSnapshot,
   MaintenanceReportSnapshot,
   Pendencia,
   ReportInstance,
@@ -128,10 +135,15 @@ export async function linkReportToAttendance(reportId: string, attendanceId: str
  */
 export async function finalizeMaintenanceReport(
   reportId: string,
-  snapshot: MaintenanceReportSnapshot
+  snapshot: MaintenanceReportSnapshot,
+  fechadoEm?: string
 ): Promise<ReportInstance> {
   if (!snapshot) throw new Error('snapshot obrigatório para fechar MANUTENCAO');
-  const now = new Date().toISOString();
+  // snapshot vazio (sem membership) não fecha (§10): protege de emissão em branco.
+  const m = snapshot.membership;
+  const vazio = !m || (m.attendanceIds.length + m.executionIds.length + m.deviceVerificationIds.length + m.pendenciaIds.length) === 0;
+  if (vazio) throw new Error('snapshot sem conteúdo (membership vazio) — nada a consolidar no período');
+  const now = fechadoEm || new Date().toISOString();
   const supabase = getSupabaseClient() as any;
   const { data, error } = await supabase.from('reports')
     .update({ status: 'finalizado', snapshot, fechado_em: now, data_fim: now, updated_at: now })
@@ -267,5 +279,184 @@ export async function buildMaintenanceConsolidation(input: {
       executionIds: execs.map((e) => e.id),
       osIds,
     },
+  };
+}
+
+/* --------------------------- Snapshot documental (§5–§9) ------------------- */
+
+const dedupe = <T,>(xs: T[]): T[] => Array.from(new Set(xs));
+
+function toPendenciaSnap(p: Pendencia): MaintenancePendenciaSnapshot {
+  return {
+    id: p.id, descricao: p.descricao, grupo: p.grupo, local: p.local,
+    acaoRecomendada: p.acaoRecomendada, deviceId: p.deviceId,
+    status: p.status, criadaEm: p.criadaEm, resolvidaEm: p.resolvidaEm,
+  };
+}
+
+function toPhotoSnap(f: FieldPhoto): MaintenancePhotoSnapshot {
+  return {
+    fieldPhotoId: f.id,
+    storagePath: f.storagePathOriginal,
+    storagePathEvidencia: f.storagePathEvidencia,
+    capturadoEm: f.capturadoEm,
+    deviceId: f.deviceId,
+    attendanceId: f.serviceAttendanceId,
+    pendenciaId: f.pendenciaId,
+    momento: f.evidenceMoment,
+    descricao: f.notaRapida,
+  };
+}
+
+/** Última verificação (por verified_at) de cada device dentro dos testes. */
+function latestTestByDevice(testes: DeviceVerification[]): Map<string, DeviceVerification> {
+  const m = new Map<string, DeviceVerification>();
+  for (const v of testes) {
+    const cur = m.get(v.deviceId);
+    if (!cur || (v.verifiedAt ?? '') > (cur.verifiedAt ?? '')) m.set(v.deviceId, v);
+  }
+  return m;
+}
+
+/** Congela um Device no MOMENTO da emissão (§6/§16). Preserva nome/localização
+ *  atuais para que renomear depois NÃO altere o documento fechado. */
+function toAssetSnap(d: Device, test?: DeviceVerification): MaintenanceAssetSnapshot {
+  return {
+    deviceId: d.id,
+    sistema: d.sistema,
+    central: d.central,
+    laco: d.laco,
+    endereco: d.endereco,
+    codigo: d.technicalIdentifier,
+    tipo: d.tipoAtivo || d.tipoDispositivo,
+    fabricante: d.fabricante,
+    modelo: d.modelo,
+    descricao: d.localizacao,
+    condicao: test?.condicao ?? d.condicao,
+    resultadoTeste: test ? classifyTestResult(test.condicao) : undefined,
+    dataTeste: test?.verifiedAt,
+  };
+}
+
+/**
+ * BUILDER PURO do snapshot documental. Congela os dados do MOMENTO (§9): nomes
+ * de ativos, testes, pendências (3 grupos), fotos (só referências §7), cobertura
+ * e membership. Não inventa conclusão (§5). Depois de gravado é imutável (0106).
+ */
+export function buildMaintenanceReportSnapshot(params: {
+  consolidation: MaintenanceConsolidation;
+  devices: Device[];
+  coverage: MaintenanceCoverage;
+  revisao: string;
+  fechadoEm: string;
+  competencia?: string;
+  conclusao?: string;
+}): MaintenanceReportSnapshot {
+  const { consolidation: c, devices, coverage } = params;
+  const deviceMap = new Map(devices.map((d) => [d.id, d] as const));
+  const latestTest = latestTestByDevice(c.testes);
+
+  // Ativos incluídos no documento = os que tiveram teste OU foto no período.
+  const assetIds = dedupe([
+    ...c.testes.map((t) => t.deviceId),
+    ...c.fotos.map((f) => f.deviceId).filter(Boolean) as string[],
+  ]);
+  const ativos: MaintenanceAssetSnapshot[] = assetIds
+    .map((id) => deviceMap.get(id))
+    .filter((d): d is Device => !!d)
+    .map((d) => toAssetSnap(d, latestTest.get(d.id)));
+
+  const pendAll = [
+    ...c.pendencias.abertasNoPeriodo,
+    ...c.pendencias.anterioresAbertas,
+    ...c.pendencias.resolvidasNoPeriodo,
+  ];
+
+  // Alterações de Base derivadas das verificações com reconciliação relevante
+  // (dado real disponível; rename com antes/depois textual é lacuna — ver entrega).
+  const alteracoesBase = c.testes
+    .filter((t) => t.reconciliation && ['ALTERADO', 'NOVO', 'NAO_LOCALIZADO', 'DUPLICADO'].includes(t.reconciliation))
+    .map((t) => ({ deviceId: t.deviceId, tipo: t.reconciliation as string, em: t.verifiedAt }));
+
+  return {
+    contratoId: c.contratoId,
+    clienteId: c.clienteId,
+    periodStart: c.periodStart,
+    periodEnd: c.periodEnd,
+    competencia: params.competencia,
+    revisao: params.revisao,
+    fechadoEm: params.fechadoEm,
+    sistemas: c.sistemas,
+    atendimentos: c.attendances.map((a) => ({
+      id: a.id, tecnicoId: a.technicianId, data: a.startedAt, resultado: a.result, osId: a.workOrderId,
+    })),
+    routineExecutions: c.executions.map((e) => ({
+      id: e.id, competencia: e.competencia, routineId: e.routineId, dataProgramada: e.dataProgramada, status: e.status,
+    })),
+    ativos,
+    testes: c.testes.map((t) => ({
+      deviceVerificationId: t.id, deviceId: t.deviceId, condicao: t.condicao,
+      resultado: classifyTestResult(t.condicao), verifiedAt: t.verifiedAt, serviceAttendanceId: t.serviceAttendanceId,
+    })),
+    cobertura: coverage,
+    pendencias: {
+      novasNoPeriodo: c.pendencias.abertasNoPeriodo.map(toPendenciaSnap),
+      anterioresAbertas: c.pendencias.anterioresAbertas.map(toPendenciaSnap),
+      resolvidasNoPeriodo: c.pendencias.resolvidasNoPeriodo.map(toPendenciaSnap),
+    },
+    fotos: c.fotos.map(toPhotoSnap),
+    alteracoesBase,
+    conclusao: params.conclusao,
+    membership: {
+      // cópias (não referências) → snapshot imune a mutações futuras da origem (§9/§11).
+      attendanceIds: [...c.membership.attendanceIds],
+      executionIds: [...c.membership.executionIds],
+      deviceVerificationIds: c.testes.map((t) => t.id),
+      pendenciaIds: dedupe(pendAll.map((p) => p.id)),
+      fieldPhotoIds: c.fotos.map((f) => f.id),
+      deviceIds: [...assetIds],
+    },
+  };
+}
+
+/**
+ * Integra CONSOLIDAÇÃO → SNAPSHOT → FECHAMENTO ATÔMICO (§10). Monta a visão
+ * dinâmica por (contrato + janela), congela no snapshot e finaliza numa única
+ * gravação (status+snapshot+fechado_em). O `fechado_em` é o mesmo no snapshot e
+ * na linha. Não fecha com snapshot vazio.
+ */
+export async function assembleAndFinalizeMaintenanceReport(input: {
+  report: ReportInstance;
+  role?: UserRole;
+  conclusao?: string;
+}): Promise<ReportInstance> {
+  const r = input.report;
+  if (r.tipo !== 'MANUTENCAO') throw new Error('fechamento consolidado só para MANUTENCAO');
+  if (!r.contratoId || !r.periodStart || !r.periodEnd) {
+    throw new Error('MANUTENCAO exige contrato + período para consolidar');
+  }
+  const consolidation = await buildMaintenanceConsolidation({
+    contratoId: r.contratoId, clienteId: r.clienteId,
+    periodStart: r.periodStart, periodEnd: r.periodEnd, role: input.role,
+  });
+  const [devices, coverage] = await Promise.all([
+    r.clienteId ? fetchDevices(r.clienteId) : Promise.resolve([] as Device[]),
+    r.clienteId
+      ? fetchMaintenanceCoverage(r.clienteId, { contractId: r.contratoId, periodStart: r.periodStart, periodEnd: r.periodEnd })
+      : Promise.resolve(emptyCoverage(r.periodStart, r.periodEnd)),
+  ]);
+  const fechadoEm = new Date().toISOString();
+  const snapshot = buildMaintenanceReportSnapshot({
+    consolidation, devices, coverage,
+    revisao: r.revisao || 'R00', fechadoEm, competencia: r.competencia, conclusao: input.conclusao,
+  });
+  return finalizeMaintenanceReport(r.id, snapshot, fechadoEm);
+}
+
+function emptyCoverage(periodStart: string, periodEnd: string): MaintenanceCoverage {
+  return {
+    periodStart, periodEnd, totalBase: 0, totalComPolitica: 0, semPolitica: 0, semHistorico: 0,
+    programadosPeriodo: 0, testadosPeriodo: 0, aprovadosPeriodo: 0, falharamPeriodo: 0, naoTestadosPeriodo: 0,
+    coberturaProgramadosPct: null, coberturaBasePct: null, aprovacaoPct: null,
   };
 }

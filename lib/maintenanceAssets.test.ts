@@ -22,10 +22,11 @@ describe('computeMaintenanceRows', () => {
     expect(rows[0].ultimaCondicao).toBe('NORMAL');
   });
 
-  it('ativo com política mas SEM teste → VENCIDO e proximoTeste indefinido', () => {
+  it('ativo com política mas SEM teste → SEM_HISTORICO (não "vencido" sem data-base)', () => {
     const rows = computeMaintenanceRows([device({ id: 'd2' })], [policyPadrao], new Map(), { referenceDate: ref });
-    expect(rows[0].status).toBe('VENCIDO');
+    expect(rows[0].status).toBe('SEM_HISTORICO');
     expect(rows[0].proximoTeste).toBeUndefined();
+    expect(rows[0].policy).not.toBeNull();
   });
 
   it('ativo sem política casada → SEM_POLITICA', () => {

@@ -71,9 +71,12 @@ export function computeMaintenanceRows(
       proximoTeste = nextMaintenanceDate(ultimoTeste, effective);
     }
 
-    const status = effective
-      ? maintenanceStatus(proximoTeste, input.referenceDate, effective.janelaToleranciaDias, input.proximoWindowDays)
-      : 'SEM_POLITICA';
+    // SEM_POLITICA: sem política. SEM_HISTORICO: com política mas sem teste-base
+    // (não afirmamos "vencido" sem data-base §1). Só com ambos calculamos vencimento.
+    let status: MaintenanceAssetRow['status'];
+    if (!effective) status = 'SEM_POLITICA';
+    else if (!proximoTeste) status = 'SEM_HISTORICO';
+    else status = maintenanceStatus(proximoTeste, input.referenceDate, effective.janelaToleranciaDias, input.proximoWindowDays);
 
     const diasParaVencer = proximoTeste
       ? diffDays(parseDateUTC(input.referenceDate), parseDateUTC(proximoTeste))
@@ -94,7 +97,7 @@ export function computeMaintenanceRows(
 
 /** Ordem operacional útil: VENCIDO → PROXIMO → SEM_POLITICA → EM_DIA; dentro do
  *  grupo, os mais atrasados primeiro. Puro (não muda o array de entrada). */
-const STATUS_ORDER = { VENCIDO: 0, PROXIMO: 1, SEM_POLITICA: 2, EM_DIA: 3 } as const;
+const STATUS_ORDER = { VENCIDO: 0, PROXIMO: 1, SEM_HISTORICO: 2, SEM_POLITICA: 3, EM_DIA: 4 } as const;
 export function sortMaintenanceRows(rows: MaintenanceAssetRow[]): MaintenanceAssetRow[] {
   return [...rows].sort((a, b) => {
     const s = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
