@@ -26,6 +26,8 @@ import { fetchCnpjData } from '@/lib/cnpj';
 import { uploadClientFachada, uploadClientLogo, removePropostaCapa } from '@/lib/propostaCapa';
 import { nomeFantasiaCliente, razaoSocialCliente } from '@/lib/utils';
 import { CLIENT_SEGMENTS, DEFAULT_CLIENT_SEGMENT } from '@/lib/clients';
+import { usePagination } from '@/lib/usePagination';
+import { PaginatedListControls } from '@/components/ui/PaginatedListControls';
 import { resolveLogoDataUrls } from '@/lib/institucional';
 import { fetchReports } from '@/lib/reports';
 import { OS_STATUS_ATIVOS } from '@/lib/ordensServico';
@@ -315,17 +317,12 @@ export const CrmView: React.FC<CrmViewProps> = ({
       .sort((a, b) => nomeFantasiaCliente(a.name).localeCompare(nomeFantasiaCliente(b.name), 'pt-BR', { sensitivity: 'base' }));
   }, [clients, searchTerm, filterContractStatus, filterSegment]);
 
-  // Paginação (15/30/50/100, padrão 15). Página sempre válida após mudança de
-  // busca/filtro/quantidade — o clamp abaixo evita página fora do intervalo.
-  const [pageSize, setPageSize] = useState(15);
-  const [currentPage, setCurrentPage] = useState(1);
-  const totalPages = Math.max(1, Math.ceil(filteredClients.length / pageSize));
-  useEffect(() => { setCurrentPage(1); }, [searchTerm, filterContractStatus, filterSegment, pageSize]);
-  const safePage = Math.min(currentPage, totalPages);
-  const pagedClients = useMemo(
-    () => filteredClients.slice((safePage - 1) * pageSize, safePage * pageSize),
-    [filteredClients, safePage, pageSize]
-  );
+  // Paginação canônica (helper reutilizável): 15/30/50/100, padrão 15. Volta à
+  // página 1 quando busca/filtros mudam (resetKey) ou o tamanho muda.
+  const pagination = usePagination(filteredClients, {
+    resetKey: `${searchTerm}|${filterContractStatus}|${filterSegment}`,
+  });
+  const pagedClients = pagination.pageItems;
 
   const resetClientForm = () => {
     setEditingClient(null);
@@ -598,46 +595,17 @@ export const CrmView: React.FC<CrmViewProps> = ({
                   />
                 );
               })}
-              {/* Rodapé de paginação: quantidade por página + navegação. */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-1 pt-2 border-t border-border">
-                <div className="flex items-center gap-2 text-xs text-fg-secondary">
-                  <span>Exibir</span>
-                  <select
-                    value={pageSize}
-                    onChange={(e) => setPageSize(Number(e.target.value))}
-                    className="px-2 py-1 border border-border rounded-lg bg-surface text-xs font-semibold"
-                  >
-                    {[15, 30, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
-                  </select>
-                  <span className="hidden sm:inline">
-                    · {filteredClients.length === 0 ? 0 : (safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, filteredClients.length)} de {filteredClients.length}
-                    {filteredClients.length !== clients.length && ` (${clients.length} no total)`}
-                  </span>
-                </div>
-                {totalPages > 1 && (
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      disabled={safePage <= 1}
-                      className="px-2.5 py-1 text-xs font-semibold border border-border rounded-lg bg-surface hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Anterior
-                    </button>
-                    <span className="px-2 text-xs font-semibold text-fg-secondary tabular-nums">
-                      {safePage} / {totalPages}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={safePage >= totalPages}
-                      className="px-2.5 py-1 text-xs font-semibold border border-border rounded-lg bg-surface hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Próxima
-                    </button>
-                  </div>
-                )}
-              </div>
+              <PaginatedListControls
+                page={pagination.page}
+                totalPages={pagination.totalPages}
+                pageSize={pagination.pageSize}
+                from={pagination.from}
+                to={pagination.to}
+                total={pagination.total}
+                onPageChange={pagination.setPage}
+                onPageSizeChange={pagination.setPageSize}
+                itemLabel="clientes"
+              />
             </div>
           )}
         </div>
