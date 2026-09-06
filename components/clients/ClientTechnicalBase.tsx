@@ -24,7 +24,8 @@ import { isSupabaseConfigured } from '@/lib/inventory';
 import { TechnicalSurveyFlow } from '@/components/clients/TechnicalSurveyFlow';
 import { TechnicalBaseImport } from '@/components/clients/TechnicalBaseImport';
 import { AssetDetailDrawer } from '@/components/clients/AssetDetailDrawer';
-import { fetchTechnicalCatalog, TechnicalCatalogItem } from '@/lib/technicalCatalog';
+import { fetchTechnicalCatalog, TechnicalCatalogItem, manufacturersForArea, modelsForManufacturer } from '@/lib/technicalCatalog';
+import { PickerField } from '@/components/ui/PickerField';
 import { TechnicalAssetFields } from '@/components/clients/TechnicalAssetFields';
 import { AssetFormValues, emptyAssetValues, firstInvalidField, buildDevicePatch, deviceToAssetValues } from '@/lib/technicalAssetForm';
 import { FILE_TYPES, fileTypeLabel, fileTypeIcon, fmtFileSize, deviceOptionLabel } from '@/lib/technicalFiles';
@@ -381,7 +382,7 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
       ) : (
         <AssetTable
           area={area} devices={visible} selected={selected} canManage={canManage}
-          hideSingleCentral={hideSingleCentral}
+          hideSingleCentral={hideSingleCentral} catalog={catalog}
           onInlineSave={inlineSave} onCopy={copyDevices}
           onToggleRow={toggleRow} onToggleAll={toggleAll}
           onVerify={setVerifDevice} onOpen={setDetailDevice} onEdit={setEditDevice}
@@ -582,15 +583,21 @@ const BulkBar: React.FC<{
 /* ------------------------- Tabela adaptativa (seleção + ações) ------------------------- */
 const AssetTable: React.FC<{
   area: TechArea; devices: Device[]; selected: Set<string>; canManage: boolean;
-  hideSingleCentral?: boolean;
+  hideSingleCentral?: boolean; catalog?: TechnicalCatalogItem[];
   onToggleRow: (id: string) => void; onToggleAll: () => void;
   onVerify: (d: Device) => void; onOpen: (d: Device) => void; onEdit: (d: Device) => void;
   onRemove: (d: Device) => void; onHistory: (d: Device) => void; onPendencia: (d: Device) => void;
   onInlineSave?: (d: Device, patch: Partial<Device>) => void; onCopy?: (list: Device[]) => void;
-}> = ({ area, devices, selected, canManage, hideSingleCentral, onToggleRow, onToggleAll, onVerify, onOpen, onEdit, onRemove, onHistory, onPendencia, onInlineSave, onCopy }) => {
+}> = ({ area, devices, selected, canManage, hideSingleCentral, catalog = [], onToggleRow, onToggleAll, onVerify, onOpen, onEdit, onRemove, onHistory, onPendencia, onInlineSave, onCopy }) => {
   // Célula em edição inline (id do device + campo). null = nenhuma.
-  const [editCell, setEditCell] = useState<{ id: string; field: 'localizacao' | 'condicao' | 'grupo' } | null>(null);
+  const [editCell, setEditCell] = useState<{ id: string; field: 'localizacao' | 'condicao' | 'grupo' | 'fabricante' | 'modelo' } | null>(null);
+  // Modo texto manual (equipamento desconhecido) para fabricante/modelo.
+  const [manualEdit, setManualEdit] = useState<{ id: string; field: 'fabricante' | 'modelo' } | null>(null);
   const canInline = canManage && !!onInlineSave;
+  // Fabricantes CANÔNICOS da disciplina/área (não limitados a 3; aparecem mesmo
+  // sem modelo do grupo cadastrado). Sentinela p/ entrada manual.
+  const MANUAL_OPT = '__manual__';
+  const manufacturerOptions = useMemo(() => manufacturersForArea(catalog, area), [catalog, area]);
   const [menu, setMenu] = useState<string | null>(null);
   if (devices.length === 0) {
     return <EmptyState variant="generico" title={`Sem ativos de ${AREA_LABEL[area]}`} description="Nenhum ativo para os filtros atuais. Ajuste os filtros, cadastre manualmente ou registre um levantamento." />;
@@ -688,7 +695,62 @@ const AssetTable: React.FC<{
                 ) : (
                   <td className={`px-3 py-2 text-fg-secondary ${canInline ? 'cursor-text hover:bg-navy/5' : 'cursor-pointer'}`} title={canInline ? 'Clique para editar o grupo' : undefined} onClick={() => canInline ? setEditCell({ id: d.id, field: 'grupo' }) : onOpen(d)}>{[legacyGroupLabel(area, d.grupo), d.tipoAtivo || d.tipoDispositivo].filter(Boolean).join(' · ') || '—'}</td>
                 )}
-                <td className="cursor-pointer px-3 py-2 text-fg-secondary" onClick={() => onOpen(d)}>{[d.fabricante, d.modelo].filter(Boolean).join(' ') || '—'}</td>
+                {/* Fabricante / Modelo — inline (pickers pesquisáveis canônicos + manual). */}
+                {canInline && manualEdit?.id === d.id ? (
+                  <td className="px-3 py-1.5">
+                    <input
+                      autoFocus
+                      defaultValue={manualEdit.field === 'fabricante' ? (d.fabricante || '') : (d.modelo || '')}
+                      placeholder={manualEdit.field === 'fabricante' ? 'Fabricante (manual)' : 'Modelo (manual)'}
+                      onBlur={(e) => { const val = e.target.value.trim(); const cur = manualEdit.field === 'fabricante' ? (d.fabricante || '') : (d.modelo || ''); if (val !== cur) onInlineSave!(d, { [manualEdit.field]: val } as Partial<Device>); setManualEdit(null); setEditCell(null); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') { setManualEdit(null); setEditCell(null); } }}
+                      className="w-full rounded border border-primary bg-surface px-1.5 py-1 text-xs text-fg focus:outline-none"
+                    />
+                  </td>
+                ) : canInline && editCell?.id === d.id && editCell.field === 'fabricante' ? (
+                  <td className="px-3 py-1.5">
+                    <PickerField
+                      ariaLabel="Fabricante" sheetTitle="Selecionar fabricante" defaultOpen
+                      placeholder="Fabricante" searchPlaceholder="Buscar fabricante..." emptyLabel="Nenhum fabricante na área."
+                      value={d.fabricante && manufacturerOptions.includes(d.fabricante) ? d.fabricante : ''}
+                      onChange={(v) => { if (v === MANUAL_OPT) { setManualEdit({ id: d.id, field: 'fabricante' }); return; } if (v !== (d.fabricante || '')) onInlineSave!(d, { fabricante: v }); setEditCell(null); }}
+                      onClose={() => setEditCell((c) => (c?.id === d.id && c.field === 'fabricante' ? null : c))}
+                      options={[{ id: MANUAL_OPT, name: '✎ Digitar manualmente…' }, ...manufacturerOptions.map((m) => ({ id: m, name: m }))]}
+                      triggerClassName="w-full flex items-center justify-between gap-2 rounded border border-primary bg-surface px-1.5 py-1 text-xs text-fg-secondary"
+                    />
+                  </td>
+                ) : canInline && editCell?.id === d.id && editCell.field === 'modelo' ? (
+                  <td className="px-3 py-1.5">
+                    {(() => {
+                      const models = d.fabricante ? modelsForManufacturer(catalog, d.fabricante, area, d.grupo) : [];
+                      const modelValue = models.find((m) => (m.model || m.name) === d.modelo)?.id || '';
+                      return (
+                        <PickerField
+                          ariaLabel="Modelo" sheetTitle="Selecionar modelo" defaultOpen
+                          placeholder="Modelo" searchPlaceholder="Buscar modelo..."
+                          emptyLabel={d.fabricante ? 'Sem modelo no catálogo — use manual.' : 'Escolha o fabricante primeiro.'}
+                          value={modelValue}
+                          onChange={(v) => { if (v === MANUAL_OPT) { setManualEdit({ id: d.id, field: 'modelo' }); return; } const it = models.find((m) => m.id === v); if (it) onInlineSave!(d, { modelo: it.model || it.name }); setEditCell(null); }}
+                          onClose={() => setEditCell((c) => (c?.id === d.id && c.field === 'modelo' ? null : c))}
+                          options={[{ id: MANUAL_OPT, name: '✎ Digitar manualmente…' }, ...models.map((m) => ({ id: m.id, name: m.model || m.name }))]}
+                          triggerClassName="w-full flex items-center justify-between gap-2 rounded border border-primary bg-surface px-1.5 py-1 text-xs text-fg-secondary"
+                        />
+                      );
+                    })()}
+                  </td>
+                ) : (
+                  <td className="px-3 py-2 text-fg-secondary">
+                    {canInline ? (
+                      <div className="flex flex-wrap items-center gap-x-1.5">
+                        <button type="button" title="Editar fabricante" onClick={() => setEditCell({ id: d.id, field: 'fabricante' })} className="rounded px-1 -mx-1 hover:bg-navy/5">{d.fabricante || <span className="italic text-fg-muted">fabricante</span>}</button>
+                        <span className="text-fg-muted">·</span>
+                        <button type="button" title="Editar modelo" onClick={() => setEditCell({ id: d.id, field: 'modelo' })} className="rounded px-1 -mx-1 hover:bg-navy/5">{d.modelo || <span className="italic text-fg-muted">modelo</span>}</button>
+                      </div>
+                    ) : (
+                      <span className="cursor-pointer" onClick={() => onOpen(d)}>{[d.fabricante, d.modelo].filter(Boolean).join(' ') || '—'}</span>
+                    )}
+                  </td>
+                )}
                 {/* Local — inline (input de texto). */}
                 {canInline && editCell?.id === d.id && editCell.field === 'localizacao' ? (
                   <td className="px-3 py-1.5">

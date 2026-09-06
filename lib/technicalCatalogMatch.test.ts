@@ -64,6 +64,18 @@ describe('CORREÇÃO 3D — taxonomia Base × catálogo (§3/§7/§8)', () => {
     expect(manufacturersForArea(CATALOG, 'SDAI')).toEqual(manufacturersFromCatalog(CATALOG, 'SDAI'));
   });
 
+  it('H) edição inline: trocar fabricante não sugere modelo de outra marca', () => {
+    // Base do inline de Modelo. Ao trocar Intelbras→Tecnohold, os modelos só
+    // podem vir da nova marca (nada de auto-preencher com modelo alheio).
+    const intel = modelsForManufacturer(CATALOG, 'Intelbras', 'SDAI', 'Central SDAI').map((m) => m.model);
+    const tecno = modelsForManufacturer(CATALOG, 'Tecnohold', 'SDAI', 'Acionador Manual').map((m) => m.model);
+    expect(intel).toEqual(['AMT 2018']);
+    expect(tecno).toEqual(['AM-100']);
+    expect(intel.some((m) => tecno.includes(m))).toBe(false);
+    // Fabricante desconhecido → sem modelos (UI cai no manual, nunca inventa).
+    expect(modelsForManufacturer(CATALOG, 'Marca Inexistente', 'SDAI', 'Central SDAI')).toEqual([]);
+  });
+
   it('C) sem filtro de saldo — item existe no catálogo mesmo sem estoque', () => {
     // a view technical_catalog não expõe quantity; o seletor nunca filtra por saldo.
     const m = manufacturersFromCatalog(CATALOG, 'CFTV', 'Câmera');

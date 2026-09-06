@@ -23,15 +23,19 @@ interface Props {
   disabled?: boolean;
   triggerClassName?: string;
   ariaLabel?: string;
+  /** Abre já expandido (uso inline em célula de tabela). */
+  defaultOpen?: boolean;
+  /** Chamado quando o painel fecha (por seleção, clique fora ou Esc). */
+  onClose?: () => void;
 }
 
 export const PickerField: React.FC<Props> = ({
   value, onChange, options, sheetTitle,
   placeholder = 'Selecionar', searchPlaceholder = 'Buscar...', emptyLabel = 'Nenhum resultado encontrado.',
-  disabled = false, triggerClassName = '', ariaLabel,
+  disabled = false, triggerClassName = '', ariaLabel, defaultOpen = false, onClose,
 }) => {
   const isMobile = useIsMobile();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [query, setQuery] = useState('');
   const rootRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -42,17 +46,20 @@ export const PickerField: React.FC<Props> = ({
     return q ? options.filter((o) => o.name.toLowerCase().includes(q)) : options;
   }, [options, query]);
 
+  const close = () => { setOpen(false); onClose?.(); };
+
   useEffect(() => {
     if (!open) return;
-    const onDown = (e: MouseEvent) => { if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    const onDown = (e: MouseEvent) => { if (rootRef.current && !rootRef.current.contains(e.target as Node)) close(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onKey);
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
   useEffect(() => { if (open) { setQuery(''); setTimeout(() => searchRef.current?.focus(), 50); } }, [open]);
 
-  const pick = (id: string) => { onChange(id); setOpen(false); };
+  const pick = (id: string) => { onChange(id); close(); };
 
   const Row = ({ id, label }: { id: string; label: string }) => {
     const active = id === value;
@@ -81,7 +88,7 @@ export const PickerField: React.FC<Props> = ({
   return (
     <div ref={rootRef} className="relative">
       <button type="button" aria-label={ariaLabel || sheetTitle} aria-haspopup="listbox" aria-expanded={open} disabled={disabled}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => (open ? close() : setOpen(true))}
         className={triggerClassName || 'w-full flex items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-semibold text-fg-secondary disabled:opacity-60'}>
         <span className={`truncate ${selected ? '' : 'text-fg-muted'}`}>{selected ? selected.name : placeholder}</span>
         <span className="material-symbols-outlined text-lg shrink-0">expand_more</span>
@@ -91,11 +98,11 @@ export const PickerField: React.FC<Props> = ({
         <div className="absolute z-50 mt-1 w-full min-w-[220px] rounded-xl border border-border bg-surface shadow-pop overflow-hidden">{list}</div>
       )}
       {open && isMobile && (
-        <div className="fixed inset-0 z-[95] flex items-end bg-slate-900/50 backdrop-blur-sm" onMouseDown={(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
+        <div className="fixed inset-0 z-[95] flex items-end bg-slate-900/50 backdrop-blur-sm" onMouseDown={(e) => { if (e.target === e.currentTarget) close(); }}>
           <div className="w-full rounded-t-2xl bg-surface shadow-2xl max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <p className="text-xs font-bold uppercase tracking-wide text-fg-secondary">{sheetTitle}</p>
-              <button type="button" onClick={() => setOpen(false)} className="text-fg-muted hover:text-fg-secondary text-2xl leading-none">×</button>
+              <button type="button" onClick={() => close()} className="text-fg-muted hover:text-fg-secondary text-2xl leading-none">×</button>
             </div>
             {list}
           </div>
