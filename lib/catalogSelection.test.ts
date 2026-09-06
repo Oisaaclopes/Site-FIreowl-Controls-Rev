@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   itemsInScope, manufacturersInScope, modelsInScope,
   allManufacturers, normalizeBrand, findExistingBrand, modelAttrs,
+  canonicalFamilyGroups, productsInFamily, brandsInFamily, UNCLASSIFIED_GROUP,
 } from './catalogSelection';
+import { buildCatalogTree, TaxonomyNode } from './catalogTree';
 import type { InventoryItem } from './types';
 
 /* MELHORIA — cadastro inteligente de produto: fabricante/modelo. */
@@ -83,5 +85,37 @@ describe('autopreenchimento estruturado (T/U)', () => {
   });
   it('U) atributo ausente não é inventado', () => {
     expect(modelAttrs(catalog[2])).toEqual({}); // CIE 1125 sem systemType/line no dado
+  });
+});
+
+describe('§10.2/§10.3 — Pedido usa a MESMA taxonomia canônica do Estoque', () => {
+  const N = (id: string, parentId: string | null, name: string, area: string, sortOrder: number): TaxonomyNode =>
+    ({ id, code: id, parentId, name, area, sortOrder, nodeType: 'X', active: true });
+  const nodes: TaxonomyNode[] = [
+    N('det', null, 'Detectores', 'SDAI', 20),
+    N('det-fum', 'det', 'Fumaça', 'SDAI', 10),
+    N('cen', null, 'Centrais de Alarme de Incêndio', 'SDAI', 10),
+  ];
+  const tree = buildCatalogTree(nodes);
+  const it2 = (o: Partial<InventoryItem>): InventoryItem => item(o);
+  const sdai: InventoryItem[] = [
+    it2({ id: 'p1', category: 'SDAI', canonicalTaxonomyId: 'det-fum', brand: 'Intelbras', model: 'DFE 523' }),
+    it2({ id: 'p2', category: 'SDAI', canonicalTaxonomyId: 'cen', brand: 'Intelbras', model: 'CIE 1125' }),
+    it2({ id: 'p3', category: 'SDAI', canonicalTaxonomyId: undefined, brand: 'Tecnohold', model: 'X', classificationStatus: 'NAO_CLASSIFICADO' }),
+  ];
+
+  it('agrupa por FAMÍLIA canônica (não pela subcategoria granular)', () => {
+    const groups = canonicalFamilyGroups(tree, sdai, 'SDAI');
+    const labels = groups.map((g) => g.label);
+    expect(labels).toContain('Detectores');
+    expect(labels).toContain('Centrais de Alarme de Incêndio');
+    // Bucket de não classificados sempre por último.
+    expect(labels[labels.length - 1]).toBe('Outros / Não classificados');
+  });
+
+  it('produtos saem do ramo canônico e o bucket cobre itens sem classificação', () => {
+    expect(productsInFamily(tree, sdai, 'det').map((p) => p.id)).toEqual(['p1']);
+    expect(productsInFamily(tree, sdai, UNCLASSIFIED_GROUP).map((p) => p.id)).toEqual(['p3']);
+    expect(brandsInFamily(tree, sdai, 'det')).toEqual(['Intelbras']);
   });
 });

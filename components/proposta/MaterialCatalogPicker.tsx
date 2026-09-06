@@ -1,11 +1,15 @@
 'use client';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { InventoryItem } from '@/lib/types';
 import { PickerField } from '@/components/ui/PickerField';
 import {
   areaMatches, groupsInArea, brandsInAreaGroup, productsInAreaGroup, searchCatalogItems,
+  canonicalFamilyGroups, productsInFamily, brandsInFamily,
   NO_BRAND, UNCLASSIFIED_GROUP,
 } from '@/lib/catalogSelection';
+import {
+  CatalogTree, TaxonomyNode, buildCatalogTree, fetchTaxonomyNodes, CANONICAL_AREAS,
+} from '@/lib/catalogTree';
 
 /* ===================================================================
  * Seletor inteligente de MATERIAIS da Proposta: Área (da proposta) → Grupo/
@@ -33,6 +37,15 @@ export const MaterialCatalogPicker: React.FC<Props> = ({ items, areaCodes, value
   const [brand, setBrand] = useState('');
   const [search, setSearch] = useState('');
   const [showAllAreas, setShowAllAreas] = useState(false);
+  // Taxonomia canônica (catalog_taxonomy_nodes) — MESMA fonte do Estoque (§10.3).
+  const [tree, setTree] = useState<CatalogTree | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetchTaxonomyNodes()
+      .then((ns: TaxonomyNode[]) => { if (alive) setTree(buildCatalogTree(ns)); })
+      .catch(() => { /* sem árvore → fallback por subcategoria */ });
+    return () => { alive = false; };
+  }, []);
 
   // Escopo por área(s) da proposta (união). Vazio → tudo (fallback controlado).
   const scoped = useMemo(() => {
@@ -40,9 +53,41 @@ export const MaterialCatalogPicker: React.FC<Props> = ({ items, areaCodes, value
     return items.filter((i) => areaCodes.some((a) => areaMatches(i.category, a)));
   }, [items, areaCodes, showAllAreas]);
 
-  const groups = useMemo(() => groupsInArea(scoped, undefined), [scoped]);
-  const brands = useMemo(() => (group ? brandsInAreaGroup(scoped, undefined, group) : []), [scoped, group]);
-  const products = useMemo(() => (group && brand ? productsInAreaGroup(scoped, undefined, group, brand) : []), [scoped, group, brand]);
+  // Usa a família CANÔNICA (árvore) quando há UMA área canônica e sem "todas as
+  // áreas". Caso contrário, cai para agregação por subcategoria (comportamento
+  // legado), nunca ocultando itens.
+  const treeArea = useMemo(() => {
+    if (showAllAreas || areaCodes.length !== 1) return null;
+    const a = (areaCodes[0] || '').toUpperCase();
+    return (CANONICAL_AREAS as readonly string[]).includes(a) ? a : null;
+  }, [areaCodes, showAllAreas]);
+  const useTree = !!tree && !!treeArea;
+
+  const groups = useMemo(
+    () => (useTree ? canonicalFamilyGroups(tree!, scoped, treeArea!) : groupsInArea(scoped, undefined)),
+    [useTree, tree, scoped, treeArea],
+  );
+  // Facetas COMBINÁVEIS (§10.1): fabricante pode ser escolhido antes ou depois
+  // do grupo. Sem grupo, lista os fabricantes de toda a área; com grupo, os da
+  // família. Produtos aparecem com grupo OU fabricante (não exigem cascata).
+  const brands = useMemo(() => {
+    if (group) return useTree ? brandsInFamily(tree!, scoped, group) : brandsInAreaGroup(scoped, undefined, group);
+    // Fabricantes no nível da área (para começar pela marca).
+    const named = Array.from(new Set(scoped.map((i) => (i.brand || '').trim()).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    return scoped.some((i) => !(i.brand || '').trim()) ? [...named, NO_BRAND] : named;
+  }, [useTree, tree, scoped, group]);
+  const products = useMemo(() => {
+    if (!group && !brand) return [];
+    const base = group
+      ? (useTree ? productsInFamily(tree!, scoped, group) : productsInAreaGroup(scoped, undefined, group))
+      : scoped;
+    const b = (brand || '').trim().toLowerCase();
+    const filtered = !brand ? base
+      : brand === NO_BRAND ? base.filter((i) => !(i.brand || '').trim())
+      : base.filter((i) => (i.brand || '').trim().toLowerCase() === b);
+    return [...filtered].sort((a, b2) => (a.model || a.name).localeCompare(b2.model || b2.name, 'pt-BR'));
+  }, [useTree, tree, scoped, group, brand]);
 
   const searchResults = useMemo(() => (search.trim() ? searchCatalogItems(items, search, showAllAreas ? undefined : (areaCodes[0] && areaCodes.length === 1 ? areaCodes[0] : undefined)) : []), [items, search, showAllAreas, areaCodes]);
   // Busca com múltiplas áreas: filtra pela união manualmente.
@@ -52,7 +97,9 @@ export const MaterialCatalogPicker: React.FC<Props> = ({ items, areaCodes, value
     return searchResults.filter((i) => areaCodes.some((a) => areaMatches(i.category, a)));
   }, [searchResults, search, showAllAreas, areaCodes]);
 
-  const changeGroup = (g: string) => { setGroup(g); setBrand(''); onPick(''); };
+  // Facetas combináveis: alterar uma NÃO zera a outra — só recalcula as opções
+  // e o produto selecionado (§10.1). "Recomeçar" limpa tudo.
+  const changeGroup = (g: string) => { setGroup(g); onPick(''); };
   const changeBrand = (b: string) => { setBrand(b); onPick(''); };
 
   const productLabel = (i: InventoryItem) => `${i.code ? `${i.code} · ` : ''}${i.model || i.name} · ${saldoTxt(i)}`;
@@ -115,9 +162,8 @@ export const MaterialCatalogPicker: React.FC<Props> = ({ items, areaCodes, value
             <span className="block text-[10px] font-bold uppercase text-fg-muted mb-1">Fabricante</span>
             <PickerField
               ariaLabel="Fabricante" sheetTitle="Selecionar fabricante"
-              placeholder={group ? 'Selecionar fabricante' : 'Escolha o grupo'}
-              searchPlaceholder="Buscar fabricante..." emptyLabel="Nenhum fabricante neste grupo."
-              disabled={!group}
+              placeholder="Selecionar fabricante"
+              searchPlaceholder="Buscar fabricante..." emptyLabel="Nenhum fabricante."
               value={brand} onChange={changeBrand}
               options={brands.map((b) => ({ id: b, name: brandLabel(b) }))}
               triggerClassName="w-full flex items-center justify-between gap-2 rounded-md border border-border-strong bg-surface px-3 py-2 text-xs text-fg-secondary disabled:opacity-60"
@@ -127,9 +173,9 @@ export const MaterialCatalogPicker: React.FC<Props> = ({ items, areaCodes, value
             <span className="block text-[10px] font-bold uppercase text-fg-muted mb-1">Produto / Modelo</span>
             <PickerField
               ariaLabel="Produto" sheetTitle="Selecionar produto"
-              placeholder={brand ? 'Selecionar produto' : 'Escolha o fabricante'}
+              placeholder={(group || brand) ? 'Selecionar produto' : 'Escolha grupo ou fabricante'}
               searchPlaceholder="Buscar produto..." emptyLabel="Nenhum produto."
-              disabled={!brand}
+              disabled={!group && !brand}
               value={value} onChange={onPick}
               options={products.map((p) => ({ id: p.id, name: productLabel(p) }))}
               triggerClassName="w-full flex items-center justify-between gap-2 rounded-md border border-border-strong bg-surface px-3 py-2 text-xs text-fg-secondary disabled:opacity-60"
@@ -138,7 +184,7 @@ export const MaterialCatalogPicker: React.FC<Props> = ({ items, areaCodes, value
         </div>
       )}
 
-      {!search.trim() && group && brand && (
+      {!search.trim() && (group || brand) && (
         <p className="text-[10px] text-fg-muted">{products.length} produto(s) encontrado(s){group === UNCLASSIFIED_GROUP ? ' · itens sem classificação nesta área' : ''}.</p>
       )}
       <p className="text-[10px] text-fg-muted">Não encontrou? Deixe em branco e preencha o material manualmente no card abaixo.</p>
