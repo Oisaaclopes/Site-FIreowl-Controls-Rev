@@ -20,11 +20,26 @@ interface Props {
   onError?: (msg: string) => void;
 }
 
+/** Sentinela: primeira opção do picker abre o cadastro em vez de selecionar. */
+const NEW_SUPPLIER_OPTION = '__new_supplier__';
+
 export const SupplierPickerField: React.FC<Props> = ({ suppliers, value, onChange, onCreated, online = true, onError }) => {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: '', cnpj: '', tradeName: '' });
   const [saving, setSaving] = useState(false);
   const selected = suppliers.find((s) => s.id === value);
+
+  // Opções: "+ Cadastrar novo fornecedor" SEMPRE em primeiro, depois os
+  // fornecedores existentes (busca do próprio PickerField). Sem botão externo
+  // que se sobreponha a outros campos do formulário (§5.1).
+  const pickerOptions = [
+    { id: NEW_SUPPLIER_OPTION, name: '+ Cadastrar novo fornecedor' },
+    ...suppliers.map((s) => ({ id: s.id, name: s.tradeName ? `${s.name} (${s.tradeName})` : s.name })),
+  ];
+  const handlePick = (id: string) => {
+    if (id === NEW_SUPPLIER_OPTION) { setOpen(true); return; }
+    onChange(id);
+  };
 
   const salvar = async () => {
     const nome = form.name.trim();
@@ -53,20 +68,17 @@ export const SupplierPickerField: React.FC<Props> = ({ suppliers, value, onChang
           <button type="button" onClick={() => setOpen(true)} className="mt-1 text-xs font-bold text-primary hover:underline">+ Cadastrar primeiro fornecedor</button>
         </div>
       ) : (
-        <div className="flex items-center gap-2">
-          <PickerField
-            ariaLabel="Fornecedor"
-            sheetTitle="Selecionar fornecedor"
-            placeholder="Selecionar fornecedor"
-            searchPlaceholder="Buscar fornecedor..."
-            emptyLabel="Nenhum fornecedor encontrado."
-            value={value}
-            onChange={onChange}
-            options={suppliers.map((s) => ({ id: s.id, name: s.tradeName ? `${s.name} (${s.tradeName})` : s.name }))}
-            triggerClassName="flex-1 flex items-center justify-between gap-2 rounded-lg border border-border-strong bg-surface px-3 py-2 text-sm text-fg-secondary"
-          />
-          <button type="button" onClick={() => setOpen(true)} className="shrink-0 rounded-lg border border-primary px-3 py-2 text-xs font-bold text-primary hover:bg-navy hover:text-white">+ Novo</button>
-        </div>
+        <PickerField
+          ariaLabel="Fornecedor"
+          sheetTitle="Selecionar fornecedor"
+          placeholder="Selecionar fornecedor"
+          searchPlaceholder="Buscar fornecedor..."
+          emptyLabel="Nenhum fornecedor encontrado."
+          value={value}
+          onChange={handlePick}
+          options={pickerOptions}
+          triggerClassName="w-full flex items-center justify-between gap-2 rounded-lg border border-border-strong bg-surface px-3 py-2 text-sm text-fg-secondary"
+        />
       )}
       {selected?.cnpj && <p className="mt-1 text-[10px] text-fg-muted">CNPJ: {selected.cnpj}</p>}
 

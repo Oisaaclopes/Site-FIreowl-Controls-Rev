@@ -8,6 +8,7 @@ import { updateSupplyOrder } from '@/lib/supplyOrders';
 import { SupplierPickerField } from '@/components/fornecimento/SupplierPickerField';
 import { syncSupplyOrderStatus, keyOf, sugestaoCompra, totalCompra } from '@/lib/supplyReceipts';
 import { isSupabaseConfigured } from '@/lib/inventory';
+import { productPricing } from '@/lib/productPricing';
 
 interface Props {
   order: SupplyOrder;
@@ -56,7 +57,12 @@ export const SupplyPurchaseModal: React.FC<Props> = ({ order, inventory, onClose
           const pedido = Number(it.quantidade || 0);
           const estoque = inv?.quantity || 0;
           const jc = jaComp[key] || 0;
-          return { key, inventoryItemId: it.vinculoEstoqueId, descricao: it.descricao || inv?.name || 'Item', pedido, estoque, jaComprado: jc, comprar: sugestaoCompra(pedido, estoque + jc), custo: it.precoUnitario || inv?.costPrice || undefined };
+          // §5.2 BUG: o custo inicial deve ser o CUSTO canônico do estoque
+          // (costPrice), NUNCA o preço unitário do pedido (it.precoUnitario, que
+          // é preço de venda/proposta) nem o preço de venda. Fica editável para
+          // registrar o custo negociado da compra. Ausente = vazio (não chuta).
+          const custoEstoque = inv ? productPricing(inv).cost : null;
+          return { key, inventoryItemId: it.vinculoEstoqueId, descricao: it.descricao || inv?.name || 'Item', pedido, estoque, jaComprado: jc, comprar: sugestaoCompra(pedido, estoque + jc), custo: custoEstoque ?? undefined };
         });
         setRows(base);
       } catch (e: any) { if (alive) setErro(e?.message || 'Falha ao carregar compras.'); }
