@@ -964,7 +964,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                 <span className="text-xs font-data-mono text-fg-muted font-bold">{numeroPedido}</span>
               </div>
               <h2 className="text-xl font-bold font-display text-white tracking-wide mt-0.5">
-                Elaboração de Proposta Comercial
+                Estruturação do Pedido
               </h2>
             </div>
           </div>

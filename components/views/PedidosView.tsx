@@ -1039,7 +1039,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
             onClick={handleOpenNewProposal}
             className="bg-danger hover:bg-danger-hover text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors shadow-sm flex items-center gap-1.5 uppercase tracking-wide"
           >
-            <Plus className="w-4 h-4" /> Nova Proposta Comercial
+            <Plus className="w-4 h-4" /> Novo Pedido
           </button>
         )}
       </div>
