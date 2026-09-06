@@ -8,12 +8,26 @@
  * disponível no browser e no Node 18+ — sem lib externa (npm audit limpo).
  * =================================================================== */
 import { TechArea, identifierFields, assetIdentityKey, validateIdentifier, AssetLike } from './technicalBase';
+import { AssetConditionValue } from './types';
 
 /* ------------------------- Normalização ------------------------- */
 export function normalizeHeader(s: string): string {
   return (s || '')
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .toLowerCase().trim().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+/** Normaliza string de condição informada na planilha para o valor canônico (AssetConditionValue). */
+export function normalizeImportCondition(raw?: string): AssetConditionValue | undefined {
+  if (!raw || !raw.trim()) return undefined;
+  const s = raw.trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9_]/g, '_');
+  if (['NORMAL', 'OK', 'BOM', 'PERFEITO'].includes(s)) return 'NORMAL';
+  if (['COM_AVARIA', 'AVARIA', 'DANIFICADO', 'AVARIADO', 'DEFEITO', 'DEFEITUOSO'].includes(s)) return 'COM_AVARIA';
+  if (['INOPERANTE', 'FALHA', 'COM_FALHA', 'QUEBRADO', 'PARADO'].includes(s)) return 'INOPERANTE';
+  if (['NAO_TESTADO', 'SEM_TESTE', 'NAO_AVALIADO'].includes(s)) return 'NAO_TESTADO';
+  if (['NAO_LOCALIZADO', 'AUSENTE', 'DESAPARECIDO', 'NAO_ENCONTRADO'].includes(s)) return 'NAO_LOCALIZADO';
+  if (['INADEQUADO', 'FORA_DE_NORMA', 'IRREGULAR'].includes(s)) return 'INADEQUADO';
+  return undefined;
 }
 
 /* ------------------------- CSV ------------------------- */
@@ -198,7 +212,7 @@ export interface ImportTarget {
   key: string;
   label: string;
   store: TargetStore;
-  deviceField?: 'tipoAtivo' | 'grupo' | 'localizacao' | 'fabricante' | 'modelo' | 'serial';
+  deviceField?: 'tipoAtivo' | 'grupo' | 'localizacao' | 'fabricante' | 'modelo' | 'serial' | 'condicao';
   attrKey?: string;
   aliases: string[];
   kind?: 'text' | 'number' | 'ip' | 'mac';
@@ -211,6 +225,7 @@ const COMMON_TARGETS: ImportTarget[] = [
   { key: 'fabricante', label: 'Fabricante', store: 'field', deviceField: 'fabricante', aliases: ['fabricante', 'marca', 'brand', 'manufacturer', 'maker', 'fornecedor'] },
   { key: 'modelo', label: 'Modelo', store: 'field', deviceField: 'modelo', aliases: ['modelo', 'model', 'mod'] },
   { key: 'serial', label: 'Nº de série', store: 'field', deviceField: 'serial', aliases: ['serial', 'serie', 'n serie', 'sn', 's n', 'numero de serie', 'n de serie', 'no de serie'] },
+  { key: 'condicao', label: 'Condição', store: 'field', deviceField: 'condicao', aliases: ['condicao', 'condição', 'condition', 'estado', 'status de conservacao', 'situacao'] },
   { key: 'observacao', label: 'Observação', store: 'attr', attrKey: 'observacao', aliases: ['observacao', 'obs', 'nota', 'notas', 'comentario', 'comentarios'] },
 ];
 
@@ -278,7 +293,7 @@ export function guessMapping(headers: string[], area: TechArea): Record<number, 
 /* ------------------------- Draft + preview ------------------------- */
 export interface DeviceDraft {
   tipoAtivo?: string; grupo?: string; localizacao?: string;
-  fabricante?: string; modelo?: string; serial?: string;
+  fabricante?: string; modelo?: string; serial?: string; condicao?: string;
   central?: string; laco?: string; endereco?: string;
   technicalAttributes: Record<string, string>;
 }

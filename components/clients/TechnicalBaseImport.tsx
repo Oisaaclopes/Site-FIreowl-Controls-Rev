@@ -3,7 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { Device, AssetSourceValue } from '@/lib/types';
 import { TechArea, AREA_LABEL, AREAS, assetDisplayIdentifier } from '@/lib/technicalBase';
 import {
-  parseSpreadsheet, parseCsv, guessMapping, importTargets, buildImportPreview, ImportPreview, DeviceDraft,
+  parseSpreadsheet, parseCsv, guessMapping, importTargets, buildImportPreview, ImportPreview, DeviceDraft, normalizeImportCondition,
 } from '@/lib/technicalImport';
 import { upsertDevice } from '@/lib/devices';
 import { newAssetId } from '@/lib/surveyCapture';
@@ -15,7 +15,8 @@ import { buildTemplateXlsxBlob, templateFileName } from '@/lib/technicalImportTe
  * ETAPA 3D.2 — Importação assistida de Base Técnica (XLSX/CSV, §9–§12).
  * Fluxo: upload → detectar colunas → mapear → pré-visualizar → validar →
  * importar. Converge para o MESMO modelo (devices), source=IMPORTACAO. Importado
- * NUNCA é "verificado em campo" (§12): não recebe condição/verificação.
+ * sem condição explícita permanece não verificado (condicao=undefined), preservando
+ * a condição existente na base e aplicando NORMAL apenas onde aplicável.
  * ========================================================================== */
 
 const inputCls = 'w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg focus:border-primary focus:outline-none';
@@ -98,15 +99,21 @@ export const TechnicalBaseImport: React.FC<Props> = ({ clienteId, area: initialA
   // Reaplica auto-map quando muda a área na etapa de mapeamento.
   const changeArea = (a: TechArea) => { setArea(a); if (matrix.length) setMapping(guessMapping(matrix[0], a)); };
 
-  const draftToDevice = (draft: DeviceDraft): Device => ({
-    id: newAssetId(), clienteId, sistema: area, status: 'ativo',
-    grupo: draft.grupo, tipoAtivo: draft.tipoAtivo, fabricante: draft.fabricante, modelo: draft.modelo,
-    serial: draft.serial, localizacao: draft.localizacao,
-    central: draft.central, laco: draft.laco, endereco: draft.endereco,
-    technicalAttributes: draft.technicalAttributes,
-    source: 'IMPORTACAO' as AssetSourceValue,
-    // §12: importado NÃO é verificado — sem condição em campo.
-  } as Device);
+  const draftToDevice = (draft: DeviceDraft): Device => {
+    const dev: Device = {
+      id: newAssetId(), clienteId, sistema: area, status: 'ativo',
+      grupo: draft.grupo, tipoAtivo: draft.tipoAtivo, fabricante: draft.fabricante, modelo: draft.modelo,
+      serial: draft.serial, localizacao: draft.localizacao,
+      central: draft.central, laco: draft.laco, endereco: draft.endereco,
+      technicalAttributes: draft.technicalAttributes,
+      source: 'IMPORTACAO' as AssetSourceValue,
+    } as Device;
+    const cond = normalizeImportCondition(draft.condicao);
+    if (cond) {
+      dev.condicao = cond;
+    }
+    return dev;
+  };
 
   const runImport = async () => {
     if (!preview || !isSupabaseConfigured()) { showToast('Supabase não configurado.'); return; }

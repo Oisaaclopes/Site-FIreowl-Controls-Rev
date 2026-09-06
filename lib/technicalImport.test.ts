@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   normalizeHeader, detectDelimiter, parseCsv, guessMapping, importTargets,
   buildImportPreview, sharedStringsFromXml, sheetXmlToMatrix, colRefToIndex,
+  normalizeImportCondition,
 } from './technicalImport';
 import { AssetLike } from './technicalBase';
 
@@ -166,5 +167,26 @@ describe('XLSX helpers (parsing puro, sem binário)', () => {
   it('sheetXmlToMatrix preenche buracos entre colunas', () => {
     const xml = '<sheetData><row><c r="A1"><v>1</v></c><c r="C1"><v>3</v></c></row></sheetData>';
     expect(sheetXmlToMatrix(xml, [])).toEqual([['1', '', '3']]);
+  });
+});
+
+describe('Auditoria da condição no importador (§A)', () => {
+  it('normalizeImportCondition preserva e normaliza condições válidas', () => {
+    expect(normalizeImportCondition('NORMAL')).toBe('NORMAL');
+    expect(normalizeImportCondition('FALHA')).toBe('INOPERANTE');
+    expect(normalizeImportCondition('INOPERANTE')).toBe('INOPERANTE');
+    expect(normalizeImportCondition('DANIFICADO')).toBe('COM_AVARIA');
+    expect(normalizeImportCondition('COM_AVARIA')).toBe('COM_AVARIA');
+    expect(normalizeImportCondition('NAO_TESTADO')).toBe('NAO_TESTADO');
+    expect(normalizeImportCondition('')).toBeUndefined();
+    expect(normalizeImportCondition(undefined)).toBeUndefined();
+  });
+
+  it('mapa de importação reconhece coluna de condição', () => {
+    const rows = parseCsv('END\tLOOP\tTIPO\tCONDIÇÃO\n45\t2\tAcionador\tFALHA');
+    const mapping = guessMapping(rows[0], 'SDAI');
+    expect(mapping[3]).toBe('condicao');
+    const p = buildImportPreview(rows, mapping, 'SDAI', []);
+    expect(p.results[0].draft.condicao).toBe('FALHA');
   });
 });
