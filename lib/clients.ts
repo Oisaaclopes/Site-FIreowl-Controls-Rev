@@ -3,6 +3,28 @@ import { Client } from './types';
 
 const TABLE = 'clients';
 
+/**
+ * Fonte única de verdade dos segmentos de cliente. Cadastro/edição e o filtro
+ * da página Clientes consomem exatamente esta lista. Valores legados gravados
+ * fora dela (ex.: "Shopping", "Indústria Pesada") NÃO são migrados de forma
+ * destrutiva: a UI preserva o que já existe no dado (ver CrmView) até que uma
+ * normalização explícita seja decidida.
+ */
+export const CLIENT_SEGMENTS: readonly string[] = [
+  'Shopping Center',
+  'Indústria',
+  'Condomínio Residencial',
+  'Condomínio Comercial',
+  'Logística & Galpões',
+  'Varejo / Supermercado',
+  'Hospitalar',
+  'Educacional',
+  'Órgão Público',
+] as const;
+
+/** Segmento padrão para novos cadastros. */
+export const DEFAULT_CLIENT_SEGMENT = CLIENT_SEGMENTS[0];
+
 function rowToClient(r: any): Client {
   return {
     id: String(r.id),

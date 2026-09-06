@@ -25,6 +25,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { fetchCnpjData } from '@/lib/cnpj';
 import { uploadClientFachada, uploadClientLogo, removePropostaCapa } from '@/lib/propostaCapa';
 import { nomeFantasiaCliente, razaoSocialCliente } from '@/lib/utils';
+import { CLIENT_SEGMENTS, DEFAULT_CLIENT_SEGMENT } from '@/lib/clients';
 import { resolveLogoDataUrls } from '@/lib/institucional';
 import { fetchReports } from '@/lib/reports';
 import { OS_STATUS_ATIVOS } from '@/lib/ordensServico';
@@ -159,7 +160,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
   const [nFantasia, setNFantasia] = useState('');
   const [nCNPJ, setNCNPJ] = useState('');
   const [nIE, setNIE] = useState('');
-  const [nSegment, setNSegment] = useState('Shopping Center');
+  const [nSegment, setNSegment] = useState(DEFAULT_CLIENT_SEGMENT);
   const [nStatus, setNStatus] = useState<Client['contractStatus']>('EM DIA');
   const [nAddress, setNAddress] = useState('');
   const [nCity, setNCity] = useState('Londrina/PR');
@@ -264,7 +265,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
 
     setNCNPJ(client.cnpj || '');
     setNIE('');
-    setNSegment(client.segment || 'Shopping Center');
+    setNSegment(client.segment || DEFAULT_CLIENT_SEGMENT);
     setNStatus(client.contractStatus || 'EM DIA');
 
     if (client.address && client.address.includes(' — ')) {
@@ -288,18 +289,43 @@ export const CrmView: React.FC<CrmViewProps> = ({
     setShowAddClientModal(true);
   };
 
-  const clientSegments = useMemo(() => Array.from(new Set(clients.map((c) => c.segment).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR')), [clients]);
+  // Opções do filtro = fonte canônica + quaisquer segmentos legados presentes
+  // nos dados (ex.: "Shopping", "Indústria Pesada"). Preserva a filtrabilidade
+  // sem migração destrutiva: valores fora da canônica aparecem marcados.
+  const legacySegments = useMemo(
+    () => Array.from(new Set(clients.map((c) => c.segment).filter((s): s is string => Boolean(s) && !CLIENT_SEGMENTS.includes(s))))
+      .sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [clients]
+  );
   useEffect(() => {
     let alive = true;
     resolveLogoDataUrls(clients.map((c) => c.logoPath || '').filter(Boolean)).then((map) => { if (alive) setClientLogoUrls(map); }).catch(() => {});
     return () => { alive = false; };
   }, [clients]);
-  const filteredClients = clients.filter((c) => {
+
+  // Pipeline: dados → busca/filtros → ordenação alfabética (nome de exibição) → paginação.
+  const filteredClients = useMemo(() => {
     const q = searchTerm.toLowerCase();
-    return (!q || c.name.toLowerCase().includes(q) || nomeFantasiaCliente(c.name).toLowerCase().includes(q) || c.code.toLowerCase().includes(q) || c.cnpj.includes(searchTerm))
-      && (!filterContractStatus || c.contractStatus === filterContractStatus)
-      && (!filterSegment || c.segment === filterSegment);
-  });
+    return clients
+      .filter((c) =>
+        (!q || c.name.toLowerCase().includes(q) || nomeFantasiaCliente(c.name).toLowerCase().includes(q) || c.code.toLowerCase().includes(q) || c.cnpj.includes(searchTerm))
+        && (!filterContractStatus || c.contractStatus === filterContractStatus)
+        && (!filterSegment || c.segment === filterSegment)
+      )
+      .sort((a, b) => nomeFantasiaCliente(a.name).localeCompare(nomeFantasiaCliente(b.name), 'pt-BR', { sensitivity: 'base' }));
+  }, [clients, searchTerm, filterContractStatus, filterSegment]);
+
+  // Paginação (15/30/50/100, padrão 15). Página sempre válida após mudança de
+  // busca/filtro/quantidade — o clamp abaixo evita página fora do intervalo.
+  const [pageSize, setPageSize] = useState(15);
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(filteredClients.length / pageSize));
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, filterContractStatus, filterSegment, pageSize]);
+  const safePage = Math.min(currentPage, totalPages);
+  const pagedClients = useMemo(
+    () => filteredClients.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [filteredClients, safePage, pageSize]
+  );
 
   const resetClientForm = () => {
     setEditingClient(null);
@@ -308,7 +334,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
     setNFantasia('');
     setNCNPJ('');
     setNIE('');
-    setNSegment('Shopping Center');
+    setNSegment(DEFAULT_CLIENT_SEGMENT);
     setNStatus('EM DIA');
     setNAddress('');
     setNCity('Londrina/PR');
@@ -433,7 +459,13 @@ export const CrmView: React.FC<CrmViewProps> = ({
             <option value="">Todas as situações</option><option value="EM DIA">Em dia</option><option value="PENDENTE">Pendente</option><option value="ATRASADO">Atrasado</option>
           </select>
           <select value={filterSegment} onChange={(e) => setFilterSegment(e.target.value)} className="px-3 py-2 text-xs border border-border rounded-lg bg-surface">
-            <option value="">Todos os segmentos</option>{clientSegments.map((segment) => <option key={segment} value={segment}>{segment}</option>)}
+            <option value="">Todos os segmentos</option>
+            {CLIENT_SEGMENTS.map((segment) => <option key={segment} value={segment}>{segment}</option>)}
+            {legacySegments.length > 0 && (
+              <optgroup label="Legados (fora do padrão)">
+                {legacySegments.map((segment) => <option key={segment} value={segment}>{segment}</option>)}
+              </optgroup>
+            )}
           </select>
           {(searchTerm || filterContractStatus || filterSegment) && <button type="button" onClick={() => { setSearchTerm(''); setFilterContractStatus(''); setFilterSegment(''); }} className="text-xs font-semibold text-primary hover:underline">Limpar</button>}
         </div>
@@ -499,7 +531,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
             />
           ) : (
             <div className="flex flex-col gap-3">
-              {filteredClients.map((client) => {
+              {pagedClients.map((client) => {
                 const statusColor =
                   client.contractStatus === 'EM DIA'
                     ? 'emerald'
@@ -566,9 +598,46 @@ export const CrmView: React.FC<CrmViewProps> = ({
                   />
                 );
               })}
-              <p className="text-xs text-fg-secondary px-1 pt-1">
-                Mostrando {filteredClients.length} de {clients.length} clientes cadastrados
-              </p>
+              {/* Rodapé de paginação: quantidade por página + navegação. */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-1 pt-2 border-t border-border">
+                <div className="flex items-center gap-2 text-xs text-fg-secondary">
+                  <span>Exibir</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    className="px-2 py-1 border border-border rounded-lg bg-surface text-xs font-semibold"
+                  >
+                    {[15, 30, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                  <span className="hidden sm:inline">
+                    · {filteredClients.length === 0 ? 0 : (safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, filteredClients.length)} de {filteredClients.length}
+                    {filteredClients.length !== clients.length && ` (${clients.length} no total)`}
+                  </span>
+                </div>
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={safePage <= 1}
+                      className="px-2.5 py-1 text-xs font-semibold border border-border rounded-lg bg-surface hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Anterior
+                    </button>
+                    <span className="px-2 text-xs font-semibold text-fg-secondary tabular-nums">
+                      {safePage} / {totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={safePage >= totalPages}
+                      className="px-2.5 py-1 text-xs font-semibold border border-border rounded-lg bg-surface hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Próxima
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -808,15 +877,9 @@ export const CrmView: React.FC<CrmViewProps> = ({
                     <div>
                       <label className={labelCls}>Segmento</label>
                       <select value={nSegment} onChange={(e) => setNSegment(e.target.value)} className={inputCls}>
-                        <option value="Shopping Center">Shopping Center</option>
-                        <option value="Indústria">Indústria</option>
-                        <option value="Condomínio Residencial">Condomínio Residencial</option>
-                        <option value="Condomínio Comercial">Condomínio Comercial</option>
-                        <option value="Logística & Galpões">Logística &amp; Galpões</option>
-                        <option value="Varejo / Supermercado">Varejo / Supermercado</option>
-                        <option value="Hospitalar">Hospitalar</option>
-                        <option value="Educacional">Educacional</option>
-                        <option value="Órgão Público">Órgão Público</option>
+                        {CLIENT_SEGMENTS.map((seg) => <option key={seg} value={seg}>{seg}</option>)}
+                        {/* Preserva segmento legado do registro em edição sem forçar troca. */}
+                        {nSegment && !CLIENT_SEGMENTS.includes(nSegment) && <option value={nSegment}>{nSegment} (legado)</option>}
                       </select>
                     </div>
                   </div>
