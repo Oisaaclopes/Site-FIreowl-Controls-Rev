@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { FinancialTransaction, OrdemServico, Contract, TabPath, TimePunch, Client } from '@/lib/types';
+import { FinancialTransaction, OrdemServico, Contract, TabPath, TimePunch, Client, Pedido } from '@/lib/types';
 import { OS_STATUS_ATIVOS } from '@/lib/ordensServico';
+import { fetchServiceAttendances } from '@/lib/serviceAttendances';
 import { getClientOperationalName } from '@/lib/utils';
 import { usePrivacy } from '@/lib/privacy';
 import { fetchTimeClockParticipants, TimeClockParticipant } from '@/lib/users';
@@ -21,7 +22,7 @@ interface DashboardViewProps {
   contracts: Contract[];
   punches: TimePunch[];
   clients: Client[];
-  onNewOSClick: () => void;
+  pedidos: Pedido[];
   onNavigateToTab: (tab: TabPath) => void;
   /** Ponto rápido no painel — depende de uses_time_clock, não do cargo. */
   currentUser?: string;
@@ -35,7 +36,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   contracts,
   punches,
   clients,
-  onNewOSClick,
+  pedidos,
   onNavigateToTab,
   currentUser = '',
   onAddPunch,
@@ -44,6 +45,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const { isPrivacyModeActive, maskMoney } = usePrivacy();
   const [fieldTechnicians, setFieldTechnicians] = useState<TimeClockParticipant[]>([]);
   const [activeFieldState, setActiveFieldState] = useState<ActiveFieldState>({ operations: [], assignments: [], attendances: [] });
+  // Contadores de atendimentos (execução/finalizados) derivados da tabela canônica
+  // service_attendances. Best-effort: falha silenciosa mantém 0 sem quebrar o painel.
+  const [attendanceCounts, setAttendanceCounts] = useState<{ emExecucao: number; finalizados: number }>({ emExecucao: 0, finalizados: 0 });
   const refreshFieldTechnicians = useCallback(async () => {
     // Diretório de participantes + estado de campo ativo (operações/atendimentos).
     const [participants, fieldState] = await Promise.all([
@@ -52,6 +56,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     ]);
     setFieldTechnicians(participants);
     setActiveFieldState(fieldState);
+    try {
+      const attendances = await fetchServiceAttendances();
+      setAttendanceCounts({
+        emExecucao: attendances.filter((a) => a.status === 'EM_EXECUCAO').length,
+        finalizados: attendances.filter((a) => a.status === 'FINALIZADO').length,
+      });
+    } catch {
+      /* mantém contadores atuais em caso de falha de rede/RLS */
+    }
   }, []);
   useEffect(() => { void refreshFieldTechnicians(); }, [refreshFieldTechnicians]);
   useDomainRefresh('dashboard', refreshFieldTechnicians);
@@ -89,6 +102,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const osAtrasadas = ordensServico.filter(
     (o) => OS_STATUS_ATIVOS.includes(o.status) && !!o.dataPrevista && o.dataPrevista < hojeISO
   ).length;
+  // Pedidos em aberto = tudo que ainda está no fluxo comercial ativo (exclui
+  // ciclos encerrados: concluído, recusado e expirado). Total preserva o volume.
+  const PEDIDO_STATUS_ENCERRADOS: Pedido['status'][] = ['concluido', 'recusado', 'expirado'];
+  const pedidosEmAberto = pedidos.filter((p) => !PEDIDO_STATUS_ENCERRADOS.includes(p.status)).length;
+  const pedidosTotal = pedidos.length;
   const cashMax = Math.max(receitaTotal, despesaTotal, 1);
   const cashBars = [
     { label: 'Receitas', value: receitaTotal, color: 'bg-emerald-500' },
@@ -128,21 +146,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             Painel de Controle Operacional
           </h1>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => onNavigateToTab('relatorios')}
-            className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-fg-secondary bg-surface border border-border rounded-lg hover:bg-surface-2 shadow-soft transition-colors flex items-center gap-1.5"
-          >
-            <span className="material-symbols-outlined text-base">fact_check</span>
-            Relatórios Técnicos
-          </button>
-          <button
-            onClick={onNewOSClick}
-            className="bg-primary hover:bg-primary-hover text-white text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-colors shadow-soft flex items-center gap-1.5 uppercase tracking-wide"
-          >
-            <span className="material-symbols-outlined text-base">add</span> Nova Ordem
-          </button>
-        </div>
       </div>
 
       {/* Ponto rápido — para gestores/administrativos que usam controle de ponto
@@ -160,7 +163,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       )}
 
       {/* Indicator Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Card: Receita */}
         <div className="bg-surface p-4 rounded-xl border border-border shadow-soft relative overflow-hidden group hover:border-border-strong hover:shadow-card transition-all">
           <div className="flex justify-between items-start">
@@ -229,6 +232,54 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="mt-1 text-[10px] text-fg-muted">
             {isPrivacyModeActive ? MASK_DIGITS : `R$ ${receitaContratadaMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} / mês contratados
+          </div>
+        </div>
+
+        {/* Card: Pedidos (comercial) */}
+        <div
+          onClick={() => onNavigateToTab('pedidos')}
+          className="bg-surface p-4 rounded-xl border border-border shadow-soft relative overflow-hidden group hover:border-border-strong hover:shadow-card cursor-pointer transition-all"
+        >
+          <div className="flex justify-between items-start">
+            <p className="text-[10px] font-semibold text-fg-secondary uppercase tracking-wider">
+              Pedidos em aberto
+            </p>
+            <div className="w-9 h-9 rounded-lg bg-primary-soft text-primary flex items-center justify-center">
+              <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+            </div>
+          </div>
+          <div className="mt-2 flex items-baseline gap-1">
+            <span className="font-data-mono text-2xl font-bold text-fg tabular-nums">
+              {pedidosEmAberto.toLocaleString('pt-BR')}
+            </span>
+          </div>
+          <div className="mt-2.5 flex items-center gap-1 text-[11px] font-semibold text-fg-secondary">
+            <span className="material-symbols-outlined text-[13px] text-primary">description</span>
+            <span>{pedidosTotal} {pedidosTotal === 1 ? 'pedido no total' : 'pedidos no total'}</span>
+          </div>
+        </div>
+
+        {/* Card: Atendimentos (execução em campo) */}
+        <div
+          onClick={() => onNavigateToTab('relatorios')}
+          className="bg-surface p-4 rounded-xl border border-border shadow-soft relative overflow-hidden group hover:border-border-strong hover:shadow-card cursor-pointer transition-all"
+        >
+          <div className="flex justify-between items-start">
+            <p className="text-[10px] font-semibold text-fg-secondary uppercase tracking-wider">
+              Atendimentos em execução
+            </p>
+            <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <span className="material-symbols-outlined text-[18px]">engineering</span>
+            </div>
+          </div>
+          <div className="mt-2 flex items-baseline gap-1">
+            <span className="font-data-mono text-2xl font-bold text-fg tabular-nums">
+              {attendanceCounts.emExecucao.toLocaleString('pt-BR')}
+            </span>
+          </div>
+          <div className="mt-2.5 flex items-center gap-1 text-[11px] font-semibold text-fg-secondary">
+            <span className="material-symbols-outlined text-[13px] text-indigo-500">task_alt</span>
+            <span>{attendanceCounts.finalizados} {attendanceCounts.finalizados === 1 ? 'finalizado' : 'finalizados'}</span>
           </div>
         </div>
 
@@ -317,45 +368,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           )}
         </div>
 
-        {/* Right: Technical Highlight Card & Team Status */}
+        {/* Right: Team Status — ocupa toda a coluna liberada pela remoção do card de anomalias. */}
         <div className="col-span-12 lg:col-span-4 flex flex-col gap-4">
-          {/* Anomalias Card — módulo premium em navy com acento azul royal */}
-          <div className="bg-navy p-4 rounded-xl shadow-card flex flex-col justify-between relative overflow-hidden">
-            {/* Detalhe gráfico técnico discreto (grid + arco), puramente decorativo */}
-            <svg aria-hidden="true" className="pointer-events-none absolute -right-6 -top-8 h-40 w-40 text-white/[0.06]" viewBox="0 0 160 160" fill="none">
-              <circle cx="80" cy="80" r="70" stroke="currentColor" strokeWidth="1.5" />
-              <circle cx="80" cy="80" r="46" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M10 80h140M80 10v140" stroke="currentColor" strokeWidth="1.5" />
-            </svg>
-            <div className="relative">
-              <span className="text-[10px] font-bold text-white bg-white/10 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                Módulo de Inteligência Técnica
-              </span>
-              <h2 className="text-base font-bold text-white mt-2 tracking-tight leading-snug uppercase">
-                Identificação de Anomalias no CRM
-              </h2>
-              <p className="text-[11px] text-white/70 mt-1.5 leading-relaxed">
-                Acompanhe pendências, manutenções atrasadas e anomalias detectadas nos relatórios de campo.
-              </p>
-            </div>
-
-            <button
-              onClick={() => onNavigateToTab('relatorios')}
-              className="relative mt-4 w-full py-2 bg-primary hover:bg-primary-hover text-white rounded-lg font-semibold text-[11px] uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-md"
-            >
-              <span>Ver pendências / anomalias</span>
-              <span className="material-symbols-outlined text-base">arrow_forward</span>
-            </button>
-          </div>
-
           {/* Estado operacional derivado de vínculos reais de Ponto, OS e cliente. */}
-          <div className="bg-surface p-4 rounded-xl border border-border shadow-soft flex flex-col gap-2">
+          <div className="bg-surface p-4 rounded-xl border border-border shadow-soft flex flex-col gap-2 h-full">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-bold text-fg uppercase tracking-wider">Operação de Campo</h4>
               <button onClick={() => onNavigateToTab('agenda')} className="text-[10px] font-semibold text-primary hover:underline">Abrir agenda</button>
             </div>
             <p className="text-[10px] text-fg-secondary">Estado real por jornada, operação e atendimento — sem rastreamento contínuo.</p>
-            <div className="max-h-72 overflow-y-auto divide-y divide-border">
+            <div className="max-h-[28rem] overflow-y-auto divide-y divide-border">
               {fieldStates.length === 0 ? (
                 <div className="min-h-[76px] text-fg-muted flex flex-col items-center justify-center text-center">
                   <span className="material-symbols-outlined text-2xl">groups_off</span>

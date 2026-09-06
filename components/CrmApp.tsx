@@ -1242,7 +1242,7 @@ export function CrmApp({
               contracts={contracts}
               punches={punches}
               clients={clients}
-              onNewOSClick={handleNewOSQuick}
+              pedidos={pedidos}
               onNavigateToTab={setCurrentTab}
               currentUser={userName}
               onAddPunch={handleAddPunch}
