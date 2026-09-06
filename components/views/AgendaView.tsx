@@ -50,12 +50,12 @@ interface AgendaEvent {
 }
 
 const STATUS_META: Record<AgendaStatus, { label: string; dot: string; chip: string }> = {
-  previsto: { label: 'Previsto', dot: 'bg-sky-400', chip: 'bg-sky-50 text-sky-700 border-sky-200' },
-  agendado: { label: 'Agendado', dot: 'bg-indigo-500', chip: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-  os_aberta: { label: 'OS aberta', dot: 'bg-slate-700', chip: 'bg-surface-3 text-fg-secondary border-border' },
-  em_atendimento: { label: 'Em atendimento', dot: 'bg-amber-500', chip: 'bg-amber-50 text-amber-700 border-amber-200' },
-  concluido: { label: 'Concluído', dot: 'bg-emerald-500', chip: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  cancelado: { label: 'Cancelado', dot: 'bg-slate-300', chip: 'bg-surface-3 text-fg-muted border-border' },
+  previsto: { label: 'Previsto', dot: 'bg-sky-400', chip: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/70 dark:text-sky-300 dark:border-sky-800' },
+  agendado: { label: 'Agendado', dot: 'bg-indigo-500', chip: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/70 dark:text-indigo-300 dark:border-indigo-800' },
+  os_aberta: { label: 'OS aberta', dot: 'bg-slate-700 dark:bg-slate-400', chip: 'bg-surface-3 text-fg-secondary border-border' },
+  em_atendimento: { label: 'Em atendimento', dot: 'bg-amber-500', chip: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800' },
+  concluido: { label: 'Concluído', dot: 'bg-emerald-500', chip: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800' },
+  cancelado: { label: 'Cancelado', dot: 'bg-slate-300 dark:bg-slate-600', chip: 'bg-surface-3 text-fg-muted border-border' },
 };
 
 const osStatusToAgenda = (s: OrdemServico['status']): AgendaStatus =>

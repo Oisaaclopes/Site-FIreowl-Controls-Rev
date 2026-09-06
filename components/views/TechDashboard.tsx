@@ -29,9 +29,9 @@ interface TechDashboardProps {
 
 const OS_TONE: Record<OrdemServico['status'], string> = {
   aberta: 'bg-surface-3 text-fg-secondary',
-  agendada: 'bg-indigo-100 text-indigo-700',
-  em_execucao: 'bg-amber-100 text-amber-700',
-  concluida: 'bg-emerald-100 text-emerald-700',
+  agendada: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300',
+  em_execucao: 'bg-amber-100 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300',
+  concluida: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300',
   cancelada: 'bg-surface-3 text-fg-muted',
 };
 
@@ -84,7 +84,7 @@ export const TechDashboard: React.FC<TechDashboardProps> = ({
   const clientName = (id?: string) => getClientOperationalName(clients.find((c) => c.id === id), 'Cliente');
 
   return (
-    <div className="flex flex-col w-full p-4 md:p-6 gap-4 max-w-2xl mx-auto">
+    <div className="flex flex-col w-full p-4 md:p-6 gap-4 max-w-4xl lg:max-w-5xl mx-auto">
       {/* Saudação + status de sincronização (só aparece em exceções, §4/§5) */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">

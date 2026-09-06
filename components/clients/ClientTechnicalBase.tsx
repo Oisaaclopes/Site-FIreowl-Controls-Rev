@@ -254,7 +254,7 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
             <button
               key={a}
               onClick={() => { setArea(a); setSearch(''); }}
-              className={`flex flex-col items-start rounded-xl border p-3 text-left transition-colors ${active ? 'border-primary bg-navy/5' : 'border-border bg-surface hover:border-border-strong'}`}
+              className={`flex flex-col items-start rounded-xl border p-3 text-left transition-colors ${active ? 'border-primary bg-primary/10' : 'border-border bg-surface hover:border-border-strong'}`}
             >
               <span className="text-[10px] font-bold uppercase tracking-wider text-fg-muted">{AREA_LABEL[a]}</span>
               <span className={`mt-1 font-data-mono text-2xl font-bold ${active ? 'text-primary' : 'text-fg'}`}>{countsByArea[a] || 0}</span>

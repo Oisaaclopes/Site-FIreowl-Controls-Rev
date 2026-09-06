@@ -83,23 +83,23 @@ type BadgeColor = 'slate' | 'blue' | 'emerald' | 'green' | 'red' | 'amber' | 'br
 
 // Classes literais (o Tailwind não detecta classes montadas dinamicamente)
 const BADGE_SOLID: Record<BadgeColor, string> = {
-  slate: 'bg-slate-100 text-slate-700',
-  blue: 'bg-blue-50 text-blue-700',
-  emerald: 'bg-emerald-50 text-emerald-700',
-  green: 'bg-emerald-50 text-emerald-700',
-  red: 'bg-red-50 text-red-700',
-  amber: 'bg-amber-50 text-amber-700',
-  brand: 'bg-primary-soft text-primary',
+  slate: 'bg-slate-100 text-slate-700 dark:bg-slate-800/80 dark:text-slate-300',
+  blue: 'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300',
+  emerald: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300',
+  green: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300',
+  red: 'bg-red-50 text-red-700 dark:bg-red-950/70 dark:text-red-300',
+  amber: 'bg-amber-50 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300',
+  brand: 'bg-primary-soft text-primary dark:bg-primary/20 dark:text-primary',
 };
 
 const BADGE_OUTLINE: Record<BadgeColor, string> = {
-  slate: 'border border-slate-300 text-slate-600',
-  blue: 'border border-blue-400 text-blue-700',
-  emerald: 'border border-emerald-500 text-emerald-700',
-  green: 'border border-emerald-500 text-emerald-700',
-  red: 'border border-danger text-danger',
-  amber: 'border border-amber-500 text-amber-700',
-  brand: 'border border-primary/30 text-primary',
+  slate: 'border border-slate-300 text-slate-600 dark:border-slate-700 dark:text-slate-300',
+  blue: 'border border-blue-400 text-blue-700 dark:border-blue-700 dark:text-blue-300',
+  emerald: 'border border-emerald-500 text-emerald-700 dark:border-emerald-700 dark:text-emerald-300',
+  green: 'border border-emerald-500 text-emerald-700 dark:border-emerald-700 dark:text-emerald-300',
+  red: 'border border-danger text-danger dark:border-danger dark:text-danger',
+  amber: 'border border-amber-500 text-amber-700 dark:border-amber-700 dark:text-amber-300',
+  brand: 'border border-primary/30 text-primary dark:border-primary/50 dark:text-primary',
 };
 
 /** Etiqueta de status colorida (sólida suave ou vazada). */

@@ -163,14 +163,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       )}
 
       {/* Indicator Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {/* Card: Receita */}
         <div className="bg-surface p-4 rounded-xl border border-border shadow-soft relative overflow-hidden group hover:border-border-strong hover:shadow-card transition-all">
           <div className="flex justify-between items-start">
             <p className="text-[10px] font-semibold text-fg-secondary uppercase tracking-wider">
               Receita lançada
             </p>
-            <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/70 dark:text-emerald-400 flex items-center justify-center">
               <span className="material-symbols-outlined text-[18px]">trending_up</span>
             </div>
           </div>
@@ -217,7 +217,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <p className="text-[10px] font-semibold text-fg-secondary uppercase tracking-wider">
               Contratos Ativos
             </p>
-            <div className="w-9 h-9 rounded-lg bg-primary-soft text-primary flex items-center justify-center">
+            <div className="w-9 h-9 rounded-lg bg-primary-soft text-primary dark:bg-primary/20 flex items-center justify-center">
               <span className="material-symbols-outlined text-[18px]">description</span>
             </div>
           </div>
@@ -244,7 +244,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <p className="text-[10px] font-semibold text-fg-secondary uppercase tracking-wider">
               Pedidos em aberto
             </p>
-            <div className="w-9 h-9 rounded-lg bg-primary-soft text-primary flex items-center justify-center">
+            <div className="w-9 h-9 rounded-lg bg-primary-soft text-primary dark:bg-primary/20 flex items-center justify-center">
               <span className="material-symbols-outlined text-[18px]">receipt_long</span>
             </div>
           </div>
@@ -268,7 +268,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <p className="text-[10px] font-semibold text-fg-secondary uppercase tracking-wider">
               Atendimentos em execução
             </p>
-            <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/70 dark:text-indigo-400 flex items-center justify-center">
               <span className="material-symbols-outlined text-[18px]">engineering</span>
             </div>
           </div>

@@ -484,13 +484,13 @@ export const CrmView: React.FC<CrmViewProps> = ({
         <div className="flex flex-col gap-6">
           {/* Bento Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-            <div className="bg-surface p-6 rounded-xl shadow-sm">
+            <div className="bg-surface p-6 rounded-xl border border-border shadow-sm">
               <p className="text-xs font-semibold text-fg-secondary uppercase">Total Ativos</p>
               <h3 className="text-3xl font-bold text-fg mt-2">{clients.length}</h3>
-              <p className="text-xs text-emerald-600 mt-2 font-medium">100% monitorados</p>
+              <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2 font-medium">100% monitorados</p>
             </div>
 
-            <div className="bg-surface p-6 rounded-xl shadow-sm">
+            <div className="bg-surface p-6 rounded-xl border border-border shadow-sm">
               <p className="text-xs font-semibold text-fg-secondary uppercase">Contratos Ativos</p>
               <h3 className="text-3xl font-bold text-fg mt-2">
                 {contracts.filter((c) => c.status === 'ATIVO').length}
@@ -498,9 +498,9 @@ export const CrmView: React.FC<CrmViewProps> = ({
               <p className="text-xs text-fg-secondary mt-2 font-medium">de {contracts.length} no total</p>
             </div>
 
-            <div className="md:col-span-2 bg-surface p-6 rounded-xl shadow-sm flex justify-between items-center gap-4">
+            <div className="md:col-span-2 bg-surface p-6 rounded-xl border border-border shadow-sm flex justify-between items-center gap-4">
               <div>
-                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full uppercase">
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/70 dark:text-emerald-300 px-2.5 py-1 rounded-full uppercase">
                   Receita Recorrente (MRR)
                 </span>
                 <h3 className="font-data-mono text-2xl font-bold text-fg mt-2">

@@ -426,14 +426,14 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
                 key={t.id}
                 onClick={() => goTab(t.id)}
                 className={`flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-semibold transition-colors ${
-                  active ? 'border-danger text-primary' : 'border-transparent text-fg-secondary hover:text-fg'
+                  active ? 'border-primary text-primary' : 'border-transparent text-fg-secondary hover:text-fg'
                 }`}
                 aria-current={active ? 'page' : undefined}
               >
                 <span className="material-symbols-outlined text-base">{t.icon}</span>
                 {t.label}
                 {t.badge ? (
-                  <span className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${active ? 'bg-danger text-white' : 'bg-surface-3 text-fg-secondary'}`}>
+                  <span className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${active ? 'bg-primary text-white' : 'bg-surface-3 text-fg-secondary'}`}>
                     {t.badge}
                   </span>
                 ) : null}

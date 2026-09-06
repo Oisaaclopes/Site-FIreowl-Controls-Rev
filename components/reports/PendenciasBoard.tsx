@@ -27,11 +27,11 @@ const STATUS_LABEL: Record<PendenciaStatus, string> = {
   recusada_cliente: 'Recusada',
 };
 const STATUS_COLOR: Record<PendenciaStatus, string> = {
-  aberta: 'bg-red-100 text-red-700',
-  orcada: 'bg-amber-100 text-amber-800',
-  aprovada: 'bg-blue-100 text-blue-800',
-  em_execucao: 'bg-indigo-100 text-indigo-800',
-  corrigida: 'bg-emerald-100 text-emerald-800',
+  aberta: 'bg-red-100 text-red-700 dark:bg-red-950/70 dark:text-red-300',
+  orcada: 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300',
+  aprovada: 'bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300',
+  em_execucao: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/70 dark:text-indigo-300',
+  corrigida: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300',
   cancelada: 'bg-surface-3 text-fg-secondary',
   recusada_cliente: 'bg-surface-3 text-fg-secondary',
 };
