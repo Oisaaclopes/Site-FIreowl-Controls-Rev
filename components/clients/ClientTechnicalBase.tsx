@@ -210,6 +210,39 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
     } catch (e: any) { showToast(`Falha: ${e?.message || e}`); }
   };
 
+  // §4.3 — edição inline (célula) de campos SIMPLES/seguros: Local, Condição e
+  // Grupo/Tipo. Reutiliza upsertDevice + validações; NÃO toca identidade técnica
+  // (central/laço/endereço) nem catálogo (fabricante/modelo) inline — esses
+  // seguem no modal "Editar" completo, preservando duplicidade/validação.
+  const inlineSave = async (d: Device, patch: Partial<Device>) => {
+    if (!isSupabaseConfigured()) { showToast('Supabase não configurado.'); return; }
+    try {
+      await upsertDevice({ ...d, ...patch });
+      onDevicesChanged();
+    } catch (e: any) { showToast(`Falha ao salvar: ${e?.message || e}`); }
+  };
+
+  // §4.4 — copiar ativos para a área de transferência em TSV (colável no
+  // Excel/Sheets: TAB=coluna, newline=linha). Somente LEITURA — colar de volta
+  // com escrita silenciosa é intencionalmente evitado (§4.4: validar antes).
+  const copyDevices = async (list: Device[]) => {
+    if (list.length === 0) return;
+    const header = ['Central', 'Laço', 'Endereço', 'Grupo', 'Fabricante', 'Modelo', 'Local', 'Condição'];
+    const cell = (v?: string) => (v ?? '').replace(/[\t\r\n]+/g, ' ').trim();
+    const lines = list.map((d) => [
+      cell(d.central), cell(d.laco), cell(d.endereco), cell(legacyGroupLabel(area, d.grupo) || d.grupo),
+      cell(d.fabricante), cell(d.modelo), cell(d.localizacao || d.pavimento),
+      cell(d.condicao ? CONDITION_LABEL[d.condicao] : ''),
+    ].join('\t'));
+    const tsv = [header.join('\t'), ...lines].join('\n');
+    try {
+      await navigator.clipboard.writeText(tsv);
+      showToast(`${list.length} linha(s) copiada(s) para a área de transferência.`);
+    } catch {
+      showToast('Não foi possível copiar (permissão da área de transferência).');
+    }
+  };
+
   return (
     <div className="mx-auto flex w-full min-w-0 max-w-[1600px] flex-col gap-5">
       {/* Cartões de resumo por disciplina */}
@@ -328,10 +361,12 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
         <BulkBar
           area={area} count={selected.size} canManage={canManage}
           onClear={clearSel}
+          onCopy={() => copyDevices(selectedDevices)}
           onRemove={() => confirmRemove(selectedDevices)}
           onCondition={(c) => bulkPatch({ condicao: c })}
           onGroup={(g) => bulkPatch({ grupo: g })}
           onFabricante={(f) => bulkPatch({ fabricante: f })}
+          onLocalizacao={(l) => bulkPatch({ localizacao: l })}
         />
       )}
 
@@ -347,6 +382,7 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
         <AssetTable
           area={area} devices={visible} selected={selected} canManage={canManage}
           hideSingleCentral={hideSingleCentral}
+          onInlineSave={inlineSave} onCopy={copyDevices}
           onToggleRow={toggleRow} onToggleAll={toggleAll}
           onVerify={setVerifDevice} onOpen={setDetailDevice} onEdit={setEditDevice}
           onRemove={(d) => confirmRemove([d])}
@@ -511,8 +547,10 @@ const SummaryPanel: React.FC<{
 const BulkBar: React.FC<{
   area: TechArea; count: number; canManage: boolean; onClear: () => void;
   onRemove: () => void; onCondition: (c: AssetConditionValue) => void; onGroup: (g: string) => void; onFabricante: (f: string) => void;
-}> = ({ area, count, canManage, onClear, onRemove, onCondition, onGroup, onFabricante }) => {
+  onLocalizacao?: (l: string) => void; onCopy?: () => void;
+}> = ({ area, count, canManage, onClear, onRemove, onCondition, onGroup, onFabricante, onLocalizacao, onCopy }) => {
   const [fab, setFab] = useState('');
+  const [loc, setLoc] = useState('');
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/40 bg-navy/5 px-3 py-2 text-xs">
       <span className="font-bold text-primary">{count} selecionado{count > 1 ? 's' : ''}</span>
@@ -528,6 +566,13 @@ const BulkBar: React.FC<{
         <input value={fab} onChange={(e) => setFab(e.target.value)} placeholder="Fabricante…" className="w-28 rounded-lg border border-border bg-surface px-2 py-1 text-fg" />
         <button onClick={() => { if (fab.trim()) { onFabricante(fab.trim()); setFab(''); } }} disabled={!fab.trim()} className="rounded-lg border border-border-strong px-2 py-1 font-semibold text-primary disabled:opacity-40">Aplicar</button>
       </div>
+      {onLocalizacao && (
+        <div className="flex items-center gap-1">
+          <input value={loc} onChange={(e) => setLoc(e.target.value)} placeholder="Localização…" className="w-28 rounded-lg border border-border bg-surface px-2 py-1 text-fg" />
+          <button onClick={() => { if (loc.trim()) { onLocalizacao(loc.trim()); setLoc(''); } }} disabled={!loc.trim()} className="rounded-lg border border-border-strong px-2 py-1 font-semibold text-primary disabled:opacity-40">Aplicar</button>
+        </div>
+      )}
+      {onCopy && <button onClick={onCopy} className="rounded-lg border border-border-strong px-2.5 py-1 font-semibold text-fg-secondary hover:border-primary hover:text-primary">Copiar (Excel)</button>}
       {canManage && <button onClick={onRemove} className="rounded-lg border border-danger px-2.5 py-1 font-bold text-danger hover:bg-danger/10">Remover</button>}
       <button onClick={onClear} className="ml-auto font-semibold text-fg-muted underline hover:text-fg-secondary">Limpar seleção</button>
     </div>
@@ -541,7 +586,11 @@ const AssetTable: React.FC<{
   onToggleRow: (id: string) => void; onToggleAll: () => void;
   onVerify: (d: Device) => void; onOpen: (d: Device) => void; onEdit: (d: Device) => void;
   onRemove: (d: Device) => void; onHistory: (d: Device) => void; onPendencia: (d: Device) => void;
-}> = ({ area, devices, selected, canManage, hideSingleCentral, onToggleRow, onToggleAll, onVerify, onOpen, onEdit, onRemove, onHistory, onPendencia }) => {
+  onInlineSave?: (d: Device, patch: Partial<Device>) => void; onCopy?: (list: Device[]) => void;
+}> = ({ area, devices, selected, canManage, hideSingleCentral, onToggleRow, onToggleAll, onVerify, onOpen, onEdit, onRemove, onHistory, onPendencia, onInlineSave, onCopy }) => {
+  // Célula em edição inline (id do device + campo). null = nenhuma.
+  const [editCell, setEditCell] = useState<{ id: string; field: 'localizacao' | 'condicao' | 'grupo' } | null>(null);
+  const canInline = canManage && !!onInlineSave;
   const [menu, setMenu] = useState<string | null>(null);
   if (devices.length === 0) {
     return <EmptyState variant="generico" title={`Sem ativos de ${AREA_LABEL[area]}`} description="Nenhum ativo para os filtros atuais. Ajuste os filtros, cadastre manualmente ou registre um levantamento." />;
@@ -556,6 +605,7 @@ const AssetTable: React.FC<{
           <div className="fixed inset-0 z-10" onClick={() => setMenu(null)} />
           <div className="absolute right-0 top-8 z-20 w-40 rounded-lg border border-border bg-surface py-1 text-[11px] shadow-lg">
             <button onClick={() => { setMenu(null); onEdit(d); }} className="block w-full px-3 py-2 text-left text-fg-secondary hover:bg-surface-2 sm:hidden">Editar</button>
+            {onCopy && <button onClick={() => { setMenu(null); onCopy([d]); }} className="block w-full px-3 py-2 text-left text-fg-secondary hover:bg-surface-2">Copiar linha (Excel)</button>}
             <button onClick={() => { setMenu(null); onHistory(d); }} className="block w-full px-3 py-2 text-left text-fg-secondary hover:bg-surface-2">Ver histórico</button>
             <button onClick={() => { setMenu(null); onPendencia(d); }} className="block w-full px-3 py-2 text-left text-fg-secondary hover:bg-surface-2">Criar pendência</button>
             {canManage && <button onClick={() => { setMenu(null); onRemove(d); }} className="block w-full px-3 py-2 text-left text-danger hover:bg-danger/10">Remover</button>}
@@ -623,10 +673,50 @@ const AssetTable: React.FC<{
               <tr key={d.id} className={`bg-surface hover:bg-surface-2 ${sel ? 'bg-navy/5' : ''}`}>
                 <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={sel} onChange={() => onToggleRow(d.id)} aria-label="Selecionar ativo" /></td>
                 <td className="cursor-pointer px-3 py-2 font-data-mono font-semibold text-primary" onClick={() => onOpen(d)}>{ident || <span className="italic text-fg-muted">sem identificador</span>}</td>
-                <td className="cursor-pointer px-3 py-2 text-fg-secondary" onClick={() => onOpen(d)}>{[legacyGroupLabel(area, d.grupo), d.tipoAtivo || d.tipoDispositivo].filter(Boolean).join(' · ') || '—'}</td>
+                {/* Grupo/Tipo — inline (select do grupo canônico da área). */}
+                {canInline && editCell?.id === d.id && editCell.field === 'grupo' ? (
+                  <td className="px-3 py-1.5">
+                    <select
+                      autoFocus defaultValue={d.grupo || ''}
+                      onBlur={() => setEditCell(null)}
+                      onChange={(e) => { const val = e.target.value; if (val !== (d.grupo || '')) onInlineSave!(d, { grupo: val }); setEditCell(null); }}
+                      className="w-full rounded border border-primary bg-surface px-1.5 py-1 text-xs text-fg focus:outline-none"
+                    >
+                      {groupsForArea(area).map((g) => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                  </td>
+                ) : (
+                  <td className={`px-3 py-2 text-fg-secondary ${canInline ? 'cursor-text hover:bg-navy/5' : 'cursor-pointer'}`} title={canInline ? 'Clique para editar o grupo' : undefined} onClick={() => canInline ? setEditCell({ id: d.id, field: 'grupo' }) : onOpen(d)}>{[legacyGroupLabel(area, d.grupo), d.tipoAtivo || d.tipoDispositivo].filter(Boolean).join(' · ') || '—'}</td>
+                )}
                 <td className="cursor-pointer px-3 py-2 text-fg-secondary" onClick={() => onOpen(d)}>{[d.fabricante, d.modelo].filter(Boolean).join(' ') || '—'}</td>
-                <td className="px-3 py-2 text-fg-secondary">{d.localizacao || d.pavimento || '—'}</td>
-                <td className="px-3 py-2">{d.condicao ? <Badge color={CONDITION_COLOR[d.condicao]}>{CONDITION_LABEL[d.condicao]}</Badge> : <span className="text-fg-muted">—</span>}</td>
+                {/* Local — inline (input de texto). */}
+                {canInline && editCell?.id === d.id && editCell.field === 'localizacao' ? (
+                  <td className="px-3 py-1.5">
+                    <input
+                      autoFocus defaultValue={d.localizacao || ''}
+                      onBlur={(e) => { const val = e.target.value.trim(); if (val !== (d.localizacao || '')) onInlineSave!(d, { localizacao: val }); setEditCell(null); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setEditCell(null); }}
+                      className="w-full rounded border border-primary bg-surface px-1.5 py-1 text-xs text-fg focus:outline-none"
+                    />
+                  </td>
+                ) : (
+                  <td className={`px-3 py-2 text-fg-secondary ${canInline ? 'cursor-text hover:bg-navy/5' : ''}`} title={canInline ? 'Clique para editar o local' : undefined} onClick={() => canInline && setEditCell({ id: d.id, field: 'localizacao' })}>{d.localizacao || d.pavimento || '—'}</td>
+                )}
+                {/* Condição — inline (select). */}
+                {canInline && editCell?.id === d.id && editCell.field === 'condicao' ? (
+                  <td className="px-3 py-1.5">
+                    <select
+                      autoFocus defaultValue={d.condicao || 'NORMAL'}
+                      onBlur={() => setEditCell(null)}
+                      onChange={(e) => { const val = e.target.value as AssetConditionValue; if (val !== d.condicao) onInlineSave!(d, { condicao: val }); setEditCell(null); }}
+                      className="w-full rounded border border-primary bg-surface px-1.5 py-1 text-xs text-fg focus:outline-none"
+                    >
+                      {CONDITIONS.map((c) => <option key={c} value={c}>{CONDITION_LABEL[c]}</option>)}
+                    </select>
+                  </td>
+                ) : (
+                  <td className={`px-3 py-2 ${canInline ? 'cursor-pointer hover:bg-navy/5' : ''}`} title={canInline ? 'Clique para editar a condição' : undefined} onClick={() => canInline && setEditCell({ id: d.id, field: 'condicao' })}>{d.condicao ? <Badge color={CONDITION_COLOR[d.condicao]}>{CONDITION_LABEL[d.condicao]}</Badge> : <span className="text-fg-muted">—</span>}</td>
+                )}
                 <td className="px-3 py-2 text-[10px] uppercase tracking-wide text-fg-muted">{d.source ? SOURCE_LABEL[d.source] : '—'}</td>
                 <td className="px-3 py-2">
                   <div className="flex items-center justify-end gap-1">
