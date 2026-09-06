@@ -70,6 +70,48 @@ export async function fetchVerificationsForDevice(deviceId: string): Promise<Dev
   return (data || []).map(rowToVerification);
 }
 
+/**
+ * Última verificação (mais recente por verified_at) de cada ativo de uma lista.
+ * Uma consulta só; reduz em memória. Base do "último teste" da manutenção
+ * (§5 — reaproveita device_verifications, sem entidade nova de teste). Retorna
+ * um Map deviceId → verificação mais recente.
+ */
+export async function fetchLatestVerificationsForDevices(
+  deviceIds: string[]
+): Promise<Map<string, DeviceVerification>> {
+  const out = new Map<string, DeviceVerification>();
+  const ids = Array.from(new Set(deviceIds.filter(Boolean)));
+  if (ids.length === 0) return out;
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase.from(TABLE).select('*')
+    .in('device_id', ids).order('verified_at', { ascending: false });
+  if (error) throw error;
+  for (const r of data || []) {
+    const v = rowToVerification(r);
+    // Já vem ordenado desc; a PRIMEIRA por device é a mais recente.
+    if (!out.has(v.deviceId)) out.set(v.deviceId, v);
+  }
+  return out;
+}
+
+/** Verificações de vários ativos dentro de uma janela de datas (consolidado). */
+export async function fetchVerificationsInWindow(
+  deviceIds: string[],
+  periodStart: string,
+  periodEnd: string
+): Promise<DeviceVerification[]> {
+  const ids = Array.from(new Set(deviceIds.filter(Boolean)));
+  if (ids.length === 0) return [];
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase.from(TABLE).select('*')
+    .in('device_id', ids)
+    .gte('verified_at', periodStart)
+    .lte('verified_at', `${periodEnd}T23:59:59.999Z`)
+    .order('verified_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(rowToVerification);
+}
+
 /** Verificações de um levantamento (para cobertura/reconciliação). */
 export async function fetchVerificationsForSurvey(surveyId: string): Promise<DeviceVerification[]> {
   const supabase = getSupabaseClient() as any;

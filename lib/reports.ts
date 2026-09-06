@@ -28,6 +28,15 @@ function rowToReport(r: any): ReportInstance {
     clientUuid: r.client_uuid ?? undefined,
     templateVersion: r.template_version ?? undefined,
     templateSnapshot: r.template_snapshot ?? undefined,
+    // ===== MANUTENÇÃO CONTRATUAL (0106) =====
+    serviceAttendanceId: r.service_attendance_id ?? undefined,
+    periodStart: r.period_start ?? undefined,
+    periodEnd: r.period_end ?? undefined,
+    competencia: r.competencia ?? undefined,
+    snapshot: r.snapshot ?? undefined,
+    revisao: r.revisao ?? undefined,
+    fechadoEm: r.fechado_em ?? undefined,
+    supersedesReportId: r.supersedes_report_id ?? undefined,
   };
 }
 
@@ -55,6 +64,15 @@ function reportToRow(r: ReportInstance): Record<string, unknown> {
   if (r.observacoesGerais !== undefined) row.observacoes_gerais = r.observacoesGerais;
   if (r.syncStatus !== undefined) row.sync_status = r.syncStatus;
   if (r.clientUuid !== undefined) row.client_uuid = r.clientUuid;
+  // ===== MANUTENÇÃO CONTRATUAL (0106) — escrita condicional (não sobrescreve com null) =====
+  // `snapshot`/`fechado_em` NÃO entram aqui de propósito: o fechamento é feito por
+  // finalizeMaintenanceReport (lib/maintenanceReports.ts), que grava atomicamente.
+  if (r.serviceAttendanceId !== undefined) row.service_attendance_id = r.serviceAttendanceId ?? null;
+  if (r.periodStart !== undefined) row.period_start = r.periodStart ?? null;
+  if (r.periodEnd !== undefined) row.period_end = r.periodEnd ?? null;
+  if (r.competencia !== undefined) row.competencia = r.competencia ?? null;
+  if (r.revisao !== undefined) row.revisao = r.revisao;
+  if (r.supersedesReportId !== undefined) row.supersedes_report_id = r.supersedesReportId ?? null;
   return row;
 }
 

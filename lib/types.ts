@@ -944,7 +944,7 @@ export interface SystemAuditLog {
  * Requer migrações 0023–0028. Fase 1: fundação de dados.
  * ===================================================================== */
 
-export type ReportTipo = 'LEVANTAMENTO' | 'CORRETIVA' | 'PREVENTIVA';
+export type ReportTipo = 'LEVANTAMENTO' | 'CORRETIVA' | 'PREVENTIVA' | 'MANUTENCAO';
 export type ReportStatus =
   | 'rascunho'
   | 'em_execucao'
@@ -1011,6 +1011,90 @@ export interface Device {
 
 export type AssetConditionValue = 'NORMAL' | 'COM_AVARIA' | 'INOPERANTE' | 'NAO_TESTADO' | 'NAO_LOCALIZADO' | 'INADEQUADO';
 export type AssetSourceValue = 'LEVANTAMENTO' | 'IMPORTACAO' | 'MANUAL' | 'ATENDIMENTO';
+
+/* ===================================================================
+ * MANUTENÇÃO CONTRATUAL (migration 0106) — política de periodicidade
+ * configurável e multidisciplinar. NÃO duplica a Base Técnica: os filtros
+ * usam os MESMOS domínios de devices (sistema=area, grupo, tipo_ativo).
+ * =================================================================== */
+export type MaintenancePolicyScope = 'PADRAO' | 'CLIENTE' | 'CONTRATO' | 'ATIVO';
+export type MaintenancePeriodicityUnit = 'DIA' | 'SEMANA' | 'MES' | 'ANO';
+
+export interface AssetMaintenancePolicy {
+  id: string;
+  escopo: MaintenancePolicyScope;
+  /** Filtros de classificação canônica (null = curinga). */
+  area?: TechAreaValue;
+  grupo?: string;
+  tipoAtivo?: string;
+  /** Âncoras do escopo. */
+  clienteId?: string;
+  contractId?: string;
+  deviceId?: string;
+  periodicidadeValor: number;
+  periodicidadeUnidade: MaintenancePeriodicityUnit;
+  obrigatorioNoCiclo?: boolean;
+  janelaToleranciaDias?: number;
+  ativa?: boolean;
+  observacao?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** Domínio canônico de área técnica (espelha devices.sistema). */
+export type TechAreaValue = 'SDAI' | 'CFTV' | 'CONTROLE_ACESSO' | 'BMS' | 'ALARME';
+
+/** Política efetiva resolvida para um ativo (com a proveniência da decisão). */
+export interface EffectiveMaintenancePolicy {
+  periodicidadeValor: number;
+  periodicidadeUnidade: MaintenancePeriodicityUnit;
+  obrigatorioNoCiclo: boolean;
+  janelaToleranciaDias: number;
+  /** Política vencedora e o peso de especificidade que a elegeu (auditabilidade). */
+  policyId: string;
+  escopo: MaintenancePolicyScope;
+  especificidade: number;
+}
+
+export type MaintenanceAssetStatus = 'EM_DIA' | 'PROXIMO' | 'VENCIDO' | 'SEM_POLITICA';
+
+/** Linha de manutenção de um ativo (deriva de devices + policy + verificações). */
+export interface MaintenanceAssetRow {
+  device: Device;
+  policy: EffectiveMaintenancePolicy | null;
+  ultimoTeste?: string;             // verified_at da última verificação
+  ultimaCondicao?: AssetConditionValue;
+  proximoTeste?: string;            // data prevista da próxima manutenção
+  status: MaintenanceAssetStatus;
+  /** Dias até (positivo) / desde (negativo) o próximo teste, na data de referência. */
+  diasParaVencer?: number;
+}
+
+/** Snapshot documental congelado do consolidado MANUTENCAO (reports.snapshot). */
+export interface MaintenanceReportSnapshot {
+  contratoId: string;
+  clienteId?: string;
+  periodStart: string;
+  periodEnd: string;
+  competencia?: string;
+  sistemas: string[];
+  atendimentos: Array<{ id: string; tecnicoId?: string; data?: string; resultado?: string; osNumero?: string }>;
+  routineExecutions: Array<{ id: string; competencia: string; routineId: string; dataProgramada?: string; status: string }>;
+  testes: Array<{ deviceId: string; condicao: string; verifiedAt?: string; local?: string; endereco?: string }>;
+  pendencias: {
+    abertasNoPeriodo: string[];
+    anterioresAbertas: string[];
+    resolvidasNoPeriodo: string[];
+  };
+  fotos: Array<{ id: string; storagePath: string; ativo?: string; atendimentoId?: string; momento?: string; capturadoEm?: string }>;
+  alteracoesBase: Array<{ deviceId: string; tipo: string; antes?: string; depois?: string; em?: string }>;
+  cobertura?: { previstos: number; testados: number; aprovados: number; reprovados: number };
+  conclusao?: string;
+  fechadoEm: string;
+  revisao: string;
+  /** Membership congelada: ids incluídos (evita recontagem/ambiguidade futura). */
+  membership: { attendanceIds: string[]; executionIds: string[] };
+}
 
 /** Levantamento técnico (technical_surveys, 0095). */
 export interface TechnicalSurvey {
@@ -1125,6 +1209,22 @@ export interface ReportInstance {
    *  legados (fallback controlado para o template vigente). */
   templateVersion?: number;
   templateSnapshot?: import('./reportSchema').TemplateSchema | null;
+  /* ===== MANUTENÇÃO CONTRATUAL (migration 0106) ===== */
+  /** Atendimento que originou este documento técnico (0..N por atendimento).
+   *  NULL no consolidado MANUTENCAO (agrega N atendimentos). */
+  serviceAttendanceId?: string;
+  /** Janela documental do consolidado (fonte da verdade; NUNCA a `competencia`). */
+  periodStart?: string;
+  periodEnd?: string;
+  /** Rótulo humano do período (2026-09 / 2026-Q3 / 2026). Apenas apresentação. */
+  competencia?: string;
+  /** Estado documental CONGELADO no fechamento do MANUTENCAO (reproduz o emitido). */
+  snapshot?: MaintenanceReportSnapshot | null;
+  /** Revisão documental R00/R01/R02… (0106). R00 = primeira emissão. */
+  revisao?: string;
+  fechadoEm?: string;
+  /** Revisão anterior superseditada (R01→R00, R02→R01). */
+  supersedesReportId?: string;
 }
 
 /** Resposta de um campo do relatório (campo_key = texto, não FK). */
