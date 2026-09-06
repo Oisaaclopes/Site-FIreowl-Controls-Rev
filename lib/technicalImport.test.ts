@@ -104,6 +104,46 @@ describe('buildImportPreview (§11/§12)', () => {
   });
 });
 
+describe('§5A — colar do Excel/Sheets (TSV) reutiliza o importador', () => {
+  it('parseCsv detecta TAB e separa colunas/linhas', () => {
+    const tsv = 'Intelbras\tDFE 521\tLoja 01\nTecnohold\tAvalon\tDepósito';
+    expect(detectDelimiter(tsv)).toBe('\t');
+    expect(parseCsv(tsv)).toEqual([
+      ['Intelbras', 'DFE 521', 'Loja 01'],
+      ['Tecnohold', 'Avalon', 'Depósito'],
+    ]);
+  });
+
+  it('sem cabeçalho: sintetiza "Coluna N" e todas as linhas viram dados', () => {
+    const rows = parseCsv('45\t2\tAcionador\n46\t2\tSirene');
+    const header = Array.from({ length: 3 }, (_, i) => `Coluna ${i + 1}`);
+    const matrix = [header, ...rows];
+    const mapping = { 0: 'endereco', 1: 'laco', 2: 'tipoAtivo' };
+    const p = buildImportPreview(matrix, mapping, 'SDAI', []);
+    expect(p.total).toBe(2);
+    expect(p.valid).toBe(2);
+  });
+
+  it('preview colado sinaliza duplicidades (arquivo e base) sem persistir', () => {
+    const rows = parseCsv('End\tLoop\tTipo\n45\t2\tAcionador\n45\t2\tAcionador\n999\t1\tSirene');
+    const mapping = guessMapping(rows[0], 'SDAI');
+    const p = buildImportPreview(rows, mapping, 'SDAI', [{ endereco: '45', laco: '2' }]);
+    expect(p.total).toBe(3);
+    expect(p.duplicatesInFile).toBe(1);           // 2ª linha repete a 1ª
+    expect(p.duplicatesInBase).toBeGreaterThanOrEqual(1); // 45/2 já existe na base
+    // buildImportPreview é PURO: só analisa, nenhuma gravação acontece aqui.
+  });
+
+  it('linha colada sem identificador nem tipo/grupo é sinalizada inválida', () => {
+    const rows = parseCsv('Intelbras\tDFE 521\tLoja 01');
+    const matrix = [['Coluna 1', 'Coluna 2', 'Coluna 3'], ...rows];
+    const mapping = { 0: 'fabricante', 1: 'modelo', 2: 'localizacao' };
+    const p = buildImportPreview(matrix, mapping, 'SDAI', []);
+    expect(p.results[0].valid).toBe(false);
+    expect(p.results[0].errors.join(' ')).toMatch(/identificador|tipo\/grupo/i);
+  });
+});
+
 describe('XLSX helpers (parsing puro, sem binário)', () => {
   it('colRefToIndex', () => {
     expect(colRefToIndex('A1')).toBe(0);

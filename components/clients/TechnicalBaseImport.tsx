@@ -3,7 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { Device, AssetSourceValue } from '@/lib/types';
 import { TechArea, AREA_LABEL, AREAS, assetDisplayIdentifier } from '@/lib/technicalBase';
 import {
-  parseSpreadsheet, guessMapping, importTargets, buildImportPreview, ImportPreview, DeviceDraft,
+  parseSpreadsheet, parseCsv, guessMapping, importTargets, buildImportPreview, ImportPreview, DeviceDraft,
 } from '@/lib/technicalImport';
 import { upsertDevice } from '@/lib/devices';
 import { newAssetId } from '@/lib/surveyCapture';
@@ -36,6 +36,9 @@ export const TechnicalBaseImport: React.FC<Props> = ({ clienteId, area: initialA
   const [includeBaseDupes, setIncludeBaseDupes] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importedCount, setImportedCount] = useState(0);
+  // §5A — colar direto do Excel/Google Sheets (TSV/CSV) no MESMO fluxo.
+  const [pasteText, setPasteText] = useState('');
+  const [pasteHasHeader, setPasteHasHeader] = useState(false);
 
   const targets = useMemo(() => importTargets(area), [area]);
   const headers = matrix[0] || [];
@@ -68,6 +71,28 @@ export const TechnicalBaseImport: React.FC<Props> = ({ clienteId, area: initialA
       setMapping(guessMapping(rows[0], area));
       setStep('map');
     } catch (e: any) { showToast(`Não foi possível ler o arquivo: ${e?.message || e}`); }
+  };
+
+  // Interpreta o texto colado (TSV do Excel = TAB; CSV também) e entra no MESMO
+  // fluxo de mapeamento→prévia→validação→confirmação. NUNCA persiste direto.
+  const onPaste = () => {
+    const text = pasteText.replace(/\r/g, '');
+    if (!text.trim()) { showToast('Cole os dados do Excel/Sheets antes de interpretar.'); return; }
+    const rows = parseCsv(text).filter((r) => r.some((c) => (c || '').trim() !== ''));
+    if (rows.length === 0) { showToast('Nada para interpretar.'); return; }
+    // Sem cabeçalho, sintetiza "Coluna N" para que TODAS as linhas sejam dados.
+    let m: string[][];
+    if (pasteHasHeader) {
+      if (rows.length < 2) { showToast('Com cabeçalho, cole ao menos 1 linha de dados.'); return; }
+      m = rows;
+    } else {
+      const maxCols = rows.reduce((n, r) => Math.max(n, r.length), 0);
+      const header = Array.from({ length: maxCols }, (_, i) => `Coluna ${i + 1}`);
+      m = [header, ...rows];
+    }
+    setMatrix(m);
+    setMapping(guessMapping(m[0], area));
+    setStep('map');
   };
 
   // Reaplica auto-map quando muda a área na etapa de mapeamento.
@@ -130,6 +155,29 @@ export const TechnicalBaseImport: React.FC<Props> = ({ clienteId, area: initialA
               <p className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-[11px] text-fg-muted">
                 Aceita cabeçalhos livres — na próxima etapa você confirma o mapeamento das colunas. Nada é importado sem sua confirmação. Ativos importados entram como <b>não verificados em campo</b> (§12).
               </p>
+
+              {/* §5A — colar direto do Excel/Google Sheets (TAB=coluna, newline=linha) */}
+              <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-3">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[18px] text-primary">content_paste</span>
+                  <span className="text-xs font-bold uppercase tracking-wide text-fg-secondary">Ou cole do Excel / Google Sheets</span>
+                </div>
+                <textarea
+                  value={pasteText}
+                  onChange={(e) => setPasteText(e.target.value)}
+                  rows={4}
+                  placeholder={'Cole aqui (TAB separa colunas, Enter separa linhas):\nIntelbras\tDFE 521\tLoja 01\tNormal\nTecnohold\tAvalon\tDepósito\tNormal'}
+                  className={`${inputCls} font-data-mono text-[11px] whitespace-pre`}
+                />
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="flex items-center gap-2 text-[11px] text-fg-secondary">
+                    <input type="checkbox" checked={pasteHasHeader} onChange={(e) => setPasteHasHeader(e.target.checked)} />
+                    A primeira linha é cabeçalho
+                  </label>
+                  <button onClick={onPaste} disabled={!pasteText.trim()} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-navy disabled:opacity-50">Interpretar dados colados</button>
+                </div>
+                <p className="text-[10px] text-fg-muted">Você revisa o mapeamento e a validação (inválidos/duplicados) antes de confirmar. Nada é salvo automaticamente.</p>
+              </div>
             </div>
           )}
 
