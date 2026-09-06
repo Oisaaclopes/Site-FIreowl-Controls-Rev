@@ -63,8 +63,12 @@ create table if not exists public.asset_maintenance_policies (
   cliente_id             text references public.clients(id)   on delete cascade,
   contract_id            text references public.contracts(id) on delete cascade,
   device_id              uuid references public.devices(id)   on delete cascade,
-  -- payload da política
-  periodicidade_meses    numeric not null check (periodicidade_meses > 0),
+  -- payload da política — valor inteiro + unidade (evita frações obscuras de mês;
+  -- cobre 15 DIAS / 2 SEMANAS / 3 MESES / 1 ANO). A resolução offline converte
+  -- valor+unidade em dias/meses de forma determinística.
+  periodicidade_valor    integer not null check (periodicidade_valor > 0),
+  periodicidade_unidade  text not null default 'MES'
+                         check (periodicidade_unidade in ('DIA','SEMANA','MES','ANO')),
   obrigatorio_no_ciclo   boolean not null default false,
   janela_tolerancia_dias integer check (janela_tolerancia_dias is null or janela_tolerancia_dias >= 0),
   ativa                  boolean not null default true,
@@ -72,10 +76,14 @@ create table if not exists public.asset_maintenance_policies (
   created_by             uuid default auth.uid(),
   created_at             timestamptz not null default now(),
   updated_at             timestamptz not null default now(),
-  -- coerência âncora × escopo
-  constraint amp_escopo_ativo    check (escopo <> 'ATIVO'    or device_id  is not null),
-  constraint amp_escopo_contrato check (escopo <> 'CONTRATO' or contract_id is not null),
-  constraint amp_escopo_cliente  check (escopo <> 'CLIENTE'  or cliente_id  is not null),
+  -- coerência ESTRITA âncora × escopo: exatamente UMA âncora conforme o escopo,
+  -- proibindo combinações ambíguas (ex.: CONTRATO com device_id).
+  constraint amp_escopo_ativo    check (escopo <> 'ATIVO'
+                                        or (device_id is not null and cliente_id is null and contract_id is null)),
+  constraint amp_escopo_contrato check (escopo <> 'CONTRATO'
+                                        or (contract_id is not null and cliente_id is null and device_id is null)),
+  constraint amp_escopo_cliente  check (escopo <> 'CLIENTE'
+                                        or (cliente_id is not null and contract_id is null and device_id is null)),
   -- PADRAO é Fireowl: sem âncora de cliente/contrato/ativo (só classificação)
   constraint amp_escopo_padrao   check (escopo <> 'PADRAO'
                                         or (cliente_id is null and contract_id is null and device_id is null))
@@ -109,7 +117,11 @@ create trigger amp_set_updated_at
 comment on table public.asset_maintenance_policies is
   'Periodicidade de manutenção configurável (§14). Precedência ATIVO>CONTRATO>'
   'CLIENTE>PADRAO; no mesmo escopo, maior especificidade de classificação vence. '
-  'Resolução da effective policy é PURA/OFFLINE (lib/maintenancePolicies.ts), sem RPC.';
+  'Resolução da effective policy é PURA/OFFLINE (lib/maintenancePolicies.ts), sem RPC. '
+  'HISTÓRICO (§8): a camada de serviço NÃO deve sobrescrever periodicidade — '
+  'desativar a política vigente (ativa=false) e inserir NOVA linha (ativa=true). '
+  'O partial-unique só vale p/ ativa=true, então versões inativas coexistem; '
+  'created_at/updated_at bastam nesta fase (sem tabela de versão dedicada).';
 
 alter table public.asset_maintenance_policies enable row level security;
 grant select, insert, update, delete on public.asset_maintenance_policies to authenticated;
@@ -153,7 +165,7 @@ alter table public.reports
   add column if not exists revisao              text not null default 'R00',
   add column if not exists fechado_em           timestamptz,
   add column if not exists supersedes_report_id uuid
-      references public.reports(id) on delete set null;
+      references public.reports(id) on delete restrict;   -- integridade da cadeia R00→R01→R02
 
 comment on column public.reports.service_attendance_id is
   'Atendimento (service_attendances) que originou este documento técnico. 0..N '
@@ -199,13 +211,23 @@ begin
     alter table public.reports add constraint reports_manutencao_requires_check
       check (tipo <> 'MANUTENCAO' or (contrato_id is not null and period_start is not null and period_end is not null));
   end if;
+  -- MANUTENCAO FINALIZADO exige snapshot + fechado_em (o congelamento acontece na
+  -- transição para finalizado; um rascunho NUNCA fica com snapshot obrigatório).
+  -- Passa para os tipos antigos (tipo<>MANUTENCAO) e para MANUTENCAO ainda não
+  -- finalizado — sem quebrar registros existentes.
+  if not exists (select 1 from pg_constraint where conrelid='public.reports'::regclass and conname='reports_manutencao_close_check') then
+    alter table public.reports add constraint reports_manutencao_close_check
+      check (tipo <> 'MANUTENCAO' or status <> 'finalizado'
+             or (snapshot is not null and fechado_em is not null));
+  end if;
 end $$;
 
--- Um único documento MANUTENCAO por (contrato, período, revisão) não-cancelado.
+-- Um único documento MANUTENCAO por (contrato, período, revisão) — INDEPENDENTE
+-- de status: um R00 cancelado continua no histórico e NÃO libera reuso de R00.
 -- Permite R00 + R01 (revisao difere); bloqueia dois R00 do mesmo período.
 create unique index if not exists reports_manutencao_periodo_revisao_uq
   on public.reports (contrato_id, period_start, period_end, revisao)
-  where tipo = 'MANUTENCAO' and status <> 'cancelado';
+  where tipo = 'MANUTENCAO';
 
 -- =====================================================================
 -- 5b) Imutabilidade do snapshot documental — ESTENDE o trigger da 0075 (NÃO
@@ -220,16 +242,19 @@ language plpgsql
 set search_path = public, pg_temp
 as $$
 begin
-  -- (0075) definição do template: imutável após set.
+  -- (0075) definição do template: imutável após set. INALTERADO.
   if old.template_snapshot is not null then
     new.template_snapshot := old.template_snapshot;
     new.template_version  := old.template_version;
   end if;
-  -- (0106) snapshot documental do fechamento: imutável após set.
-  if old.snapshot is not null then
-    new.snapshot    := old.snapshot;
-    new.revisao     := old.revisao;
-    new.fechado_em  := old.fechado_em;
+  -- (0106) snapshot documental: só é IMUTÁVEL depois de FINALIZADO. Enquanto o
+  -- relatório está em rascunho/execução, snapshot pode ser regravado/limpo — assim
+  -- um snapshot salvo por engano no rascunho NÃO fica congelado para sempre. O
+  -- congelamento vale a partir do momento em que a linha JÁ estava finalizada.
+  if old.status = 'finalizado' and old.snapshot is not null then
+    new.snapshot   := old.snapshot;
+    new.revisao    := old.revisao;
+    new.fechado_em := old.fechado_em;
   end if;
   return new;
 end;
@@ -237,44 +262,82 @@ $$;
 -- trigger reports_freeze_template_snapshot já criado na 0075 sobre reports.
 
 -- =====================================================================
--- 6) reports.tipo / report_templates.tipo += 'MANUTENCAO'. NÃO assume o nome do
---    constraint: dropa dinamicamente o CHECK do domínio (contém 'LEVANTAMENTO' e
---    ainda NÃO contém 'MANUTENCAO') e recria nomeado. Idempotente (o novo CHECK
---    contém 'MANUTENCAO' e não é redropado numa reexecução).
+-- 5c) Integridade da SÉRIE documental (§5): uma revisão só supersede documento
+--     da MESMA série (mesmo contrato_id, tipo, period_start, period_end) e a
+--     cadeia não pode formar CICLO. CHECK não enxerga outra linha → trigger.
+--     Integridade no banco, sem complexidade excessiva. Só age quando há
+--     supersessão (early-return caso contrário) — não afeta relatórios comuns.
 -- =====================================================================
-do $$
-declare r record;
+create or replace function public.reports_validate_supersession()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+declare
+  parent    public.reports%rowtype;
+  cursor_id uuid;
+  hops      integer := 0;
 begin
-  for r in
-    select conname from pg_constraint
-     where conrelid = 'public.reports'::regclass and contype = 'c'
-       and pg_get_constraintdef(oid) like '%LEVANTAMENTO%'
-       and pg_get_constraintdef(oid) not like '%MANUTENCAO%'
-  loop
-    execute format('alter table public.reports drop constraint %I', r.conname);
-  end loop;
-  if not exists (select 1 from pg_constraint where conrelid='public.reports'::regclass and conname='reports_tipo_check') then
-    alter table public.reports add constraint reports_tipo_check
-      check (tipo in ('LEVANTAMENTO','CORRETIVA','PREVENTIVA','MANUTENCAO'));
+  if new.supersedes_report_id is null then
+    return new;
   end if;
-end $$;
+  if new.supersedes_report_id = new.id then
+    raise exception 'supersessao nao pode referenciar o proprio relatorio';
+  end if;
 
-do $$
-declare r record;
-begin
-  for r in
-    select conname from pg_constraint
-     where conrelid = 'public.report_templates'::regclass and contype = 'c'
-       and pg_get_constraintdef(oid) like '%LEVANTAMENTO%'
-       and pg_get_constraintdef(oid) not like '%MANUTENCAO%'
-  loop
-    execute format('alter table public.report_templates drop constraint %I', r.conname);
-  end loop;
-  if not exists (select 1 from pg_constraint where conrelid='public.report_templates'::regclass and conname='report_templates_tipo_check') then
-    alter table public.report_templates add constraint report_templates_tipo_check
-      check (tipo in ('LEVANTAMENTO','CORRETIVA','PREVENTIVA','MANUTENCAO'));
+  select * into parent from public.reports where id = new.supersedes_report_id;
+  if not found then
+    raise exception 'relatorio superseditado % inexistente', new.supersedes_report_id;
   end if;
-end $$;
+
+  -- Mesma série documental (nunca Contrato A→B, Set→Ago, MANUTENCAO→CORRETIVA).
+  if parent.contrato_id  is distinct from new.contrato_id
+     or parent.tipo         is distinct from new.tipo
+     or parent.period_start is distinct from new.period_start
+     or parent.period_end   is distinct from new.period_end then
+    raise exception
+      'revisao deve superseder documento da MESMA serie (contrato/tipo/period_start/period_end)';
+  end if;
+
+  -- Anti-ciclo: sobe a cadeia de supersessão; se reencontrar new.id, há ciclo.
+  cursor_id := parent.supersedes_report_id;
+  while cursor_id is not null loop
+    hops := hops + 1;
+    if cursor_id = new.id then
+      raise exception 'ciclo de supersessao detectado';
+    end if;
+    if hops > 1000 then
+      raise exception 'cadeia de supersessao excessiva (possivel ciclo)';
+    end if;
+    select supersedes_report_id into cursor_id from public.reports where id = cursor_id;
+  end loop;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists reports_validate_supersession on public.reports;
+create trigger reports_validate_supersession
+  before insert or update of supersedes_report_id, contrato_id, tipo, period_start, period_end
+  on public.reports
+  for each row execute function public.reports_validate_supersession();
+
+-- =====================================================================
+-- 6) reports.tipo / report_templates.tipo += 'MANUTENCAO'.
+--    Nomes CONFIRMADOS no histórico: os CHECKs foram definidos INLINE (sem nome
+--    explícito) em 0029 (reports) e 0024 (report_templates); o Postgres nomeia
+--    CHECK de coluna única como <tabela>_<coluna>_check → reports_tipo_check e
+--    report_templates_tipo_check. Drop-if-exists determinístico + recriação
+--    explícita (idempotente: sempre dropa e recria a mesma definição).
+--    NÃO altera os tipos existentes; apenas ADICIONA 'MANUTENCAO'.
+-- =====================================================================
+alter table public.reports drop constraint if exists reports_tipo_check;
+alter table public.reports add constraint reports_tipo_check
+  check (tipo in ('LEVANTAMENTO','CORRETIVA','PREVENTIVA','MANUTENCAO'));
+
+alter table public.report_templates drop constraint if exists report_templates_tipo_check;
+alter table public.report_templates add constraint report_templates_tipo_check
+  check (tipo in ('LEVANTAMENTO','CORRETIVA','PREVENTIVA','MANUTENCAO'));
 
 -- =====================================================================
 -- 7) Realtime — adiciona a nova tabela à publicação existente (RLS continua
