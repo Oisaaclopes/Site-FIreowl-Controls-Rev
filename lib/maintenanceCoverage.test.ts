@@ -139,3 +139,28 @@ describe('janela explícita: mensal vs acumulada (sem hard-code de ano)', () => 
     expect(cov.testadosProgramadosPeriodo).toBe(0);
   });
 });
+
+describe('integração cobertura ← plano (plannedDeviceIds, §13)', () => {
+  const start = '2026-09-01';
+  const end = '2026-09-30';
+  it('quando há plano, programados = plano (inclui SEM_HISTORICO planejado)', () => {
+    const devices = [
+      dev({ id: 'plan1' }),               // sem histórico, mas PLANEJADO
+      dev({ id: 'dueNotPlanned' }),        // venceria, mas NÃO está no plano
+    ];
+    const verifs = [ver('dueNotPlanned', '2025-08-01', 'NORMAL')]; // vence 2026-08 (venceria)
+    const cov = computeMaintenanceCoverage(devices, [policy], groupVerificationsByDevice(verifs), {
+      contractId: null, periodStart: start, periodEnd: end, plannedDeviceIds: ['plan1'],
+    });
+    expect(cov.programadosPeriodo).toBe(1);          // só o do plano
+    expect(cov.programadosPeriodo).not.toBe(2);      // heurística de vencimento NÃO domina
+  });
+  it('sem plano, mantém a heurística (compatibilidade)', () => {
+    const devices = [dev({ id: 'due' })];
+    const verifs = [ver('due', '2025-08-01', 'NORMAL')];
+    const cov = computeMaintenanceCoverage(devices, [policy], groupVerificationsByDevice(verifs), {
+      contractId: null, periodStart: start, periodEnd: end,
+    });
+    expect(cov.programadosPeriodo).toBe(1);
+  });
+});

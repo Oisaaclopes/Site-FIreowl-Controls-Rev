@@ -102,6 +102,7 @@ const routineRow = (r: any): ContractRoutine => ({
   qtdTecnicos: r.qtd_tecnicos ?? undefined, horasMensais: r.horas_mensais ?? undefined,
   visitasMes: r.visitas_mes ?? undefined, sla: r.sla ?? undefined, area: r.area ?? undefined,
   ativo: r.ativo ?? true, observacoes: r.observacoes ?? undefined,
+  templateCodigo: r.template_codigo ?? undefined,
 });
 const routineToRow = (r: ContractRoutine): Record<string, unknown> => ({
   id: r.id && r.id.length > 20 ? r.id : undefined, contract_id: r.contractId, tipo: r.tipo,
@@ -109,7 +110,7 @@ const routineToRow = (r: ContractRoutine): Record<string, unknown> => ({
   dia_regra: r.diaRegra ?? null, dias_semana: r.diasSemana ?? [], horario_inicio: r.horarioInicio ?? null,
   horario_fim: r.horarioFim ?? null, qtd_tecnicos: r.qtdTecnicos ?? 1, horas_mensais: r.horasMensais ?? null,
   visitas_mes: r.visitasMes ?? null, sla: r.sla ?? null, area: r.area ?? null, ativo: r.ativo ?? true,
-  observacoes: r.observacoes ?? null,
+  observacoes: r.observacoes ?? null, template_codigo: r.templateCodigo ?? null,
 });
 
 export async function fetchContractRoutines(contractId: string): Promise<ContractRoutine[]> {

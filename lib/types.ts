@@ -679,6 +679,8 @@ export interface ContractRoutine {
   area?: string;
   ativo?: boolean;
   observacoes?: string;
+  /** Template/checklist que a rotina normalmente usa (report_templates.codigo, 0106). */
+  templateCodigo?: string;
 }
 
 /** Execução de uma competência da rotina (PREVISTO→…→RELATÓRIO). */
@@ -1208,6 +1210,69 @@ export interface MaintenanceTechnicalReportSnapshot {
   sistema?: string;        // best-effort: sistema único dos devices citados nas answers
   answers: MaintenanceAnswerSnapshot[];
   measurements: MaintenanceMeasurementSnapshot[];
+}
+
+/* ===================================================================
+ * PLANO DE MANUTENÇÃO por período (visão de DOMÍNIO derivada; sem tabela nova).
+ * Deriva de contrato + contract_routines + contract_routine_executions +
+ * asset_maintenance_policies + devices. Planejamento ≠ status técnico.
+ * =================================================================== */
+
+/** Estado de PLANEJAMENTO do ativo na janela (derivado; não é enum de banco). */
+export type MaintenancePlanningStatus =
+  | 'PROGRAMADO_PERIODO'        // periodicidade vence na janela e a rotina roda no período
+  | 'PROGRAMADO_PRIMEIRO_TESTE' // SEM_HISTORICO com execução da rotina planejada no período
+  | 'PRIMEIRO_TESTE_PENDENTE'   // SEM_HISTORICO sem execução no período (não entra nos programados)
+  | 'NAO_PROGRAMADO';
+
+/** Motivo estruturado da decisão de planejamento (nunca texto inventado). */
+export type MaintenancePlanningReason =
+  | 'PERIODICIDADE_VENCE_NO_PERIODO'
+  | 'PRIMEIRO_TESTE_PLANEJADO'
+  | 'JA_VENCIDO_ANTES_DO_PERIODO'
+  | 'FORA_DA_JANELA'
+  | 'ROTINA_NAO_PROGRAMADA_NO_PERIODO'
+  | 'SEM_POLITICA';
+
+export interface MaintenancePlanAsset {
+  deviceId: string;
+  sistema: string;
+  routineId?: string;             // undefined quando em conflito (não escolhe silenciosamente)
+  templateCodigo?: string;
+  effectivePolicyId?: string;
+  technicalStatus: MaintenanceAssetStatus;
+  planningStatus: MaintenancePlanningStatus;
+  lastTestAt?: string;
+  nextTestAt?: string;
+  plannedFirstTest?: string;      // data planejada do 1º teste (execução da rotina)
+  reason: MaintenancePlanningReason;
+  conflict?: boolean;
+}
+
+export interface MaintenancePlanRoutine {
+  routineId: string;
+  area?: string;
+  templateCodigo?: string;
+  frequencia?: string;
+  scheduledInPeriod: boolean;     // tem execução com data_programada na janela
+  executionIds: string[];
+}
+
+/** Dois+ rotinas agendadas disputando o mesmo device na janela (§11). */
+export interface MaintenancePlanConflict {
+  deviceId: string;
+  routineIds: string[];
+}
+
+export interface MaintenancePeriodPlan {
+  contractId: string;
+  periodStart: string;
+  periodEnd: string;
+  routines: MaintenancePlanRoutine[];
+  devices: MaintenancePlanAsset[];
+  conflicts: MaintenancePlanConflict[];
+  /** Atalho p/ cobertura: ids dos ativos efetivamente programados na janela. */
+  programadosDeviceIds: string[];
 }
 
 /** Snapshot documental congelado do consolidado MANUTENCAO (reports.snapshot).

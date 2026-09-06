@@ -53,6 +53,13 @@ export interface CoverageInput {
   /** Filtro de área opcional (ex.: cobertura só de SDAI). */
   area?: string;
   includeInactiveAssets?: boolean;
+  /**
+   * FONTE PREFERENCIAL dos "programados" (§13): ids dos ativos efetivamente
+   * planejados no período (de MaintenancePeriodPlan.programadosDeviceIds). Quando
+   * presente, substitui a heurística "vence até period_end". Ausente → mantém a
+   * heurística (compatibilidade com o comportamento atual, sem quebrar testes).
+   */
+  plannedDeviceIds?: Iterable<string>;
 }
 
 /** Última verificação (por verified_at) de uma lista, ou undefined. */
@@ -76,6 +83,7 @@ export function computeMaintenanceCoverage(
 ): MaintenanceCoverage {
   const start = dateOnly(input.periodStart)!;
   const end = dateOnly(input.periodEnd)!;
+  const plannedSet = input.plannedDeviceIds ? new Set(input.plannedDeviceIds) : null;
 
   const scope = devices.filter(
     (d) => (input.includeInactiveAssets || d.status === 'ativo') && (!input.area || d.sistema === input.area)
@@ -111,10 +119,12 @@ export function computeMaintenanceCoverage(
     const anyConclusiveUpToEnd = verifs.some((v) => { const dd = dateOnly(v.verifiedAt); return dd != null && dd <= end && isConclusive(v); });
     if (!anyConclusiveUpToEnd) primeiroTestePendente++;
 
-    // PROGRAMADO = tinha base conclusiva e vencia até o fim da janela. SEM_HISTORICO
-    // NÃO entra automaticamente (§2): sem plano que o coloque no período, não há
-    // como afirmar que era previsto — lacuna registrada (ver entrega).
-    const programado = !!lastBefore && nextMaintenanceDate(lastBefore.verifiedAt!, effective) <= end;
+    // PROGRAMADO: quando há PLANO (plannedDeviceIds), a fonte da verdade é o plano
+    // (inclui SEM_HISTORICO com 1º teste planejado). Sem plano, cai na heurística
+    // "tinha base conclusiva e vencia até o fim da janela" (compatibilidade §13).
+    const programado = plannedSet
+      ? plannedSet.has(d.id)
+      : (!!lastBefore && nextMaintenanceDate(lastBefore.verifiedAt!, effective) <= end);
     if (programado) programados++;
 
     // Teste conclusivo DENTRO da janela (última verificação conclusiva do período).
