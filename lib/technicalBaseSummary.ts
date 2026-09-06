@@ -162,6 +162,77 @@ export function centralAddressAnomalies(area: TechArea, devices: Device[]): Devi
   return activeDevices(devices).filter((d) => centralGroups.has(displayGroup(area, d)) && (!!(d.laco || '').trim() || !!(d.endereco || '').trim()));
 }
 
+// ---------------------------------------------------------------------
+// HIERARQUIA SDAI (Central → Laço → Dispositivos) — só SDAI (§20/§33).
+// Derivada dos devices ATIVOS. Ordenação NUMÉRICA. Expected NUNCA é inventado
+// (§28): sem fonte estruturada real → null (cobertura null). Cadastrado ≠
+// verificado (§29): verificados = tem last_verified_at.
+// ---------------------------------------------------------------------
+export interface SdaiLoopNode {
+  key: string; laco: string | null; label: string; devices: Device[];
+  cadastrados: number; verificados: number; duplicados: number;
+}
+export interface SdaiCentralNode {
+  key: string; central: string | null; label: string;
+  centralDevice?: Device;      // device real da Central SDAI (fonte do fab/modelo)
+  centralRegistros: number;    // >1 → "N registros da Central X — revisar" (§26)
+  fabricante?: string; modelo?: string;
+  loops: SdaiLoopNode[];
+  cadastrados: number; verificados: number; duplicados: number;
+  expected: number | null;     // §28 — só com fonte real; senão null
+}
+export interface SdaiHierarchy { centrals: SdaiCentralNode[] }
+
+/** Cobertura verificada só quando expected é real (§30). */
+export function coveragePct(expected: number | null, verificados: number): number | null {
+  if (expected == null || expected <= 0) return null;
+  return Math.round((Math.min(verificados, expected) / expected) * 1000) / 10;
+}
+
+export function buildSdaiHierarchy(devices: Device[]): SdaiHierarchy {
+  const area: TechArea = 'SDAI';
+  const act = activeDevices(devices).filter((d) => d.sistema === 'SDAI');
+  const dupIds = new Set<string>();
+  for (const g of duplicateGroups(area, devices)) for (const d of g.devices) dupIds.add(d.id);
+  const centralGroups = new Set(CENTRAL_GROUPS.SDAI);
+  const n = (v?: string) => { const x = Number(String(v ?? '').trim()); return Number.isFinite(x) && String(v ?? '').trim() !== '' ? x : Number.POSITIVE_INFINITY; };
+  const ver = (list: Device[]) => list.filter((d) => d.lastVerifiedAt).length;
+  const dup = (list: Device[]) => list.filter((d) => dupIds.has(d.id)).length;
+
+  const byCentral = new Map<string, Device[]>();
+  for (const d of act) {
+    const key = (d.central || '').trim() || '__none__';
+    (byCentral.get(key) || byCentral.set(key, []).get(key)!).push(d);
+  }
+
+  const centrals: SdaiCentralNode[] = [...byCentral.entries()].map(([ckey, list]) => {
+    const central = ckey === '__none__' ? null : ckey;
+    const centralDevs = list.filter((d) => centralGroups.has(displayGroup(area, d)));
+    const centralDevice = centralDevs[0];
+    // Loops (só periféricos; a central é representada no cabeçalho).
+    const byLoop = new Map<string, Device[]>();
+    for (const d of list) {
+      if (centralGroups.has(displayGroup(area, d))) continue;
+      const lkey = (d.laco || '').trim() || '__none__';
+      (byLoop.get(lkey) || byLoop.set(lkey, []).get(lkey)!).push(d);
+    }
+    const loops: SdaiLoopNode[] = [...byLoop.entries()].map(([lkey, ldevs]) => {
+      const laco = lkey === '__none__' ? null : lkey;
+      const sorted = [...ldevs].sort((a, b) => n(a.endereco) - n(b.endereco) || (a.modelo || '').localeCompare(b.modelo || '', 'pt-BR'));
+      return { key: `${ckey}|${lkey}`, laco, label: laco ? `Laço ${laco}` : 'Sem laço definido', devices: sorted, cadastrados: ldevs.length, verificados: ver(ldevs), duplicados: dup(ldevs) };
+    }).sort((a, b) => (a.laco === null ? 1 : b.laco === null ? -1 : n(a.laco) - n(b.laco)));
+    return {
+      key: ckey, central, label: central ? `Central ${central}` : 'Sem central definida',
+      centralDevice, centralRegistros: centralDevs.length,
+      fabricante: centralDevice?.fabricante, modelo: centralDevice?.modelo,
+      loops, cadastrados: list.length, verificados: ver(list), duplicados: dup(list),
+      expected: null, // §28 — nenhuma fonte estruturada real disponível aqui
+    };
+  }).sort((a, b) => (a.central === null ? 1 : b.central === null ? -1 : n(a.central) - n(b.central)));
+
+  return { centrals };
+}
+
 export type OriginFilter = 'todos' | 'MANUAL' | 'IMPORTACAO' | 'ATENDIMENTO' | 'LEVANTAMENTO';
 export type VerifFilter = 'todos' | 'verificados' | 'nao_verificados';
 

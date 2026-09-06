@@ -10,6 +10,7 @@ import { addVerification, fetchVerificationsForDevice } from '@/lib/deviceVerifi
 import {
   summarizeCentrals, summarizeGroups, duplicateGroups, centralAddressAnomalies,
   importReview, importInconsistencyDevices, sortDevicesForArea, filterDevices, fabricantesInArea, assetCardView,
+  buildSdaiHierarchy, coveragePct, SdaiHierarchy,
   OriginFilter, VerifFilter, GroupSummary, DuplicateGroup,
 } from '@/lib/technicalBaseSummary';
 import { fetchCredentials, createCredential, revealCredentialSecret, deleteCredential } from '@/lib/clientCredentials';
@@ -72,10 +73,13 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
   const [showDup, setShowDup] = useState(false);
   const [showFiltersMobile, setShowFiltersMobile] = useState(false);
   const [special, setSpecial] = useState<'' | 'no_model' | 'no_brand' | 'not_verified' | 'inconsistencias'>('');
+  const [viewMode, setViewMode] = useState<'lista' | 'hierarquia'>('lista');
+  const [centralFilter, setCentralFilter] = useState('');
+  const [lacoFilter, setLacoFilter] = useState('');
   const canManage = isGestao(userRole);
 
   // Ao trocar de área/aba, zera seleção e filtros específicos (evita ids órfãos).
-  useEffect(() => { setSelected(new Set()); setGroupFilter(''); setShowDup(false); setSpecial(''); }, [area]);
+  useEffect(() => { setSelected(new Set()); setGroupFilter(''); setShowDup(false); setSpecial(''); setCentralFilter(''); setLacoFilter(''); if (area !== 'SDAI') setViewMode('lista'); }, [area]);
 
   // Catálogo técnico (só identificação: área/família/fabricante/modelo — sem preço).
   useEffect(() => {
@@ -117,6 +121,8 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
       group: groupFilter || undefined, fabricante: fabFilter || undefined,
       origem, condicao: condFilter || undefined, verificacao: verif,
     });
+    if (centralFilter) list = list.filter((d) => (d.central || '').trim() === centralFilter);
+    if (lacoFilter) list = list.filter((d) => (d.laco || '').trim() === lacoFilter);
     // Filtros rápidos da revisão de importação (§12) — escopo: importados ativos.
     if (special) list = list.filter((d) => {
       if (d.source !== 'IMPORTACAO') return false;
@@ -135,7 +141,9 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
     });
     return sortDevicesForArea(area, list);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [devices, area, search, lifecycle, groupFilter, fabFilter, origem, condFilter, verif, special, inconsistentIds]);
+  }, [devices, area, search, lifecycle, groupFilter, fabFilter, origem, condFilter, verif, special, inconsistentIds, centralFilter, lacoFilter]);
+
+  const sdaiHierarchy = useMemo(() => (area === 'SDAI' ? buildSdaiHierarchy(areaAll) : { centrals: [] }), [area, areaAll]);
 
   // Duplicados (quando o painel está aberto): achata mantendo grupos.
   const dupDevices = useMemo(() => {
@@ -146,7 +154,11 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
   }, [dupGroups, anomalies, areaAll, area]);
 
   const visible = showDup ? dupDevices : tableDevices;
-  const anyFilter = !!(groupFilter || fabFilter || condFilter || search || special) || origem !== 'todos' || verif !== 'todos';
+  const anyFilter = !!(groupFilter || fabFilter || condFilter || search || special || centralFilter || lacoFilter) || origem !== 'todos' || verif !== 'todos';
+  const openInList = (central: string | null, laco?: string | null) => {
+    setViewMode('lista'); setShowDup(false); setSpecial(''); setGroupFilter('');
+    setCentralFilter(central || ''); setLacoFilter(laco || '');
+  };
 
   const toggleRow = (id: string) => setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAll = () => setSelected((prev) => {
@@ -226,9 +238,18 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
 
       {/* Barra de ação da disciplina selecionada */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-fg-secondary">
-          {AREA_LABEL[area]} — {visible.length} {visible.length === 1 ? 'ativo' : 'ativos'}
-        </h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-fg-secondary">
+            {AREA_LABEL[area]} — {visible.length} {visible.length === 1 ? 'ativo' : 'ativos'}
+          </h2>
+          {area === 'SDAI' && (
+            <div className="flex items-center gap-0.5 rounded-lg bg-surface-3 p-0.5 text-[11px] font-semibold">
+              {(['lista', 'hierarquia'] as const).map((m) => (
+                <button key={m} onClick={() => setViewMode(m)} className={`rounded-md px-2.5 py-1 capitalize transition-colors ${viewMode === m ? 'bg-surface text-primary shadow-sm' : 'text-fg-muted hover:text-fg-secondary'}`}>{m}</button>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           {/* Busca sempre visível */}
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar…" className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-fg placeholder:text-fg-muted focus:border-primary focus:outline-none sm:w-40 sm:flex-none" />
@@ -283,7 +304,9 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
           {special === 'no_brand' && <span className="rounded-full bg-navy/10 px-2.5 py-1 font-semibold text-primary">Sem fabricante</span>}
           {special === 'not_verified' && <span className="rounded-full bg-navy/10 px-2.5 py-1 font-semibold text-primary">Não verificados</span>}
           {groupFilter && <span className="rounded-full bg-navy/10 px-2.5 py-1 font-semibold text-primary">Grupo: {groupFilter}</span>}
-          <button onClick={() => { setGroupFilter(''); setShowDup(false); setSpecial(''); setOrigem('todos'); setVerif('todos'); setCondFilter(''); setFabFilter(''); setSearch(''); }} className="font-semibold text-fg-muted underline hover:text-fg-secondary">Limpar filtros</button>
+          {centralFilter && <span className="rounded-full bg-navy/10 px-2.5 py-1 font-semibold text-primary">Central {centralFilter}</span>}
+          {lacoFilter && <span className="rounded-full bg-navy/10 px-2.5 py-1 font-semibold text-primary">Laço {lacoFilter}</span>}
+          <button onClick={() => { setGroupFilter(''); setShowDup(false); setSpecial(''); setOrigem('todos'); setVerif('todos'); setCondFilter(''); setFabFilter(''); setSearch(''); setCentralFilter(''); setLacoFilter(''); }} className="font-semibold text-fg-muted underline hover:text-fg-secondary">Limpar filtros</button>
         </div>
       )}
 
@@ -299,8 +322,10 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
         />
       )}
 
-      {/* Duplicados: comparação lado a lado (§15); senão, tabela/cards */}
-      {showDup ? (
+      {/* Hierarquia SDAI (§20–§33) — só SDAI; senão duplicados/tabela */}
+      {area === 'SDAI' && viewMode === 'hierarquia' && !showDup ? (
+        <SdaiHierarchyView hierarchy={sdaiHierarchy} onOpenInList={openInList} onOpenDevice={setDetailDevice} onVerify={setVerifDevice} />
+      ) : showDup ? (
         <DuplicatesReviewPanel
           area={area} groups={dupGroups} anomalies={anomalies} canManage={canManage}
           onEdit={setEditDevice} onOpen={setDetailDevice} onRemove={(d) => confirmRemove([d])}
@@ -664,6 +689,89 @@ const DuplicatesReviewPanel: React.FC<{
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+/* ------------------------- Hierarquia SDAI (Central → Laço → Dispositivos, §20–§33) ------------------------- */
+const Recon: React.FC<{ node: { cadastrados: number; verificados: number; duplicados: number; expected?: number | null } }> = ({ node }) => {
+  const cov = coveragePct(node.expected ?? null, node.verificados);
+  return (
+    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-fg-secondary">
+      <span>Esperados: <b className="text-fg-muted">{node.expected ?? '—'}</b></span>
+      <span>Cadastrados: <b className="text-fg">{node.cadastrados}</b></span>
+      <span>Verificados: <b className="text-emerald-700">{node.verificados}</b></span>
+      {node.duplicados > 0 && <span className="text-amber-700">Duplicados: <b>{node.duplicados}</b></span>}
+      <span>Cobertura: <b>{cov == null ? '—' : `${cov}%`}</b></span>
+    </div>
+  );
+};
+
+const SdaiHierarchyView: React.FC<{
+  hierarchy: SdaiHierarchy;
+  onOpenInList: (central: string | null, laco?: string | null) => void;
+  onOpenDevice: (d: Device) => void;
+  onVerify: (d: Device) => void;
+}> = ({ hierarchy, onOpenInList, onOpenDevice, onVerify }) => {
+  const [openC, setOpenC] = useState<Set<string>>(() => new Set(hierarchy.centrals.slice(0, 1).map((c) => c.key)));
+  const [openL, setOpenL] = useState<Set<string>>(new Set());
+  const toggle = (set: Set<string>, setter: (s: Set<string>) => void, k: string) => { const n = new Set(set); n.has(k) ? n.delete(k) : n.add(k); setter(n); };
+
+  if (hierarchy.centrals.length === 0) {
+    return <EmptyState variant="generico" title="Sem ativos de SDAI" description="Nenhum ativo para montar a hierarquia. Cadastre manualmente, importe ou registre um levantamento." />;
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      {hierarchy.centrals.map((c) => {
+        const openc = openC.has(c.key);
+        return (
+          <div key={c.key} className="rounded-xl border border-border bg-surface">
+            <div className="flex items-start gap-2 p-3">
+              <button onClick={() => toggle(openC, setOpenC, c.key)} className="mt-0.5 shrink-0 text-fg-muted"><span className="material-symbols-outlined text-[20px]">{openc ? 'expand_more' : 'chevron_right'}</span></button>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-navy/10"><span className="material-symbols-outlined text-primary">developer_board</span></span>
+              <button onClick={() => toggle(openC, setOpenC, c.key)} className="min-w-0 flex-1 text-left">
+                <p className="text-sm font-bold text-fg">{c.label}</p>
+                {(c.fabricante || c.modelo) && <p className="text-[11px] text-fg-secondary">{[c.fabricante, c.modelo].filter(Boolean).join(' · ')}</p>}
+                {c.centralRegistros > 1 && <p className="text-[10px] font-bold text-amber-700">{c.centralRegistros} registros da {c.label} — revisar</p>}
+                <div className="mt-1"><Recon node={c} /></div>
+              </button>
+              <button onClick={() => onOpenInList(c.central)} className="shrink-0 rounded-lg border border-border-strong px-2 py-1 text-[10px] font-semibold text-primary hover:border-primary">Ver na lista</button>
+            </div>
+            {openc && (
+              <div className="border-t border-border p-2 pl-4">
+                {c.loops.length === 0 ? <p className="px-2 py-2 text-[11px] italic text-fg-muted">Sem periféricos cadastrados nesta central.</p> : c.loops.map((l) => {
+                  const openl = openL.has(l.key);
+                  return (
+                    <div key={l.key} className="mb-1 rounded-lg border border-border bg-surface-2">
+                      <div className="flex items-center gap-2 px-2 py-1.5">
+                        <button onClick={() => toggle(openL, setOpenL, l.key)} className="shrink-0 text-fg-muted"><span className="material-symbols-outlined text-[18px]">{openl ? 'expand_more' : 'chevron_right'}</span></button>
+                        <button onClick={() => toggle(openL, setOpenL, l.key)} className="min-w-0 flex-1 text-left">
+                          <p className="text-xs font-bold text-fg-secondary">{l.label}</p>
+                          <p className="text-[10px] text-fg-muted">{l.cadastrados} dispositivos · {l.verificados} verificados{l.duplicados > 0 ? ` · ${l.duplicados} duplicados` : ''}</p>
+                        </button>
+                        <button onClick={() => onOpenInList(c.central, l.laco)} className="shrink-0 rounded-lg border border-border-strong px-2 py-1 text-[10px] font-semibold text-primary hover:border-primary">Ver na lista</button>
+                      </div>
+                      {openl && (
+                        <div className="divide-y divide-border border-t border-border">
+                          {l.devices.map((d) => (
+                            <div key={d.id} className="flex items-center gap-2 px-3 py-1.5">
+                              <button onClick={() => onOpenDevice(d)} className="min-w-0 flex-1 text-left">
+                                <p className="font-data-mono text-[11px] font-bold text-primary">{d.endereco ? `End. ${d.endereco}` : 'sem endereço'} · <span className="text-fg">{legacyGroupLabel('SDAI', d.grupo) || d.tipoAtivo || 'Ativo'}</span></p>
+                                <p className="text-[10px] text-fg-secondary">{[d.fabricante, d.modelo].filter(Boolean).join(' · ') || '—'}{d.lastVerifiedAt ? '' : ' · não verificado'}</p>
+                              </button>
+                              <button onClick={() => onVerify(d)} className="shrink-0 rounded-lg border border-border-strong px-2 py-1 text-[10px] font-semibold text-primary hover:border-primary hover:bg-navy hover:text-white">Verificar</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 };
