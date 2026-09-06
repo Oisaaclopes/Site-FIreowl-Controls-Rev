@@ -9,8 +9,8 @@ import { upsertDevice } from '@/lib/devices';
 import { addVerification, fetchVerificationsForDevice } from '@/lib/deviceVerifications';
 import {
   summarizeCentrals, summarizeGroups, duplicateGroups, centralAddressAnomalies,
-  importReview, sortDevicesForArea, filterDevices, fabricantesInArea, assetCardView,
-  OriginFilter, VerifFilter, GroupSummary,
+  importReview, importInconsistencyDevices, sortDevicesForArea, filterDevices, fabricantesInArea, assetCardView,
+  OriginFilter, VerifFilter, GroupSummary, DuplicateGroup,
 } from '@/lib/technicalBaseSummary';
 import { fetchCredentials, createCredential, revealCredentialSecret, deleteCredential } from '@/lib/clientCredentials';
 import {
@@ -71,10 +71,11 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showDup, setShowDup] = useState(false);
   const [showFiltersMobile, setShowFiltersMobile] = useState(false);
+  const [special, setSpecial] = useState<'' | 'no_model' | 'no_brand' | 'not_verified' | 'inconsistencias'>('');
   const canManage = isGestao(userRole);
 
   // Ao trocar de área/aba, zera seleção e filtros específicos (evita ids órfãos).
-  useEffect(() => { setSelected(new Set()); setGroupFilter(''); setShowDup(false); }, [area]);
+  useEffect(() => { setSelected(new Set()); setGroupFilter(''); setShowDup(false); setSpecial(''); }, [area]);
 
   // Catálogo técnico (só identificação: área/família/fabricante/modelo — sem preço).
   useEffect(() => {
@@ -99,6 +100,7 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
   const peripheralSummary = useMemo(() => groupSummary.filter((g) => !centralGroupNames.has(g.group)), [groupSummary, centralGroupNames]);
   const dupGroups = useMemo(() => duplicateGroups(area, areaAll), [area, areaAll]);
   const anomalies = useMemo(() => centralAddressAnomalies(area, areaAll), [area, areaAll]);
+  const inconsistentIds = useMemo(() => new Set(importInconsistencyDevices(area, areaAll).map((d) => d.id)), [area, areaAll]);
   const review = useMemo(() => importReview(area, areaAll), [area, areaAll]);
   const fabricantes = useMemo(() => fabricantesInArea(areaAll), [areaAll]);
   const dupCandidateCount = useMemo(() => dupGroups.reduce((a, g) => a + g.devices.length, 0) + anomalies.length, [dupGroups, anomalies]);
@@ -115,6 +117,15 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
       group: groupFilter || undefined, fabricante: fabFilter || undefined,
       origem, condicao: condFilter || undefined, verificacao: verif,
     });
+    // Filtros rápidos da revisão de importação (§12) — escopo: importados ativos.
+    if (special) list = list.filter((d) => {
+      if (d.source !== 'IMPORTACAO') return false;
+      if (special === 'no_model') return !(d.modelo || '').trim();
+      if (special === 'no_brand') return !(d.fabricante || '').trim();
+      if (special === 'not_verified') return !d.lastVerifiedAt;
+      if (special === 'inconsistencias') return inconsistentIds.has(d.id);
+      return true;
+    });
     const q = search.trim().toLowerCase();
     if (q) list = list.filter((d) => {
       const ident = assetDisplayIdentifier(area, { central: d.central, laco: d.laco, endereco: d.endereco, technicalAttributes: d.technicalAttributes }).toLowerCase();
@@ -124,7 +135,7 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
     });
     return sortDevicesForArea(area, list);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [devices, area, search, lifecycle, groupFilter, fabFilter, origem, condFilter, verif]);
+  }, [devices, area, search, lifecycle, groupFilter, fabFilter, origem, condFilter, verif, special, inconsistentIds]);
 
   // Duplicados (quando o painel está aberto): achata mantendo grupos.
   const dupDevices = useMemo(() => {
@@ -135,7 +146,7 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
   }, [dupGroups, anomalies, areaAll, area]);
 
   const visible = showDup ? dupDevices : tableDevices;
-  const anyFilter = !!(groupFilter || fabFilter || condFilter || search) || origem !== 'todos' || verif !== 'todos';
+  const anyFilter = !!(groupFilter || fabFilter || condFilter || search || special) || origem !== 'todos' || verif !== 'todos';
 
   const toggleRow = (id: string) => setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAll = () => setSelected((prev) => {
@@ -200,15 +211,16 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
         activeGroup={groupFilter} onPickGroup={(g) => { setShowDup(false); setGroupFilter((cur) => (cur === g ? '' : g)); }}
       />
 
-      {/* Revisão pós-importação (§18) */}
+      {/* Revisão pós-importação (§9–§13) — contadores clicáveis, estado dinâmico (§19) */}
       {review.importados > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface-2 px-3 py-2 text-[11px]">
           <span className="font-bold uppercase tracking-wider text-fg-muted">Revisar importação</span>
           <span className="text-fg-secondary">{review.importados} importados</span>
-          {review.duplicados > 0 && <button onClick={() => { setShowDup(true); setGroupFilter(''); }} className="rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-800">{review.duplicados} possíveis duplicados</button>}
-          {review.semModelo > 0 && <span className="rounded-full bg-surface-3 px-2 py-0.5 text-fg-secondary">{review.semModelo} sem modelo</span>}
-          {review.semFabricante > 0 && <span className="rounded-full bg-surface-3 px-2 py-0.5 text-fg-secondary">{review.semFabricante} sem fabricante</span>}
-          {review.naoVerificados > 0 && <button onClick={() => { setShowDup(false); setOrigem('IMPORTACAO'); setVerif('nao_verificados'); }} className="rounded-full bg-surface-3 px-2 py-0.5 font-semibold text-primary">{review.naoVerificados} não verificados</button>}
+          {review.duplicados > 0 && <button onClick={() => { setSpecial(''); setShowDup(true); setGroupFilter(''); }} className={`rounded-full px-2 py-0.5 font-semibold ${showDup ? 'bg-amber-200 text-amber-900' : 'bg-amber-100 text-amber-800'}`}>{review.duplicados} possíveis duplicados</button>}
+          {review.inconsistencias > 0 && <button onClick={() => { setShowDup(false); setSpecial('inconsistencias'); }} className={`rounded-full px-2 py-0.5 font-semibold ${special === 'inconsistencias' ? 'bg-red-200 text-red-900' : 'bg-red-100 text-red-800'}`}>{review.inconsistencias} inconsistência{review.inconsistencias > 1 ? 's' : ''}</button>}
+          {review.semModelo > 0 && <button onClick={() => { setShowDup(false); setSpecial('no_model'); }} className={`rounded-full px-2 py-0.5 font-semibold ${special === 'no_model' ? 'bg-navy text-white' : 'bg-surface-3 text-fg-secondary'}`}>{review.semModelo} sem modelo</button>}
+          {review.semFabricante > 0 && <button onClick={() => { setShowDup(false); setSpecial('no_brand'); }} className={`rounded-full px-2 py-0.5 font-semibold ${special === 'no_brand' ? 'bg-navy text-white' : 'bg-surface-3 text-fg-secondary'}`}>{review.semFabricante} sem fabricante</button>}
+          {review.naoVerificados > 0 && <button onClick={() => { setShowDup(false); setSpecial('not_verified'); }} className={`rounded-full px-2 py-0.5 font-semibold ${special === 'not_verified' ? 'bg-navy text-white' : 'bg-surface-3 text-fg-secondary'}`}>{review.naoVerificados} não verificados</button>}
         </div>
       )}
 
@@ -262,12 +274,16 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
         </div>
       </div>
 
-      {/* Filtro ativo (grupo/duplicados) */}
+      {/* Filtro ativo (grupo/duplicados/revisão) */}
       {(groupFilter || showDup || anyFilter) && (
         <div className="flex flex-wrap items-center gap-2 text-[11px]">
           {showDup && <span className="rounded-full bg-amber-100 px-2.5 py-1 font-semibold text-amber-800">Possíveis duplicados</span>}
+          {special === 'inconsistencias' && <span className="rounded-full bg-red-100 px-2.5 py-1 font-semibold text-red-800">Inconsistências</span>}
+          {special === 'no_model' && <span className="rounded-full bg-navy/10 px-2.5 py-1 font-semibold text-primary">Sem modelo</span>}
+          {special === 'no_brand' && <span className="rounded-full bg-navy/10 px-2.5 py-1 font-semibold text-primary">Sem fabricante</span>}
+          {special === 'not_verified' && <span className="rounded-full bg-navy/10 px-2.5 py-1 font-semibold text-primary">Não verificados</span>}
           {groupFilter && <span className="rounded-full bg-navy/10 px-2.5 py-1 font-semibold text-primary">Grupo: {groupFilter}</span>}
-          <button onClick={() => { setGroupFilter(''); setShowDup(false); setOrigem('todos'); setVerif('todos'); setCondFilter(''); setFabFilter(''); setSearch(''); }} className="font-semibold text-fg-muted underline hover:text-fg-secondary">Limpar filtros</button>
+          <button onClick={() => { setGroupFilter(''); setShowDup(false); setSpecial(''); setOrigem('todos'); setVerif('todos'); setCondFilter(''); setFabFilter(''); setSearch(''); }} className="font-semibold text-fg-muted underline hover:text-fg-secondary">Limpar filtros</button>
         </div>
       )}
 
@@ -283,14 +299,21 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
         />
       )}
 
-      {/* Tabela adaptativa por disciplina */}
-      <AssetTable
-        area={area} devices={visible} selected={selected} canManage={canManage}
-        onToggleRow={toggleRow} onToggleAll={toggleAll}
-        onVerify={setVerifDevice} onOpen={setDetailDevice} onEdit={setEditDevice}
-        onRemove={(d) => confirmRemove([d])}
-        onHistory={setDetailDevice} onPendencia={setDetailDevice}
-      />
+      {/* Duplicados: comparação lado a lado (§15); senão, tabela/cards */}
+      {showDup ? (
+        <DuplicatesReviewPanel
+          area={area} groups={dupGroups} anomalies={anomalies} canManage={canManage}
+          onEdit={setEditDevice} onOpen={setDetailDevice} onRemove={(d) => confirmRemove([d])}
+        />
+      ) : (
+        <AssetTable
+          area={area} devices={visible} selected={selected} canManage={canManage}
+          onToggleRow={toggleRow} onToggleAll={toggleAll}
+          onVerify={setVerifDevice} onOpen={setDetailDevice} onEdit={setEditDevice}
+          onRemove={(d) => confirmRemove([d])}
+          onHistory={setDetailDevice} onPendencia={setDetailDevice}
+        />
+      )}
 
       {/* Credenciais protegidas + Backups técnicos */}
       <CredentialsPanel client={client} userRole={userRole} devices={devices} />
@@ -575,6 +598,73 @@ const AssetTable: React.FC<{
       </table>
     </div>
     </>
+  );
+};
+
+/* ------------------------- Duplicados: comparação lado a lado (§15) ------------------------- */
+const DupDeviceCard: React.FC<{ area: TechArea; d: Device; canManage: boolean; onEdit: (d: Device) => void; onOpen: (d: Device) => void; onRemove: (d: Device) => void }> = ({ area, d, canManage, onEdit, onOpen, onRemove }) => (
+  <div className="flex-1 rounded-lg border border-border bg-surface p-3 text-[11px]">
+    <p className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-fg-muted">
+      Origem: {d.source ? SOURCE_LABEL[d.source] : '—'}
+      <span className={`rounded px-1.5 py-0.5 ${d.lastVerifiedAt ? 'bg-emerald-50 text-emerald-700' : 'bg-surface-3 text-fg-muted'}`}>{d.lastVerifiedAt ? 'Verificado' : 'Não verificado'}</span>
+    </p>
+    <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5">
+      <dt className="text-fg-muted">Grupo</dt><dd className="font-semibold text-fg">{legacyGroupLabel(area, d.grupo) || '—'}</dd>
+      <dt className="text-fg-muted">Fabricante</dt><dd className="text-fg-secondary">{d.fabricante || '—'}</dd>
+      <dt className="text-fg-muted">Modelo</dt><dd className="text-fg-secondary">{d.modelo || '—'}</dd>
+      <dt className="text-fg-muted">Local</dt><dd className="text-fg-secondary">{d.localizacao || d.pavimento || '—'}</dd>
+      <dt className="text-fg-muted">Condição</dt><dd className="text-fg-secondary">{d.condicao ? CONDITION_LABEL[d.condicao] : '—'}</dd>
+    </dl>
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      <button onClick={() => onOpen(d)} className="rounded-lg border border-border-strong px-2 py-1 font-semibold text-fg-secondary hover:border-primary hover:text-primary">Detalhes</button>
+      <button onClick={() => onEdit(d)} className="rounded-lg border border-border-strong px-2 py-1 font-semibold text-primary hover:bg-navy hover:text-white">Editar</button>
+      {canManage && <button onClick={() => onRemove(d)} className="rounded-lg border border-danger px-2 py-1 font-bold text-danger hover:bg-danger/10">Remover</button>}
+    </div>
+  </div>
+);
+
+const DuplicatesReviewPanel: React.FC<{
+  area: TechArea; groups: DuplicateGroup[]; anomalies: Device[]; canManage: boolean;
+  onEdit: (d: Device) => void; onOpen: (d: Device) => void; onRemove: (d: Device) => void;
+}> = ({ area, groups, anomalies, canManage, onEdit, onOpen, onRemove }) => {
+  if (groups.length === 0 && anomalies.length === 0) {
+    return <EmptyState variant="generico" title="Nenhum candidato a duplicado" description="Não há registros com mesma identidade técnica (central+laço+endereço) nem centrais com endereço de periférico." />;
+  }
+  return (
+    <div className="flex flex-col gap-3">
+      {groups.map((g) => {
+        const ident = assetDisplayIdentifier(area, { central: g.devices[0].central, laco: g.devices[0].laco, endereco: g.devices[0].endereco, technicalAttributes: g.devices[0].technicalAttributes });
+        return (
+          <div key={g.key} className="rounded-xl border border-amber-300 bg-amber-50/40 p-3">
+            <p className="mb-2 text-xs font-bold text-amber-800">Possível duplicidade · <span className="font-data-mono">{ident || g.key}</span> · {g.devices.length} registros</p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {g.devices.map((d) => <DupDeviceCard key={d.id} area={area} d={d} canManage={canManage} onEdit={onEdit} onOpen={onOpen} onRemove={onRemove} />)}
+            </div>
+            <p className="mt-2 text-[10px] text-fg-muted">Você decide qual manter — o sistema não mescla nem remove automaticamente.</p>
+          </div>
+        );
+      })}
+      {anomalies.length > 0 && (
+        <div className="rounded-xl border border-red-300 bg-red-50/40 p-3">
+          <p className="mb-2 text-xs font-bold text-red-800">Central com laço/endereço de periférico · {anomalies.length} registro(s) — revisar (§22)</p>
+          <div className="flex flex-col gap-2">
+            {anomalies.map((d) => {
+              const ident = assetDisplayIdentifier(area, { central: d.central, laco: d.laco, endereco: d.endereco, technicalAttributes: d.technicalAttributes });
+              return (
+                <div key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-[11px]">
+                  <span className="min-w-0"><b className="font-data-mono text-primary">{ident || 'sem id'}</b> · {legacyGroupLabel(area, d.grupo)} · {[d.fabricante, d.modelo].filter(Boolean).join(' ') || '—'}</span>
+                  <span className="flex gap-1.5">
+                    <button onClick={() => onOpen(d)} className="rounded-lg border border-border-strong px-2 py-1 font-semibold text-fg-secondary hover:border-primary hover:text-primary">Detalhes</button>
+                    <button onClick={() => onEdit(d)} className="rounded-lg border border-border-strong px-2 py-1 font-semibold text-primary hover:bg-navy hover:text-white">Editar</button>
+                    {canManage && <button onClick={() => onRemove(d)} className="rounded-lg border border-danger px-2 py-1 font-bold text-danger hover:bg-danger/10">Remover</button>}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 

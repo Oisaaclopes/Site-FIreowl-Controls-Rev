@@ -193,6 +193,16 @@ export function fabricantesInArea(devices: Device[]): string[] {
   return [...set].sort((a, b) => a.localeCompare(b, 'pt-BR'));
 }
 
+/**
+ * Inconsistências OBJETIVAS de importação (§17): grupo ausente ou central com
+ * laço/endereço de periférico (§18/§22). Campo opcional ausente (fabricante/
+ * modelo) NÃO é inconsistência aqui — tem contador próprio. Só ativos.
+ */
+export function importInconsistencyDevices(area: TechArea, devices: Device[]): Device[] {
+  const anomalyIds = new Set(centralAddressAnomalies(area, devices).map((d) => d.id));
+  return activeDevices(devices).filter((d) => anomalyIds.has(d.id) || !(d.grupo || '').trim());
+}
+
 export interface ImportReview {
   importados: number;
   duplicados: number;
@@ -200,6 +210,7 @@ export interface ImportReview {
   semModelo: number;
   semCondicao: number;
   naoVerificados: number;
+  inconsistencias: number;
 }
 
 /** Resumo de revisão pós-importação (§18). Só ativos; condição vazia NÃO vira NORMAL (§20). */
@@ -207,6 +218,7 @@ export function importReview(area: TechArea, devices: Device[]): ImportReview {
   const imported = activeDevices(devices).filter((d) => d.source === 'IMPORTACAO');
   const dupIds = new Set<string>();
   for (const g of duplicateGroups(area, devices)) for (const d of g.devices) if (d.source === 'IMPORTACAO') dupIds.add(d.id);
+  const inconsistentImportedIds = new Set(importInconsistencyDevices(area, devices).filter((d) => d.source === 'IMPORTACAO').map((d) => d.id));
   return {
     importados: imported.length,
     duplicados: dupIds.size,
@@ -214,5 +226,6 @@ export function importReview(area: TechArea, devices: Device[]): ImportReview {
     semModelo: imported.filter((d) => !(d.modelo || '').trim()).length,
     semCondicao: imported.filter((d) => !(d.condicao || '').trim()).length,
     naoVerificados: imported.filter((d) => !d.lastVerifiedAt).length,
+    inconsistencias: inconsistentImportedIds.size,
   };
 }

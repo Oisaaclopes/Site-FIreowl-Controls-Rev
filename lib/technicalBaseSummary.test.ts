@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   activeDevices, summarizeGroups, summarizeCentrals, sortDevicesForArea,
   duplicateGroups, centralAddressAnomalies, filterDevices, importReview, displayGroup, assetCardView,
+  importInconsistencyDevices,
 } from './technicalBaseSummary';
 import type { Device } from './types';
 
@@ -101,6 +102,23 @@ describe('revisão pós-importação (J/§18/§20)', () => {
     expect(r.semModelo).toBe(1);        // i2
     expect(r.semCondicao).toBe(3);      // nenhum verificado/condição
     expect(r.naoVerificados).toBe(3);
+  });
+  it('inconsistências: central com laço/endereço + sem grupo', () => {
+    const list: Device[] = [
+      dev({ id: 'ca', source: 'IMPORTACAO', grupo: 'Central SDAI', central: '1', laco: '1', endereco: '1' }), // anomalia
+      dev({ id: 'nog', source: 'IMPORTACAO', grupo: '', central: '1', laco: '1', endereco: '6' }),             // sem grupo
+      dev({ id: 'ok', source: 'IMPORTACAO', grupo: 'Acionador Manual', central: '1', laco: '1', endereco: '7' }),
+    ];
+    expect(importInconsistencyDevices('SDAI', list).map((d) => d.id).sort()).toEqual(['ca', 'nog']);
+    expect(importReview('SDAI', list).inconsistencias).toBe(2);
+  });
+  it('edição/remoção alteram o resumo dinamicamente (§19)', () => {
+    const before = importReview('SDAI', imp);
+    // remove um dos duplicados → duplicados cai
+    const after = importReview('SDAI', imp.map((d) => (d.id === 'i2' ? { ...d, status: 'removido', removedAt: 'x' } : d)));
+    expect(before.duplicados).toBe(2);
+    expect(after.duplicados).toBe(0);
+    expect(after.importados).toBe(2);
   });
 });
 
