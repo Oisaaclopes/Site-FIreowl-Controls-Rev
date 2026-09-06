@@ -51,6 +51,7 @@ import { ClientTechnicalBase } from '@/components/clients/ClientTechnicalBase';
 type DossieTab =
   | 'overview'
   | 'os'
+  | 'pedidos'
   | 'relatorios'
   | 'pendencias'
   | 'fotos'
@@ -96,6 +97,20 @@ const OS_TIPO_LABEL: Record<OrdemServico['tipo'], string> = {
 
 const PROPOSAL_ACEITO: Pedido['status'][] = ['aceito'];
 const PROPOSAL_ABERTO: Pedido['status'][] = ['rascunho', 'em_revisao', 'aprovado_interno', 'enviado_ao_cliente', 'visualizado_cliente', 'em_negociacao'];
+
+// Rótulo/cor canônicos do status do Pedido (mesma taxonomia de PedidoStatus).
+const PEDIDO_STATUS_UI: Record<Pedido['status'], { label: string; color: 'emerald' | 'amber' | 'blue' | 'red' | 'slate' }> = {
+  rascunho: { label: 'Rascunho', color: 'slate' },
+  em_revisao: { label: 'Em revisão', color: 'amber' },
+  aprovado_interno: { label: 'Aprovado interno', color: 'blue' },
+  enviado_ao_cliente: { label: 'Enviado ao cliente', color: 'blue' },
+  visualizado_cliente: { label: 'Visualizada pelo cliente', color: 'blue' },
+  em_negociacao: { label: 'Em negociação', color: 'amber' },
+  aceito: { label: 'Aceito', color: 'emerald' },
+  concluido: { label: 'Concluída / Recebida', color: 'emerald' },
+  recusado: { label: 'Recusado', color: 'red' },
+  expirado: { label: 'Expirado', color: 'red' },
+};
 
 const REPORT_STATUS_COLOR: Record<string, 'emerald' | 'amber' | 'blue' | 'red' | 'slate'> = {
   finalizado: 'emerald',
@@ -309,6 +324,7 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
   const TABS: { id: DossieTab; label: string; icon: string; badge?: number }[] = [
     { id: 'overview', label: 'Visão Geral', icon: 'dashboard' },
     { id: 'os', label: 'OS', icon: 'engineering', badge: osAtivas.length || undefined },
+    { id: 'pedidos', label: 'Pedidos', icon: 'receipt_long', badge: clientPedidos.length || undefined },
     { id: 'relatorios', label: 'Relatórios', icon: 'assignment', badge: reports?.length || undefined },
     { id: 'pendencias', label: 'Pendências', icon: 'flag', badge: pendAbertas.length || undefined },
     { id: 'fotos', label: 'Fotos', icon: 'photo_library', badge: photos?.length || undefined },
@@ -430,6 +446,7 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
             <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(10.5rem,1fr))]">
               <OverviewCard icon="assignment_late" label="OS abertas" value={osAbertas.length} tone="amber" onClick={() => goTab('os')} />
               <OverviewCard icon="engineering" label="OS em execução" value={osExecucao.length} tone="blue" onClick={() => goTab('os')} />
+              <OverviewCard icon="receipt_long" label="Pedidos" value={clientPedidos.length} tone="brand" onClick={() => goTab('pedidos')} />
               <OverviewCard icon="flag" label="Pendências abertas" value={pendencias === null ? '…' : pendAbertas.length} tone="rose" onClick={() => goTab('pendencias')} />
               <OverviewCard icon="assignment" label="Relatórios" value={reports === null ? '…' : reports.length} tone="violet" onClick={() => goTab('relatorios')} />
               <OverviewCard icon="photo_library" label="Fotos de campo" value={photos === null ? (photosLoading ? '…' : '·') : photos.length} tone="sky" onClick={() => goTab('fotos')} />
@@ -496,6 +513,52 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
                     </button>
                   </div>
                 ))}
+              </div>
+            )}
+          </SectionWrap>
+        )}
+
+        {tab === 'pedidos' && (
+          <SectionWrap
+            title={`Pedidos (${clientPedidos.length})`}
+            actionLabel="Abrir módulo de Pedidos"
+            onAction={() => onNavigateToTab('pedidos')}
+          >
+            {clientPedidos.length === 0 ? (
+              <EmptyState variant="generico" title="Nenhum pedido" description="Este cliente ainda não possui pedidos comerciais registrados." />
+            ) : (
+              <div className="flex flex-col gap-2">
+                {[...clientPedidos].sort((a, b) => toTime(b.dataEmissao) - toTime(a.dataEmissao)).map((p) => {
+                  const osVinculadas = clientOS.filter((o) => o.sourcePedidoId === p.id);
+                  const ui = PEDIDO_STATUS_UI[p.status] || { label: p.status, color: 'slate' as const };
+                  return (
+                    <div key={p.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-data-mono text-xs font-bold text-fg">{p.numeroPedido || p.id}</span>
+                          <Badge color={ui.color}>{ui.label}</Badge>
+                        </div>
+                        <p className="mt-0.5 truncate text-sm font-semibold text-fg">{p.referencia || 'Pedido comercial'}</p>
+                        <p className="mt-0.5 flex flex-wrap gap-x-3 text-[11px] text-fg-secondary">
+                          <span>Emissão: {fmtDate(p.dataEmissao)}</span>
+                          <span className="font-semibold text-fg">{brlM(p.proposal?.valorTotal || 0)}</span>
+                          {osVinculadas.length > 0 && (
+                            <span className="font-semibold text-amber-700">
+                              {osVinculadas.length === 1 ? `OS ${osVinculadas[0].numero || osVinculadas[0].id}` : `${osVinculadas.length} OS vinculadas`}
+                            </span>
+                          )}
+                          {p.responsavelComercialNome && <span>Resp.: {p.responsavelComercialNome}</span>}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => onNavigateToTab('pedidos')}
+                        className="shrink-0 rounded-lg border border-primary px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-navy hover:text-white"
+                      >
+                        Abrir
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </SectionWrap>
