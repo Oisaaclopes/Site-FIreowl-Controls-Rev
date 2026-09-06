@@ -123,6 +123,13 @@ comment on table public.asset_maintenance_policies is
   'O partial-unique só vale p/ ativa=true, então versões inativas coexistem; '
   'created_at/updated_at bastam nesta fase (sem tabela de versão dedicada).';
 
+comment on column public.asset_maintenance_policies.periodicidade_unidade is
+  'DIA/SEMANA/MES/ANO. REGRA para lib/maintenancePolicies.ts (fase de código): '
+  'MES/ANO usam ARITMÉTICA DE CALENDÁRIO (add_months), NÃO conversão cega em dias — '
+  'ex.: 31/01 + 1 MES deve ser determinístico (28/02 ou 29/02 em ano bissexto). '
+  'DIA/SEMANA usam duração fixa. janela_tolerancia_dias é sempre em dias. '
+  'Definir e TESTAR explicitamente esse comportamento na fase de código.';
+
 alter table public.asset_maintenance_policies enable row level security;
 grant select, insert, update, delete on public.asset_maintenance_policies to authenticated;
 
@@ -278,6 +285,18 @@ declare
   cursor_id uuid;
   hops      integer := 0;
 begin
+  -- (§ ordem de revisão) A sequência R00→R01→R02 só é exigida para MANUTENCAO;
+  -- os demais tipos mantêm o comportamento histórico (sem exigência de R00/+1).
+  if new.tipo = 'MANUTENCAO' then
+    if new.revisao !~ '^R[0-9]{2,}$' then
+      raise exception 'revisao invalida % (esperado R00, R01, R02, ...)', new.revisao;
+    end if;
+    -- Primeira emissão (sem parent) TEM de ser exatamente R00.
+    if new.supersedes_report_id is null and new.revisao <> 'R00' then
+      raise exception 'primeira emissao MANUTENCAO deve ser R00 (recebido %)', new.revisao;
+    end if;
+  end if;
+
   if new.supersedes_report_id is null then
     return new;
   end if;
@@ -299,6 +318,14 @@ begin
       'revisao deve superseder documento da MESMA serie (contrato/tipo/period_start/period_end)';
   end if;
 
+  -- (§ ordem de revisão) Para MANUTENCAO, a nova revisão = anterior + 1 (numérico).
+  -- R00→0, R01→1, R10→10 (formato garantido pelo CHECK/guarda acima). Bloqueia
+  -- R05 supersede R00, R03 supersede R01, R02 supersede R05, etc.
+  if new.tipo = 'MANUTENCAO'
+     and (substring(new.revisao from 2))::int <> (substring(parent.revisao from 2))::int + 1 then
+    raise exception 'revisao fora de sequencia: % deve ser (% + 1)', new.revisao, parent.revisao;
+  end if;
+
   -- Anti-ciclo: sobe a cadeia de supersessão; se reencontrar new.id, há ciclo.
   cursor_id := parent.supersedes_report_id;
   while cursor_id is not null loop
@@ -318,7 +345,7 @@ $$;
 
 drop trigger if exists reports_validate_supersession on public.reports;
 create trigger reports_validate_supersession
-  before insert or update of supersedes_report_id, contrato_id, tipo, period_start, period_end
+  before insert or update of supersedes_report_id, contrato_id, tipo, period_start, period_end, revisao
   on public.reports
   for each row execute function public.reports_validate_supersession();
 
