@@ -43,6 +43,41 @@ const inWindow = (v: string | undefined, start: string, end: string): boolean =>
   return d != null && d >= dateOnly(start)! && d <= dateOnly(end)!;
 };
 
+/* --------------------------- Rodízio determinístico (§3) ------------------- */
+
+const MESES_POR_FREQ: Record<string, number> = {
+  mensal: 1, bimestral: 2, trimestral: 3, quadrimestral: 4, semestral: 6, anual: 12,
+};
+/** Passo em meses da rotina (mesma regra de contractRoutines; inline p/ pureza). */
+function routineIntervalMonths(r: { intervaloMeses?: number; frequencia?: string }): number {
+  if (r.intervaloMeses && r.intervaloMeses > 0) return r.intervaloMeses;
+  return MESES_POR_FREQ[(r.frequencia || '').toLowerCase()] || 1;
+}
+/** Periodicidade do ativo em MESES (aprox. p/ dividir em execuções da rotina). */
+function policyPeriodMonths(valor: number, unidade: string): number {
+  switch (unidade) {
+    case 'DIA': return valor / 30;
+    case 'SEMANA': return (valor * 7) / 30;
+    case 'ANO': return valor * 12;
+    case 'MES': default: return valor;
+  }
+}
+/** Índice global determinístico da execução a partir da data e do passo. */
+function execOrdinal(dateStr: string, intervalMonths: number): number {
+  const [y, m] = dateStr.slice(0, 10).split('-').map((n) => parseInt(n, 10));
+  const absMonth = y * 12 + ((m || 1) - 1);
+  return Math.floor(absMonth / Math.max(1, intervalMonths));
+}
+/** Hash estável (FNV-1a 32 bits) do device_id → base do slot (independe do banco). */
+function stableHash(s: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return h >>> 0;
+}
+
 /** Ativos da Base aplicáveis a uma rotina (§4): por ÁREA canônica (único filtro
  *  disponível hoje em contract_routines) e status 'ativo'. area nula = todas.
  *  NÃO duplica taxonomia; usa devices.sistema. */
@@ -62,6 +97,14 @@ export interface MaintenancePlanInput {
   policies: AssetMaintenancePolicy[];
   lastTests: Map<string, LastTestInfo>;
   proximoWindowDays?: number;
+  /**
+   * Rodízio/amostragem (§3-§6). OFF por padrão (compatível). Quando ON, ativos
+   * SEM_HISTORICO cuja periodicidade > frequência da rotina são distribuídos por
+   * slot determinístico ao longo das visitas do ciclo (só o subconjunto da janela
+   * entra no 1º teste; os demais ficam PRIMEIRO_TESTE_PENDENTE/RODIZIO_OUTRA_JANELA).
+   * VENCIDOS têm prioridade e entram independentemente do slot (§7).
+   */
+  rotation?: boolean;
 }
 
 interface RoutineCtx {
@@ -127,6 +170,21 @@ export function buildMaintenancePeriodPlan(input: MaintenancePlanInput): Mainten
     const routineId = conflict ? undefined : chosen?.routine.id;
     const templateCodigo = conflict ? undefined : chosen?.routine.templateCodigo;
 
+    // Rodízio: slot determinístico quando a periodicidade cobre várias execuções.
+    let rotationSlot: number | undefined;
+    let rotationTotalSlots: number | undefined;
+    let inRotationSlot = true; // sem rodízio → sempre "no slot" (comportamento atual)
+    if (input.rotation && effective && chosen && !conflict) {
+      const interval = routineIntervalMonths(chosen.routine);
+      const cadence = Math.max(1, Math.round(policyPeriodMonths(effective.periodicidadeValor, effective.periodicidadeUnidade) / interval));
+      if (cadence > 1) {
+        rotationTotalSlots = cadence;
+        rotationSlot = stableHash(deviceId) % cadence;
+        const anchor = scheduled[0]?.plannedDate ?? chosen.plannedDate;
+        inRotationSlot = anchor ? (execOrdinal(anchor, interval) % cadence) === rotationSlot : false;
+      }
+    }
+
     let planningStatus: MaintenancePlanningStatus;
     let reason: MaintenancePlanningReason;
     let plannedFirstTest: string | undefined;
@@ -134,9 +192,12 @@ export function buildMaintenancePeriodPlan(input: MaintenancePlanInput): Mainten
     if (!effective) {
       planningStatus = 'NAO_PROGRAMADO'; reason = 'SEM_POLITICA';
     } else if (technicalStatus === 'SEM_HISTORICO') {
-      if (scheduled.length >= 1) {
+      if (scheduled.length >= 1 && inRotationSlot) {
         planningStatus = 'PROGRAMADO_PRIMEIRO_TESTE'; reason = 'PRIMEIRO_TESTE_PLANEJADO';
         plannedFirstTest = scheduled.map((c) => c.plannedDate).filter(Boolean).sort()[0];
+      } else if (scheduled.length >= 1) {
+        // rotina roda, mas o slot do ativo é de outra visita do ciclo (§6).
+        planningStatus = 'PRIMEIRO_TESTE_PENDENTE'; reason = 'RODIZIO_OUTRA_JANELA';
       } else {
         planningStatus = 'PRIMEIRO_TESTE_PENDENTE'; reason = 'ROTINA_NAO_PROGRAMADA_NO_PERIODO';
       }
@@ -157,6 +218,7 @@ export function buildMaintenancePeriodPlan(input: MaintenancePlanInput): Mainten
       deviceId, sistema: device.sistema, routineId, templateCodigo,
       effectivePolicyId: effective?.policyId, technicalStatus, planningStatus,
       lastTestAt, nextTestAt, plannedFirstTest, reason, conflict: conflict || undefined,
+      rotationSlot, rotationTotalSlots,
     });
   }
 
@@ -193,6 +255,7 @@ export async function fetchMaintenancePeriodPlan(input: {
   periodStart: string;
   periodEnd: string;
   proximoWindowDays?: number;
+  rotation?: boolean;
 }): Promise<MaintenancePeriodPlan> {
   const { fetchContractRoutines, fetchRoutineExecutions } = await import('./contractRoutines');
   const { fetchDevices } = await import('./devices');
@@ -211,6 +274,7 @@ export async function fetchMaintenancePeriodPlan(input: {
 
   return buildMaintenancePeriodPlan({
     contractId: input.contractId, periodStart: input.periodStart, periodEnd: input.periodEnd,
-    routines, executions, devices, policies, lastTests, proximoWindowDays: input.proximoWindowDays,
+    routines, executions, devices, policies, lastTests,
+    proximoWindowDays: input.proximoWindowDays, rotation: input.rotation,
   });
 }

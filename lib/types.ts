@@ -1232,6 +1232,7 @@ export type MaintenancePlanningReason =
   | 'JA_VENCIDO_ANTES_DO_PERIODO'
   | 'FORA_DA_JANELA'
   | 'ROTINA_NAO_PROGRAMADA_NO_PERIODO'
+  | 'RODIZIO_OUTRA_JANELA'          // rodízio: 1º teste do ativo cai em outra visita do ciclo
   | 'SEM_POLITICA';
 
 export interface MaintenancePlanAsset {
@@ -1247,6 +1248,11 @@ export interface MaintenancePlanAsset {
   plannedFirstTest?: string;      // data planejada do 1º teste (execução da rotina)
   reason: MaintenancePlanningReason;
   conflict?: boolean;
+  /** Rodízio (§3): slot determinístico do ativo (0..cadência-1) quando a
+   *  periodicidade é maior que a frequência da rotina. undefined quando não há
+   *  rodízio aplicável (cadência ≤ 1) ou rodízio desligado. */
+  rotationSlot?: number;
+  rotationTotalSlots?: number;
 }
 
 export interface MaintenancePlanRoutine {
