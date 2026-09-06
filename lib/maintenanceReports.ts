@@ -10,28 +10,82 @@
  * revisão são PUROS/testáveis.
  * =================================================================== */
 import { getSupabaseClient } from './supabaseClient';
-import { createReport, updateReport } from './reports';
+import { createReport, updateReport, fetchAnswers, fetchReportsByAttendanceIds } from './reports';
 import { fetchServiceAttendances } from './serviceAttendances';
 import { fetchRoutineExecutions } from './contractRoutines';
 import { fetchPendencias } from './pendencias';
 import { fetchVerificationsInWindow } from './deviceVerifications';
 import { fetchDevices } from './devices';
+import { fetchSurveyRequirements } from './surveyRequirements';
 import { listFieldPhotosForOs, type FieldPhoto } from './fieldPhotos';
 import { classifyTestResult, fetchMaintenanceCoverage } from './maintenanceCoverage';
 import type {
   ContractRoutineExecution,
   Device,
   DeviceVerification,
+  MaintenanceAnswerSnapshot,
   MaintenanceAssetSnapshot,
   MaintenanceCoverage,
+  MaintenanceMeasurementSnapshot,
   MaintenancePendenciaSnapshot,
   MaintenancePhotoSnapshot,
   MaintenanceReportSnapshot,
+  MaintenanceTechnicalReportSnapshot,
   Pendencia,
+  ReportAnswer,
   ReportInstance,
   ServiceAttendance,
+  SurveyMeasurement,
   UserRole,
 } from './types';
+
+/* --------------------------- Reports técnicos por atendimento -------------- */
+
+/** Documento técnico fonte + seus dados estruturados já carregados. */
+export interface TechnicalReportSource {
+  report: ReportInstance;
+  answers: ReportAnswer[];
+  measurements: SurveyMeasurement[];
+}
+
+/** Statuses documentais que podem alimentar o consolidado (documento válido). */
+export const MAINTENANCE_SOURCE_STATUSES: ReadonlyArray<string> = ['finalizado'];
+
+/**
+ * Seleciona os relatórios técnicos VÁLIDOS para o consolidado (PURO/testável):
+ *  - status documental válido (default: finalizado);
+ *  - tipo técnico (exclui o próprio MANUTENCAO);
+ *  - do contrato correto (quando `contractId` informado);
+ *  - ligados a um atendimento do período (quando `validAttendanceIds` informado);
+ *  - COLAPSA a série de supersessão: se R01 supersede R00 e ambos estão no
+ *    conjunto, mantém só R01; R00→R01→R02 mantém só R02. Nunca duas revisões da
+ *    mesma série. Identidade por report_id/service_attendance_id — nunca os_id.
+ */
+export function resolveLatestValidReports(
+  reports: ReportInstance[],
+  opts?: { contractId?: string; validAttendanceIds?: Iterable<string>; validStatuses?: ReadonlyArray<string> }
+): ReportInstance[] {
+  const validStatuses = opts?.validStatuses ?? MAINTENANCE_SOURCE_STATUSES;
+  const attSet = opts?.validAttendanceIds ? new Set(opts.validAttendanceIds) : null;
+
+  const eligible = reports.filter((r) =>
+    validStatuses.includes(r.status) &&
+    r.tipo !== 'MANUTENCAO' &&
+    (opts?.contractId == null || r.contratoId === opts.contractId) &&
+    (attSet == null || (r.serviceAttendanceId != null && attSet.has(r.serviceAttendanceId)))
+  );
+
+  // Colapsa supersessão: descarta quem foi superseditado por outro do conjunto.
+  const superseded = new Set(
+    eligible.map((r) => r.supersedesReportId).filter((x): x is string => !!x)
+  );
+  const seen = new Set<string>();
+  return eligible.filter((r) => {
+    if (superseded.has(r.id) || seen.has(r.id)) return false;
+    seen.add(r.id);
+    return true;
+  });
+}
 
 /* --------------------------- Helpers PUROS de revisão ---------------------- */
 
@@ -216,6 +270,8 @@ export interface MaintenanceConsolidation {
   attendances: ServiceAttendance[];
   sistemas: string[];
   testes: Awaited<ReturnType<typeof fetchVerificationsInWindow>>;
+  /** Documentos técnicos por atendimento (revisão vigente) + answers/measurements. */
+  technicalReports: TechnicalReportSource[];
   pendencias: PendenciaBuckets;
   fotos: Awaited<ReturnType<typeof listFieldPhotosForOs>>;
   membership: { attendanceIds: string[]; executionIds: string[]; osIds: string[] };
@@ -244,6 +300,21 @@ export async function buildMaintenanceConsolidation(input: {
   // 2) Atendimentos dessas OS que ocorreram na janela (evidência real de execução).
   const attArrays = await Promise.all(osIds.map((osId) => fetchServiceAttendances({ workOrderId: osId })));
   const attendances = attendancesInWindow(attArrays.flat(), input.periodStart, input.periodEnd);
+  const attendanceIds = attendances.map((a) => a.id);
+
+  // 2b) Documentos técnicos por atendimento (revisão vigente) → answers/measurements.
+  //     Membership por report_id/service_attendance_id; NUNCA por os_id.
+  const rawReports = await fetchReportsByAttendanceIds(attendanceIds);
+  const validReports = resolveLatestValidReports(rawReports, {
+    contractId: input.contratoId,
+    validAttendanceIds: attendanceIds,
+  });
+  const technicalReports: TechnicalReportSource[] = await Promise.all(
+    validReports.map(async (report) => {
+      const [answers, req] = await Promise.all([fetchAnswers(report.id), fetchSurveyRequirements(report.id)]);
+      return { report, answers, measurements: req.measurements };
+    })
+  );
 
   // 3) Pendências do cliente, separadas em abertas/anteriores/resolvidas.
   const pendencias = input.clienteId
@@ -272,10 +343,11 @@ export async function buildMaintenanceConsolidation(input: {
     attendances,
     sistemas,
     testes,
+    technicalReports,
     pendencias,
     fotos,
     membership: {
-      attendanceIds: attendances.map((a) => a.id),
+      attendanceIds,
       executionIds: execs.map((e) => e.id),
       osIds,
     },
@@ -285,6 +357,14 @@ export async function buildMaintenanceConsolidation(input: {
 /* --------------------------- Snapshot documental (§5–§9) ------------------- */
 
 const dedupe = <T,>(xs: T[]): T[] => Array.from(new Set(xs));
+
+/** Deduplica por identidade real (chave), preservando a 1ª ocorrência (§6). */
+function dedupeBy<T>(xs: T[], key: (x: T) => string): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const x of xs) { const k = key(x); if (!seen.has(k)) { seen.add(k); out.push(x); } }
+  return out;
+}
 
 function toPendenciaSnap(p: Pendencia): MaintenancePendenciaSnapshot {
   return {
@@ -305,6 +385,50 @@ function toPhotoSnap(f: FieldPhoto): MaintenancePhotoSnapshot {
     pendenciaId: f.pendenciaId,
     momento: f.evidenceMoment,
     descricao: f.notaRapida,
+  };
+}
+
+/** Cópia profunda simples do valor bruto de uma answer (imunidade §11). */
+function cloneValor(v: unknown): unknown {
+  try { return structuredClone(v); } catch { return v == null ? null : JSON.parse(JSON.stringify(v)); }
+}
+
+function toAnswerSnap(a: ReportAnswer): MaintenanceAnswerSnapshot {
+  return { fieldKey: a.fieldKey, secao: a.secao, valor: cloneValor(a.valor), deviceId: a.deviceId, observacao: a.observacao };
+}
+
+function toMeasurementSnap(m: SurveyMeasurement, report: ReportInstance): MaintenanceMeasurementSnapshot {
+  return {
+    id: m.id, reportId: m.reportId, categoria: m.categoria, descricao: m.descricao,
+    quantidade: m.quantidade, unidade: m.unidade, local: m.local, observacao: m.observacao,
+    attendanceId: report.serviceAttendanceId, data: report.finalizadoEm ?? report.iniciadoEm, tecnicoId: report.tecnicoId,
+  };
+}
+
+/** Sistema do documento (best-effort §9): sistema ÚNICO dos devices citados nas
+ *  answers; ambíguo/ausente → undefined (não força/inventa). */
+function reportSistema(answers: ReportAnswer[], deviceMap: Map<string, Device>): string | undefined {
+  const sis = dedupe(
+    answers.map((a) => a.deviceId).filter((x): x is string => !!x)
+      .map((id) => deviceMap.get(id)?.sistema as string | undefined)
+      .filter((s): s is string => !!s)
+  );
+  return sis.length === 1 ? sis[0] : undefined;
+}
+
+function toTechnicalReportSnap(src: TechnicalReportSource, deviceMap: Map<string, Device>): MaintenanceTechnicalReportSnapshot {
+  return {
+    reportId: src.report.id,
+    numero: src.report.numero,
+    tipo: src.report.tipo,
+    templateCodigo: src.report.templateCodigo,
+    templateVersion: src.report.templateVersion,
+    revisao: src.report.revisao,
+    serviceAttendanceId: src.report.serviceAttendanceId,
+    tecnicoId: src.report.tecnicoId,
+    sistema: reportSistema(src.answers, deviceMap),
+    answers: src.answers.map(toAnswerSnap),
+    measurements: src.measurements.map((m) => toMeasurementSnap(m, src.report)),
   };
 }
 
@@ -356,16 +480,24 @@ export function buildMaintenanceReportSnapshot(params: {
   const deviceMap = new Map(devices.map((d) => [d.id, d] as const));
   const latestTest = latestTestByDevice(c.testes);
 
-  // Ativos incluídos no documento = os que tiveram teste OU foto no período.
+  const technicalReports = c.technicalReports.map((src) => toTechnicalReportSnap(src, deviceMap));
+
+  // Ativos incluídos = citados por teste OU foto OU answer de report técnico (§8).
+  const answerDeviceIds = c.technicalReports.flatMap((src) =>
+    src.answers.map((a) => a.deviceId).filter((x): x is string => !!x)
+  );
   const assetIds = dedupe([
     ...c.testes.map((t) => t.deviceId),
-    ...c.fotos.map((f) => f.deviceId).filter(Boolean) as string[],
+    ...(c.fotos.map((f) => f.deviceId).filter(Boolean) as string[]),
+    ...answerDeviceIds,
   ]);
   const ativos: MaintenanceAssetSnapshot[] = assetIds
     .map((id) => deviceMap.get(id))
     .filter((d): d is Device => !!d)
     .map((d) => toAssetSnap(d, latestTest.get(d.id)));
 
+  // Evidência deduplicada pela identidade real (field_photo_id), nunca por os_id (§6).
+  const fotosUnicas = dedupeBy(c.fotos, (f) => f.id);
   const pendAll = [
     ...c.pendencias.abertasNoPeriodo,
     ...c.pendencias.anterioresAbertas,
@@ -398,22 +530,24 @@ export function buildMaintenanceReportSnapshot(params: {
       deviceVerificationId: t.id, deviceId: t.deviceId, condicao: t.condicao,
       resultado: classifyTestResult(t.condicao), verifiedAt: t.verifiedAt, serviceAttendanceId: t.serviceAttendanceId,
     })),
+    technicalReports,
     cobertura: { ...coverage },   // cópia → imune a recálculo/mutação posterior (§4/§9)
     pendencias: {
       novasNoPeriodo: c.pendencias.abertasNoPeriodo.map(toPendenciaSnap),
       anterioresAbertas: c.pendencias.anterioresAbertas.map(toPendenciaSnap),
       resolvidasNoPeriodo: c.pendencias.resolvidasNoPeriodo.map(toPendenciaSnap),
     },
-    fotos: c.fotos.map(toPhotoSnap),
+    fotos: fotosUnicas.map(toPhotoSnap),
     alteracoesBase,
     conclusao: params.conclusao,
     membership: {
       // cópias (não referências) → snapshot imune a mutações futuras da origem (§9/§11).
       attendanceIds: [...c.membership.attendanceIds],
       executionIds: [...c.membership.executionIds],
+      technicalReportIds: technicalReports.map((t) => t.reportId),
       deviceVerificationIds: c.testes.map((t) => t.id),
       pendenciaIds: dedupe(pendAll.map((p) => p.id)),
-      fieldPhotoIds: c.fotos.map((f) => f.id),
+      fieldPhotoIds: fotosUnicas.map((f) => f.id),
       deviceIds: [...assetIds],
     },
   };

@@ -1171,6 +1171,45 @@ export interface MaintenanceAttendanceSnapshot {
   osId?: string;
 }
 
+/** Resposta estruturada congelada (§4: preserva bruto; não infere semântica). */
+export interface MaintenanceAnswerSnapshot {
+  fieldKey: string;
+  secao?: string;
+  valor: unknown;       // valor bruto do FormEngine (jsonb), copiado
+  deviceId?: string;
+  observacao?: string;
+}
+
+/** Medição estruturada congelada (§5: nunca converte texto livre em número). */
+export interface MaintenanceMeasurementSnapshot {
+  id: string;
+  reportId: string;
+  categoria: string;
+  descricao: string;
+  quantidade: number;
+  unidade: string;
+  local?: string;
+  observacao?: string;
+  attendanceId?: string;   // do report fonte
+  data?: string;           // do report fonte
+  tecnicoId?: string;      // do report fonte
+}
+
+/** Documento técnico por atendimento congelado como FONTE do consolidado. */
+export interface MaintenanceTechnicalReportSnapshot {
+  reportId: string;
+  numero?: string;
+  tipo: string;
+  templateCodigo: string;
+  templateVersion?: number;
+  revisao?: string;
+  serviceAttendanceId?: string;
+  tecnicoId?: string;
+  sistema?: string;        // best-effort: sistema único dos devices citados nas answers
+  answers: MaintenanceAnswerSnapshot[];
+  measurements: MaintenanceMeasurementSnapshot[];
+}
+
 /** Snapshot documental congelado do consolidado MANUTENCAO (reports.snapshot).
  *  Suficiente para reproduzir o documento mesmo que a Base mude depois (§5/§9). */
 export interface MaintenanceReportSnapshot {
@@ -1186,6 +1225,8 @@ export interface MaintenanceReportSnapshot {
   routineExecutions: Array<{ id: string; competencia: string; routineId: string; dataProgramada?: string; status: string }>;
   ativos: MaintenanceAssetSnapshot[];
   testes: MaintenanceTestSnapshot[];
+  /** Documentos técnicos por atendimento que alimentaram o consolidado (§11). */
+  technicalReports: MaintenanceTechnicalReportSnapshot[];
   cobertura: MaintenanceCoverage;
   pendencias: {
     novasNoPeriodo: MaintenancePendenciaSnapshot[];
@@ -1200,6 +1241,7 @@ export interface MaintenanceReportSnapshot {
   membership: {
     attendanceIds: string[];
     executionIds: string[];
+    technicalReportIds: string[];
     deviceVerificationIds: string[];
     pendenciaIds: string[];
     fieldPhotoIds: string[];

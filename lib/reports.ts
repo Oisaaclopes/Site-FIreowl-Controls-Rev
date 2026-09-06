@@ -86,6 +86,20 @@ export async function fetchReports(filter?: { clienteId?: string; status?: strin
   return (data || []).map(rowToReport);
 }
 
+/** Reports (documentos técnicos) vinculados a uma lista de atendimentos (0106).
+ *  Base do consolidado MANUTENCAO — identidade por report_id/service_attendance_id,
+ *  NUNCA por os_id. */
+export async function fetchReportsByAttendanceIds(attendanceIds: string[]): Promise<ReportInstance[]> {
+  const ids = Array.from(new Set(attendanceIds.filter(Boolean)));
+  if (ids.length === 0) return [];
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase.from('reports').select('*')
+    .in('service_attendance_id', ids)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(rowToReport);
+}
+
 export async function createReport(r: ReportInstance): Promise<ReportInstance> {
   const supabase = getSupabaseClient() as any;
   const { id, ...rest } = reportToRow(r); // deixa o banco gerar o uuid

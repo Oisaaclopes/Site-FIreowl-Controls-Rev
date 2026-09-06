@@ -17,8 +17,51 @@ import {
   inWindow,
   nextRevisaoLabel,
   parseRevisao,
+  resolveLatestValidReports,
   type MaintenanceConsolidation,
+  type TechnicalReportSource,
 } from './maintenanceReports';
+import type { ReportInstance, ReportAnswer, SurveyMeasurement } from './types';
+
+const rpt = (p: Partial<ReportInstance> & Pick<ReportInstance, 'id'>): ReportInstance => ({
+  templateCodigo: 'PREVENTIVA_SDAI', tipo: 'PREVENTIVA', status: 'finalizado',
+  contratoId: 'C', serviceAttendanceId: 'a1', revisao: 'R00', ...p,
+});
+
+describe('resolveLatestValidReports — membership + supersessão (§2/§3)', () => {
+  it('1 atendimento com 2 reports distintos → ambos entram', () => {
+    const rs = [rpt({ id: 'r1', serviceAttendanceId: 'a1' }), rpt({ id: 'r2', serviceAttendanceId: 'a1' })];
+    expect(resolveLatestValidReports(rs, { contractId: 'C', validAttendanceIds: ['a1'] }).map((r) => r.id).sort()).toEqual(['r1', 'r2']);
+  });
+  it('R00 + R01 da mesma série → só R01', () => {
+    const rs = [rpt({ id: 'R00', revisao: 'R00' }), rpt({ id: 'R01', revisao: 'R01', supersedesReportId: 'R00' })];
+    expect(resolveLatestValidReports(rs).map((r) => r.id)).toEqual(['R01']);
+  });
+  it('R00 + R01 + R02 → só R02', () => {
+    const rs = [
+      rpt({ id: 'R00', revisao: 'R00' }),
+      rpt({ id: 'R01', revisao: 'R01', supersedesReportId: 'R00' }),
+      rpt({ id: 'R02', revisao: 'R02', supersedesReportId: 'R01' }),
+    ];
+    expect(resolveLatestValidReports(rs).map((r) => r.id)).toEqual(['R02']);
+  });
+  it('report de OUTRO contrato → não entra', () => {
+    const rs = [rpt({ id: 'r1', contratoId: 'OUTRO' })];
+    expect(resolveLatestValidReports(rs, { contractId: 'C' })).toHaveLength(0);
+  });
+  it('atendimento FORA do período → não entra', () => {
+    const rs = [rpt({ id: 'r1', serviceAttendanceId: 'fora' })];
+    expect(resolveLatestValidReports(rs, { validAttendanceIds: ['a1'] })).toHaveLength(0);
+  });
+  it('status não-válido (rascunho) e MANUTENCAO são excluídos', () => {
+    const rs = [
+      rpt({ id: 'draft', status: 'rascunho' }),
+      rpt({ id: 'consolidado', tipo: 'MANUTENCAO' }),
+      rpt({ id: 'ok' }),
+    ];
+    expect(resolveLatestValidReports(rs).map((r) => r.id)).toEqual(['ok']);
+  });
+});
 
 describe('revisões R00/R01/R02', () => {
   it('parse/format', () => {
@@ -127,6 +170,7 @@ describe('buildMaintenanceReportSnapshot — congela dados do momento (§5–§9
     attendances: [{ id: 'a1', workOrderId: 'os1', status: 'FINALIZADO', technicianId: 't1', startedAt: '2026-09-03T08:00:00Z', result: 'RESOLVIDO' }],
     sistemas: ['SDAI'],
     testes: [test1],
+    technicalReports: [],
     pendencias: {
       abertasNoPeriodo: [{ id: 'PN', status: 'aberta', criadaEm: '2026-09-05' }],
       anterioresAbertas: [{ id: 'PA', status: 'aberta', criadaEm: '2026-08-01' }],
@@ -188,5 +232,97 @@ describe('buildMaintenanceReportSnapshot — congela dados do momento (§5–§9
     consolidation.membership.attendanceIds.push('INTRUSO');
     expect(snap.ativos[0].descricao).toBe('Detector Sala ADM');
     expect(snap.membership.attendanceIds).toEqual(['a1']);
+  });
+});
+
+describe('consolidado agrega reports técnicos por atendimento (§4/§5/§9/§11)', () => {
+  const cov = {
+    periodStart: '2026-09-01', periodEnd: '2026-09-30', totalBase: 2, totalComPolitica: 2,
+    semPolitica: 0, semHistorico: 0, primeiroTestePendente: 0, programadosPeriodo: 2, testadosProgramadosPeriodo: 2,
+    naoTestadosPeriodo: 0, testadosExtrasPeriodo: 0, testadosTotaisPeriodo: 2, aprovadosPeriodo: 2, falharamPeriodo: 0,
+    coberturaProgramadaPct: 1, taxaAprovacaoPct: 1,
+  } as const;
+  const devices: Device[] = [
+    { id: 'd1', clienteId: 'A', sistema: 'SDAI', status: 'ativo', localizacao: 'Central SDAI' },
+    { id: 'd2', clienteId: 'A', sistema: 'CFTV', status: 'ativo', localizacao: 'NVR' },
+  ];
+  const ans = (id: string, reportId: string, deviceId: string, valor: unknown): ReportAnswer => ({ id, reportId, fieldKey: 'condicao', valor, deviceId });
+  const med = (id: string, reportId: string): SurveyMeasurement => ({ id, reportId, categoria: 'tensao', descricao: 'Tensão fonte', quantidade: 27.4, unidade: 'V', incluirNoPedido: false, local: 'Central' });
+  const reportSDAI: ReportInstance = {
+    id: 'rS', templateCodigo: 'PREVENTIVA_SDAI', tipo: 'PREVENTIVA', status: 'finalizado', contratoId: 'C',
+    serviceAttendanceId: 'a1', revisao: 'R00', tecnicoId: 't1', templateVersion: 3, finalizadoEm: '2026-09-03',
+  };
+  const reportCFTV: ReportInstance = {
+    id: 'rC', templateCodigo: 'PREVENTIVA_CFTV', tipo: 'PREVENTIVA', status: 'finalizado', contratoId: 'C',
+    serviceAttendanceId: 'a2', revisao: 'R00', tecnicoId: 't2', finalizadoEm: '2026-09-04',
+  };
+  const build = () => {
+    const techSDAI: TechnicalReportSource = { report: { ...reportSDAI }, answers: [ans('x1', 'rS', 'd1', { ok: true })], measurements: [med('m1', 'rS')] };
+    const techCFTV: TechnicalReportSource = { report: { ...reportCFTV }, answers: [ans('x2', 'rC', 'd2', 'online')], measurements: [] };
+    const consolidation: MaintenanceConsolidation = {
+      contratoId: 'C', clienteId: 'A', periodStart: '2026-09-01', periodEnd: '2026-09-30',
+      executions: [], attendances: [], sistemas: ['SDAI', 'CFTV'], testes: [],
+      technicalReports: [techSDAI, techCFTV],
+      pendencias: { abertasNoPeriodo: [], anterioresAbertas: [], resolvidasNoPeriodo: [] },
+      fotos: [], membership: { attendanceIds: ['a1', 'a2'], executionIds: [], osIds: [] },
+    };
+    return { consolidation, techSDAI, techCFTV };
+  };
+
+  it('congela reports/answers/measurements e agrupa por sistema (dois sistemas)', () => {
+    const { consolidation } = build();
+    const snap = buildMaintenanceReportSnapshot({ consolidation, devices, coverage: { ...cov }, revisao: 'R00', fechadoEm: 'now' });
+    expect(snap.technicalReports).toHaveLength(2);
+    const s = snap.technicalReports.find((t) => t.reportId === 'rS')!;
+    const c = snap.technicalReports.find((t) => t.reportId === 'rC')!;
+    expect(s.sistema).toBe('SDAI');
+    expect(c.sistema).toBe('CFTV');
+    expect(s.templateVersion).toBe(3);
+    // measurement estruturada preservada + herda atendimento/técnico/data do report
+    expect(s.measurements[0]).toMatchObject({ id: 'm1', categoria: 'tensao', quantidade: 27.4, unidade: 'V', attendanceId: 'a1', tecnicoId: 't1', data: '2026-09-03' });
+    // answer preservada como contexto bruto (sem inferência)
+    expect(s.answers[0]).toMatchObject({ fieldKey: 'condicao', deviceId: 'd1' });
+    // devices citados nas answers entram na membership
+    expect(snap.membership.technicalReportIds.sort()).toEqual(['rC', 'rS']);
+    expect(snap.membership.deviceIds.sort()).toEqual(['d1', 'd2']);
+  });
+
+  it('snapshot imune a alteração posterior dos reports fonte (§11)', () => {
+    const { consolidation, techSDAI } = build();
+    const snap = buildMaintenanceReportSnapshot({ consolidation, devices, coverage: { ...cov }, revisao: 'R00', fechadoEm: 'now' });
+    // Muta o report fonte e a answer DEPOIS de congelar.
+    techSDAI.report.status = 'cancelado';
+    techSDAI.report.tecnicoId = 'OUTRO';
+    (techSDAI.answers[0].valor as { ok: boolean }).ok = false;
+    techSDAI.measurements[0].quantidade = 999;
+    const s = snap.technicalReports.find((t) => t.reportId === 'rS')!;
+    expect(s.tecnicoId).toBe('t1');
+    expect(s.answers[0].valor).toEqual({ ok: true });
+    expect(s.measurements[0].quantidade).toBe(27.4);
+  });
+});
+
+describe('deduplicação de evidência e pendências (§6/§7)', () => {
+  const cov = {
+    periodStart: '2026-09-01', periodEnd: '2026-09-30', totalBase: 0, totalComPolitica: 0, semPolitica: 0,
+    semHistorico: 0, primeiroTestePendente: 0, programadosPeriodo: 0, testadosProgramadosPeriodo: 0, naoTestadosPeriodo: 0,
+    testadosExtrasPeriodo: 0, testadosTotaisPeriodo: 0, aprovadosPeriodo: 0, falharamPeriodo: 0,
+    coberturaProgramadaPct: null, taxaAprovacaoPct: null,
+  } as const;
+  const photo = (): FieldPhoto => ({ id: 'F', sessionId: 's', clientId: 'A', storagePathOriginal: 'p.jpg', capturadoEm: 'now', clientUuid: 'u', syncStatus: 'sincronizado', deviceId: 'd1' });
+
+  it('mesma foto por duas relações → uma evidência; pendência em 2 lentes → id único', () => {
+    const pend = { id: 'PX', status: 'corrigida' as const, criadaEm: '2026-09-02', resolvidaEm: '2026-09-20' };
+    const consolidation: MaintenanceConsolidation = {
+      contratoId: 'C', clienteId: 'A', periodStart: '2026-09-01', periodEnd: '2026-09-30',
+      executions: [], attendances: [], sistemas: [], testes: [], technicalReports: [],
+      pendencias: { abertasNoPeriodo: [pend], anterioresAbertas: [], resolvidasNoPeriodo: [pend] }, // mesma nas 2 lentes
+      fotos: [photo(), photo()], // mesma foto (mesmo id) duas vezes
+      membership: { attendanceIds: [], executionIds: [], osIds: [] },
+    };
+    const snap = buildMaintenanceReportSnapshot({ consolidation, devices: [], coverage: { ...cov }, revisao: 'R00', fechadoEm: 'now' });
+    expect(snap.fotos).toHaveLength(1);
+    expect(snap.membership.fieldPhotoIds).toEqual(['F']);
+    expect(snap.membership.pendenciaIds).toEqual(['PX']); // não duplica
   });
 });
