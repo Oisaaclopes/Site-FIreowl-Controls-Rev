@@ -780,7 +780,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     setWizardStep(0);
   };
 
-  const startForm = (preset?: { tipo: string; area: string; clienteId: string; osId?: string; contratoId?: string }) => {
+  const startForm = (preset?: { tipo: string; area: string; clienteId: string; osId?: string; contratoId?: string; templateCodigo?: string }) => {
     const tipo = preset?.tipo || wTipo;
     const area = preset?.area || wArea;
     const clienteId = preset?.clienteId || wClienteId;
@@ -792,9 +792,12 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     }
     const osId = preset?.osId || wOsId;
     const contratoId = preset?.contratoId || wContratoId;
-    // Resolve o template pela combinação Tipo + Área.
+    // Resolve o template: por CÓDIGO quando informado (evita colisão tipo+área,
+    // ex.: dois PREVENTIVA/SDAI); senão pela combinação Tipo + Área (legado).
     const loaded =
-      templates.find((t) => t.schema.tipo === tipo && (t.schema.area || 'SDAI') === area) || null;
+      (preset?.templateCodigo ? templates.find((t) => t.schema.codigo === preset.templateCodigo) : null)
+      || templates.find((t) => t.schema.tipo === tipo && (t.schema.area || 'SDAI') === area)
+      || null;
     if (!loaded) return;
     const areaTemplate = (loaded.schema.area as Device['sistema']) || 'SDAI';
     setFormTemplate(loaded.schema);
