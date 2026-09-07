@@ -56,9 +56,9 @@ jobs:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          # Hostinger aceita FTPS (mais seguro). Se der erro de conexão,
-          # troque para: protocol: ftp
-          protocol: ftps
+          # O endpoint da hospedagem passou a encerrar as tentativas FTPS antes
+          # da sincronização; usa o FTP explícito aceito na mesma porta/conta.
+          protocol: ftp
           port: 21
           security: loose
           # Sobe o conteúdo do build para a raiz do site.
