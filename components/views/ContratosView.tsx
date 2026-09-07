@@ -18,6 +18,10 @@ interface ContratosViewProps {
   clients: Client[];
   onAddContract: (contract: Contract) => void;
   userRole?: UserRole;
+  /** Usuário atual (técnico que iniciaria o atendimento contratual). */
+  currentUserId?: string;
+  /** Recarrega os contratos após excluir/encerrar. */
+  onReload?: () => void | Promise<void>;
 }
 
 /** Áreas/sistemas cobertos (multi-select) e tipos de atendimento. */
@@ -86,6 +90,8 @@ const formatDateBR = (iso: string): string => {
 
 export const ContratosView: React.FC<ContratosViewProps> = ({
   contracts,
+  currentUserId,
+  onReload,
   clients,
   onAddContract,
   userRole,
@@ -727,7 +733,14 @@ export const ContratosView: React.FC<ContratosViewProps> = ({
       )}
 
       {detailContract && (
-        <ContractDetailPanel contract={detailContract} onClose={() => setDetailContract(null)} userRole={userRole} initialTab={detailTab} />
+        <ContractDetailPanel
+          contract={detailContract}
+          onClose={() => setDetailContract(null)}
+          userRole={userRole}
+          initialTab={detailTab}
+          technicianId={currentUserId}
+          onChanged={() => { setDetailContract(null); void onReload?.(); }}
+        />
       )}
     </div>
   );

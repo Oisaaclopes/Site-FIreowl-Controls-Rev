@@ -135,3 +135,63 @@ export async function deleteContract(id: string): Promise<void> {
   const { error } = await supabase.from(TABLE).delete().eq('id', id);
   if (error) throw error;
 }
+
+/* ===================================================================
+ * Exclusão vs. encerramento (hardening). FKs de contracts: config em CASCADE
+ * (contract_routines/executions/hour_ledger/attachments/asset_maintenance_policies)
+ * e histórico em SET NULL (ordens_servico/reports/field_operations). Só
+ * hard-delete quando NÃO há histórico operacional — senão, encerrar.
+ * =================================================================== */
+export interface ContractHistorySummary {
+  executionsWithHistory: number;   // execuções além de previsto/agendado, ou com OS/relatório
+  osCount: number;                 // ordens de serviço do contrato
+  reportCount: number;             // relatórios do contrato
+  hourLedgerCount: number;         // apontamentos de horas
+}
+
+/** Decisão PURA: contrato sem histórico → pode excluir; com histórico → encerrar. */
+export function contractDeletionDecision(s: ContractHistorySummary): { canDelete: boolean; reason?: string } {
+  const total = (s.executionsWithHistory || 0) + (s.osCount || 0) + (s.reportCount || 0) + (s.hourLedgerCount || 0);
+  if (total > 0) {
+    return {
+      canDelete: false,
+      reason: 'Este contrato possui histórico operacional e não pode ser excluído. Você pode encerrá-lo para impedir novas execuções mantendo o histórico.',
+    };
+  }
+  return { canDelete: true };
+}
+
+/** Coleta o resumo de histórico do contrato (contagens reais). */
+export async function fetchContractHistorySummary(contractId: string): Promise<ContractHistorySummary> {
+  const supabase = getSupabaseClient() as any;
+  const count = async (q: any): Promise<number> => { const { count: c } = await q; return c || 0; };
+  const [execHist, osCount, reportCount, hours] = await Promise.all([
+    count(supabase.from('contract_routine_executions').select('id', { count: 'exact', head: true })
+      .eq('contract_id', contractId)
+      .or('status.not.in.(previsto,agendado),ordem_servico_id.not.is.null,report_id.not.is.null')),
+    count(supabase.from('ordens_servico').select('id', { count: 'exact', head: true }).eq('contrato_id', contractId)),
+    count(supabase.from('reports').select('id', { count: 'exact', head: true }).eq('contrato_id', contractId)),
+    count(supabase.from('contract_hour_ledger').select('id', { count: 'exact', head: true }).eq('contract_id', contractId)),
+  ]);
+  return { executionsWithHistory: execHist, osCount, reportCount, hourLedgerCount: hours };
+}
+
+/**
+ * Exclui o contrato SOMENTE quando não há histórico (respeita RLS: ADMIN/GESTOR/
+ * FINANCEIRO na policy de contracts). A CASCADE remove apenas configuração
+ * (rotinas/execuções previstas/políticas/anexos/horas). Com histórico → bloqueia.
+ */
+export async function deleteContractIfUnused(contractId: string): Promise<{ deleted: boolean; reason?: string }> {
+  const summary = await fetchContractHistorySummary(contractId);
+  const decision = contractDeletionDecision(summary);
+  if (!decision.canDelete) return { deleted: false, reason: decision.reason };
+  await deleteContract(contractId);
+  return { deleted: true };
+}
+
+/** Encerra/inativa o contrato (preserva histórico; impede novas execuções). */
+export async function setContractStatus(contractId: string, status: Contract['status']): Promise<void> {
+  const supabase = getSupabaseClient() as any;
+  const { error } = await supabase.from(TABLE).update({ status, updated_at: new Date().toISOString() }).eq('id', contractId);
+  if (error) throw error;
+}

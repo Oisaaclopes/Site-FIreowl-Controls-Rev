@@ -1297,7 +1297,7 @@ export function CrmApp({
           )}
 
           {currentTab === 'contratos' && (
-            <ContratosView contracts={contracts} clients={clients} onAddContract={handleAddContract} userRole={userRole} />
+            <ContratosView contracts={contracts} clients={clients} onAddContract={handleAddContract} userRole={userRole} currentUserId={userId} onReload={async () => setContracts(await fetchContracts())} />
           )}
 
           {currentTab === 'receitas' && (

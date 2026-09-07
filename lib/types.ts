@@ -625,7 +625,7 @@ export interface Contract {
   readjustmentIndex: string; // IPCA
   contractedHours: number;
   usedHours: number;
-  status: 'ATIVO' | 'A VENCER' | 'SUSPENSO';
+  status: 'ATIVO' | 'A VENCER' | 'SUSPENSO' | 'ENCERRADO' | 'INATIVO';
   responsibleTech: string;
   artDocumentRef: string;
   // Campos estendidos (opcionais) — requerem migração 0022_contracts_details.sql
