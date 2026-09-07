@@ -27,9 +27,12 @@ import { classifyTestResult } from './maintenanceCoverage';
 
 /** Código de template do atendimento: o da rotina; fallback ao SDAI contratual
  *  quando a rotina é SDAI e nada foi configurado. undefined se indeterminado. */
+/** Normaliza a área para comparação robusta (área é texto; QA gravou "SDAI " etc.). */
+const normArea = (a?: string): string => (a || '').trim().toUpperCase();
+
 export function resolveAttendanceTemplateCodigo(routine?: Pick<ContractRoutine, 'templateCodigo' | 'area'>): string | undefined {
   if (routine?.templateCodigo) return routine.templateCodigo;
-  if (routine?.area === 'SDAI') return PREVENTIVA_SDAI_CONTRATO_CODIGO;
+  if (normArea(routine?.area) === 'SDAI') return PREVENTIVA_SDAI_CONTRATO_CODIGO;
   return undefined;
 }
 
@@ -41,9 +44,11 @@ export function resolveAttendanceTemplateCodigo(routine?: Pick<ContractRoutine, 
 export function resolveSdaiPreventiveRoutine<T extends Pick<ContractRoutine, 'area' | 'tipo' | 'ativo' | 'templateCodigo'>>(
   routines: T[]
 ): T | undefined {
+  // Gate por template_codigo resolvido (autoritativo) + tipo preventiva. NÃO
+  // exige r.area === 'SDAI' literal — a área (texto livre no legado) é normalizada
+  // dentro de resolveAttendanceTemplateCodigo, e o template_codigo persistido vence.
   return routines.find((r) =>
     r.ativo !== false &&
-    r.area === 'SDAI' &&
     (r.tipo || 'preventiva') === 'preventiva' &&
     resolveAttendanceTemplateCodigo(r) === PREVENTIVA_SDAI_CONTRATO_CODIGO
   );

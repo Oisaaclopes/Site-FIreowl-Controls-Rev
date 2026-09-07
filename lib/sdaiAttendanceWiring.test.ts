@@ -158,3 +158,20 @@ describe('gate do CTA preventivo SDAI (§2 hardening)', () => {
     expect(sdaiPreventiveApplies({ isSdai: true, contratoId: 'C', clienteId: null, routines })).toBe(false);
   });
 });
+
+describe('gate robusto — causa raiz do QA (área texto livre)', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rt = (p: any) => ({ area: 'SDAI', tipo: 'preventiva', ativo: true, ...p });
+  it('área com espaço/caixa ainda resolve (normalização)', () => {
+    expect(resolveAttendanceTemplateCodigo({ area: 'SDAI ' })).toBe(PREVENTIVA_SDAI_CONTRATO_CODIGO);
+    expect(resolveAttendanceTemplateCodigo({ area: ' sdai' })).toBe(PREVENTIVA_SDAI_CONTRATO_CODIGO);
+    expect(!!resolveSdaiPreventiveRoutine([rt({ area: 'SDAI ' })])).toBe(true);
+    expect(!!resolveSdaiPreventiveRoutine([rt({ area: 'sdai' })])).toBe(true);
+  });
+  it('template_codigo persistido casa mesmo com área vazia', () => {
+    expect(!!resolveSdaiPreventiveRoutine([rt({ area: '', templateCodigo: 'PREVENTIVA_SDAI_CONTRATO' })])).toBe(true);
+  });
+  it('preventiva SDAI com execução ausente ainda aplica (mostra Iniciar)', () => {
+    expect(sdaiPreventiveApplies({ isSdai: true, osTipo: 'preventiva', contratoId: 'C', clienteId: 'A', routines: [rt({ area: 'SDAI ' })] })).toBe(true);
+  });
+});

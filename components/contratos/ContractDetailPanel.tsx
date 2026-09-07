@@ -105,7 +105,7 @@ export const ContractDetailPanel: React.FC<{
     } catch (e) { setErro(e instanceof Error ? e.message : 'Falha ao iniciar atendimento.'); } finally { setBusy(false); }
   };
   const rotinaPreventivaSdai = (r: ContractRoutine) =>
-    r.area === 'SDAI' && (r.tipo || 'preventiva') === 'preventiva'
+    (r.tipo || 'preventiva') === 'preventiva'
     && resolveAttendanceTemplateCodigo(r) === PREVENTIVA_SDAI_CONTRATO_CODIGO;
   /** Execução da competência corrente da rotina (base do estado do botão). */
   const execAtual = (r: ContractRoutine): ContractRoutineExecution | undefined =>
@@ -116,7 +116,13 @@ export const ContractDetailPanel: React.FC<{
   const salvarRotina = async () => {
     setBusy(true); setErro(null);
     try {
-      await upsertContractRoutine({ id: '', contractId: contract.id, tipo: nova.tipo || 'preventiva', frequencia: nova.frequencia, diaRegra: nova.diaRegra, horarioInicio: nova.horarioInicio, horarioFim: nova.horarioFim, qtdTecnicos: nova.qtdTecnicos, visitasMes: nova.visitasMes, horasMensais: nova.horasMensais, sla: nova.sla, area: nova.area, descricao: nova.descricao, ativo: nova.ativo ?? true });
+      // Persiste template_codigo (§2): rotina preventiva SDAI → PREVENTIVA_SDAI_CONTRATO.
+      // Não depende do texto visual: resolve pelo (tipo + área normalizada).
+      const tipo = nova.tipo || 'preventiva';
+      const templateCodigo = tipo === 'preventiva'
+        ? resolveAttendanceTemplateCodigo({ area: nova.area, templateCodigo: nova.templateCodigo })
+        : nova.templateCodigo;
+      await upsertContractRoutine({ id: '', contractId: contract.id, tipo, frequencia: nova.frequencia, diaRegra: nova.diaRegra, horarioInicio: nova.horarioInicio, horarioFim: nova.horarioFim, qtdTecnicos: nova.qtdTecnicos, visitasMes: nova.visitasMes, horasMensais: nova.horasMensais, sla: nova.sla, area: nova.area, descricao: nova.descricao, ativo: nova.ativo ?? true, templateCodigo });
       setNova({ tipo: 'preventiva', frequencia: 'mensal', diaRegra: 'primeiro_dia_util', qtdTecnicos: 1, ativo: true });
       await load();
     } catch (err) { setErro(err instanceof Error ? err.message : 'Falha ao salvar rotina.'); } finally { setBusy(false); }
@@ -237,7 +243,7 @@ export const ContractDetailPanel: React.FC<{
                       <div><label className={lbl}>Técnicos</label><input type="number" min={1} value={nova.qtdTecnicos ?? 1} onChange={(e) => setNova((n) => ({ ...n, qtdTecnicos: Number(e.target.value) }))} className={inp} /></div>
                       <div><label className={lbl}>Visitas/mês</label><input type="number" min={0} value={nova.visitasMes ?? ''} onChange={(e) => setNova((n) => ({ ...n, visitasMes: e.target.value === '' ? undefined : Number(e.target.value) }))} className={inp} /></div>
                       <div><label className={lbl}>Horas/mês</label><input type="number" min={0} value={nova.horasMensais ?? ''} onChange={(e) => setNova((n) => ({ ...n, horasMensais: e.target.value === '' ? undefined : Number(e.target.value) }))} className={inp} /></div>
-                      <div><label className={lbl}>Área</label><input value={nova.area || ''} onChange={(e) => setNova((n) => ({ ...n, area: e.target.value }))} placeholder="SDAI…" className={inp} /></div>
+                      <div><label className={lbl}>Área</label><select value={nova.area || ''} onChange={(e) => setNova((n) => ({ ...n, area: e.target.value }))} className={inp}><option value="">Selecione…</option><option value="SDAI">SDAI</option><option value="CFTV">CFTV</option><option value="CONTROLE_ACESSO">Controle de Acesso</option><option value="BMS">Automação / BMS</option><option value="ALARME">Alarme</option></select></div>
                     </div>
                     <div className="mt-2"><label className={lbl}>SLA (texto)</label><input value={nova.sla || ''} onChange={(e) => setNova((n) => ({ ...n, sla: e.target.value }))} className={inp} placeholder="Ex.: Emergência em 4h" /></div>
                     <button disabled={busy} onClick={salvarRotina} className="mt-3 bg-navy-3 hover:bg-[#13315C] disabled:opacity-40 text-white text-xs font-bold uppercase rounded-lg px-4 py-2">Adicionar rotina</button>
