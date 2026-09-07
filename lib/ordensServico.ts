@@ -123,6 +123,16 @@ function osToRow(o: OrdemServico): Record<string, unknown> {
   return row;
 }
 
+/** Uma OS pela sua identidade (ordens_servico.id). Null quando não existe/sem
+ *  acesso RLS. Usado para enriquecer mensagens (ex.: atendimento ativo de outra OS). */
+export async function fetchOrdemServicoById(id: string): Promise<OrdemServico | null> {
+  if (!id) return null;
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase.from(TABLE).select('*').eq('id', id).maybeSingle();
+  if (error) throw error;
+  return data ? rowToOS(data) : null;
+}
+
 export async function fetchOrdensServico(filter?: {
   clienteId?: string;
   status?: OrdemServicoStatus | OrdemServicoStatus[];

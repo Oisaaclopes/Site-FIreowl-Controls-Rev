@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AttendanceResult, Client, OrdemServico, ServiceAttendance, TimePunch } from '@/lib/types';
 import {
   ActiveAttendanceExistsError,
+  activeAttendanceBlockMessage,
   fetchActiveAttendanceForTechnician,
   fetchServiceAttendances,
   finishServiceAttendance,
@@ -23,7 +24,7 @@ import {
   resultNeedsObservation,
   shouldWarnNoJourney,
 } from '@/lib/attendanceFlow';
-import { fetchOrdensServico, updateOrdemServicoStatus } from '@/lib/ordensServico';
+import { fetchOrdemServicoById, fetchOrdensServico, updateOrdemServicoStatus } from '@/lib/ordensServico';
 import { capturePosition } from '@/lib/fieldPhotoGeo';
 import { fetchOsMission, missionHasContent, missionIsSdai, OsMission } from '@/lib/osMission';
 import { AttendanceEvidence, EvidenceState } from '@/components/operacoes/AttendanceEvidence';
@@ -213,11 +214,21 @@ export const StartAttendanceButton: React.FC<{
       setScreen(started);
     } catch (e) {
       if (e instanceof ActiveAttendanceExistsError) {
-        // Não contorna o índice do banco (§34): oferece continuar o atual.
+        // Não contorna o índice do banco (§34): oferece continuar o atual, com
+        // contexto (OS, cliente, descrição) do atendimento em andamento.
         if (e.existing) {
+          const existingOs = e.existing.workOrderId === os.id
+            ? os
+            : await fetchOrdemServicoById(e.existing.workOrderId).catch(() => null);
+          const clienteNome = clients.find((c) => c.id === existingOs?.clienteId)?.name;
           const go = await confirm({
             title: 'Atendimento em andamento',
-            message: 'Você já possui um atendimento em andamento. Deseja continuá-lo?',
+            message: activeAttendanceBlockMessage({
+              isSelf: true,
+              osNumero: existingOs?.numero,
+              osTitulo: existingOs?.titulo,
+              clienteNome,
+            }),
             confirmLabel: 'Continuar atendimento',
           });
           if (go) setScreen(e.existing);

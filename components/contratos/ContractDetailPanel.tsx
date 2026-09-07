@@ -2,6 +2,8 @@
 import { requestConfirm, showToast } from '@/components/ui/Feedback';
 import { deleteContractIfUnused, setContractStatus } from '@/lib/contracts';
 import { startContractualAttendance, resolveResponsibleTechnician } from '@/lib/contractMaintenance';
+import { ActiveAttendanceExistsError, activeAttendanceBlockMessage } from '@/lib/serviceAttendances';
+import { fetchOrdemServicoById } from '@/lib/ordensServico';
 import { resolveAttendanceTemplateCodigo } from '@/lib/sdaiAttendanceWiring';
 import { PREVENTIVA_SDAI_CONTRATO_CODIGO } from '@/lib/sdaiMaintenance';
 import { fetchAssignableTechnicians, ManagedUser } from '@/lib/users';
@@ -102,7 +104,23 @@ export const ContractDetailPanel: React.FC<{
       const res = await startContractualAttendance({ routine: r, technicianId: effectiveTechnicianId });
       if (onOpenAttendance) onOpenAttendance({ attendance: res.attendance, workOrderId: res.workOrderId });
       else showToast(res.reused ? 'Atendimento em andamento — continue em Atendimentos.' : 'Atendimento iniciado — continue em Atendimentos.');
-    } catch (e) { setErro(e instanceof Error ? e.message : 'Falha ao iniciar atendimento.'); } finally { setBusy(false); }
+    } catch (e) {
+      // Exclusividade (§7/§34): NÃO contorna o índice único. A checagem vale para
+      // o técnico SELECIONADO (effectiveTechnicianId), nunca para o gestor que
+      // clica — mensagem com contexto + opção de CONTINUAR o atendimento ativo.
+      if (e instanceof ActiveAttendanceExistsError && e.existing) {
+        const isSelf = effectiveTechnicianId === technicianId;
+        const tecnicoNome = tecnicos.find((t) => t.id === effectiveTechnicianId)?.name;
+        const os = await fetchOrdemServicoById(e.existing.workOrderId).catch(() => null);
+        const msg = activeAttendanceBlockMessage({ isSelf, tecnicoNome, osNumero: os?.numero, osTitulo: os?.titulo });
+        setErro(msg);
+        if (onOpenAttendance && await requestConfirm(`${msg}\n\nAbrir o atendimento em andamento agora?`)) {
+          onOpenAttendance({ attendance: e.existing, workOrderId: e.existing.workOrderId });
+        }
+      } else {
+        setErro(e instanceof Error ? e.message : 'Falha ao iniciar atendimento.');
+      }
+    } finally { setBusy(false); }
   };
   const rotinaPreventivaSdai = (r: ContractRoutine) =>
     (r.tipo || 'preventiva') === 'preventiva'

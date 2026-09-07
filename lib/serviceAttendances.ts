@@ -90,6 +90,35 @@ export class ActiveAttendanceExistsError extends Error {
 }
 
 /**
+ * Mensagem de bloqueio de exclusividade (PURA/testável). A proteção NÃO é
+ * removida — apenas explicada com contexto. Distingue se o técnico ocupado é o
+ * próprio usuário ("Você") ou um técnico SELECIONADO por um gestor (nome dele),
+ * porque a exclusividade vale para o technician_id do NOVO atendimento, nunca
+ * para quem clica. Inclui OS, cliente e descrição do atendimento em andamento.
+ */
+export function activeAttendanceBlockMessage(input: {
+  isSelf: boolean;
+  tecnicoNome?: string;
+  osNumero?: string;
+  osTitulo?: string;
+  clienteNome?: string;
+}): string {
+  const sujeito = input.isSelf
+    ? 'Você já tem um atendimento em andamento'
+    : `${input.tecnicoNome?.trim() || 'O técnico selecionado'} já tem um atendimento em andamento`;
+  const ctx = [
+    input.osNumero?.trim(),
+    input.clienteNome?.trim(),
+    input.osTitulo?.trim(),
+  ].filter(Boolean).join(' · ');
+  const corpo = ctx ? `${sujeito}: ${ctx}.` : `${sujeito}.`;
+  const regra = input.isSelf
+    ? ' Conclua ou continue esse atendimento antes de iniciar outro.'
+    : ' Cada técnico só pode ter um atendimento ativo por vez.';
+  return corpo + regra;
+}
+
+/**
  * Inicia um atendimento de uma OS (GPS pontual opcional, sem rastreio contínuo).
  * IDEMPOTENTE em relação ao índice único da 0083: se o técnico já tiver um
  * atendimento EM_EXECUCAO, o banco rejeita (23505) e devolvemos o atendimento

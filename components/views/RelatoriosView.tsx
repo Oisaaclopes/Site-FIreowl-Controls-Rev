@@ -183,6 +183,16 @@ const TIPO_LABEL: Record<string, string> = {
   PREVENTIVA: 'Preventiva',
 };
 
+/* Rótulo do TIPO da OS (ordens_servico.tipo — corretiva/preventiva/instalacao/
+   outro). A OS gerada de rotina contratual preventiva herda tipo 'preventiva'
+   (generate_os_from_execution/0057); o card NÃO deve rotular tudo como Corretiva. */
+const OS_TIPO_LABEL: Record<string, string> = {
+  corretiva: 'Corretiva',
+  preventiva: 'Preventiva',
+  instalacao: 'Instalação',
+  outro: 'Serviço',
+};
+
 export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   clients,
   inventory,
@@ -1251,7 +1261,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         <div className="space-y-3">
           <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-xs text-indigo-900 flex items-center gap-2">
             <span className="material-symbols-outlined">engineering</span>
-            <span><strong>Atendimento de campo.</strong> Escolha uma OS para abrir a corretiva já vinculada, sem redigitar cliente ou contexto.</span>
+            <span><strong>Atendimento de campo.</strong> Escolha uma OS para abrir o atendimento já vinculado, sem redigitar cliente ou contexto.</span>
           </div>
           {ordens.filter((os) => ['aberta', 'agendada', 'em_execucao'].includes(os.status)).length === 0 ? (
             <EmptyState variant="relatorio" title="Nenhum atendimento aberto" description="As Ordens de Serviço abertas aparecerão aqui para início rápido." />
@@ -1264,7 +1274,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                     <div className="flex items-start gap-3">
                       {/* Interface operacional: logo real + NOME FANTASIA (§6/§11). */}
                       <ClientLogo src={clientLogoUrl(os.clienteId)} name={getClientOperationalName(cliente, 'Cliente')} sizeClass="w-11 h-11" rounded="rounded-xl" />
-                      <div className="min-w-0 flex-1"><p className="font-bold text-fg truncate">{cliente ? getClientOperationalName(cliente, 'Cliente') : 'Cliente não identificado'}</p><p className="text-[11px] text-fg-secondary mt-0.5">{os.numero || os.id.slice(0, 8)} · Corretiva · {os.status.replace('_', ' ')}</p><p className="text-xs text-fg-secondary mt-1 line-clamp-2">{os.titulo || `${os.pendenciaIds.length} pendência(s) vinculada(s)`}</p></div>
+                      <div className="min-w-0 flex-1"><p className="font-bold text-fg truncate">{cliente ? getClientOperationalName(cliente, 'Cliente') : 'Cliente não identificado'}</p><p className="text-[11px] text-fg-secondary mt-0.5">{os.numero || os.id.slice(0, 8)} · {OS_TIPO_LABEL[os.tipo] || 'Serviço'}{os.contratoId ? ' · Contratual' : ''} · {os.status.replace('_', ' ')}</p><p className="text-xs text-fg-secondary mt-1 line-clamp-2">{os.titulo || `${os.pendenciaIds.length} pendência(s) vinculada(s)`}</p></div>
                     </div>
                     <div className="flex items-center gap-2 text-[11px] border-t border-border pt-2">
                       <span className="material-symbols-outlined text-[16px] text-fg-muted">engineering</span>
