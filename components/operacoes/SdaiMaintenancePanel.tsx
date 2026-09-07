@@ -8,7 +8,7 @@ import type { CatalogSources } from '@/components/reports/FormEngine';
 import { fetchMaintenancePeriodPlan } from '@/lib/maintenancePlan';
 import { fetchReportsByAttendanceIds } from '@/lib/reports';
 import { pickAttendanceReport } from '@/lib/maintenanceReports';
-import { attendancePlanDevices, resolveAttendanceTemplateCodigo } from '@/lib/sdaiAttendanceWiring';
+import { attendancePlanDevices, resolveSdaiPreventiveRoutine } from '@/lib/sdaiAttendanceWiring';
 import { PREVENTIVA_SDAI_CONTRATO_CODIGO } from '@/lib/sdaiMaintenance';
 import { fetchContractRoutines } from '@/lib/contractRoutines';
 import { fetchDevices } from '@/lib/devices';
@@ -68,9 +68,14 @@ export const SdaiMaintenancePanel: React.FC<{
     (async () => {
       try {
         const { periodStart, periodEnd } = monthWindow();
+        // Gate endurecido (§2): a OS não pode ser corretiva/instalação e precisa
+        // existir rotina preventiva SDAI contratual (PREVENTIVA_SDAI_CONTRATO).
+        // Sem isso → NÃO mostra CTA (não classifica corretiva como preventiva).
+        if (os?.tipo && os.tipo !== 'preventiva') { if (alive) setStatus('na'); return; }
         const routines = await fetchContractRoutines(contratoId);
-        const routine = routines.find((r) => r.ativo !== false && (r.area === 'SDAI'));
-        const codigo = resolveAttendanceTemplateCodigo(routine) || PREVENTIVA_SDAI_CONTRATO_CODIGO;
+        const routine = resolveSdaiPreventiveRoutine(routines);
+        if (!routine) { if (alive) setStatus('na'); return; }
+        const codigo = PREVENTIVA_SDAI_CONTRATO_CODIGO;
 
         const dbTpl = await fetchTemplateByCodigo(codigo).catch(() => null);
         const template = (dbTpl?.schema as TemplateSchema | undefined)

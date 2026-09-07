@@ -33,6 +33,40 @@ export function resolveAttendanceTemplateCodigo(routine?: Pick<ContractRoutine, 
   return undefined;
 }
 
+/**
+ * Rotina preventiva SDAI contratual aplicável: ativa, área SDAI, tipo preventiva
+ * e que resolve para PREVENTIVA_SDAI_CONTRATO. NÃO casa corretiva/inspeção nem
+ * outro template (evita classificar corretiva como preventiva). PURO.
+ */
+export function resolveSdaiPreventiveRoutine<T extends Pick<ContractRoutine, 'area' | 'tipo' | 'ativo' | 'templateCodigo'>>(
+  routines: T[]
+): T | undefined {
+  return routines.find((r) =>
+    r.ativo !== false &&
+    r.area === 'SDAI' &&
+    (r.tipo || 'preventiva') === 'preventiva' &&
+    resolveAttendanceTemplateCodigo(r) === PREVENTIVA_SDAI_CONTRATO_CODIGO
+  );
+}
+
+/**
+ * O CTA de manutenção preventiva SDAI deve aparecer? Só quando: SDAI, com
+ * contrato/cliente, a OS NÃO é corretiva/instalação, e existe rotina preventiva
+ * contratual aplicável (§2). Um atendimento corretivo SDAI NÃO ativa o CTA só
+ * por ser SDAI. PURO/testável.
+ */
+export function sdaiPreventiveApplies(input: {
+  isSdai: boolean;
+  osTipo?: string;
+  contratoId?: string | null;
+  clienteId?: string | null;
+  routines: Array<Pick<ContractRoutine, 'area' | 'tipo' | 'ativo' | 'templateCodigo'>>;
+}): boolean {
+  if (!input.isSdai || !input.contratoId || !input.clienteId) return false;
+  if (input.osTipo && input.osTipo !== 'preventiva') return false; // corretiva/instalação/outro → não
+  return !!resolveSdaiPreventiveRoutine(input.routines);
+}
+
 /* --------------------------- Idempotência (§10/§16) ------------------------ */
 
 /**

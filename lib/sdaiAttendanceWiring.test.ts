@@ -9,6 +9,8 @@ import {
   finalizationGate,
   parseSdaiChecklistResults,
   resolveAttendanceTemplateCodigo,
+  resolveSdaiPreventiveRoutine,
+  sdaiPreventiveApplies,
   stableVerificationId,
 } from './sdaiAttendanceWiring';
 
@@ -118,5 +120,41 @@ describe('parseSdaiChecklistResults (cards do form → resultados)', () => {
     expect(out).toHaveLength(2);
     expect(out[0]).toMatchObject({ deviceId: 'd1', result: 'TESTADO_APROVADO' });
     expect(out[1]).toMatchObject({ deviceId: 'd2', result: 'TESTADO_FALHOU', notes: 'sem áudio', divergencia: true, renomear: true });
+  });
+});
+
+describe('gate do CTA preventivo SDAI (§2 hardening)', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rt = (p: any) => ({ area: 'SDAI', tipo: 'preventiva', ativo: true, ...p });
+
+  it('rotina preventiva SDAI com PREVENTIVA_SDAI_CONTRATO → aplica', () => {
+    const routines = [rt({ templateCodigo: 'PREVENTIVA_SDAI_CONTRATO' })];
+    expect(sdaiPreventiveApplies({ isSdai: true, osTipo: 'preventiva', contratoId: 'C', clienteId: 'A', routines })).toBe(true);
+  });
+  it('rotina preventiva SDAI sem templateCodigo (fallback de área) → aplica', () => {
+    const routines = [rt({})];
+    expect(sdaiPreventiveApplies({ isSdai: true, osTipo: 'preventiva', contratoId: 'C', clienteId: 'A', routines })).toBe(true);
+  });
+  it('OS corretiva → NÃO aplica (mesmo com contrato SDAI)', () => {
+    const routines = [rt({})];
+    expect(sdaiPreventiveApplies({ isSdai: true, osTipo: 'corretiva', contratoId: 'C', clienteId: 'A', routines })).toBe(false);
+  });
+  it('SDAI sem rotina preventiva → NÃO aplica', () => {
+    expect(sdaiPreventiveApplies({ isSdai: true, osTipo: 'preventiva', contratoId: 'C', clienteId: 'A', routines: [] })).toBe(false);
+  });
+  it('só rotina corretiva SDAI → NÃO aplica', () => {
+    const routines = [rt({ tipo: 'corretiva' })];
+    expect(resolveSdaiPreventiveRoutine(routines)).toBeUndefined();
+    expect(sdaiPreventiveApplies({ isSdai: true, osTipo: 'preventiva', contratoId: 'C', clienteId: 'A', routines })).toBe(false);
+  });
+  it('rotina com template legado PREVENTIVA_SDAI → NÃO casa (não é contratual)', () => {
+    const routines = [rt({ templateCodigo: 'PREVENTIVA_SDAI' })];
+    expect(sdaiPreventiveApplies({ isSdai: true, osTipo: 'preventiva', contratoId: 'C', clienteId: 'A', routines })).toBe(false);
+  });
+  it('não-SDAI ou sem contrato/cliente → NÃO aplica', () => {
+    const routines = [rt({ templateCodigo: 'PREVENTIVA_SDAI_CONTRATO' })];
+    expect(sdaiPreventiveApplies({ isSdai: false, contratoId: 'C', clienteId: 'A', routines })).toBe(false);
+    expect(sdaiPreventiveApplies({ isSdai: true, contratoId: null, clienteId: 'A', routines })).toBe(false);
+    expect(sdaiPreventiveApplies({ isSdai: true, contratoId: 'C', clienteId: null, routines })).toBe(false);
   });
 });

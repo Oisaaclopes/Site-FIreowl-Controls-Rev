@@ -181,6 +181,7 @@ function buildPendencias(
 import { TriagemFotos, UnclassifiedPhoto } from '@/components/reports/TriagemFotos';
 import { buildSurveyTemplate, surveyBlockSections, SurveyMode, SURVEY_BLOCKS_KEY, SURVEY_MODE_KEY } from '@/lib/surveyMode';
 import { PREVENTIVA_SDAI_CONTRATO_CODIGO } from '@/lib/sdaiMaintenance';
+import { reportDraftKey } from '@/lib/reportDraft';
 import { finalizeMaintenanceAttendance, parseSdaiChecklistResults, type SdaiChecklistCard } from '@/lib/sdaiAttendanceWiring';
 
 export const ReportForm: React.FC<ReportFormProps> = ({
@@ -205,8 +206,16 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   const roleForEngine = userRole.toLowerCase();
   const isTecnico = userRole === 'TECNICO';
 
-  // Chave do rascunho por CÓDIGO (independe da versão), cliente e contexto.
-  const rascunhoKey = `fireowl_atendimento_rascunho:${templateProp.codigo}:${cliente?.id || 'sem_cliente'}:${contexto?.osId || 'avulso'}`;
+  // Chave do rascunho por CÓDIGO + cliente + identidade do contexto. Quando o
+  // documento é executado dentro de um Atendimento, a identidade é o
+  // serviceAttendanceId (1 OS pode ter N atendimentos → rascunhos independentes);
+  // senão, fallback legado por OS/avulso.
+  const rascunhoKey = reportDraftKey({
+    codigo: templateProp.codigo,
+    clienteId: cliente?.id,
+    serviceAttendanceId: maintenance?.serviceAttendanceId,
+    osId: contexto?.osId,
+  });
 
   // CAMPO 2B — CONGELAMENTO no INÍCIO: se já existe rascunho com snapshot, o
   // atendimento continua PRESO àquela definição/versão (FASE 4/11); senão,
