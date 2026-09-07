@@ -25,6 +25,7 @@ import {
   shouldWarnNoJourney,
 } from '@/lib/attendanceFlow';
 import { fetchOrdemServicoById, fetchOrdensServico, updateOrdemServicoStatus } from '@/lib/ordensServico';
+import { fetchClientById } from '@/lib/clients';
 import { capturePosition } from '@/lib/fieldPhotoGeo';
 import { fetchOsMission, missionHasContent, missionIsSdai, OsMission } from '@/lib/osMission';
 import { AttendanceEvidence, EvidenceState } from '@/components/operacoes/AttendanceEvidence';
@@ -420,9 +421,20 @@ export const AttendanceScreen: React.FC<{
   technicianId?: string;
   technicianName?: string;
   onClose: () => void;
-}> = ({ attendance, os, clients, technicianId, technicianName = '', onClose }) => {
+}> = ({ attendance, os: osProp, clients, technicianId, technicianName = '', onClose }) => {
   const toast = useToast();
   const confirm = useConfirm();
+  // A tela é AUTOSSUFICIENTE (§1 do QA): resolve a OS e o cliente por conta
+  // própria quando o chamador não os fornece (ex.: card mobile sem `orders`).
+  // Nunca depende só da prop — antes o cabeçalho caía em "Cliente" + id truncado.
+  const [resolvedOs, setResolvedOs] = useState<OrdemServico | null>(null);
+  useEffect(() => {
+    if (osProp) { setResolvedOs(null); return; }
+    let alive = true;
+    fetchOrdemServicoById(attendance.workOrderId).then((o) => { if (alive) setResolvedOs(o); }).catch(() => {});
+    return () => { alive = false; };
+  }, [osProp, attendance.workOrderId]);
+  const os = osProp ?? resolvedOs ?? undefined;
   const [diagnosis, setDiagnosis] = useState(attendance.diagnosis || '');
   const [execution, setExecution] = useState(attendance.executionNotes || '');
   const [result, setResult] = useState<AttendanceResult | undefined>(attendance.result);
@@ -461,7 +473,24 @@ export const AttendanceScreen: React.FC<{
     hasCentralAfter: evidence.hasCentralAfter,
   });
 
-  const cliente = clientNameOf(clients, os?.clienteId);
+  // Cliente da OS: lista em memória → fallback por id → estado explícito. NUNCA
+  // mostra o UUID/id como nome (§1 do QA). Sem cliente resolvido = "Cliente não
+  // localizado", nunca o id truncado.
+  const [resolvedClient, setResolvedClient] = useState<Client | null>(null);
+  useEffect(() => {
+    const cid = os?.clienteId;
+    if (!cid) { setResolvedClient(null); return; }
+    if (clients.some((c) => c.id === cid)) { setResolvedClient(null); return; }
+    let alive = true;
+    fetchClientById(cid).then((c) => { if (alive) setResolvedClient(c); }).catch(() => {});
+    return () => { alive = false; };
+  }, [os?.clienteId, clients]);
+  const clienteObj = os?.clienteId
+    ? (clients.find((c) => c.id === os.clienteId) || (resolvedClient?.id === os.clienteId ? resolvedClient : undefined))
+    : undefined;
+  const cliente = clienteObj
+    ? getClientOperationalName(clienteObj, 'Cliente não localizado')
+    : (os?.clienteId ? 'Cliente não localizado' : 'Cliente');
 
   useEffect(() => {
     const t = window.setInterval(() => setTick((v) => v + 1), 60000);

@@ -92,6 +92,17 @@ export async function fetchClients(): Promise<Client[]> {
   return (data || []).map(rowToClient);
 }
 
+/** Um cliente pela identidade (clients.id, TEXT). Null quando não existe/sem
+ *  acesso RLS. Usado para resolver o NOME quando a lista em memória não o traz
+ *  (ex.: AttendanceScreen aberto sem o cliente da OS carregado). */
+export async function fetchClientById(id: string): Promise<Client | null> {
+  if (!id) return null;
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase.from(TABLE).select('*').eq('id', id).maybeSingle();
+  if (error) throw error;
+  return data ? rowToClient(data) : null;
+}
+
 export async function upsertClient(c: Client): Promise<Client> {
   const supabase = getSupabaseClient() as any;
   const { data, error } = await supabase.from(TABLE).upsert(clientToRow(c), { onConflict: 'id' }).select().single();
