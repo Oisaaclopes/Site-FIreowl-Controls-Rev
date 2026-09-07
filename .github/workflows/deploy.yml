@@ -70,5 +70,5 @@ jobs:
             set net:max-retries 2;
             set net:timeout 20;
             open -p 21 -u \"$FTP_USERNAME\",\"$FTP_PASSWORD\" \"$FTP_SERVER\";
-            mirror --reverse --only-newer --parallel=2 --verbose ./out/ /public_html/;
+            mirror --reverse --only-newer --no-perms --parallel=2 --verbose ./out/ /public_html/;
           "
