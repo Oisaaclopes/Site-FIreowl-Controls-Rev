@@ -50,19 +50,25 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_BUILD_SHA: ${{ github.sha }}
 
-      - name: Publicar via FTP no Hostinger
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          # Hostinger aceita FTPS (configuração dos deploys verdes anteriores).
-          protocol: ftps
-          port: 21
-          security: loose
-          # Sobe o conteúdo do build para a raiz do site.
-          local-dir: ./out/
-          # Se a sua conta de FTP já abre dentro do public_html, troque para: /
-          server-dir: /public_html/
-          # Só envia o que mudou (sync incremental); remove arquivos apagados.
-          dangerous-clean-slate: false
+      # A action anterior fazia upload para arquivos ocultos `.in.*` e depois
+      # RNFR/RNTO. O FTP da Hostinger passou a responder 550 nesse rename.
+      # lftp envia diretamente (xfer:use-temp-file=false), no mesmo destino.
+      - name: Instalar cliente FTPS
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+
+      - name: Publicar out/ via FTPS no Hostinger
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          lftp -c "
+            set ftp:ssl-force true;
+            set ftp:ssl-protect-data true;
+            set ssl:verify-certificate no;
+            set xfer:use-temp-file false;
+            set net:max-retries 2;
+            set net:timeout 20;
+            open -p 21 -u \"$FTP_USERNAME\",\"$FTP_PASSWORD\" \"$FTP_SERVER\";
+            mirror --reverse --only-newer --parallel=2 --verbose ./out/ /public_html/;
+          "
