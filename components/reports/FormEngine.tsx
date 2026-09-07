@@ -66,6 +66,32 @@ export interface CatalogSources {
   }[];
 }
 
+/* ROTA A — capacidade GENÉRICA e opcional: um campo pode ter suas opções/valor
+ * resolvidos pelo CONTEXTO atual (fora do FormEngine). O motor não sabe o que as
+ * opções significam — só as renderiza. O domínio (ex.: SDAI) mora nos callbacks. */
+export interface FieldResolution {
+  options?: { value: string; label: string }[];
+  autoValue?: string;   // aplicado quando o campo está vazio (determinístico)
+  readonly?: boolean;   // valor determinístico → somente leitura
+  emptyState?: string;  // sem opções na Base
+  manual?: boolean;     // com emptyState: permite entrada manual (texto)
+}
+export type ResolveFieldOptions = (args: {
+  field: FieldSchema;
+  repeaterKey?: string;
+  itemIndex?: number;
+  itemValues?: RepeaterCard;
+  formValues: FormValues;
+}) => FieldResolution | undefined;
+export type ResolveItemPatch = (args: {
+  field: FieldSchema;
+  newValue: unknown;
+  repeaterKey: string;
+  itemIndex: number;
+  itemValues: RepeaterCard;
+  formValues: FormValues;
+}) => Record<string, unknown> | undefined;
+
 interface FormEngineProps {
   template: TemplateSchema;
   values: FormValues;
@@ -74,6 +100,10 @@ interface FormEngineProps {
   role: string;
   /** Persistência do "Cadastrar novo…" dos comboboxes (ex.: marca -> brands). */
   onCreateCatalogo?: (origem: string, name: string) => void;
+  /** Rota A: resolve opções/valor de um campo pelo contexto (genérico). */
+  resolveFieldOptions?: ResolveFieldOptions;
+  /** Rota A: patch reativo ao mudar um campo de card (auto-preenche/reseta). */
+  resolveItemPatch?: ResolveItemPatch;
 }
 
 const inputCls =
@@ -132,13 +162,54 @@ const FieldControl: React.FC<{
   filtroValor?: string;
   /** disable_if verdadeiro: visível, porém não editável (não vira obrigatório). */
   disabled?: boolean;
-}> = ({ field, value, onValue: onValueRaw, catalog, onCreateCatalogo, filtroValor, disabled = false }) => {
+  /** Rota A: resolução de opções/valor pelo contexto (genérico). */
+  resolution?: FieldResolution;
+}> = ({ field, value, onValue: onValueRaw, catalog, onCreateCatalogo, filtroValor, disabled = false, resolution }) => {
   const [sigOpen, setSigOpen] = useState(false);
   const [markupId, setMarkupId] = useState<string | null>(null);
   const [, forceTick] = useState(0); // re-render após gravar markup (registro é mutável)
   // disable_if: campo visível porém não editável — bloqueia qualquer mutação.
   const onValue = disabled ? () => {} : onValueRaw;
   const negative = isNegativeAnswer(field, value as never);
+
+  // Rota A — auto-preenchimento determinístico: aplica autoValue quando vazio.
+  const autoValue = resolution?.autoValue;
+  React.useEffect(() => {
+    if (!autoValue || disabled) return;
+    const empty = value === undefined || value === null || value === '';
+    if (empty && value !== autoValue) onValueRaw(autoValue);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoValue]);
+
+  // Rota A — opções resolvidas pelo contexto substituem a lista genérica.
+  if (resolution?.options) {
+    const cur = (value as string) || '';
+    if (resolution.readonly || disabled) {
+      const lbl = resolution.options.find((o) => o.value === cur)?.label
+        || (resolution.options.length === 1 ? resolution.options[0].label : '—');
+      return <div className={`${inputCls} bg-surface-2/60`} aria-readonly>{lbl}</div>;
+    }
+    return (
+      <>
+        <select className={inputCls} value={cur} onChange={(e) => onValue(e.target.value)}>
+          <option value="">— selecione —</option>
+          {resolution.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </>
+    );
+  }
+  // Rota A — sem opções na Base: manual (texto) com aviso, ou apenas o aviso.
+  if (resolution?.emptyState) {
+    if (resolution.manual) {
+      return (
+        <>
+          <input type="text" className={inputCls} value={(value as string) || ''} onChange={(e) => onValue(e.target.value)} />
+          <p className="mt-1 text-[10px] text-amber-700">{resolution.emptyState}</p>
+        </>
+      );
+    }
+    return <div className="rounded-lg border border-amber-200 bg-amber-50/60 px-2.5 py-2 text-[11px] text-amber-800">{resolution.emptyState}</div>;
+  }
 
   const negHint = negative ? (
     <p className="mt-1 text-[10px] font-semibold text-danger flex items-center gap-1">
@@ -365,7 +436,10 @@ const Repeater: React.FC<{
   catalog: CatalogSources;
   role: string;
   onCreateCatalogo?: (origem: string, name: string) => void;
-}> = ({ field, cards, onCards, catalog, role, onCreateCatalogo }) => {
+  resolveFieldOptions?: ResolveFieldOptions;
+  resolveItemPatch?: ResolveItemPatch;
+  formValues: FormValues;
+}> = ({ field, cards, onCards, catalog, role, onCreateCatalogo, resolveFieldOptions, resolveItemPatch, formValues }) => {
   const schema = field.card_schema || [];
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerQuery, setPickerQuery] = useState('');
@@ -459,6 +533,14 @@ const Repeater: React.FC<{
           else delete next.service_id;
         }
       }
+      // Rota A — patch reativo do domínio (auto-preenche derivados + reset §7).
+      if (resolveItemPatch) {
+        const sf = schema.find((s) => s.key === key);
+        if (sf) {
+          const patch = resolveItemPatch({ field: sf, newValue: v, repeaterKey: field.key, itemIndex: idx, itemValues: c, formValues });
+          if (patch) Object.assign(next, patch);
+        }
+      }
       return next;
     }));
   };
@@ -534,6 +616,7 @@ const Repeater: React.FC<{
                       catalog={catalog}
                       onCreateCatalogo={onCreateCatalogo}
                       filtroValor={f.filtro_por ? String(card[f.filtro_por] ?? '') : undefined}
+                      resolution={resolveFieldOptions?.({ field: f, repeaterKey: field.key, itemIndex: idx, itemValues: card, formValues })}
                     />
                   )}
                 </div>
@@ -652,7 +735,9 @@ const Section: React.FC<{
   catalog: CatalogSources;
   role: string;
   onCreateCatalogo?: (origem: string, name: string) => void;
-}> = ({ section, values, onChange, catalog, role, onCreateCatalogo }) => {
+  resolveFieldOptions?: ResolveFieldOptions;
+  resolveItemPatch?: ResolveItemPatch;
+}> = ({ section, values, onChange, catalog, role, onCreateCatalogo, resolveFieldOptions, resolveItemPatch }) => {
   // Visibilidade da seção (pula_se legado + show_if/hide_if) — mesmo evaluator
   // usado pela validação, sem duplicar lógica.
   if (!isSectionVisible(section, values)) return null;
@@ -685,6 +770,9 @@ const Section: React.FC<{
                     catalog={catalog}
                     role={role}
                     onCreateCatalogo={onCreateCatalogo}
+                    resolveFieldOptions={resolveFieldOptions}
+                    resolveItemPatch={resolveItemPatch}
+                    formValues={values}
                   />
                 ) : (
                   <div className={disabled ? 'opacity-60 pointer-events-none' : ''}>
@@ -700,6 +788,7 @@ const Section: React.FC<{
                     catalog={catalog}
                     onCreateCatalogo={onCreateCatalogo}
                     filtroValor={field.filtro_por ? String(values[field.filtro_por] ?? '') : undefined}
+                    resolution={resolveFieldOptions?.({ field, formValues: values })}
                   />
                   </div>
                 )}
@@ -716,7 +805,7 @@ export const FormEngine: React.FC<FormEngineProps & {
   onOpenTriagem?: () => void;
   onFastPhotoCaptured?: (url: string) => void;
   hideFloatingCamera?: boolean;
-}> = ({ template, values, onChange, catalog, role, onCreateCatalogo, unclassifiedCount = 0, onOpenTriagem, onFastPhotoCaptured, hideFloatingCamera = false }) => {
+}> = ({ template, values, onChange, catalog, role, onCreateCatalogo, resolveFieldOptions, resolveItemPatch, unclassifiedCount = 0, onOpenTriagem, onFastPhotoCaptured, hideFloatingCamera = false }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleCameraClick = () => {
@@ -773,7 +862,7 @@ export const FormEngine: React.FC<FormEngineProps & {
       </div>
 
       {template.secoes.map((section) => (
-        <Section key={section.key} section={section} values={values} onChange={onChange} catalog={catalog} role={role} onCreateCatalogo={onCreateCatalogo} />
+        <Section key={section.key} section={section} values={values} onChange={onChange} catalog={catalog} role={role} onCreateCatalogo={onCreateCatalogo} resolveFieldOptions={resolveFieldOptions} resolveItemPatch={resolveItemPatch} />
       ))}
     </div>
   );

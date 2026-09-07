@@ -15,7 +15,8 @@ import {
   FinalizeIssue,
 } from '@/lib/reportSchema';
 import { isFieldVisible, isFieldRequired, isSectionVisible } from '@/lib/formConditions';
-import { FormEngine, CatalogSources } from '@/components/reports/FormEngine';
+import { FormEngine, CatalogSources, type ResolveFieldOptions, type ResolveItemPatch } from '@/components/reports/FormEngine';
+import { resolveSdaiFieldOptions, resolveSdaiItemPatch, seedLacoCards, SDAI_REPEATER_LACOS, type SdaiCentralContext } from '@/lib/sdaiChecklistResolver';
 import { isSupabaseConfigured } from '@/lib/inventory';
 import { getCapturedPhoto, getPhotoPreview, isPhotoId, registerPhoto, clearPhotoRegistry } from '@/lib/reportMedia';
 import { getSignature, isSignatureId, clearSignatureRegistry } from '@/lib/signatures';
@@ -47,6 +48,9 @@ interface ReportFormProps {
   attendanceTitle?: string;
   /** Inventário do cliente — semeia o checklist_dispositivos (Preventiva). */
   devices?: Device[];
+  /** Base Técnica COMPLETA do cliente (SDAI) — resolve laço/endereço/device/bateria
+   *  na cascata do checklist contratual. Diferente de `devices` (só planejados). */
+  baseTecnicaDevices?: Device[];
   /** Pendências aprovadas do cliente — semeiam o checklist_pendencias (Corretiva). */
   pendenciasAprovadas?: { id: string; descricao?: string; grupo?: string }[];
   /** Ciclo de amostragem vigente (Preventiva) — atualiza cobertura ao finalizar. */
@@ -407,6 +411,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   ciclo,
   maintenance,
   maintenanceContext,
+  baseTecnicaDevices,
   onCreateCatalogo,
   onBack,
   onSaved,
@@ -575,6 +580,37 @@ export const ReportForm: React.FC<ReportFormProps> = ({
     if (centrais.length !== 1) return;
     setValues((prev) => (prev.central_device_id ? prev : { ...prev, central_device_id: centrais[0].id }));
   }, [isSdaiContract, maintenanceContext]);
+
+  // Contexto da cascata SDAI (central selecionada + Base Técnica). O FormEngine
+  // recebe apenas resoluções genéricas; o domínio (laço/endereço/device/bateria)
+  // vive no adapter sdaiChecklistResolver.
+  const sdaiCtx = useMemo<SdaiCentralContext>(() => {
+    const devs = baseTecnicaDevices || [];
+    const centralId = typeof values.central_device_id === 'string' ? values.central_device_id : undefined;
+    return { central: devs.find((d) => d.id === centralId), devices: devs };
+  }, [baseTecnicaDevices, values.central_device_id]);
+
+  const resolveFieldOptions = useMemo<ResolveFieldOptions | undefined>(() => {
+    if (!isSdaiContract) return undefined;
+    return ({ field, repeaterKey, itemValues }) => resolveSdaiFieldOptions(sdaiCtx, repeaterKey, field.key, itemValues as Record<string, unknown> | undefined);
+  }, [isSdaiContract, sdaiCtx]);
+
+  const resolveItemPatch = useMemo<ResolveItemPatch | undefined>(() => {
+    if (!isSdaiContract) return undefined;
+    return ({ field, newValue, repeaterKey, itemValues }) => resolveSdaiItemPatch(sdaiCtx, repeaterKey, field.key, newValue, itemValues as Record<string, unknown> | undefined);
+  }, [isSdaiContract, sdaiCtx]);
+
+  // Semeia o repeater de laços (medição) com um card por laço REAL da central (§17).
+  useEffect(() => {
+    if (!isSdaiContract || !sdaiCtx.central) return;
+    const seeds = seedLacoCards(sdaiCtx);
+    if (seeds.length === 0) return;
+    setValues((prev) => {
+      const atual = prev[SDAI_REPEATER_LACOS];
+      if (Array.isArray(atual) && atual.length > 0) return prev; // já semeado/editado
+      return { ...prev, [SDAI_REPEATER_LACOS]: seeds };
+    });
+  }, [isSdaiContract, sdaiCtx]);
 
   // Chaves suprimidas do FormEngine por seção (apresentadas fora dele, read-only):
   // identificação (contrato/periodicidade/pendências) e central (seleção canônica).
@@ -1295,6 +1331,8 @@ export const ReportForm: React.FC<ReportFormProps> = ({
             catalog={catalog}
             role={roleForEngine}
             onCreateCatalogo={onCreateCatalogo}
+            resolveFieldOptions={resolveFieldOptions}
+            resolveItemPatch={resolveItemPatch}
             unclassifiedCount={unclassifiedPhotos.length}
             onOpenTriagem={() => setIsTriagemOpen(true)}
             onFastPhotoCaptured={handleFastPhotoCaptured}

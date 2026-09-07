@@ -40,6 +40,7 @@ interface ResolvedCtx {
   cliente?: Client;
   finalizedReport?: ReportInstance;
   identity: MaintenanceReportContext;
+  baseDevices: Device[];
 }
 
 const LOAD_TIMEOUT_MS = 20_000;
@@ -223,6 +224,7 @@ export const SdaiMaintenancePanel: React.FC<{
           cliente: clients.find((c) => c.id === clienteId),
           finalizedReport,
           identity,
+          baseDevices: devicesCliente,
         });
         setStatus('ready');
       } catch (e) {
@@ -319,6 +321,7 @@ export const SdaiMaintenancePanel: React.FC<{
         devices={ctx.planDevices}
         maintenance={{ serviceAttendanceId: attendance.id, plan: { programadosDeviceIds: ctx.plan.programadosDeviceIds } }}
         maintenanceContext={ctx.identity}
+        baseTecnicaDevices={ctx.baseDevices}
         onBack={() => setOpen(false)}
         onSaved={() => { setOpen(false); setReloadKey((k) => k + 1); onSaved?.(); }}
       />
