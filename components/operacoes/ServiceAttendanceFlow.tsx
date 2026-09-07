@@ -39,6 +39,7 @@ import { fetchOrdemServicoById, fetchOrdensServico, updateOrdemServicoStatus } f
 import { fetchClientById } from '@/lib/clients';
 import { capturePosition } from '@/lib/fieldPhotoGeo';
 import { fetchOsMission, missionHasContent, missionIsSdai, OsMission } from '@/lib/osMission';
+import { attendanceMayBeContractualSdai } from '@/lib/sdaiAttendanceWiring';
 import { AttendanceEvidence, EvidenceState } from '@/components/operacoes/AttendanceEvidence';
 import { resolveLogoDataUrls } from '@/lib/institucional';
 import { getClientOperationalName } from '@/lib/utils';
@@ -555,6 +556,11 @@ export const AttendanceScreen: React.FC<{
   }, [attendance.workOrderId]);
   const isSdai = missionIsSdai(mission);
   const missionArea = mission?.area?.[0];
+  // Habilita o motor de manutenção preventiva SDAI CONTRATUAL. A "missão" (área)
+  // vem do PEDIDO e é vazia em OS de contrato — por isso o gate contratual é por
+  // contrato_id + tipo (a confirmação autoritativa por rotina/template acontece
+  // dentro do SdaiMaintenancePanel, que some se não casar). §3/§4.
+  const sdaiMaintenanceEnabled = isSdai || attendanceMayBeContractualSdai({ contratoId: os?.contratoId, osTipo: os?.tipo });
 
   // Estado das evidências (reportado pela seção inline) p/ validar finalização.
   const [evidence, setEvidence] = useState<EvidenceState>({
@@ -730,7 +736,7 @@ export const AttendanceScreen: React.FC<{
           {/* Manutenção Preventiva SDAI (contratual) — entrada canônica. Self-gate
               adicional em contrato/cliente dentro do painel. Só SDAI. */}
           <SdaiMaintenancePanel
-            enabled={isSdai}
+            enabled={sdaiMaintenanceEnabled}
             attendance={attendance}
             os={os}
             clients={clients}

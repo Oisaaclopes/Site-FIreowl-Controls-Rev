@@ -72,6 +72,20 @@ export function sdaiPreventiveApplies(input: {
   return !!resolveSdaiPreventiveRoutine(input.routines);
 }
 
+/**
+ * Gate LEVE do AttendanceScreen para HABILITAR o SdaiMaintenancePanel (§3/§4): a
+ * OS precisa ter origem CONTRATUAL (contrato_id) e não ser corretiva/instalação.
+ * NÃO decide sozinho que é SDAI — a confirmação AUTORITATIVA (rotina preventiva
+ * SDAI + template PREVENTIVA_SDAI_CONTRATO) acontece dentro do painel, que faz
+ * setStatus('na') e some se não casar. Existe porque a área da "missão" vem do
+ * PEDIDO (get_os_mission), inexistente em OS de contrato — então a missão nunca
+ * marcaria SDAI para o fluxo contratual. Puro/testável.
+ */
+export function attendanceMayBeContractualSdai(input: { contratoId?: string | null; osTipo?: string }): boolean {
+  if (!input.contratoId) return false;
+  return !input.osTipo || input.osTipo === 'preventiva';
+}
+
 /* --------------------------- Idempotência (§10/§16) ------------------------ */
 
 /**

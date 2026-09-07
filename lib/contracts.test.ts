@@ -18,13 +18,21 @@ describe('friendlyContractRef', () => {
   });
 });
 
-describe('nextContractNumero', () => {
-  it('começa em 101 quando não há números', () => {
-    expect(nextContractNumero([])).toBe('CTR-FWL-101');
-    expect(nextContractNumero([{ numero: undefined }, { numero: '' }])).toBe('CTR-FWL-101');
+describe('nextContractNumero (padrão CTR-AAAA-NNN)', () => {
+  const y2026 = new Date('2026-06-15T00:00:00Z');
+  it('começa em 001 no ano quando não há números do ano', () => {
+    expect(nextContractNumero([], y2026)).toBe('CTR-2026-001');
+    expect(nextContractNumero([{ numero: undefined }, { numero: '' }], y2026)).toBe('CTR-2026-001');
   });
-
-  it('incrementa a partir do maior número existente no padrão', () => {
-    expect(nextContractNumero([{ numero: 'CTR-FWL-101' }, { numero: 'CTR-FWL-107' }, { numero: 'outro' }])).toBe('CTR-FWL-108');
+  it('incrementa a partir do maior número DO ANO', () => {
+    expect(nextContractNumero([{ numero: 'CTR-2026-001' }, { numero: 'CTR-2026-007' }], y2026)).toBe('CTR-2026-008');
+  });
+  it('ignora números legados CTR-FWL-* (padrão abandonado)', () => {
+    expect(nextContractNumero([{ numero: 'CTR-FWL-107' }, { numero: 'CTR-FWL-999' }], y2026)).toBe('CTR-2026-001');
+  });
+  it('sequência é por ano (não mistura anos)', () => {
+    const list = [{ numero: 'CTR-2025-050' }, { numero: 'CTR-2026-002' }];
+    expect(nextContractNumero(list, y2026)).toBe('CTR-2026-003');
+    expect(nextContractNumero(list, new Date('2025-06-15T12:00:00Z'))).toBe('CTR-2025-051');
   });
 });

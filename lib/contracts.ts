@@ -18,16 +18,20 @@ export function friendlyContractRef(c: Pick<Contract, 'id' | 'numero'>): string 
 }
 
 /**
- * Próximo número sequencial para um NOVO contrato no padrão CTR-FWL-NNN,
- * a partir do maior número já usado nesse padrão; começa em 101.
+ * Próximo número sequencial para um NOVO contrato no padrão CTR-AAAA-NNN
+ * (coerente com OS-AAAA-NNNN), por ANO, a partir do maior número do ano; começa
+ * em 001. Ignora números legados CTR-FWL-* (padrão abandonado) — sem migration/
+ * backfill: contratos antigos preservam o `numero` que já têm.
  */
-export function nextContractNumero(contracts: Pick<Contract, 'numero'>[]): string {
-  let max = 100;
+export function nextContractNumero(contracts: Pick<Contract, 'numero'>[], now: Date = new Date()): string {
+  const ano = now.getFullYear();
+  let max = 0;
+  const re = new RegExp(`^CTR-${ano}-(\\d+)$`, 'i');
   for (const c of contracts) {
-    const m = (c.numero || '').match(/CTR-FWL-(\d+)/i);
+    const m = (c.numero || '').trim().match(re);
     if (m) max = Math.max(max, Number(m[1]));
   }
-  return `CTR-FWL-${max + 1}`;
+  return `CTR-${ano}-${String(max + 1).padStart(3, '0')}`;
 }
 
 function rowToContract(r: any): Contract {

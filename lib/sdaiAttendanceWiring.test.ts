@@ -3,6 +3,7 @@ import type { Device, MaintenancePeriodPlan } from './types';
 import type { SdaiDeviceResult } from './sdaiMaintenance';
 import { PREVENTIVA_SDAI_CONTRATO_CODIGO } from './sdaiMaintenance';
 import {
+  attendanceMayBeContractualSdai,
   attendancePlanDevices,
   buildAttendanceVerification,
   coverageInProgress,
@@ -156,6 +157,21 @@ describe('gate do CTA preventivo SDAI (§2 hardening)', () => {
     expect(sdaiPreventiveApplies({ isSdai: false, contratoId: 'C', clienteId: 'A', routines })).toBe(false);
     expect(sdaiPreventiveApplies({ isSdai: true, contratoId: null, clienteId: 'A', routines })).toBe(false);
     expect(sdaiPreventiveApplies({ isSdai: true, contratoId: 'C', clienteId: null, routines })).toBe(false);
+  });
+});
+
+describe('attendanceMayBeContractualSdai — habilita painel em OS de contrato (§3/§4)', () => {
+  it('OS contratual preventiva → habilita (missão do pedido é vazia em OS de contrato)', () => {
+    expect(attendanceMayBeContractualSdai({ contratoId: 'C', osTipo: 'preventiva' })).toBe(true);
+    expect(attendanceMayBeContractualSdai({ contratoId: 'C' })).toBe(true); // tipo ausente ainda tenta
+  });
+  it('sem contrato → não habilita (não é atendimento contratual)', () => {
+    expect(attendanceMayBeContractualSdai({ contratoId: null, osTipo: 'preventiva' })).toBe(false);
+    expect(attendanceMayBeContractualSdai({ osTipo: 'preventiva' })).toBe(false);
+  });
+  it('OS corretiva/instalação contratual → não habilita (evita flash em não-preventiva)', () => {
+    expect(attendanceMayBeContractualSdai({ contratoId: 'C', osTipo: 'corretiva' })).toBe(false);
+    expect(attendanceMayBeContractualSdai({ contratoId: 'C', osTipo: 'instalacao' })).toBe(false);
   });
 });
 
