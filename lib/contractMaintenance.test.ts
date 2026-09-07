@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ServiceAttendance } from './types';
 import { contractDeletionDecision } from './contracts';
-import { pickReusableAttendance } from './contractMaintenance';
+import { pickReusableAttendance, resolveResponsibleTechnician } from './contractMaintenance';
 
 describe('contractDeletionDecision (hard-delete vs encerrar)', () => {
   it('contrato novo sem histórico → pode excluir', () => {
@@ -28,5 +28,19 @@ describe('pickReusableAttendance (idempotência do iniciar atendimento)', () => 
   it('sem EM_EXECUCAO da OS → undefined (cria novo)', () => {
     expect(pickReusableAttendance([att('a1', 'os1', 'FINALIZADO')], 'os1')).toBeUndefined();
     expect(pickReusableAttendance([], 'os1')).toBeUndefined();
+  });
+});
+
+describe('resolveResponsibleTechnician (§2/§3 — ADMIN não vira técnico)', () => {
+  it('TÉCNICO inicia o próprio', () => {
+    expect(resolveResponsibleTechnician({ userRole: 'TECNICO', currentUserId: 'u1' })).toBe('u1');
+  });
+  it('ADMIN/GESTOR usa o técnico SELECIONADO', () => {
+    expect(resolveResponsibleTechnician({ userRole: 'ADMINISTRATIVO', currentUserId: 'admin', selectedTechnicianId: 't9' })).toBe('t9');
+    expect(resolveResponsibleTechnician({ userRole: 'GESTOR', currentUserId: 'gestor', selectedTechnicianId: 't9' })).toBe('t9');
+  });
+  it('ADMIN/GESTOR SEM seleção → undefined (nunca o próprio admin)', () => {
+    expect(resolveResponsibleTechnician({ userRole: 'ADMINISTRATIVO', currentUserId: 'admin' })).toBeUndefined();
+    expect(resolveResponsibleTechnician({ userRole: 'GESTOR', currentUserId: 'gestor' })).toBeUndefined();
   });
 });

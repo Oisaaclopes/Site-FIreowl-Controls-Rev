@@ -25,6 +25,20 @@ export function pickReusableAttendance(attendances: ServiceAttendance[], workOrd
   return attendances.find((a) => a.workOrderId === workOrderId && a.status === 'EM_EXECUCAO');
 }
 
+/**
+ * Técnico responsável do atendimento (§2/§3): TÉCNICO inicia o PRÓPRIO; ADMIN/
+ * GESTOR precisa SELECIONAR — NUNCA vira técnico automaticamente. Sem seleção →
+ * undefined (a UI exige "Selecione o técnico responsável"). PURO/testável.
+ */
+export function resolveResponsibleTechnician(input: {
+  userRole?: string;
+  currentUserId?: string;
+  selectedTechnicianId?: string;
+}): string | undefined {
+  if (input.userRole === 'TECNICO') return input.currentUserId || undefined;
+  return input.selectedTechnicianId || undefined;
+}
+
 export interface StartContractualAttendanceResult {
   attendance: ServiceAttendance;
   workOrderId: string;

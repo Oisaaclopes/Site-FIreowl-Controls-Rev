@@ -1,9 +1,10 @@
 'use client';
 import { requestConfirm, showToast } from '@/components/ui/Feedback';
 import { deleteContractIfUnused, setContractStatus } from '@/lib/contracts';
-import { startContractualAttendance } from '@/lib/contractMaintenance';
+import { startContractualAttendance, resolveResponsibleTechnician } from '@/lib/contractMaintenance';
 import { resolveAttendanceTemplateCodigo } from '@/lib/sdaiAttendanceWiring';
 import { PREVENTIVA_SDAI_CONTRATO_CODIGO } from '@/lib/sdaiMaintenance';
+import { fetchAssignableTechnicians, ManagedUser } from '@/lib/users';
 
 import React, { useEffect, useState } from 'react';
 import { Contract, ContractRoutine, ContractRoutineExecution, ContractHourEntry, ContractAttachment, ContractExecutionStatus, ServiceAttendance, UserRole } from '@/lib/types';
@@ -63,6 +64,18 @@ export const ContractDetailPanel: React.FC<{
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [contract.id]);
 
+  // Técnico responsável (§2/§3): ADMIN/GESTOR escolhe do diretório; TÉCNICO
+  // inicia o próprio. NUNCA usar ADMIN/GESTOR como técnico automaticamente.
+  const [tecnicos, setTecnicos] = useState<ManagedUser[]>([]);
+  const [selectedTecnicoId, setSelectedTecnicoId] = useState('');
+  const isTecnico = userRole === 'TECNICO';
+  useEffect(() => {
+    if (!online || isTecnico) return;
+    fetchAssignableTechnicians().then(setTecnicos).catch(() => {});
+  }, [online, isTecnico]);
+  // Técnico efetivo (regra pura): TÉCNICO → ele mesmo; ADMIN/GESTOR → o selecionado.
+  const effectiveTechnicianId = resolveResponsibleTechnician({ userRole, currentUserId: technicianId, selectedTechnicianId: selectedTecnicoId });
+
   // Excluir (só sem histórico) ou encerrar (preserva histórico). RBAC ADMIN/GESTOR.
   const excluirContrato = async () => {
     if (!canManageOps || busy) return;
@@ -81,10 +94,10 @@ export const ContractDetailPanel: React.FC<{
   // Manutenção contratual: cria/reutiliza execução+OS+atendimento (idempotente),
   // SEM OS manual. A OS é gerada automaticamente a partir da execução da rotina.
   const iniciarAtendimento = async (r: ContractRoutine) => {
-    if (!technicianId) { setErro('Sem técnico definido para iniciar o atendimento.'); return; }
+    if (!effectiveTechnicianId) { setErro('Selecione o técnico responsável para iniciar o atendimento.'); return; }
     setBusy(true); setErro(null);
     try {
-      const res = await startContractualAttendance({ routine: r, technicianId });
+      const res = await startContractualAttendance({ routine: r, technicianId: effectiveTechnicianId });
       if (onOpenAttendance) onOpenAttendance({ attendance: res.attendance, workOrderId: res.workOrderId });
       else showToast(res.reused ? 'Atendimento em andamento — continue em Atendimentos.' : 'Atendimento iniciado — continue em Atendimentos.');
     } catch (e) { setErro(e instanceof Error ? e.message : 'Falha ao iniciar atendimento.'); } finally { setBusy(false); }
@@ -222,6 +235,16 @@ export const ContractDetailPanel: React.FC<{
                     <button disabled={busy} onClick={salvarRotina} className="mt-3 bg-navy-3 hover:bg-[#13315C] disabled:opacity-40 text-white text-xs font-bold uppercase rounded-lg px-4 py-2">Adicionar rotina</button>
                   </div>
 
+                  {!isTecnico && routines.some(rotinaPreventivaSdai) && (
+                    <div className="rounded-xl border border-border p-3 bg-surface-2 flex items-center gap-2 flex-wrap">
+                      <span className="text-[11px] font-bold uppercase text-primary">Técnico responsável</span>
+                      <select value={selectedTecnicoId} onChange={(e) => setSelectedTecnicoId(e.target.value)} className={`${inp} max-w-xs`}>
+                        <option value="">Selecione o técnico…</option>
+                        {tecnicos.map((t) => <option key={t.id} value={t.id}>{t.fullName || t.name}</option>)}
+                      </select>
+                      <span className="text-[10px] text-fg-muted">Necessário para iniciar o atendimento (o admin/gestor que inicia não vira técnico).</span>
+                    </div>
+                  )}
                   {routines.length === 0 ? (
                     <p className="text-center text-xs text-fg-muted py-6">Nenhuma rotina cadastrada.</p>
                   ) : routines.map((r) => {
@@ -240,7 +263,7 @@ export const ContractDetailPanel: React.FC<{
                                 return <span className="text-[10px] font-bold uppercase text-emerald-700 inline-flex items-center gap-1"><span className="material-symbols-outlined text-sm">task_alt</span>Concluído no período</span>;
                               }
                               const label = ex && ex.status === 'os_gerada' ? 'Continuar atendimento' : 'Iniciar atendimento';
-                              return <button disabled={busy || !technicianId} onClick={() => iniciarAtendimento(r)} title={!technicianId ? 'Sem técnico para iniciar' : undefined} className="text-[10px] font-bold uppercase text-white bg-navy-3 hover:bg-[#13315C] disabled:opacity-40 rounded-lg px-2.5 py-1.5 inline-flex items-center gap-1"><span className="material-symbols-outlined text-sm">play_arrow</span>{label}</button>;
+                              return <button disabled={busy || !effectiveTechnicianId} onClick={() => iniciarAtendimento(r)} title={!effectiveTechnicianId ? 'Selecione o técnico responsável' : undefined} className="text-[10px] font-bold uppercase text-white bg-navy-3 hover:bg-[#13315C] disabled:opacity-40 rounded-lg px-2.5 py-1.5 inline-flex items-center gap-1"><span className="material-symbols-outlined text-sm">play_arrow</span>{label}</button>;
                             })()}
                             <button disabled={busy} onClick={() => gerarProxima(r)} className="text-[10px] font-bold uppercase text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 rounded-lg px-2.5 py-1.5 inline-flex items-center gap-1"><span className="material-symbols-outlined text-sm">event_available</span>Programar próxima</button>
                             <button onClick={() => removerRotina(r.id)} className="text-fg-muted hover:text-danger p-1"><span className="material-symbols-outlined text-base">delete</span></button>
