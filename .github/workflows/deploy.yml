@@ -68,7 +68,7 @@ jobs:
           : > /tmp/fireowl-upload.lftp
           find ./out -type d | sort | while IFS= read -r dir; do
             rel="${dir#./out}"
-            [ -z "$rel" ] || printf 'mkdir -pf "/public_html%s";\n' "$rel" >> /tmp/fireowl-upload.lftp
+            [ -z "$rel" ] || printf 'mkdir -p -f "/public_html%s";\n' "$rel" >> /tmp/fireowl-upload.lftp
           done
           find ./out -type f | sort | while IFS= read -r file; do
             rel="${file#./out/}"
