@@ -65,6 +65,8 @@ export interface ReportBundle {
     clienteNome?: string;
     osId?: string;
     contratoId?: string;
+    /** Atendimento que originou o documento (manutenção contratual, 0106). */
+    serviceAttendanceId?: string;
     tecnicoNome?: string;
     titulo?: string;
     geoInicio?: GeoPoint | null;
@@ -158,6 +160,7 @@ export async function persistReportBundle(b: ReportBundle): Promise<{ reportId?:
       clienteId: b.report.clienteId,
       osId: b.report.osId,
       contratoId: b.report.contratoId,
+      serviceAttendanceId: b.report.serviceAttendanceId,
       tecnicoNome: b.report.tecnicoNome,
       titulo: b.report.titulo,
       status: 'rascunho',

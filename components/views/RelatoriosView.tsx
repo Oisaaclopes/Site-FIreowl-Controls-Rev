@@ -22,6 +22,7 @@ import {
 import { ALL_TEMPLATES, seedReportTemplates } from '@/lib/reportTemplatesData';
 import { TemplateSchema } from '@/lib/reportSchema';
 import { CatalogSources } from '@/components/reports/FormEngine';
+import { buildBaseReportCatalog } from '@/lib/reportCatalog';
 import { ReportForm } from '@/components/reports/ReportForm';
 import { isSupabaseConfigured } from '@/lib/inventory';
 import { fetchReports, updateReport, safelyDeleteReport } from '@/lib/reports';
@@ -40,7 +41,7 @@ import { fetchCicloAtivo, quotaPorVisita } from '@/lib/ciclos';
 import { cancelReportBundle, flushOutbox, pendingCount, isOnline, purgeDeletedLegacyReportBundles } from '@/lib/offline/reportSync';
 import { removeReportPhoto } from '@/lib/reportMedia';
 import { EmptyState } from '@/components/EmptyState';
-import { GRUPOS_FALHA, falhasPorArea, AreaFalha } from '@/lib/catalogoFalhas';
+import { falhasPorArea, AreaFalha } from '@/lib/catalogoFalhas';
 import { fetchTemplates } from '@/lib/reportTemplates';
 import { gerarPdfExecucao } from '@/lib/reportPdf';
 import { ReportTechnicalPDFView } from '@/components/documentos/ReportTechnicalPDFView';
@@ -646,45 +647,10 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Montagem base extraída para lib/reportCatalog (compartilhada com o
+  // AttendanceScreen). Saída idêntica à anterior — nenhuma mudança de wizard.
   const catalog: CatalogSources = useMemo(
-    () => ({
-      categorias: uniq([...GRUPOS_FALHA, ...inventory.map((i) => i.category), ...services.map((s) => s.category)]),
-      itens: uniq([...inventory.map((i) => i.name), ...services.map((s) => s.title)]),
-      itensDetalhados: [
-        ...inventory.map((i) => ({ id: i.id, label: i.name, tipo: 'material' as const, marca: i.brand, modelo: i.model, unidade: i.unit })),
-        ...services.map((s) => ({ id: s.id, label: s.title, tipo: 'servico' as const, unidade: 'vb' })),
-      ],
-      marcas: uniqCI([...brands.map((b) => b.name), ...inventory.map((i) => i.brand || '')]),
-      // Modelo do produto; quando o item não tem "modelo" preenchido (ex.: os
-      // catálogos importados de Intelbras/Tecnohold), cai para o NOME — assim a
-      // central/detector aparece no campo "modelo" mesmo sem coluna de modelo.
-      modelos: uniqCI(inventory.map((i) => (i.model || i.name || '').trim())),
-      // Agrupa modelos por marca (do estoque) para filtrar o campo modelo.
-      modelosPorMarca: inventory.reduce<Record<string, string[]>>((acc, i) => {
-        const marca = (i.brand || '').trim();
-        const modelo = (i.model || '').trim() || (i.name || '').trim();
-        if (!marca || !modelo) return acc;
-        if (!acc[marca]) acc[marca] = [];
-        if (!acc[marca].includes(modelo)) acc[marca].push(modelo);
-        return acc;
-      }, {}),
-      modelosPorGrupo: {
-        centrais_sdai: uniqCI(inventory.filter((i) => i.category === 'SDAI' && /central|painel/i.test(`${i.subcategory || ''} ${i.name}`)).map((i) => i.model || i.name)),
-        gravadores_cftv: uniqCI(inventory.filter((i) => i.category === 'CFTV' && /gravador|nvr|dvr|nvd|mhdx|invd/i.test(`${i.subcategory || ''} ${i.name} ${i.model || ''}`)).map((i) => i.model || i.name)),
-        controladoras_acesso: uniqCI(inventory.filter((i) => /controle de acesso/i.test(i.category) && /controladora|painel/i.test(`${i.subcategory || ''} ${i.name}`)).map((i) => i.model || i.name)),
-        controladores_bms: uniqCI(inventory.filter((i) => i.category === 'BMS' && /controlador|clp|servidor/i.test(`${i.subcategory || ''} ${i.name}`)).map((i) => i.model || i.name)),
-        centrais_alarme: uniqCI(inventory.filter((i) => i.category === 'ALARME' && /central/i.test(`${i.subcategory || ''} ${i.name}`)).map((i) => i.model || i.name)),
-      },
-      detalhesModelo: inventory.reduce<Record<string, { marca?: string; linha?: string; resumo?: string; tecnologias?: string[]; indicacao?: string }>>((acc, item) => {
-        const model = (item.model || item.name || '').trim();
-        if (model && !acc[model]) acc[model] = { marca: item.brand, linha: item.productLine, resumo: item.shortDescription || item.technicalDescription, tecnologias: item.technologies, indicacao: item.recommendedUse };
-        return acc;
-      }, {}),
-      devices: [],
-      contratos: contracts.map((c) => ({ id: c.id, label: `${c.contractType || c.unit} (${c.id})` })),
-      pendenciasAprovadas: [],
-      pendenciasAbertas: [],
-    }),
+    () => buildBaseReportCatalog({ inventory, services, brands, contracts }),
     [inventory, services, brands, contracts]
   );
 

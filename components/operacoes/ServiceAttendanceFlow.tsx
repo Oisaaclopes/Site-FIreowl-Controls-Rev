@@ -36,6 +36,7 @@ import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 import { useConfirm, useToast } from '@/components/ui/Feedback';
 import { ClientLogo } from '@/components/ClientLogo';
 import { SignatureCanvas } from '@/components/reports/SignatureCanvas';
+import { SdaiMaintenancePanel } from '@/components/operacoes/SdaiMaintenancePanel';
 import { OsDocumentsView, OsDocKind } from '@/components/documentos/OsDocumentsView';
 import { BaseUpdateStep } from '@/components/operacoes/BaseUpdateStep';
 import type { TechArea } from '@/lib/technicalBase';
@@ -566,6 +567,15 @@ export const AttendanceScreen: React.FC<{
         <div className="overflow-y-auto p-4 sm:p-5 flex flex-col gap-4">
           {/* SERVIÇO / MISSÃO DA OS (§14–§22) — o que veio fazer, sem preços */}
           <OsMissionPanel osId={attendance.workOrderId} osDescricao={os?.descricao} />
+          {/* Manutenção Preventiva SDAI (contratual) — entrada canônica. Self-gate
+              adicional em contrato/cliente dentro do painel. Só SDAI. */}
+          <SdaiMaintenancePanel
+            enabled={isSdai}
+            attendance={attendance}
+            os={os}
+            clients={clients}
+            technicianName={technicianName}
+          />
 
           {/* DIAGNÓSTICO (§10) */}
           <label className="block">

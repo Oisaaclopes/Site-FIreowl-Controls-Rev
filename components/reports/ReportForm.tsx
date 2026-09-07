@@ -703,6 +703,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         clienteNome: cliente?.name,
         osId: contexto?.osId,
         contratoId: contexto?.contratoId,
+        serviceAttendanceId: maintenance?.serviceAttendanceId,
         tecnicoNome: currentUserName || undefined,
         titulo: `${template.nome} — ${cliente?.name || ''}`.trim(),
         geoInicio: geoInicio || undefined,
