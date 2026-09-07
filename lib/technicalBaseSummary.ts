@@ -1,5 +1,5 @@
 import type { Device } from './types';
-import { TechArea, legacyGroupLabel, assetIdentityKey, assetDisplayIdentifier, CONDITION_LABEL, SOURCE_LABEL, AssetCondition, AssetSource } from './technicalBase';
+import { TechArea, legacyGroupLabel, groupsForArea, assetIdentityKey, assetDisplayIdentifier, CONDITION_LABEL, SOURCE_LABEL, AssetCondition, AssetSource } from './technicalBase';
 
 /* ===================================================================
  * RESUMO DA BASE TÉCNICA — helpers PUROS e testáveis (§31).
@@ -22,10 +22,113 @@ export const CENTRAL_GROUPS: Record<TechArea, string[]> = {
   CONTROLE_ACESSO: ['Controladora'],
 };
 
-/** Rótulo de grupo canônico do device (normaliza legado; fallback seguro). */
+/** Rótulo de grupo canônico do device (normaliza legado; fallback seguro).
+ *  Autoritativo: quando `grupo` (canônico) existe, o legado tipoAtivo/tipoDispositivo
+ *  NÃO é apresentado junto — evita o falso "concatenado" (grupo · tipo legado). */
 export function displayGroup(area: TechArea, d: Device): string {
-  const g = legacyGroupLabel(area, d.grupo);
+  const g = legacyGroupLabel(area, dedupeMidDot(area, d.grupo));
   return (g || d.tipoAtivo || d.tipoDispositivo || 'Outros').trim() || 'Outros';
+}
+
+/* ---------------- Normalização de classificação (bulk edit fix) ------------ */
+
+/** Chave de comparação: sem acento, minúsculo, espaços colapsados. */
+function normKey(s?: string): string {
+  return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+/**
+ * Desfaz um valor "X · X" (duplicação por edição/merge) num único valor. Prefere
+ * a parte que é um grupo canônico válido da área; senão a primeira parte.
+ * NÃO adivinha entre grafias diferentes (§4) — só colapsa duplicatas equivalentes.
+ */
+export function dedupeMidDot(area: TechArea, v?: string): string {
+  const raw = (v || '').trim();
+  if (!raw.includes('·')) return raw;
+  const parts = raw.split('·').map((p) => p.trim()).filter(Boolean);
+  const canon = parts.map((p) => legacyGroupLabel(area, p) || p);
+  const uniqByKey = new Map<string, string>();
+  for (const c of canon) if (!uniqByKey.has(normKey(c))) uniqByKey.set(normKey(c), c);
+  const uniq = Array.from(uniqByKey.values());
+  if (uniq.length === 1) return uniq[0];
+  const valido = uniq.find((u) => groupsForArea(area).includes(u));
+  return valido || uniq[0] || raw;
+}
+
+export interface ClassificationPatch {
+  changed: boolean;
+  /** Campos a atualizar. tipoAtivo/tipoDispositivo === undefined = limpar (redundante). */
+  patch: { grupo?: string; tipoAtivo?: string; tipoDispositivo?: string };
+  /** Legado difere do grupo canônico e NÃO há regra de alias — decisão manual (§4). */
+  needsReview: boolean;
+}
+
+/**
+ * Normaliza a CLASSIFICAÇÃO de um device (SUBSTITUI, nunca concatena §2/§8):
+ *  - `grupo` → canônico (legacyGroupLabel + desfaz "X · X");
+ *  - limpa tipoAtivo/tipoDispositivo REDUNDANTES com o grupo (iguais ou alias
+ *    legado do mesmo grupo canônico) — foi o que "duplicava" na tela;
+ *  - se o legado difere do grupo e não é alias conhecido, NÃO apaga: marca
+ *    needsReview (sem adivinhar grafia, §4).
+ * PURO. Não toca id/central/laço/endereço/fabricante/modelo/origem/histórico.
+ */
+export function normalizeClassificationPatch(
+  area: TechArea,
+  d: Pick<Device, 'grupo' | 'tipoAtivo' | 'tipoDispositivo'>
+): ClassificationPatch {
+  const patch: ClassificationPatch['patch'] = {};
+  let changed = false;
+  let needsReview = false;
+
+  const grupoRaw = (d.grupo || '').trim();
+  const grupoDedup = dedupeMidDot(area, grupoRaw);
+  const canonicalGrupo = grupoDedup ? (legacyGroupLabel(area, grupoDedup) || grupoDedup) : '';
+  if (canonicalGrupo && canonicalGrupo !== grupoRaw) { patch.grupo = canonicalGrupo; changed = true; }
+
+  const grupoRef = canonicalGrupo || grupoRaw;
+  const grupoIsCanonical = !!grupoRef && groupsForArea(area).includes(grupoRef);
+
+  for (const key of ['tipoAtivo', 'tipoDispositivo'] as const) {
+    const val = (d[key] || '').trim();
+    if (!val || !grupoRef) continue;
+    const aliasDoGrupo = legacyGroupLabel(area, val) === grupoRef;
+    const redundante = normKey(val) === normKey(grupoRef) || (!!legacyGroupLabel(area, val) && aliasDoGrupo);
+    if (redundante) { patch[key] = undefined; changed = true; continue; }
+    if (grupoIsCanonical) needsReview = true; // legado divergente → revisão manual
+  }
+  return { changed, patch, needsReview };
+}
+
+export interface ClassificationCleanupItem {
+  id: string;
+  before: { grupo?: string; tipoAtivo?: string; tipoDispositivo?: string };
+  after: { grupo?: string; tipoAtivo?: string; tipoDispositivo?: string };
+  needsReview: boolean;
+}
+
+/**
+ * Plano de LIMPEZA (dry-run §9): lista os devices da área cuja classificação
+ * seria alterada (duplicata/alias) ou precisa de revisão manual. NÃO escreve —
+ * só descreve o impacto (antes/depois) para aprovação explícita.
+ */
+export function planClassificationCleanup(area: TechArea, devices: Device[]): ClassificationCleanupItem[] {
+  const out: ClassificationCleanupItem[] = [];
+  for (const d of devices || []) {
+    if (d.sistema !== area) continue;
+    const { changed, patch, needsReview } = normalizeClassificationPatch(area, d);
+    if (!changed && !needsReview) continue;
+    out.push({
+      id: d.id,
+      before: { grupo: d.grupo, tipoAtivo: d.tipoAtivo, tipoDispositivo: d.tipoDispositivo },
+      after: {
+        grupo: patch.grupo ?? d.grupo,
+        tipoAtivo: 'tipoAtivo' in patch ? patch.tipoAtivo : d.tipoAtivo,
+        tipoDispositivo: 'tipoDispositivo' in patch ? patch.tipoDispositivo : d.tipoDispositivo,
+      },
+      needsReview,
+    });
+  }
+  return out;
 }
 
 export interface AssetCardView {

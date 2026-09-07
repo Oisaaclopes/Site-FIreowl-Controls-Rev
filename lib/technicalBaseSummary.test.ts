@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   activeDevices, summarizeGroups, summarizeCentrals, sortDevicesForArea,
   duplicateGroups, centralAddressAnomalies, filterDevices, importReview, displayGroup, assetCardView,
-  importInconsistencyDevices,
+  importInconsistencyDevices, normalizeClassificationPatch, planClassificationCleanup, dedupeMidDot,
 } from './technicalBaseSummary';
 import type { Device } from './types';
 
@@ -11,6 +11,60 @@ import type { Device } from './types';
 const dev = (o: Partial<Device>): Device => ({
   id: Math.random().toString(36).slice(2), clienteId: 'c1', sistema: 'SDAI', status: 'ativo', ...o,
 } as Device);
+
+describe('normalização de classificação — bulk edit é REPLACE, não concatena (§2/§8)', () => {
+  it('limpa tipoAtivo/tipoDispositivo REDUNDANTE (duplicata exata) com o grupo', () => {
+    const r = normalizeClassificationPatch('SDAI', { grupo: 'Acionador Manual', tipoAtivo: 'Acionador Manual', tipoDispositivo: 'Acionador Manual' });
+    expect(r.changed).toBe(true);
+    expect(r.patch.tipoAtivo).toBeUndefined();
+    expect(r.patch.tipoDispositivo).toBeUndefined();
+    expect(r.needsReview).toBe(false);
+  });
+  it('canoniza grupo legado (Central → Central SDAI) e limpa legado alias', () => {
+    const r = normalizeClassificationPatch('SDAI', { grupo: 'Central', tipoDispositivo: 'Central' });
+    expect(r.patch.grupo).toBe('Central SDAI');
+    expect(r.patch.tipoDispositivo).toBeUndefined();
+  });
+  it('grafia divergente (typo) NÃO é apagada às cegas — marca needsReview (§4)', () => {
+    const r = normalizeClassificationPatch('SDAI', { grupo: 'Sirene / Sinalizador', tipoAtivo: 'Sireme / Sinalizador' });
+    expect(r.patch.tipoAtivo).toBeUndefined(); // não limpa (não é redundância exata/alias)
+    expect('tipoAtivo' in r.patch).toBe(false);
+    expect(r.needsReview).toBe(true);
+  });
+  it('subtipo distinto legítimo é preservado (needsReview, não apaga)', () => {
+    const r = normalizeClassificationPatch('SDAI', { grupo: 'Detector de Fumaça', tipoAtivo: 'Detector óptico X' });
+    expect('tipoAtivo' in r.patch).toBe(false);
+    expect(r.needsReview).toBe(true);
+  });
+  it('re-editar para o mesmo valor não gera duplicação', () => {
+    const r = normalizeClassificationPatch('SDAI', { grupo: 'Acionador Manual', tipoAtivo: undefined, tipoDispositivo: undefined });
+    expect(r.changed).toBe(false);
+  });
+  it('dedupeMidDot desfaz "X · X" preservando o canônico', () => {
+    expect(dedupeMidDot('SDAI', 'Acionador Manual · Acionador Manual')).toBe('Acionador Manual');
+    expect(dedupeMidDot('SDAI', 'Central · Central SDAI')).toBe('Central SDAI');
+  });
+});
+
+describe('planClassificationCleanup — dry-run do impacto (§9)', () => {
+  it('lista só devices afetados, com antes/depois e flag de revisão', () => {
+    const devices: Device[] = [
+      dev({ id: 'ok', grupo: 'Detector de Fumaça' }),
+      dev({ id: 'dup', grupo: 'Acionador Manual', tipoAtivo: 'Acionador Manual' }),
+      dev({ id: 'typo', grupo: 'Sirene / Sinalizador', tipoAtivo: 'Sireme / Sinalizador' }),
+      dev({ id: 'cftv', sistema: 'CFTV', grupo: 'Câmera', tipoAtivo: 'Câmera' }),
+    ];
+    const plan = planClassificationCleanup('SDAI', devices);
+    const ids = plan.map((p) => p.id).sort();
+    expect(ids).toEqual(['dup', 'typo']); // 'ok' inalterado; 'cftv' é outra área
+    const dup = plan.find((p) => p.id === 'dup')!;
+    expect(dup.after.tipoAtivo).toBeUndefined();
+    expect(dup.needsReview).toBe(false);
+    const typo = plan.find((p) => p.id === 'typo')!;
+    expect(typo.needsReview).toBe(true);
+    expect(typo.after.tipoAtivo).toBe('Sireme / Sinalizador'); // preservado até decisão manual
+  });
+});
 
 const base: Device[] = [
   dev({ id: 'c', grupo: 'Central SDAI', fabricante: 'Tecnohold', modelo: 'Avalon Evolution 125', central: '1' }),

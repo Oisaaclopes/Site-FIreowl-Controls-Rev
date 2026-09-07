@@ -10,7 +10,7 @@ import { addVerification, fetchVerificationsForDevice } from '@/lib/deviceVerifi
 import {
   summarizeCentrals, summarizeGroups, duplicateGroups, centralAddressAnomalies,
   importReview, importInconsistencyDevices, sortDevicesForArea, filterDevices, fabricantesInArea, assetCardView,
-  buildSdaiHierarchy, coveragePct, SdaiHierarchy,
+  buildSdaiHierarchy, coveragePct, SdaiHierarchy, displayGroup, normalizeClassificationPatch,
   OriginFilter, VerifFilter, GroupSummary, DuplicateGroup,
 } from '@/lib/technicalBaseSummary';
 import { fetchCredentials, createCredential, revealCredentialSecret, deleteCredential } from '@/lib/clientCredentials';
@@ -205,7 +205,7 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
   const bulkPatch = async (patch: Partial<Device>) => {
     if (!isSupabaseConfigured()) { showToast('Supabase não configurado.'); return; }
     try {
-      for (const d of selectedDevices) await upsertDevice({ ...d, ...patch });
+      for (const d of selectedDevices) await upsertDevice(applyClassificationReplace({ ...d, ...patch }, 'grupo' in patch));
       showToast(`${selectedDevices.length} ativo(s) atualizados.`);
       clearSel(); onDevicesChanged();
     } catch (e: any) { showToast(`Falha: ${e?.message || e}`); }
@@ -218,9 +218,17 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
   const inlineSave = async (d: Device, patch: Partial<Device>) => {
     if (!isSupabaseConfigured()) { showToast('Supabase não configurado.'); return; }
     try {
-      await upsertDevice({ ...d, ...patch });
+      await upsertDevice(applyClassificationReplace({ ...d, ...patch }, 'grupo' in patch));
       onDevicesChanged();
     } catch (e: any) { showToast(`Falha ao salvar: ${e?.message || e}`); }
+  };
+
+  // Edição de Grupo/Tipo é SUBSTITUIÇÃO (§2/§8): ao trocar o grupo, limpa o legado
+  // tipoAtivo/tipoDispositivo REDUNDANTE (o que "duplicava" na tela). Nunca concatena.
+  const applyClassificationReplace = (device: Device, touchedGroup: boolean): Device => {
+    if (!touchedGroup) return device;
+    const { patch } = normalizeClassificationPatch(area, device);
+    return { ...device, ...patch };
   };
 
   // §4.4 — copiar ativos para a área de transferência em TSV (colável no
@@ -693,7 +701,7 @@ const AssetTable: React.FC<{
                     </select>
                   </td>
                 ) : (
-                  <td className={`px-3 py-2 text-fg-secondary ${canInline ? 'cursor-text hover:bg-navy/5' : 'cursor-pointer'}`} title={canInline ? 'Clique para editar o grupo' : undefined} onClick={() => canInline ? setEditCell({ id: d.id, field: 'grupo' }) : onOpen(d)}>{[legacyGroupLabel(area, d.grupo), d.tipoAtivo || d.tipoDispositivo].filter(Boolean).join(' · ') || '—'}</td>
+                  <td className={`px-3 py-2 text-fg-secondary ${canInline ? 'cursor-text hover:bg-navy/5' : 'cursor-pointer'}`} title={canInline ? 'Clique para editar o grupo' : undefined} onClick={() => canInline ? setEditCell({ id: d.id, field: 'grupo' }) : onOpen(d)}>{displayGroup(area, d) || '—'}</td>
                 )}
                 {/* Fabricante / Modelo — inline (pickers pesquisáveis canônicos + manual). */}
                 {canInline && manualEdit?.id === d.id ? (
