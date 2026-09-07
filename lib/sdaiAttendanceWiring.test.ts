@@ -7,6 +7,7 @@ import {
   buildAttendanceVerification,
   coverageInProgress,
   finalizationGate,
+  parseSdaiChecklistResults,
   resolveAttendanceTemplateCodigo,
   stableVerificationId,
 } from './sdaiAttendanceWiring';
@@ -101,5 +102,21 @@ describe('attendancePlanDevices (§4 — só planejados, sem duplicar)', () => {
     ];
     const full = { ...plan(['d1', 'd3']), contractId: 'C', periodStart: '2026-09-01', periodEnd: '2026-09-30', routines: [], devices: [], conflicts: [] } as unknown as MaintenancePeriodPlan;
     expect(attendancePlanDevices(full, devices).map((d) => d.id)).toEqual(['d1', 'd3']);
+  });
+});
+
+describe('parseSdaiChecklistResults (cards do form → resultados)', () => {
+  it('mapeia rótulo→resultado; ignora sem device/sem resultado; marca divergência/renome', () => {
+    const cards = [
+      { device_id: 'd1', resultado: 'Testado e aprovado' },
+      { device_id: 'd2', resultado: 'Testado e reprovou', observacao: 'sem áudio', endereco_confere: 'Não', renomear: 'Sim' },
+      { resultado: 'Testado e aprovado' },           // sem device_id → ignora
+      { device_id: 'd3' },                            // sem resultado → ignora
+      { device_id: 'd4', resultado: 'rótulo inválido' }, // não reconhecido → ignora
+    ];
+    const out = parseSdaiChecklistResults(cards);
+    expect(out).toHaveLength(2);
+    expect(out[0]).toMatchObject({ deviceId: 'd1', result: 'TESTADO_APROVADO' });
+    expect(out[1]).toMatchObject({ deviceId: 'd2', result: 'TESTADO_FALHOU', notes: 'sem áudio', divergencia: true, renomear: true });
   });
 });

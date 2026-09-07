@@ -233,6 +233,44 @@ export async function createMaintenanceRevision(previous: ReportInstance): Promi
   } as ReportInstance);
 }
 
+/**
+ * Escolhe o report técnico do atendimento para um template (PURO): o mais
+ * recente não-consolidado daquele código. Base do "1 report por atendimento".
+ */
+export function pickAttendanceReport(existing: ReportInstance[], templateCodigo: string): ReportInstance | undefined {
+  const cands = existing.filter((r) => r.templateCodigo === templateCodigo && r.tipo !== 'MANUTENCAO');
+  if (cands.length === 0) return undefined;
+  return cands.reduce((a, b) => ((b.iniciadoEm ?? '') > (a.iniciadoEm ?? '') ? b : a));
+}
+
+/**
+ * Draft do report técnico do atendimento, IDEMPOTENTE por (service_attendance_id
+ * + template_codigo): reabrir NÃO cria segundo report; atendimento diferente →
+ * report diferente (§2/§14). Identidade por service_attendance_id, nunca os_id.
+ */
+export async function findOrCreateAttendanceReport(input: {
+  serviceAttendanceId: string;
+  templateCodigo: string;
+  clienteId?: string;
+  contratoId?: string;
+  tecnicoNome?: string;
+  titulo?: string;
+}): Promise<ReportInstance> {
+  const existing = await fetchReportsByAttendanceIds([input.serviceAttendanceId]);
+  const found = pickAttendanceReport(existing, input.templateCodigo);
+  if (found) return found;
+  return createReport({
+    templateCodigo: input.templateCodigo,
+    tipo: 'PREVENTIVA',
+    status: 'rascunho',
+    clienteId: input.clienteId,
+    contratoId: input.contratoId,
+    serviceAttendanceId: input.serviceAttendanceId,
+    tecnicoNome: input.tecnicoNome,
+    titulo: input.titulo,
+  } as ReportInstance);
+}
+
 /** Cria o consolidado inicial (R00) em rascunho para um contrato+período. */
 export async function createMaintenanceReportDraft(input: {
   contratoId: string;

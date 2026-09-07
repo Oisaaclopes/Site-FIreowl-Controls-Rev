@@ -17,6 +17,8 @@ import {
   buildDeviceVerificationFromResult,
   findEquivalentOpenPendencia,
   mapDeviceResultToCondicao,
+  resultFromLabel,
+  resultOpensPendencia,
   shouldCreatePendencia,
 } from './sdaiMaintenance';
 import { classifyTestResult } from './maintenanceCoverage';
@@ -202,4 +204,91 @@ export function finalizationGate(input: {
 export function attendancePlanDevices(plan: MaintenancePeriodPlan, devices: Device[]): Device[] {
   const planned = new Set(plan.programadosDeviceIds);
   return devices.filter((d) => planned.has(d.id));
+}
+
+/* --------------------------- Parse do checklist do form -------------------- */
+
+/** Card do checklist_dispositivos do template SDAI (campos que interessam). */
+export interface SdaiChecklistCard {
+  device_id?: string;
+  resultado?: string;     // rótulo (SDAI_DEVICE_RESULT_OPCOES)
+  observacao?: string;
+  renomear?: string;
+  endereco_confere?: string;
+  descricao_confere?: string;
+  [k: string]: unknown;
+}
+
+export interface ParsedDeviceResult { deviceId: string; result: SdaiDeviceResult; notes?: string; renomear?: boolean; divergencia?: boolean }
+
+/**
+ * Extrai resultados por device dos cards do checklist (PURO). Só cards com
+ * device_id e resultado reconhecível entram (rótulo → SdaiDeviceResult). Marca
+ * divergência (endereço/descrição não confere) e pedido de renome — SEM alterar
+ * a Base (§13): fica como dado do atendimento/reconciliação.
+ */
+export function parseSdaiChecklistResults(cards: SdaiChecklistCard[]): ParsedDeviceResult[] {
+  const out: ParsedDeviceResult[] = [];
+  for (const c of cards) {
+    const deviceId = c.device_id ? String(c.device_id) : '';
+    if (!deviceId || !c.resultado) continue;
+    const result = resultFromLabel(String(c.resultado));
+    if (!result) continue;
+    out.push({
+      deviceId, result,
+      notes: c.observacao ? String(c.observacao) : undefined,
+      renomear: c.renomear === 'Sim',
+      divergencia: c.endereco_confere === 'Não' || c.descricao_confere === 'Não',
+    });
+  }
+  return out;
+}
+
+/* --------------------------- Finalização do atendimento SDAI --------------- */
+
+export interface MaintenanceAttendanceContext {
+  serviceAttendanceId: string;
+  clienteId?: string;
+  contratoId?: string;
+  reportOrigemId?: string;
+  plan?: Pick<MaintenancePeriodPlan, 'programadosDeviceIds'>;
+}
+
+export interface MaintenanceFinalizeSummary {
+  verifications: number;
+  pendencias: number;
+  coverage?: AttendanceCoverageLive;
+}
+
+/**
+ * Orquestra a persistência de manutenção ao finalizar o atendimento SDAI (§5/§6/
+ * §7/§17): grava device_verifications idempotentes por device e cria/reutiliza
+ * pendências (sem duplicar), devolvendo a cobertura. Só para o template
+ * contratual — o chamador gateia por template_codigo. I/O fino; reusa o motor.
+ */
+export async function finalizeMaintenanceAttendance(
+  ctx: MaintenanceAttendanceContext,
+  results: ParsedDeviceResult[]
+): Promise<MaintenanceFinalizeSummary> {
+  let verifications = 0;
+  let pendencias = 0;
+  const resultsByDevice = new Map<string, SdaiDeviceResult>();
+  for (const r of results) {
+    resultsByDevice.set(r.deviceId, r.result);
+    const v = await persistDeviceResult({
+      serviceAttendanceId: ctx.serviceAttendanceId, deviceId: r.deviceId, clienteId: ctx.clienteId,
+      result: r.result, notes: r.notes,
+    });
+    if (v) verifications++;
+    if (resultOpensPendencia(r.result)) {
+      await createOrReuseDevicePendencia({
+        clienteId: ctx.clienteId, contratoId: ctx.contratoId, serviceAttendanceId: ctx.serviceAttendanceId,
+        reportOrigemId: ctx.reportOrigemId, deviceId: r.deviceId, grupo: 'SDAI',
+        descricao: r.notes, acaoRecomendada: 'investigar',
+      });
+      pendencias++;
+    }
+  }
+  const coverage = ctx.plan ? coverageInProgress(ctx.plan, resultsByDevice) : undefined;
+  return { verifications, pendencias, coverage };
 }

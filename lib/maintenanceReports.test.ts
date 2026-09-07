@@ -17,6 +17,7 @@ import {
   inWindow,
   nextRevisaoLabel,
   parseRevisao,
+  pickAttendanceReport,
   resolveLatestValidReports,
   type MaintenanceConsolidation,
   type TechnicalReportSource,
@@ -324,5 +325,18 @@ describe('deduplicação de evidência e pendências (§6/§7)', () => {
     expect(snap.fotos).toHaveLength(1);
     expect(snap.membership.fieldPhotoIds).toEqual(['F']);
     expect(snap.membership.pendenciaIds).toEqual(['PX']); // não duplica
+  });
+});
+
+describe('pickAttendanceReport — 1 report técnico por atendimento (§2/§14)', () => {
+  it('escolhe o mais recente não-consolidado do código; ignora MANUTENCAO', () => {
+    const rs = [
+      rpt({ id: 'r1', templateCodigo: 'PREVENTIVA_SDAI_CONTRATO', iniciadoEm: '2026-09-03T08:00:00Z' }),
+      rpt({ id: 'r2', templateCodigo: 'PREVENTIVA_SDAI_CONTRATO', iniciadoEm: '2026-09-05T08:00:00Z' }),
+      rpt({ id: 'cons', templateCodigo: 'PREVENTIVA_SDAI_CONTRATO', tipo: 'MANUTENCAO', iniciadoEm: '2026-09-09T08:00:00Z' }),
+    ];
+    expect(pickAttendanceReport(rs, 'PREVENTIVA_SDAI_CONTRATO')!.id).toBe('r2');
+    expect(pickAttendanceReport([], 'PREVENTIVA_SDAI_CONTRATO')).toBeUndefined();
+    expect(pickAttendanceReport(rs, 'OUTRO')).toBeUndefined();
   });
 });

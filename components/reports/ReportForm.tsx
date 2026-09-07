@@ -51,6 +51,14 @@ interface ReportFormProps {
   pendenciasAprovadas?: { id: string; descricao?: string; grupo?: string }[];
   /** Ciclo de amostragem vigente (Preventiva) — atualiza cobertura ao finalizar. */
   ciclo?: CicloAmostragem;
+  /** MANUTENÇÃO CONTRATUAL SDAI: quando presente e o template for
+   *  PREVENTIVA_SDAI_CONTRATO, ao finalizar persiste device_verifications
+   *  idempotentes + pendências (dedupe) via o motor de wiring. Ausente ou outro
+   *  template → nenhuma mudança de comportamento. */
+  maintenance?: {
+    serviceAttendanceId: string;
+    plan?: { programadosDeviceIds: string[] };
+  };
   /** Persistência do "Cadastrar novo…" dos comboboxes (ex.: marca -> brands). */
   onCreateCatalogo?: (origem: string, name: string) => void;
   onBack: () => void;
@@ -172,6 +180,8 @@ function buildPendencias(
 
 import { TriagemFotos, UnclassifiedPhoto } from '@/components/reports/TriagemFotos';
 import { buildSurveyTemplate, surveyBlockSections, SurveyMode, SURVEY_BLOCKS_KEY, SURVEY_MODE_KEY } from '@/lib/surveyMode';
+import { PREVENTIVA_SDAI_CONTRATO_CODIGO } from '@/lib/sdaiMaintenance';
+import { finalizeMaintenanceAttendance, parseSdaiChecklistResults, type SdaiChecklistCard } from '@/lib/sdaiAttendanceWiring';
 
 export const ReportForm: React.FC<ReportFormProps> = ({
   template: templateProp,
@@ -186,6 +196,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   devices,
   pendenciasAprovadas,
   ciclo,
+  maintenance,
   onCreateCatalogo,
   onBack,
   onSaved,
@@ -793,6 +804,21 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         try { window.localStorage.removeItem(rascunhoKey); } catch { /* noop */ }
       }
       onSaved();
+      // MANUTENÇÃO CONTRATUAL SDAI (gated pelo código): persiste device_verifications
+      // idempotentes + pendências (dedupe) via o motor de wiring. NÃO afeta outros
+      // templates (maintenance ausente ou código diferente → no-op). Não-fatal.
+      if (template.codigo === PREVENTIVA_SDAI_CONTRATO_CODIGO && maintenance) {
+        try {
+          const checklist = template.secoes.flatMap((s) => s.campos).find((f) => f.tipo === 'checklist_dispositivos');
+          const cards = checklist && Array.isArray(values[checklist.key]) ? (values[checklist.key] as SdaiChecklistCard[]) : [];
+          await finalizeMaintenanceAttendance(
+            { serviceAttendanceId: maintenance.serviceAttendanceId, clienteId: cliente?.id, contratoId: contexto?.contratoId, plan: maintenance.plan },
+            parseSdaiChecklistResults(cards),
+          );
+        } catch (e) {
+          console.warn('Persistência de manutenção adiada (verificações/pendências):', e);
+        }
+      }
       // Baixa de estoque dos materiais aplicados (Corretiva).
       onConsumeMaterials?.(collectConsumedMaterials(), { numero: bundle.report.numero, clienteNome: cliente?.name });
     } catch (err) {
