@@ -1,5 +1,10 @@
 import { TemplateSchema, FieldSchema } from './reportSchema';
 import { publishTemplate, reportTemplatesSupportsVersioning, PublishResult } from './reportTemplates';
+import {
+  PREVENTIVA_SDAI_CONTRATO_CODIGO,
+  SDAI_DEVICE_RESULT_OPCOES,
+  SDAI_DEVICE_RESULT_PENDENCIA_LABELS,
+} from './sdaiMaintenance';
 
 /* =====================================================================
  * Templates dos Relatórios Técnicos (seções 4, 5 e 6 do documento),
@@ -703,12 +708,185 @@ export const PREVENTIVA_ALARME: TemplateSchema = {
   ],
 };
 
+/* =====================================================================
+ * MANUTENÇÃO PREVENTIVA SDAI (contratual) — template operacional executado
+ * dentro de um Atendimento. Dispositivos vêm do MaintenancePeriodPlan (injetados
+ * como `dispositivosPadrao` no FormEngine), NÃO de lista manual. Central vem da
+ * Base Técnica (select origem 'devices'). N laços via repeater. Sem Base/galeria
+ * paralela. Versionado (0075): mudar → INCREMENTAR `versao`.
+ * ===================================================================== */
+
+// Sim/Não que abre pendência quando "Não".
+const snPendSeNao = (key: string, label: string, grupo?: string, acao?: string): FieldSchema => ({
+  key, tipo: 'select', label, opcoes: ['Sim', 'Não'], abre_pendencia_se: ['Não'],
+  ...(grupo ? { pendencia_sugerida: { grupo, acao: acao as never } } : {}),
+});
+// Conforme/Não conforme que abre pendência quando "Não conforme".
+const conformePend = (key: string, label: string, grupo?: string, acao?: string): FieldSchema => ({
+  key, tipo: 'passfail', label, opcoes: ['Conforme', 'Não conforme'], abre_pendencia_se: ['Não conforme'],
+  ...(grupo ? { pendencia_sugerida: { grupo, acao: acao as never } } : {}),
+});
+
+export const PREVENTIVA_SDAI_CONTRATO: TemplateSchema = {
+  codigo: PREVENTIVA_SDAI_CONTRATO_CODIGO,
+  nome: 'Manutenção Preventiva SDAI (Contrato)',
+  area: 'SDAI',
+  tipo: 'PREVENTIVA',
+  versao: 1,
+  secoes: [
+    // A. IDENTIFICAÇÃO
+    { key: 'identificacao', titulo: 'Identificação do atendimento', campos: [
+      { key: 'contrato_id', tipo: 'select_catalogo', origem: 'contratos', label: 'Contrato' },
+      { key: 'periodicidade', tipo: 'select', label: 'Periodicidade da rotina', opcoes: ['Mensal', 'Bimestral', 'Trimestral', 'Semestral', 'Anual'] },
+      { key: 'pendencias_abertas_ref', tipo: 'select_catalogo', origem: 'pendencias_abertas', label: 'Pendências em aberto (somente leitura)' },
+    ]},
+    // B/C. CENTRAL DE SDAI — checklist mensal (uma vez por central/período)
+    { key: 'central', titulo: 'Central de SDAI', descricao: 'Checklist mensal da central. Uma vez por central por período; refazer quando houver intervenção/nova falha.', campos: [
+      { key: 'central_device_id', tipo: 'select_catalogo', origem: 'devices', label: 'Central verificada (Base Técnica)', obrigatorio: true },
+      { key: 'refazer_checklist_central', tipo: 'select', label: 'Refazer checklist da central', opcoes: ['Não', 'Sim'], default: 'Não' },
+      { key: 'foto_geral', tipo: 'foto', label: 'Foto geral da central', obrigatorio: true, fotos: 1 },
+      snPendSeNao('central_energizada', 'Central energizada?', 'SDAI > Central', 'reparar'),
+      snPendSeNao('operacao_normal', 'Central em operação normal?'),
+      { key: 'alarme_ativo', tipo: 'select', label: 'Existe alarme de incêndio ativo?', opcoes: ['Não', 'Sim'] },
+      { key: 'alarme_motivo', tipo: 'texto', label: 'Motivo/descrição do alarme', multilinha: true, show_if: { field: 'alarme_ativo', operator: 'equals', value: 'Sim' } },
+      { key: 'alarme_laco', tipo: 'texto', label: 'Laço', show_if: { field: 'alarme_ativo', operator: 'equals', value: 'Sim' } },
+      { key: 'alarme_endereco', tipo: 'texto', label: 'Endereço', show_if: { field: 'alarme_ativo', operator: 'equals', value: 'Sim' } },
+      { key: 'alarme_device_id', tipo: 'select_catalogo', origem: 'devices', label: 'Dispositivo (quando identificável)', show_if: { field: 'alarme_ativo', operator: 'equals', value: 'Sim' } },
+      { key: 'alarme_foto', tipo: 'foto', label: 'Foto do alarme', fotos: 1, show_if: { field: 'alarme_ativo', operator: 'equals', value: 'Sim' } },
+      { key: 'falha_ativa', tipo: 'select', label: 'Existe falha ativa?', opcoes: ['Não', 'Sim'] },
+      { key: 'falhas_qtd', tipo: 'numero', label: 'Quantidade de falhas', show_if: { field: 'falha_ativa', operator: 'equals', value: 'Sim' } },
+      { key: 'falhas', tipo: 'repeater', label: 'Falhas', botao_adicionar: '+ Adicionar falha', gera_pendencia: true,
+        show_if: { field: 'falha_ativa', operator: 'equals', value: 'Sim' },
+        card_schema: [
+          { key: 'descricao', tipo: 'texto', label: 'Descrição', multilinha: true, obrigatorio: true },
+          { key: 'laco', tipo: 'texto', label: 'Laço' },
+          { key: 'endereco', tipo: 'texto', label: 'Endereço' },
+          { key: 'device_id', tipo: 'select_catalogo', origem: 'devices', label: 'Dispositivo (quando identificável)' },
+          { key: 'codigo', tipo: 'texto', label: 'Código' },
+          { key: 'local', tipo: 'texto', label: 'Localização' },
+          { key: 'causa_provavel', tipo: 'texto', label: 'Causa provável' },
+          { key: 'acao_recomendada', tipo: 'select', label: 'Ação recomendada', opcoes: ACOES },
+          { key: 'foto', tipo: 'foto', label: 'Foto', fotos: 1 },
+        ],
+      },
+      { key: 'dispositivos_desabilitados', tipo: 'select', label: 'Existem dispositivos desabilitados?', opcoes: ['Não', 'Sim'], abre_pendencia_se: ['Sim'], pendencia_sugerida: { grupo: 'SDAI > Central', acao: 'reprogramar' as never } },
+      { key: 'desabilitados_qtd', tipo: 'numero', label: 'Quantidade desabilitados', show_if: { field: 'dispositivos_desabilitados', operator: 'equals', value: 'Sim' } },
+      { key: 'desabilitados_lista', tipo: 'texto', label: 'Quais dispositivos', multilinha: true, show_if: { field: 'dispositivos_desabilitados', operator: 'equals', value: 'Sim' } },
+      { key: 'evento_anormal', tipo: 'select', label: 'Evento/anormalidade adicional?', opcoes: ['Não', 'Sim'] },
+      { key: 'evento_descricao', tipo: 'texto', label: 'Descrição do evento', multilinha: true, show_if: { field: 'evento_anormal', operator: 'equals', value: 'Sim' } },
+      snPendSeNao('data_hora_ok', 'Data/hora da central corretas?', 'SDAI > Central', 'reprogramar'),
+      conformePend('teste_leds', 'Teste de LEDs', 'SDAI > Central', 'reparar'),
+      conformePend('teste_buzzer', 'Teste do buzzer', 'SDAI > Central', 'reparar'),
+      { key: 'backup_programacao', tipo: 'select', label: 'Backup da programação', opcoes: ['Realizado', 'Não realizado', 'Não aplicável'], help: 'Procedimento técnico/operacional (não é requisito normativo).' },
+      { key: 'checklist_central_concluido', tipo: 'select', label: 'Checklist da central concluído', opcoes: ['Sim', 'Não'], default: 'Sim', help: 'Marca a conclusão do checklist mensal desta central (derivação por período).' },
+    ]},
+    // D. INTEGRIDADE FÍSICA
+    { key: 'integridade', titulo: 'Integridade física', campos: [
+      conformePend('gabinete', 'Gabinete íntegro', 'SDAI > Central', 'reparar'),
+      conformePend('oxidacao', 'Ausência de oxidação', 'SDAI > Central', 'reparar'),
+      conformePend('placas', 'Placas sem avaria', 'SDAI > Central', 'substituir'),
+      conformePend('terminais_frouxos', 'Terminais firmes (sem frouxos)', 'SDAI > Central', 'reparar'),
+      conformePend('terminais_queimados', 'Terminais sem queima/dano', 'SDAI > Central', 'substituir'),
+      { key: 'sujeira', tipo: 'select', label: 'Sujeira excessiva', opcoes: ['Não', 'Sim'], abre_pendencia_se: ['Sim'], pendencia_sugerida: { grupo: 'SDAI > Central', acao: 'limpar' as never } },
+      { key: 'limpeza_realizada', tipo: 'select', label: 'Limpeza interna realizada', opcoes: ['Sim', 'Não', 'Não aplicável'] },
+      { key: 'reaperto_realizado', tipo: 'select', label: 'Reaperto realizado', opcoes: ['Sim', 'Não', 'Não aplicável'] },
+      conformePend('identificacao_cabos', 'Identificação dos cabos legível', 'SDAI > Central', 'reparar'),
+      conformePend('acesso_manutencao', 'Acesso livre para manutenção', 'SDAI > Infraestrutura', 'desobstruir'),
+      { key: 'obstrucao', tipo: 'select', label: 'Há obstrução', opcoes: ['Não', 'Sim'], abre_pendencia_se: ['Sim'], pendencia_sugerida: { grupo: 'SDAI > Infraestrutura', acao: 'desobstruir' as never } },
+      { key: 'integridade_obs', tipo: 'texto', label: 'Observações', multilinha: true },
+      { key: 'integridade_foto', tipo: 'foto', label: 'Fotos (quando não conforme)', fotos: 1 },
+    ]},
+    // E. ALIMENTAÇÃO / BATERIAS (medições estruturadas)
+    { key: 'alimentacao', titulo: 'Alimentação e baterias', descricao: 'Medições reais. N baterias (repeater).', campos: [
+      { key: 'tensao_ac_entrada', tipo: 'numero', label: 'Tensão AC de entrada (V)' },
+      { key: 'tensao_dc_fonte', tipo: 'numero', label: 'Tensão DC da fonte (V)' },
+      { key: 'baterias', tipo: 'repeater', label: 'Baterias', botao_adicionar: '+ Adicionar bateria', card_schema: [
+        { key: 'device_id', tipo: 'select_catalogo', origem: 'devices', label: 'Bateria (Base Técnica, se cadastrada)' },
+        { key: 'tensao', tipo: 'numero', label: 'Tensão medida (V)' },
+        { key: 'ano_fabricacao', tipo: 'texto', label: 'Ano/data de fabricação' },
+        { key: 'condicao', tipo: 'select', label: 'Condição', opcoes: ['Boa', 'Regular', 'Substituir'], abre_pendencia_se: ['Substituir'] },
+        { key: 'observacao', tipo: 'texto', label: 'Observação' },
+        { key: 'foto', tipo: 'foto', label: 'Foto da medição', fotos: 1 },
+      ]},
+      { key: 'medicoes', tipo: 'repeater', label: 'Outras medições', botao_adicionar: '+ Adicionar medição', card_schema: [
+        { key: 'categoria', tipo: 'texto', label: 'Tipo de medição' },
+        { key: 'descricao', tipo: 'texto', label: 'Descrição' },
+        { key: 'quantidade', tipo: 'numero', label: 'Valor' },
+        { key: 'unidade', tipo: 'texto', label: 'Unidade' },
+        { key: 'local', tipo: 'texto', label: 'Local' },
+        { key: 'observacao', tipo: 'texto', label: 'Observação' },
+      ]},
+    ]},
+    // F. LAÇOS (N dinâmicos)
+    { key: 'lacos', titulo: 'Laços', descricao: 'N laços — quantidade vem da Base Técnica da central quando disponível; senão, entrada manual.', campos: [
+      { key: 'lacos', tipo: 'repeater', label: 'Laços', botao_adicionar: '+ Adicionar laço', card_schema: [
+        { key: 'identificacao', tipo: 'texto', label: 'Laço (identificação/número)', obrigatorio: true },
+        { key: 'tensao', tipo: 'numero', label: 'Tensão medida (V)' },
+        { key: 'condicao', tipo: 'select', label: 'Condição', opcoes: ['Normal', 'Anormal'], abre_pendencia_se: ['Anormal'], pendencia_sugerida: { grupo: 'SDAI > Laço', acao: 'investigar' as never } },
+        { key: 'observacao', tipo: 'texto', label: 'Observação' },
+        { key: 'foto', tipo: 'foto', label: 'Foto (opcional)', fotos: 1 },
+      ]},
+    ]},
+    // G/H. DISPOSITIVOS PROGRAMADOS (injetados do MaintenancePeriodPlan)
+    { key: 'dispositivos', titulo: 'Dispositivos programados', descricao: 'Lista vem do plano de manutenção do período (não manual). Resultado por dispositivo atualiza o histórico do ativo.', campos: [
+      { key: 'dispositivos', tipo: 'checklist_dispositivos', label: 'Dispositivos', botao_adicionar: '+ Adicionar dispositivo fora do plano', gera_pendencia: true, card_schema: [
+        { key: 'dispositivo', tipo: 'texto', label: 'Dispositivo' },
+        { key: 'resultado', tipo: 'select', label: 'Resultado do teste', opcoes: SDAI_DEVICE_RESULT_OPCOES, obrigatorio: true, abre_pendencia_se: SDAI_DEVICE_RESULT_PENDENCIA_LABELS },
+        { key: 'acionou', tipo: 'select', label: 'Acionou corretamente na central?', opcoes: ['Sim', 'Não', 'N/A'], show_if: { field: 'resultado', operator: 'equals', value: 'Testado e aprovado' } },
+        { key: 'endereco_confere', tipo: 'select', label: 'Endereço confere?', opcoes: ['Sim', 'Não'] },
+        { key: 'descricao_confere', tipo: 'select', label: 'Descrição confere?', opcoes: ['Sim', 'Não'] },
+        { key: 'led_ok', tipo: 'select', label: 'LED/indicador funcionando?', opcoes: ['Sim', 'Não', 'N/A'] },
+        { key: 'integridade', tipo: 'passfail', label: 'Integridade física', opcoes: ['Conforme', 'Não conforme'], abre_pendencia_se: ['Não conforme'] },
+        { key: 'obstruido', tipo: 'select', label: 'Obstruído', opcoes: ['Não', 'Sim'], abre_pendencia_se: ['Sim'] },
+        { key: 'renomear', tipo: 'select', label: 'Precisa renomear/corrigir Base?', opcoes: ['Não', 'Sim'] },
+        { key: 'observacao', tipo: 'texto', label: 'Observação', multilinha: true },
+        { key: 'foto_antes', tipo: 'foto', label: 'Foto antes', fotos: ['antes'] },
+        { key: 'foto_depois', tipo: 'foto', label: 'Foto depois', fotos: ['depois'] },
+      ]},
+    ]},
+    // Intervenções executadas na visita
+    { key: 'intervencoes', titulo: 'Serviços / intervenções realizadas', campos: [INTERVENCOES_FIELD] },
+    // §14 Equipamento encontrado fora da Base Técnica (NÃO cria device automaticamente)
+    { key: 'fora_base', titulo: 'Equipamentos fora da Base Técnica', descricao: 'Registrar ocorrência. Incorporação à Base é ação administrativa posterior (não automática).', campos: [
+      { key: 'equipamentos_fora_base', tipo: 'repeater', label: 'Equipamentos fora da Base', botao_adicionar: '+ Registrar equipamento', card_schema: [
+        { key: 'tipo', tipo: 'texto', label: 'Tipo (quando identificado)' },
+        { key: 'fabricante', tipo: 'texto', label: 'Fabricante' },
+        { key: 'modelo', tipo: 'texto', label: 'Modelo' },
+        { key: 'central', tipo: 'texto', label: 'Central' },
+        { key: 'laco', tipo: 'texto', label: 'Laço' },
+        { key: 'endereco', tipo: 'texto', label: 'Endereço' },
+        { key: 'localizacao', tipo: 'texto', label: 'Localização' },
+        { key: 'foto', tipo: 'foto', label: 'Foto', fotos: 1 },
+        { key: 'observacao', tipo: 'texto', label: 'Observação', multilinha: true },
+      ]},
+    ]},
+    // I. PENDÊNCIAS (consolidação/apontamentos)
+    { key: 'pendencias', titulo: 'Pendências', descricao: 'Apontamentos que viram pendência. Dedupe de equivalente aberta na camada de serviço.', campos: [apontamentosRepeater(1)] },
+    // J. EVIDÊNCIAS
+    { key: 'evidencias', titulo: 'Evidências', campos: [
+      { key: 'fotos_gerais', tipo: 'foto', label: 'Fotos gerais do atendimento', fotos: 1 },
+    ]},
+    // K/L. RESULTADO + ASSINATURA
+    { key: 'encerramento', titulo: 'Resultado do atendimento', campos: [
+      { key: 'resultado_atendimento', tipo: 'select', label: 'Resultado do atendimento', opcoes: ['RESOLVIDO', 'PARCIALMENTE_RESOLVIDO', 'NAO_RESOLVIDO'], obrigatorio: true },
+      { key: 'qtd_planejada', tipo: 'numero', label: 'Dispositivos planejados', help: 'Vem do plano — não digitar.' },
+      { key: 'qtd_testada', tipo: 'numero', label: 'Testados', help: 'Derivado dos resultados — não digitar.' },
+      { key: 'qtd_aprovada', tipo: 'numero', label: 'Aprovados', help: 'Derivado — não digitar.' },
+      { key: 'qtd_falhou', tipo: 'numero', label: 'Falharam', help: 'Derivado — não digitar.' },
+      { key: 'qtd_nao_testada', tipo: 'numero', label: 'Não testados', help: 'Derivado — não digitar.' },
+      { key: 'qtd_extra', tipo: 'numero', label: 'Testes extras', help: 'Derivado — não digitar.' },
+      { key: 'recomendacoes', tipo: 'texto', label: 'Recomendações', multilinha: true },
+      { key: 'assinatura', tipo: 'assinatura', label: 'Assinatura do responsável', obrigatorio: true },
+    ]},
+  ],
+};
+
 // CORREÇÃO DEFINITIVA: os templates LEVANTAMENTO_* NÃO são mais semeados/oferecidos
 // para criação (o Levantamento Técnico é o motor 3D). Os `export const LEVANTAMENTO_*`
 // permanecem apenas como fixtures de teste do motor de formulário (formConditions/
 // versionamento) e NÃO entram em ALL_TEMPLATES → nenhum novo relatório LEVANTAMENTO.
 export const ALL_TEMPLATES: TemplateSchema[] = [
-  CORRETIVA_SDAI, PREVENTIVA_SDAI,
+  CORRETIVA_SDAI, PREVENTIVA_SDAI, PREVENTIVA_SDAI_CONTRATO,
   CORRETIVA_CFTV, PREVENTIVA_CFTV,
   CORRETIVA_CA, PREVENTIVA_CA,
   CORRETIVA_BMS, PREVENTIVA_BMS,
