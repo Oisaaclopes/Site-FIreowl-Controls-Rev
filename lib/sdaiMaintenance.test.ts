@@ -10,6 +10,12 @@ import {
   mapDeviceResultToCondicao,
   resolveCentralChecklist,
   resolveCentralLoops,
+  resolveLoopAddresses,
+  resolveDeviceByLoopAddress,
+  resolveCentralBatteries,
+  resolveBatteryCatalog,
+  isBatteryDevice,
+  compareNumericThenText,
   resultOpensPendencia,
   shouldCreatePendencia,
   shouldRequireCentralChecklist,
@@ -103,6 +109,88 @@ describe('resolveCentralLoops (N laços da Base, §8)', () => {
   });
   it('sem info → [] (lacuna: entrada manual, não inventa)', () => {
     expect(resolveCentralLoops(central, [central])).toEqual([]);
+  });
+  it('ordena laços NUMERICAMENTE (1,2,10 — não 1,10,2)', () => {
+    const devices: Device[] = [
+      central,
+      { id: 'a', clienteId: 'A', sistema: 'SDAI', status: 'ativo', parentDeviceId: 'C1', laco: '10' },
+      { id: 'b', clienteId: 'A', sistema: 'SDAI', status: 'ativo', parentDeviceId: 'C1', laco: '2' },
+      { id: 'c', clienteId: 'A', sistema: 'SDAI', status: 'ativo', parentDeviceId: 'C1', laco: '1' },
+    ];
+    expect(resolveCentralLoops(central, devices)).toEqual(['1', '2', '10']);
+  });
+});
+
+describe('Base Técnica inteligente — laço/endereço/device (§2/§3/§4/§18)', () => {
+  const C1: Device = { id: 'C1', clienteId: 'A', sistema: 'SDAI', status: 'ativo', grupo: 'Central SDAI', central: 'EST3X-01' };
+  const C2: Device = { id: 'C2', clienteId: 'A', sistema: 'SDAI', status: 'ativo', grupo: 'Central SDAI', central: 'EST3X-02' };
+  const mk = (id: string, parent: string, laco: string, endereco: string, over: Partial<Device> = {}): Device =>
+    ({ id, clienteId: 'A', sistema: 'SDAI', status: 'ativo', parentDeviceId: parent, laco, endereco, ...over } as Device);
+  const devices: Device[] = [
+    C1, C2,
+    mk('d1', 'C1', '1', '1', { grupo: 'Detector de Fumaça' }),
+    mk('d2', 'C1', '1', '2', { grupo: 'Acionador Manual', tipoAtivo: 'Acionador Manual', technicalIdentifier: 'DF-025', localizacao: 'Loja X - Estoque' }),
+    mk('d3', 'C1', '1', '4'),
+    mk('d4', 'C1', '1', '7'),
+    mk('d5', 'C1', '1', '10'),
+    mk('x1', 'C2', '1', '2', { grupo: 'Sirene / Sinalizador' }), // outra central
+  ];
+
+  it('endereços reais do laço, ordem numérica, sem inventar o 3', () => {
+    expect(resolveLoopAddresses(C1, '1', devices)).toEqual(['1', '2', '4', '7', '10']);
+  });
+  it('endereço restrito à central+laço (não usa devices de outra central)', () => {
+    // C2 só tem o x1 (laço 1, endereço 2)
+    expect(resolveLoopAddresses(C2, '1', devices)).toEqual(['2']);
+  });
+  it('device por (central,laço,endereço) inequívoco → device correto; ambíguo/ausente → undefined', () => {
+    expect(resolveDeviceByLoopAddress(C1, '1', '2', devices)?.id).toBe('d2');
+    expect(resolveDeviceByLoopAddress(C1, '1', '3', devices)).toBeUndefined(); // não cadastrado
+  });
+  it('devices de C1 não aparecem em C2', () => {
+    const enderecosC2 = resolveLoopAddresses(C2, '1', devices);
+    expect(enderecosC2).not.toContain('1'); // endereço 1 é de C1
+  });
+  it('compareNumericThenText: números antes de texto, numérico entre si', () => {
+    expect(['10', '2', '1', 'A'].sort(compareNumericThenText)).toEqual(['1', '2', '10', 'A']);
+  });
+});
+
+describe('Baterias da central (§10/§11/§16)', () => {
+  const central: Device = { id: 'C1', clienteId: 'A', sistema: 'SDAI', status: 'ativo', grupo: 'Central SDAI', central: 'EST3X-01' };
+  const bat = (id: string, over: Partial<Device> = {}): Device =>
+    ({ id, clienteId: 'A', sistema: 'SDAI', status: 'ativo', parentDeviceId: 'C1', grupo: 'Bateria', ...over } as Device);
+  it('classifica bateria por grupo/tipo canônico, nunca campo de detecção', () => {
+    expect(isBatteryDevice({ grupo: 'Bateria' })).toBe(true);
+    expect(isBatteryDevice({ tipoAtivo: 'Bateria' })).toBe(true);
+    expect(isBatteryDevice({ grupo: 'Sirene / Sinalizador' })).toBe(false);
+    expect(isBatteryDevice({ grupo: 'Acionador Manual' })).toBe(false);
+    expect(isBatteryDevice({ grupo: 'Bateria', status: 'inativo' })).toBe(false);
+  });
+  it('central com 2 baterias → só as 2 (não dispositivos de campo)', () => {
+    const devices: Device[] = [
+      central,
+      bat('b1'), bat('b2'),
+      { id: 'd1', clienteId: 'A', sistema: 'SDAI', status: 'ativo', parentDeviceId: 'C1', grupo: 'Detector de Fumaça' },
+      { id: 's1', clienteId: 'A', sistema: 'SDAI', status: 'ativo', parentDeviceId: 'C1', grupo: 'Sirene / Sinalizador' },
+    ];
+    expect(resolveCentralBatteries(central, devices).map((d) => d.id)).toEqual(['b1', 'b2']);
+  });
+  it('central sem bateria → [] (UI usa catálogo/manual, sem fallback de campo)', () => {
+    const devices: Device[] = [central, { id: 'd1', clienteId: 'A', sistema: 'SDAI', status: 'ativo', parentDeviceId: 'C1', grupo: 'Detector de Fumaça' }];
+    expect(resolveCentralBatteries(central, devices)).toEqual([]);
+  });
+});
+
+describe('resolveBatteryCatalog (§13 — só categoria/tipo Bateria)', () => {
+  it('filtra produtos de bateria do catálogo existente, ordenado', () => {
+    const items = [
+      { id: '1', name: 'Moura 12V 7Ah', category: 'SDAI', subcategory: 'Bateria', brand: 'Moura', model: '12V 7Ah' },
+      { id: '2', name: 'Detector de fumaça', category: 'SDAI', subcategory: 'Detector' },
+      { id: '3', name: 'Bateria selada 12V 7Ah', category: 'Insumos', brand: 'Unipower', model: '12V 7Ah' },
+    ];
+    const out = resolveBatteryCatalog(items);
+    expect(out.map((i) => i.id).sort()).toEqual(['1', '3']);
   });
 });
 

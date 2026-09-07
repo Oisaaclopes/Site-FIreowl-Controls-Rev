@@ -199,23 +199,106 @@ export function extractCentralChecklistRecords(
 
 /* --------------------------- Laços dinâmicos (§8) -------------------------- */
 
-/**
- * Laços de uma central derivados da Base: valores distintos de `laco` entre os
- * devices do mesmo cliente/sistema associados à central (por parentDeviceId OU
- * mesmo identificador de central). Sem info suficiente → [] (lacuna: entrada
- * manual segura, sem inventar). Ordenado e estável.
- */
-export function resolveCentralLoops(central: Device, devices: Device[]): string[] {
-  const irmaos = devices.filter((d) =>
+/** Ordenação numérica quando ambos são números (1,2,10 — não 1,10,2); senão
+ *  lexical estável. Endereço/laço são texto no schema; §2/§18 exigem ordem real. */
+export function compareNumericThenText(a: string, b: string): number {
+  const sa = String(a).trim(), sb = String(b).trim();
+  const na = Number(sa), nb = Number(sb);
+  const aNum = sa !== '' && Number.isFinite(na);
+  const bNum = sb !== '' && Number.isFinite(nb);
+  if (aNum && bNum) return na - nb;
+  if (aNum) return -1;
+  if (bNum) return 1;
+  return sa.localeCompare(sb, 'pt-BR');
+}
+
+/** Devices que pertencem à central (parent explícito OU mesmo nº de central).
+ *  NUNCA cruza centrais diferentes. Base é a fonte — sem texto livre. */
+export function siblingsOfCentral(central: Pick<Device, 'id' | 'sistema' | 'central' | 'parentDeviceId'>, devices: Device[]): Device[] {
+  return devices.filter((d) =>
     d.sistema === central.sistema && d.id !== central.id && (
+      d.parentDeviceId === central.id ||
       (central.parentDeviceId == null && d.parentDeviceId === central.id) ||
-      (central.central != null && d.central === central.central) ||
-      d.parentDeviceId === central.id
+      (central.central != null && String(central.central).trim() !== '' && d.central === central.central)
     )
   );
+}
+
+/**
+ * Laços de uma central derivados da Base: valores distintos de `laco` entre os
+ * devices da central. Sem info suficiente → [] (lacuna: entrada manual segura,
+ * sem inventar). Ordenado NUMERICAMENTE (§2).
+ */
+export function resolveCentralLoops(central: Device, devices: Device[]): string[] {
   const lacos = new Set<string>();
-  for (const d of irmaos) if (d.laco != null && String(d.laco).trim() !== '') lacos.add(String(d.laco).trim());
-  return Array.from(lacos).sort();
+  for (const d of siblingsOfCentral(central, devices)) {
+    if (d.laco != null && String(d.laco).trim() !== '') lacos.add(String(d.laco).trim());
+  }
+  return Array.from(lacos).sort(compareNumericThenText);
+}
+
+/**
+ * Endereços REALMENTE cadastrados em um laço da central (§3/§18). NUNCA assume
+ * 1..N por contagem: retorna só os endereços existentes, distintos, numéricos-
+ * ordenados. Restrito a cliente/central/laço (não usa devices de outro laço).
+ */
+export function resolveLoopAddresses(central: Device, loop: string, devices: Device[]): string[] {
+  const alvoLaco = String(loop).trim();
+  const enderecos = new Set<string>();
+  for (const d of siblingsOfCentral(central, devices)) {
+    if (String(d.laco ?? '').trim() !== alvoLaco) continue;
+    const e = String(d.endereco ?? '').trim();
+    if (e !== '') enderecos.add(e);
+  }
+  return Array.from(enderecos).sort(compareNumericThenText);
+}
+
+/**
+ * Device canônico por (central, laço, endereço) — §4. Só retorna quando o
+ * casamento é INEQUÍVOCO (exatamente 1). Ambiguidade/ausência → undefined
+ * (a UI cai para entrada manual, sem alterar a Base).
+ */
+export function resolveDeviceByLoopAddress(central: Device, loop: string, address: string, devices: Device[]): Device | undefined {
+  const alvoLaco = String(loop).trim();
+  const alvoEnd = String(address).trim();
+  const matches = siblingsOfCentral(central, devices).filter((d) =>
+    String(d.laco ?? '').trim() === alvoLaco && String(d.endereco ?? '').trim() === alvoEnd
+  );
+  return matches.length === 1 ? matches[0] : undefined;
+}
+
+/* --------------------------- Baterias da central (§10/§11/§16) ------------- */
+
+/** Classificação canônica de bateria. ATENÇÃO: a taxonomia SDAI (technicalBase)
+ *  NÃO possui grupo 'Bateria' hoje (só 'Fonte / Alimentação'); 'Bateria' existe
+ *  em ALARME. Prioriza o grupo canônico quando existir; fallback ao tipo do ativo
+ *  (legado) — SEM texto do nome do produto. Ver lacuna reportada. */
+export function isBatteryDevice(d: Pick<Device, 'grupo' | 'tipoAtivo' | 'tipoDispositivo' | 'status'>): boolean {
+  if (d.status && d.status !== 'ativo') return false;
+  const g = (d.grupo || '').trim().toUpperCase();
+  if (g === 'BATERIA') return true;
+  const tipo = (d.tipoAtivo || d.tipoDispositivo || '').trim().toUpperCase();
+  return tipo === 'BATERIA';
+}
+
+/** Baterias vinculadas à central na Base (§11/§16). Sem bateria vinculada → []
+ *  (a UI NÃO faz fallback para dispositivos de campo; usa catálogo/manual). */
+export function resolveCentralBatteries(central: Device, devices: Device[]): Device[] {
+  return siblingsOfCentral(central, devices).filter(isBatteryDevice);
+}
+
+/** Item de catálogo mínimo (produtos do Estoque) para o seletor de bateria. */
+export interface BatteryCatalogItem { id: string; name?: string; category?: string; subcategory?: string; model?: string; brand?: string }
+
+/**
+ * Produtos de bateria do catálogo existente (§13). Filtra por categoria/
+ * subcategoria/nome contendo "bateria/battery" — catálogo é texto livre, não há
+ * taxonomia canônica de categoria; NÃO cria catálogo paralelo. Ordenado por nome.
+ */
+export function resolveBatteryCatalog(items: BatteryCatalogItem[]): BatteryCatalogItem[] {
+  return items
+    .filter((i) => /bateria|battery/i.test(`${i.category || ''} ${i.subcategory || ''} ${i.name || ''} ${i.model || ''}`))
+    .sort((a, b) => `${a.brand || ''} ${a.model || a.name || ''}`.localeCompare(`${b.brand || ''} ${b.model || b.name || ''}`, 'pt-BR'));
 }
 
 /* --------------------------- Devices planejados (§9) ----------------------- */
