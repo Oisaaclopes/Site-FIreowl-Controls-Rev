@@ -150,18 +150,26 @@ export async function fetchOrdensServico(filter?: {
   return (data || []).map(rowToOS);
 }
 
-/** Gera o próximo número OS-AAAA-NNNN a partir das OS existentes do ano. */
+/** Gera o próximo número OS-AAAA-NNNN a partir do MAIOR número vivo OU aposentado
+ *  do ano (retired_os_numbers, 0107) — assim uma OS excluída nunca reemite seu
+ *  número (§10). Best-effort: se o ledger ainda não existir (0107 não aplicada),
+ *  degrada para só as OS vivas. */
 export async function nextOsNumero(): Promise<string> {
   const ano = new Date().getFullYear();
   const supabase = getSupabaseClient() as any;
-  const { data } = await supabase
-    .from(TABLE)
-    .select('numero')
-    .like('numero', `OS-${ano}-%`);
-  const maior = (data || []).reduce((max: number, r: any) => {
-    const n = Number(String(r.numero || '').split('-')[2] || 0);
-    return n > max ? n : max;
-  }, 0);
+  const seq = (rows: any[] | null | undefined): number =>
+    (rows || []).reduce((max: number, r: any) => {
+      const n = Number(String(r.numero || '').split('-')[2] || 0);
+      return n > max ? n : max;
+    }, 0);
+  const [vivos, aposentados] = await Promise.all([
+    supabase.from(TABLE).select('numero').like('numero', `OS-${ano}-%`),
+    supabase.from('retired_os_numbers').select('numero').like('numero', `OS-${ano}-%`).then(
+      (r: any) => r,
+      () => ({ data: [] }),
+    ),
+  ]);
+  const maior = Math.max(seq(vivos?.data), seq(aposentados?.data));
   return `OS-${ano}-${String(maior + 1).padStart(4, '0')}`;
 }
 
@@ -262,6 +270,40 @@ export async function deleteOsIfUnused(osId: string): Promise<{ numero?: string 
   const { data, error } = await supabase.rpc('delete_os_if_unused', { p_os_id: osId });
   if (error) throw error;
   return { numero: data?.numero ?? undefined };
+}
+
+export interface DeleteContractOsResult {
+  success: boolean;
+  deletedOsId: string;
+  numero?: string;
+  /** A execução de rotina foi religada (ordem_servico_id null + status coerente). */
+  routineExecutionReset: boolean;
+  /** Quantos atendimentos vazios foram removidos junto (0..N). */
+  removedEmptyAttendance: number;
+}
+
+/**
+ * HARD DELETE seguro de OS SEM histórico técnico (RPC delete_contract_os_if_clean,
+ * 0107). Cobre OS criada por engano/teste e OS de rotina agendada nunca executada.
+ * O banco (SECURITY DEFINER) valida transacionalmente a AUSÊNCIA de qualquer
+ * evidência técnica — inclusive a oculta por RLS —, religa a execução de rotina
+ * para poder gerar nova OS sem duplicar e remove atendimento(s) comprovadamente
+ * vazio(s). Se houver qualquer histórico, a RPC bloqueia com a mensagem de domínio
+ * "Esta OS possui histórico técnico e deve ser preservada." (nada é apagado).
+ * O número da OS é aposentado e nunca reutilizado.
+ */
+export async function deleteContractOsIfClean(osId: string): Promise<DeleteContractOsResult> {
+  if (!osId) throw new Error('OS obrigatória para exclusão.');
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase.rpc('delete_contract_os_if_clean', { p_os_id: osId });
+  if (error) throw error;
+  return {
+    success: data?.success === true,
+    deletedOsId: String(data?.deleted_os_id ?? osId),
+    numero: data?.numero ?? undefined,
+    routineExecutionReset: data?.routine_execution_reset === true,
+    removedEmptyAttendance: Number(data?.removed_empty_attendance ?? 0),
+  };
 }
 
 export async function deleteOrdemServico(id: string): Promise<void> {

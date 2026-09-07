@@ -28,7 +28,7 @@ import { isSupabaseConfigured } from '@/lib/inventory';
 import { fetchReports, updateReport, safelyDeleteReport } from '@/lib/reports';
 import { fetchPendencias, updatePendenciaStatus } from '@/lib/pendencias';
 import { fetchDevices } from '@/lib/devices';
-import { fetchOrdensServico, updateOrdemServico } from '@/lib/ordensServico';
+import { deleteContractOsIfClean, fetchOrdensServico, updateOrdemServico } from '@/lib/ordensServico';
 import { fetchAssignableTechnicians, ManagedUser } from '@/lib/users';
 import { ResponsibleSelect } from '@/components/ui/ResponsibleSelect';
 import { OsAttendanceCta } from '@/components/operacoes/ServiceAttendanceFlow';
@@ -269,6 +269,34 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
       console.error('Falha ao atribuir responsável:', err);
       toast.error('Não foi possível atualizar o responsável.');
     }
+  };
+  // Exclusão segura de OS SEM histórico técnico (§9, RPC 0107). RBAC ADMIN/GESTOR.
+  // Confirmação interna (nunca window.confirm). O banco decide a elegibilidade de
+  // forma transacional; aqui não escondemos o erro técnico real do bloqueio.
+  const [deletingOsId, setDeletingOsId] = useState<string | null>(null);
+  const excluirOs = async (os: OrdemServico) => {
+    if (!podeAtribuir || deletingOsId) return;
+    const numero = os.numero || os.id.slice(0, 8);
+    await requestConfirm({
+      title: 'Excluir OS?',
+      message: `${numero} · ${OS_TIPO_LABEL[os.tipo] || 'Serviço'}\n${clientName(os.clienteId)}\n\nEsta OS ainda não possui histórico técnico e poderá ser removida. Registros operacionais vazios vinculados também poderão ser removidos.`,
+      confirmLabel: 'Excluir OS',
+      danger: true,
+      action: async () => {
+        try {
+          setDeletingOsId(os.id);
+          const r = await deleteContractOsIfClean(os.id);
+          setOrdens((prev) => prev.filter((x) => x.id !== r.deletedOsId));
+          const extra = r.removedEmptyAttendance > 0 ? ` (${r.removedEmptyAttendance} atendimento vazio removido)` : '';
+          showToast(`OS ${r.numero || numero} excluída.${extra}`);
+        } catch (e) {
+          // Bloqueio de domínio ("Esta OS possui histórico técnico...") ou erro real.
+          showToast(e instanceof Error ? e.message : 'Não foi possível excluir a OS.');
+        } finally {
+          setDeletingOsId(null);
+        }
+      },
+    });
   };
   const [loading, setLoading] = useState(false);
   // Templates: "template é dado, não código" — carregados do banco, com
@@ -1310,6 +1338,18 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                         agora é o próprio Atendimento (ServiceAttendanceFlow) e o PDF
                         sai pelo detalhe da OS. Relatórios históricos seguem na aba
                         Relatórios (§2/§46). */}
+                    {/* Exclusão segura (§9): só ADMIN/GESTOR; o banco (0107) valida
+                        se a OS está sem histórico técnico e bloqueia caso contrário. */}
+                    {podeAtribuir && (
+                      <button
+                        onClick={() => excluirOs(os)}
+                        disabled={deletingOsId === os.id}
+                        className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-danger/30 px-3 py-2 text-[11px] font-semibold text-danger hover:bg-danger/5 disabled:opacity-50 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">delete</span>
+                        {deletingOsId === os.id ? 'Excluindo…' : 'Excluir OS'}
+                      </button>
+                    )}
                   </article>
                 );
               })}
