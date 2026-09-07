@@ -2,13 +2,14 @@
 import React, { useEffect, useState } from 'react';
 import type { Client, Device, OrdemServico, ReportInstance, ServiceAttendance, UserRole } from '@/lib/types';
 import type { TemplateSchema } from '@/lib/reportSchema';
-import { ReportForm } from '@/components/reports/ReportForm';
+import { ReportForm, type MaintenanceReportContext } from '@/components/reports/ReportForm';
 import { buildBaseReportCatalog, augmentCatalogForSdaiMaintenance } from '@/lib/reportCatalog';
 import type { CatalogSources } from '@/components/reports/FormEngine';
 import { fetchMaintenancePeriodPlan } from '@/lib/maintenancePlan';
 import { fetchReportsByAttendanceIds } from '@/lib/reports';
 import { pickAttendanceReport } from '@/lib/maintenanceReports';
-import { attendancePlanDevices, resolveSdaiPreventiveRoutine } from '@/lib/sdaiAttendanceWiring';
+import { attendancePlanDevices, resolveSdaiPreventiveRoutine, periodicidadeLabel, competenciaFromPeriodStart } from '@/lib/sdaiAttendanceWiring';
+import { friendlyContractRef } from '@/lib/contracts';
 import type { SdaiMaintenanceMode } from '@/lib/sdaiAttendanceWiring';
 import { PREVENTIVA_SDAI_CONTRATO_CODIGO } from '@/lib/sdaiMaintenance';
 import { fetchContractRoutines } from '@/lib/contractRoutines';
@@ -36,6 +37,7 @@ interface ResolvedCtx {
   catalog: CatalogSources;
   cliente?: Client;
   finalizedReport?: ReportInstance;
+  identity: MaintenanceReportContext;
 }
 
 const LOAD_TIMEOUT_MS = 20_000;
@@ -132,6 +134,35 @@ export const SdaiMaintenancePanel: React.FC<{
         const found = pickAttendanceReport(existing, codigo);
         const finalizedReport = found && found.status === 'finalizado' ? found : undefined;
 
+        // Contexto documental RESOLVIDO pela cadeia real (contrato → rotina →
+        // execução → OS → atendimento). NUNCA expõe contract.id: usa a referência
+        // PÚBLICA (friendlyContractRef → contract.numero). O técnico não escolhe.
+        const contrato = contracts.find((c) => c.id === contratoId);
+        // Pendências do contexto SDAI: abertas do cliente, restritas à área SDAI
+        // (ou sem grupo). Não duplica — apenas apresenta as que já existem.
+        const pendenciasCtx = pendAbertas
+          .filter((p) => {
+            const g = (p.grupo || '').trim().toUpperCase();
+            return g === '' || g.includes('SDAI');
+          })
+          .map((p) => ({
+            id: p.id,
+            grupo: p.grupo,
+            descricao: p.descricao,
+            local: p.local,
+            criadaEm: p.criadaEm,
+            status: p.status,
+          }));
+        const identity: MaintenanceReportContext = {
+          contratoRef: contrato ? friendlyContractRef(contrato) : (contratoId ? friendlyContractRef({ id: contratoId }) : '—'),
+          contratoEscopo: contrato?.contractType,
+          periodicidade: periodicidadeLabel(routine),
+          competencia: competenciaFromPeriodStart(periodStart),
+          osNumero: os?.numero,
+          tecnico: technicianName,
+          pendencias: pendenciasCtx,
+        };
+
         if (!alive) return;
         setCtx({
           template: { ...template, versao: dbTpl?.versao ?? template.versao },
@@ -141,6 +172,7 @@ export const SdaiMaintenancePanel: React.FC<{
           catalog,
           cliente: clients.find((c) => c.id === clienteId),
           finalizedReport,
+          identity,
         });
         setStatus('ready');
       } catch (e) {
@@ -236,6 +268,7 @@ export const SdaiMaintenancePanel: React.FC<{
         contexto={{ osId: os?.id, contratoId: os?.contratoId }}
         devices={ctx.planDevices}
         maintenance={{ serviceAttendanceId: attendance.id, plan: { programadosDeviceIds: ctx.plan.programadosDeviceIds } }}
+        maintenanceContext={ctx.identity}
         onBack={() => setOpen(false)}
         onSaved={() => { setOpen(false); setReloadKey((k) => k + 1); onSaved?.(); }}
       />

@@ -59,6 +59,12 @@ interface ReportFormProps {
     serviceAttendanceId: string;
     plan?: { programadosDeviceIds: string[] };
   };
+  /** MANUTENÇÃO CONTRATUAL SDAI: contexto RESOLVIDO pela cadeia real
+   *  (contrato → rotina → execução → OS → atendimento). Quando presente e o
+   *  template for PREVENTIVA_SDAI_CONTRATO, a etapa "Identificação" é apresentada
+   *  SOMENTE LEITURA (sem selects de contrato/periodicidade/pendências) — o
+   *  técnico não escolhe o contrato de uma manutenção nascida de rotina. */
+  maintenanceContext?: MaintenanceReportContext;
   /** Persistência do "Cadastrar novo…" dos comboboxes (ex.: marca -> brands). */
   onCreateCatalogo?: (origem: string, name: string) => void;
   onBack: () => void;
@@ -76,6 +82,88 @@ interface PendenciaPreview {
   local?: string;
   origem: string;
 }
+
+/** Contexto documental resolvido do atendimento contratual SDAI (read-only). */
+export interface MaintenanceReportContext {
+  contratoRef: string;        // referência PÚBLICA (nunca contract.id)
+  contratoEscopo?: string;    // escopo/contractType
+  periodicidade: string;      // rótulo humano da rotina
+  competencia?: string;       // YYYY-MM
+  osNumero?: string;          // OS-AAAA-NNNN
+  tecnico?: string;
+  pendencias: { id: string; grupo?: string; descricao?: string; local?: string; criadaEm?: string; status?: string }[];
+}
+
+/** "Aberta há N dias" — a partir da data de origem (YYYY-MM-DD ou ISO). */
+function abertaHaLabel(criadaEm?: string): string | null {
+  if (!criadaEm) return null;
+  const d = new Date(criadaEm);
+  if (Number.isNaN(d.getTime())) return null;
+  const dias = Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000));
+  return dias === 0 ? 'Aberta hoje' : `Aberta há ${dias} dia${dias === 1 ? '' : 's'}`;
+}
+function fmtDataBR(iso?: string): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString('pt-BR');
+}
+
+/**
+ * Etapa "Identificação do atendimento" SOMENTE LEITURA para manutenção contratual
+ * SDAI. Substitui os selects manuais (contrato/periodicidade/pendências) pelo
+ * contexto já determinado pela cadeia de origem. Usa tokens theme-aware.
+ */
+const MaintenanceIdentityCard: React.FC<{ ctx: MaintenanceReportContext; clienteNome?: string }> = ({ ctx, clienteNome }) => {
+  const Info = ({ label, value, hint, mono }: { label: string; value: string; hint?: string; mono?: boolean }) => (
+    <div>
+      <p className="text-[11px] font-semibold uppercase text-fg-secondary">{label}</p>
+      <p className={`text-sm font-bold text-fg ${mono ? 'font-data-mono' : ''}`}>{value}</p>
+      {hint && <p className="text-[11px] text-fg-secondary mt-0.5">{hint}</p>}
+    </div>
+  );
+  return (
+    <div className="bg-surface rounded-xl border border-border shadow-sm p-5">
+      <div className="border-b border-border pb-3 mb-4">
+        <h3 className="text-sm font-bold text-fg uppercase tracking-wide">Identificação do atendimento</h3>
+        <p className="text-[11px] text-fg-secondary mt-1">
+          Contexto resolvido automaticamente pela rotina contratual — somente leitura.
+        </p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Info label="Contrato" value={ctx.contratoRef} hint={ctx.contratoEscopo} />
+        <Info label="Periodicidade da rotina" value={ctx.periodicidade} />
+        <Info label="Competência" value={ctx.competencia || '—'} mono />
+        <Info label="Ordem de serviço" value={ctx.osNumero || '—'} mono />
+        {clienteNome && <Info label="Cliente" value={clienteNome} />}
+        {ctx.tecnico && <Info label="Técnico" value={ctx.tecnico} />}
+      </div>
+      <div className="mt-5">
+        <p className="text-[11px] font-semibold uppercase text-fg-secondary">Pendências em aberto (somente leitura)</p>
+        {ctx.pendencias.length === 0 ? (
+          <p className="text-[11px] text-fg-muted italic mt-1.5">Nenhuma pendência em aberto para este contexto.</p>
+        ) : (
+          <div className="mt-2 space-y-2">
+            {ctx.pendencias.map((p) => {
+              const meta = [
+                p.local,
+                fmtDataBR(p.criadaEm) ? `Origem: ${fmtDataBR(p.criadaEm)}` : null,
+                abertaHaLabel(p.criadaEm),
+                p.status ? `Status: ${p.status}` : null,
+              ].filter(Boolean).join(' · ');
+              return (
+                <div key={p.id} className="rounded-lg border border-amber-200 bg-amber-50/60 p-2.5">
+                  {p.grupo && <p className="text-[10px] font-bold uppercase text-amber-800">{p.grupo}</p>}
+                  <p className="text-[11px] font-semibold text-fg">{p.descricao || 'Pendência'}</p>
+                  {meta && <p className="text-[10px] text-fg-secondary mt-0.5">{meta}</p>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const QUICK_DIAGNOSIS = ['Falha de alimentação', 'Falha de cabeamento', 'Mau contato', 'Bateria', 'Programação', 'Configuração', 'Dispositivo em alarme', 'Dispositivo em falha', 'Sujeira / manutenção', 'Infraestrutura', 'Não identificado'];
 const QUICK_EXECUTION = ['Testado', 'Ajustado', 'Reprogramado', 'Reconfigurado', 'Substituído', 'Reparado', 'Limpo', 'Resetado', 'Refeito cabeamento', 'Religado', 'Sem intervenção'];
@@ -198,6 +286,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   pendenciasAprovadas,
   ciclo,
   maintenance,
+  maintenanceContext,
   onCreateCatalogo,
   onBack,
   onSaved,
@@ -236,6 +325,15 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   });
   const template = frozen.template;
   const templateVersion = frozen.version;
+
+  // MANUTENÇÃO CONTRATUAL SDAI: quando o contexto resolvido chega, a etapa de
+  // Identificação vira somente leitura — os selects manuais (contrato/periodicidade/
+  // pendências) NÃO são renderizados; o técnico não escolhe o contrato de origem.
+  const isSdaiContract = !!maintenanceContext && template.codigo === PREVENTIVA_SDAI_CONTRATO_CODIGO;
+  const suppressedIdentKeys = useMemo(
+    () => (isSdaiContract ? new Set(['periodicidade', 'contrato_id', 'pendencias_abertas_ref']) : null),
+    [isSdaiContract]
+  );
 
   const [values, setValues] = useState<FormValues>({});
   const [issues, setIssues] = useState<FinalizeIssue[] | null>(null);
@@ -335,6 +433,24 @@ export const ReportForm: React.FC<ReportFormProps> = ({
     });
   }, [pendenciasAprovadas, template]);
 
+  // Prefill READ-ONLY da identificação (manutenção contratual SDAI): grava a
+  // periodicidade e a referência PÚBLICA do contrato nas respostas para que o
+  // relatório persista o contexto, sem que o técnico precise (ou possa) escolher.
+  useEffect(() => {
+    if (!isSdaiContract || !maintenanceContext) return;
+    setValues((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      if ((next.periodicidade === undefined || next.periodicidade === '') && maintenanceContext.periodicidade && maintenanceContext.periodicidade !== '—') {
+        next.periodicidade = maintenanceContext.periodicidade; changed = true;
+      }
+      if ((next.contrato_id === undefined || next.contrato_id === '') && maintenanceContext.contratoRef) {
+        next.contrato_id = maintenanceContext.contratoRef; changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [isSdaiContract, maintenanceContext]);
+
   // Navegação em passos (uma seção por tela — modo campo, Partes 4.7/8)
   const [showPend, setShowPend] = useState(false);
   const [sectionErr, setSectionErr] = useState<string | null>(null);
@@ -368,7 +484,14 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   );
   const idx = Math.min(currentIdx, Math.max(0, visibleSections.length - 1));
   const currentSection = visibleSections[idx];
-  const stepTemplate = { ...effectiveTemplate, secoes: currentSection ? [currentSection] : [] };
+  // Na manutenção contratual SDAI, os campos de identificação (contrato/periodicidade/
+  // pendências) são apresentados read-only fora do FormEngine — removê-los do passo
+  // evita renderizar selects manuais e um card de seção vazio.
+  const stepSection = currentSection && suppressedIdentKeys
+    ? { ...currentSection, campos: currentSection.campos.filter((f) => !suppressedIdentKeys.has(f.key)) }
+    : currentSection;
+  const stepTemplate = { ...effectiveTemplate, secoes: stepSection ? [stepSection] : [] };
+  const showIdentityCard = isSdaiContract && currentSection?.key === 'identificacao';
   const isLast = idx >= visibleSections.length - 1;
   const etapaRapida: Record<string, string> = {
     chamado: 'Chamado', diagnostico: 'Diagnóstico', servico_executado: 'Execução', materiais: 'Execução',
@@ -872,7 +995,8 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       )}
 
       {/* Topo fixo: contexto operacional, progresso e geolocalização. */}
-      <div className="sticky top-16 z-20 bg-surface border-b border-border px-4 py-3 flex items-center gap-3">
+      <div className="sticky top-16 z-20 bg-surface border-b border-border px-4 py-3">
+        <div className="max-w-3xl mx-auto w-full flex items-center gap-3">
         <button onClick={onBack} title="Sair" className="w-9 h-9 rounded-lg flex items-center justify-center text-fg-secondary hover:bg-surface-3 shrink-0">
           <span className="material-symbols-outlined">arrow_back</span>
         </button>
@@ -894,6 +1018,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
           {geoInicio ? `±${Math.round(geoInicio.accuracy || 0)}` : '—'}
         </span>
         <span className="text-[11px] font-data-mono text-fg-secondary shrink-0">{idx + 1}/{visibleSections.length}</span>
+        </div>
       </div>
       <div className="h-1 bg-surface-3 sticky top-[calc(4rem+57px)] z-20">
         <div className="h-full bg-navy transition-all" style={{ width: `${progresso}%` }} />
@@ -942,8 +1067,8 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         </div>
       )}
 
-      {/* Conteúdo: uma seção por vez */}
-      <div className="flex-1 p-4 md:p-8 pb-28">
+      {/* Conteúdo: uma seção por vez (centralizado com max-width no desktop) */}
+      <div className="flex-1 w-full max-w-3xl mx-auto p-4 md:p-6 pb-28">
         {/* Seletor Pontual/Parcial/Completo: só para rascunhos LEGADOS já salvos
             nesses modos (compat.). Novas "Visitas para Orçamento" não o exibem
             — o Levantamento Técnico com modos vive no motor 3D (Base Técnica). */}
@@ -1006,18 +1131,23 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         {modoCampo === 'rapido' && template.tipo === 'CORRETIVA' && currentSection && (
           <QuickCorrectiveActions sectionKey={currentSection.key} values={values} onChange={handleChange} />
         )}
-        <FormEngine
-          template={stepTemplate}
-          values={values}
-          onChange={handleChange}
-          catalog={catalog}
-          role={roleForEngine}
-          onCreateCatalogo={onCreateCatalogo}
-          unclassifiedCount={unclassifiedPhotos.length}
-          onOpenTriagem={() => setIsTriagemOpen(true)}
-          onFastPhotoCaptured={handleFastPhotoCaptured}
-          hideFloatingCamera
-        />
+        {showIdentityCard && maintenanceContext && (
+          <MaintenanceIdentityCard ctx={maintenanceContext} clienteNome={cliente?.name} />
+        )}
+        {(stepTemplate.secoes[0]?.campos.length ?? 0) > 0 && (
+          <FormEngine
+            template={stepTemplate}
+            values={values}
+            onChange={handleChange}
+            catalog={catalog}
+            role={roleForEngine}
+            onCreateCatalogo={onCreateCatalogo}
+            unclassifiedCount={unclassifiedPhotos.length}
+            onOpenTriagem={() => setIsTriagemOpen(true)}
+            onFastPhotoCaptured={handleFastPhotoCaptured}
+            hideFloatingCamera
+          />
+        )}
 
         {template.tipo === 'LEVANTAMENTO' && isLast && (
           <div className="mt-5 rounded-xl border border-border bg-surface p-4">
@@ -1082,8 +1212,9 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         </button>
       )}
 
-      {/* Rodapé fixo — zona do polegar */}
-      {(template.tipo !== 'LEVANTAMENTO' || surveyMode) && <div className="sticky bottom-0 z-30 bg-surface border-t border-border px-4 py-3 flex items-center gap-2">
+      {/* Rodapé fixo — zona do polegar (centralizado no desktop) */}
+      {(template.tipo !== 'LEVANTAMENTO' || surveyMode) && <div className="sticky bottom-0 z-30 bg-surface border-t border-border px-4 py-3">
+        <div className="max-w-3xl mx-auto w-full flex items-center gap-2">
         <button
           onClick={goPrev}
           disabled={idx === 0}
@@ -1116,6 +1247,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
             Próximo
           </button>
         )}
+        </div>
       </div>}
 
       {/* Bottom sheet: pendências a abrir */}

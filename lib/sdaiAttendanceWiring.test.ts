@@ -6,6 +6,8 @@ import {
   attendanceMayBeContractualSdai,
   attendancePlanDevices,
   buildAttendanceVerification,
+  competenciaFromPeriodStart,
+  periodicidadeLabel,
   coverageInProgress,
   finalizationGate,
   parseSdaiChecklistResults,
@@ -31,6 +33,33 @@ describe('visibilidade do fluxo genérico no atendimento', () => {
 });
 
 const plan = (ids: string[]): Pick<MaintenancePeriodPlan, 'programadosDeviceIds'> => ({ programadosDeviceIds: ids });
+
+describe('periodicidadeLabel — read-only da identificação', () => {
+  it('prioriza intervaloMeses e mapeia para rótulo humano', () => {
+    expect(periodicidadeLabel({ intervaloMeses: 1 })).toBe('Mensal');
+    expect(periodicidadeLabel({ intervaloMeses: 3 })).toBe('Trimestral');
+    expect(periodicidadeLabel({ intervaloMeses: 6 })).toBe('Semestral');
+    expect(periodicidadeLabel({ intervaloMeses: 12 })).toBe('Anual');
+    expect(periodicidadeLabel({ intervaloMeses: 5 })).toBe('A cada 5 meses');
+  });
+  it('deriva da frequência quando não há intervaloMeses; casos especiais explícitos', () => {
+    expect(periodicidadeLabel({ frequencia: 'mensal' })).toBe('Mensal');
+    expect(periodicidadeLabel({ frequencia: 'trimestral' })).toBe('Trimestral');
+    expect(periodicidadeLabel({ frequencia: 'sob_demanda' })).toBe('Sob demanda');
+    expect(periodicidadeLabel({ frequencia: 'semanal' })).toBe('Semanal');
+    expect(periodicidadeLabel(undefined)).toBe('—');
+    expect(periodicidadeLabel({})).toBe('—'); // nunca cai em "Mensal" por omissão
+  });
+});
+
+describe('competenciaFromPeriodStart', () => {
+  it('extrai YYYY-MM do início da janela', () => {
+    expect(competenciaFromPeriodStart('2026-09-01')).toBe('2026-09');
+    expect(competenciaFromPeriodStart('2026-12-31')).toBe('2026-12');
+    expect(competenciaFromPeriodStart(undefined)).toBeUndefined();
+    expect(competenciaFromPeriodStart('lixo')).toBeUndefined();
+  });
+});
 
 describe('resolveAttendanceTemplateCodigo (§3)', () => {
   it('usa o template da rotina; fallback SDAI contratual; undefined se indeterminado', () => {

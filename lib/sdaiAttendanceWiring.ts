@@ -46,6 +46,31 @@ export function resolveAttendanceTemplateCodigo(routine?: Pick<ContractRoutine, 
   return undefined;
 }
 
+/** Rótulo humano da periodicidade da rotina (exibição read-only §IDENTIFICAÇÃO).
+ *  Prioriza intervaloMeses; senão deriva da frequência. NUNCA cai em "Mensal" por
+ *  omissão (sob_demanda/semanal/desconhecido são explícitos). PURO/testável. */
+const MESES_FREQ: Record<string, number> = {
+  mensal: 1, bimestral: 2, trimestral: 3, quadrimestral: 4, semestral: 6, anual: 12,
+};
+const LABEL_MESES: Record<number, string> = {
+  1: 'Mensal', 2: 'Bimestral', 3: 'Trimestral', 4: 'Quadrimestral', 6: 'Semestral', 12: 'Anual',
+};
+export function periodicidadeLabel(routine?: Pick<ContractRoutine, 'intervaloMeses' | 'frequencia'>): string {
+  if (!routine) return '—';
+  const f = (routine.frequencia || '').trim().toLowerCase();
+  if (f === 'sob_demanda') return 'Sob demanda';
+  if (f === 'semanal') return 'Semanal';
+  const meses = routine.intervaloMeses && routine.intervaloMeses > 0 ? routine.intervaloMeses : (MESES_FREQ[f] || 0);
+  return LABEL_MESES[meses] || (meses > 0 ? `A cada ${meses} meses` : '—');
+}
+
+/** Competência (YYYY-MM) a partir do início da janela do período (YYYY-MM-DD). */
+export function competenciaFromPeriodStart(periodStart?: string): string | undefined {
+  if (!periodStart) return undefined;
+  const m = /^(\d{4})-(\d{2})/.exec(periodStart);
+  return m ? `${m[1]}-${m[2]}` : undefined;
+}
+
 /**
  * Rotina preventiva SDAI contratual aplicável: ativa, área SDAI, tipo preventiva
  * e que resolve para PREVENTIVA_SDAI_CONTRATO. NÃO casa corretiva/inspeção nem

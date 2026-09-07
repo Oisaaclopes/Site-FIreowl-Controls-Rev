@@ -94,7 +94,7 @@ import { fetchCompanyProfile, upsertCompanyProfile } from '@/lib/companyProfile'
 import { fetchEmpresasAtendidas, upsertEmpresaAtendida, deleteEmpresaAtendida } from '@/lib/empresasAtendidas';
 import { fetchMarcasTecnologias, upsertMarcaTecnologia, deleteMarcaTecnologia } from '@/lib/marcasTecnologias';
 import { fetchTransactions, upsertTransaction, deleteTransaction } from '@/lib/transactions';
-import { fetchContracts, upsertContract } from '@/lib/contracts';
+import { fetchContracts, upsertContract, nextContractNumero } from '@/lib/contracts';
 import { fetchSupplyOrders, insertSupplyOrder, updateSupplyOrder } from '@/lib/supplyOrders';
 import { WorkSchedule } from '@/lib/schedule';
 import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
@@ -658,7 +658,9 @@ export function CrmApp({
     const renewal = new Date(started); renewal.setMonth(renewal.getMonth() + months);
     const stamp = Date.now().toString(36);
     await handleAddContract({
-      id: `CTR-FOWL-${stamp}`,
+      id: `CTR-FOWL-${stamp}`, // id INTERNO (técnico); a referência pública é `numero`
+      // Referência PÚBLICA/documental no padrão CTR-AAAA-NNN (sequencial anual).
+      numero: nextContractNumero(contracts),
       clientName: pedido.clienteNome,
       clientId: pedido.clienteId,
       unit: client?.address || 'Unidade a definir',
