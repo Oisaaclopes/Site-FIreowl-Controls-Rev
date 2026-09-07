@@ -81,6 +81,7 @@ jobs:
             set ftp:ssl-force true;
             set ftp:ssl-protect-data true;
             set ssl:verify-certificate no;
+            set xfer:use-temp-file false;
             set cmd:fail-exit true;
             set net:max-retries 2;
             set net:timeout 20;
