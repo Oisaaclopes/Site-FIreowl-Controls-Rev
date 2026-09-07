@@ -41,6 +41,7 @@ import { usePagination } from '@/lib/usePagination';
 import { PaginatedListControls } from '@/components/ui/PaginatedListControls';
 import { ClientTechnicalBase } from '@/components/clients/ClientTechnicalBase';
 import { ContractDetailPanel } from '@/components/contratos/ContractDetailPanel';
+import { ContractForm } from '@/components/contratos/ContractForm';
 import { AttendanceScreen } from '@/components/operacoes/ServiceAttendanceFlow';
 import { fetchOrdensServico } from '@/lib/ordensServico';
 import type { ServiceAttendance } from '@/lib/types';
@@ -86,6 +87,8 @@ interface ClientDossieProps {
   currentUserName?: string;
   /** Recarrega os contratos após criar/excluir/encerrar (thread do CRM). */
   onReloadContracts?: () => void | Promise<void>;
+  /** Persiste um contrato criado/editado no Cliente 360 (mesmo handler do CRM). */
+  onCreateContract?: (c: Contract) => void;
 }
 
 const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -185,10 +188,12 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
   currentUserId,
   currentUserName,
   onReloadContracts,
+  onCreateContract,
 }) => {
   const { maskMoney } = usePrivacy();
   // Gestão contratual inline (§1/§5): painel do contrato e atendimento dentro do 360.
   const [contractPanel, setContractPanel] = useState<Contract | null>(null);
+  const [contractFormOpen, setContractFormOpen] = useState<Contract | null | 'new'>(null);
   const [attendanceView, setAttendanceView] = useState<{ attendance: ServiceAttendance; os?: OrdemServico } | null>(null);
   const abrirAtendimentoContratual = async (info: { attendance: ServiceAttendance; workOrderId: string }) => {
     let os: OrdemServico | undefined;
@@ -707,7 +712,7 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
           <SectionWrap
             title={`Contratos (${clientContracts.length})`}
             actionLabel={userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR' ? 'Novo contrato' : undefined}
-            onAction={userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR' ? () => onNavigateToTab('contratos') : undefined}
+            onAction={userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR' ? () => setContractFormOpen('new') : undefined}
           >
             {clientContracts.length === 0 ? (
               <EmptyState variant="generico" title="Nenhum contrato" description="Este cliente não possui contratos vinculados." />
@@ -779,6 +784,24 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
           onClose={() => setContractPanel(null)}
           onChanged={() => { setContractPanel(null); void onReloadContracts?.(); }}
           onOpenAttendance={abrirAtendimentoContratual}
+          onEdit={(c) => { setContractPanel(null); setContractFormOpen(c); }}
+        />
+      )}
+      {/* Novo/editar contrato inline (§1/§3/§5): mesmo ContractForm, cliente travado. */}
+      {contractFormOpen && (
+        <ContractForm
+          clients={[client]}
+          contracts={clientContracts}
+          contract={contractFormOpen === 'new' ? null : contractFormOpen}
+          lockClientId={client.id}
+          userRole={userRole}
+          onCancel={() => setContractFormOpen(null)}
+          onSaved={(c) => {
+            onCreateContract?.(c);
+            setContractFormOpen(null);
+            void onReloadContracts?.();
+            setContractPanel(c); // abre o contrato recém-criado/editado no 360
+          }}
         />
       )}
       {/* Atendimento contratual aberto diretamente (§5/§6). */}

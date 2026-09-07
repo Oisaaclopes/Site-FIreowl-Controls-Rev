@@ -1350,6 +1350,7 @@ export function CrmApp({
               currentUserId={userId}
               currentUserName={userName}
               onReloadContracts={async () => setContracts(await fetchContracts())}
+              onCreateContract={handleAddContract}
             />
           )}
 

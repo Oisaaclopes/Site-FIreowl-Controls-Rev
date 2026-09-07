@@ -55,6 +55,7 @@ interface CrmViewProps {
   currentUserId?: string;
   currentUserName?: string;
   onReloadContracts?: () => void | Promise<void>;
+  onCreateContract?: (c: Contract) => void;
 }
 
 const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -119,6 +120,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
   currentUserId,
   currentUserName,
   onReloadContracts,
+  onCreateContract,
 }) => {
   const { maskMoney } = usePrivacy();
   // O CRM não clona o menu lateral: mostra só a base de Clientes. (Estoque,
@@ -430,6 +432,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
         currentUserId={currentUserId}
         currentUserName={currentUserName}
         onReloadContracts={onReloadContracts}
+        onCreateContract={onCreateContract}
       />
     );
   }

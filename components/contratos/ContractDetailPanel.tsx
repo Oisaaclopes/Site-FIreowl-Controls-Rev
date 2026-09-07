@@ -41,7 +41,9 @@ export const ContractDetailPanel: React.FC<{
   onChanged?: () => void;
   /** Abre o atendimento criado/reutilizado (host renderiza o AttendanceScreen). */
   onOpenAttendance?: (info: { attendance: ServiceAttendance; workOrderId: string }) => void;
-}> = ({ contract, onClose, userRole, initialTab = 'rotinas', technicianId, onChanged, onOpenAttendance }) => {
+  /** Editar dados do contrato (host abre o ContractForm em modo edição). */
+  onEdit?: (c: Contract) => void;
+}> = ({ contract, onClose, userRole, initialTab = 'rotinas', technicianId, onChanged, onOpenAttendance, onEdit }) => {
   const online = isSupabaseConfigured();
   const canManageOps = userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR';
   const [tab, setTab] = useState<DetailTab>(initialTab);
@@ -191,6 +193,12 @@ export const ContractDetailPanel: React.FC<{
             <p className="text-[11px] text-fg-muted font-data-mono">{contract.numero || contract.id}</p>
           </div>
           <div className="flex items-center gap-3 shrink-0">
+            {canManageOps && onEdit && (
+              <button onClick={() => onEdit(contract)} disabled={busy}
+                className="text-[11px] font-bold uppercase text-primary border border-primary/40 hover:bg-primary/10 disabled:opacity-40 rounded-lg px-2.5 py-1.5 inline-flex items-center gap-1">
+                <span className="material-symbols-outlined text-sm">edit</span>Editar dados
+              </button>
+            )}
             {canManageOps && (
               <button onClick={excluirContrato} disabled={busy}
                 className="text-[11px] font-bold uppercase text-danger border border-danger/40 hover:bg-danger/10 disabled:opacity-40 rounded-lg px-2.5 py-1.5 inline-flex items-center gap-1">
