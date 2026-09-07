@@ -9,6 +9,7 @@ import { fetchMaintenancePeriodPlan } from '@/lib/maintenancePlan';
 import { fetchReportsByAttendanceIds } from '@/lib/reports';
 import { pickAttendanceReport } from '@/lib/maintenanceReports';
 import { attendancePlanDevices, resolveSdaiPreventiveRoutine } from '@/lib/sdaiAttendanceWiring';
+import type { SdaiMaintenanceMode } from '@/lib/sdaiAttendanceWiring';
 import { PREVENTIVA_SDAI_CONTRATO_CODIGO } from '@/lib/sdaiMaintenance';
 import { fetchContractRoutines } from '@/lib/contractRoutines';
 import { fetchDevices } from '@/lib/devices';
@@ -37,6 +38,21 @@ interface ResolvedCtx {
   finalizedReport?: ReportInstance;
 }
 
+const LOAD_TIMEOUT_MS = 20_000;
+
+function withLoadTimeout<T>(promise: Promise<T>, stage: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(
+      () => reject(new Error(`Tempo limite ao carregar ${stage}.`)),
+      LOAD_TIMEOUT_MS,
+    );
+    promise.then(
+      (value) => { window.clearTimeout(timer); resolve(value); },
+      (error) => { window.clearTimeout(timer); reject(error); },
+    );
+  });
+}
+
 /**
  * MANUTENÇÃO PREVENTIVA SDAI dentro do Atendimento (entrada canônica). Só ATIVA
  * quando `enabled` (atendimento SDAI vinculado a contrato). Resolve
@@ -44,6 +60,8 @@ interface ResolvedCtx {
  * abre o ReportForm existente (com plano injetado + gancho de manutenção). Tudo
  * gated por PREVENTIVA_SDAI_CONTRATO — não afeta outros fluxos.
  */
+export type { SdaiMaintenanceMode } from '@/lib/sdaiAttendanceWiring';
+
 export const SdaiMaintenancePanel: React.FC<{
   enabled: boolean;
   attendance: ServiceAttendance;
@@ -52,19 +70,33 @@ export const SdaiMaintenancePanel: React.FC<{
   userRole?: UserRole;
   technicianName?: string;
   onSaved?: () => void;
-}> = ({ enabled, attendance, os, clients, userRole = 'TECNICO', technicianName, onSaved }) => {
+  onExit?: () => void;
+  /** Reporta o estado ao AttendanceScreen para não competir com o fluxo genérico (§7). */
+  onModeChange?: (mode: SdaiMaintenanceMode) => void;
+}> = ({ enabled, attendance, os, clients, userRole = 'TECNICO', technicianName, onSaved, onExit, onModeChange }) => {
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'na' | 'error'>('idle');
   const [ctx, setCtx] = useState<ResolvedCtx | null>(null);
   const [open, setOpen] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // reloadKey força re-resolução (retry §8 / após salvar) SEM depender de `status`
+  // nas deps do efeito — depender de status causava o loop que travava em loading:
+  // setStatus('loading') disparava o cleanup (alive=false) da própria execução.
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // Reporta o modo ao pai (§7): 'off' quando desabilitado.
+  useEffect(() => {
+    onModeChange?.(!enabled ? 'off' : status === 'idle' ? 'loading' : status);
+  }, [enabled, status, onModeChange]);
 
   useEffect(() => {
-    if (!enabled || status !== 'idle') return;
+    if (!enabled) { setStatus('idle'); return; }
     const contratoId = os?.contratoId || undefined;
     const clienteId = os?.clienteId || undefined;
     if (!contratoId || !clienteId) { setStatus('na'); return; }
     let alive = true;
+    setCtx(null);
     setStatus('loading');
+    setErr(null);
     (async () => {
       try {
         const { periodStart, periodEnd } = monthWindow();
@@ -72,23 +104,23 @@ export const SdaiMaintenancePanel: React.FC<{
         // existir rotina preventiva SDAI contratual (PREVENTIVA_SDAI_CONTRATO).
         // Sem isso → NÃO mostra CTA (não classifica corretiva como preventiva).
         if (os?.tipo && os.tipo !== 'preventiva') { if (alive) setStatus('na'); return; }
-        const routines = await fetchContractRoutines(contratoId);
+        const routines = await withLoadTimeout(fetchContractRoutines(contratoId), 'rotinas do contrato');
         const routine = resolveSdaiPreventiveRoutine(routines);
         if (!routine) { if (alive) setStatus('na'); return; }
         const codigo = PREVENTIVA_SDAI_CONTRATO_CODIGO;
 
-        const dbTpl = await fetchTemplateByCodigo(codigo).catch(() => null);
+        const dbTpl = await withLoadTimeout(fetchTemplateByCodigo(codigo), 'template SDAI');
         const template = (dbTpl?.schema as TemplateSchema | undefined)
           || ALL_TEMPLATES.find((t) => t.codigo === codigo);
-        if (!template) { if (alive) setStatus('na'); return; }
+        if (!template) throw new Error('Template da preventiva SDAI não encontrado.');
 
         const [plan, devicesCliente, inventory, contracts, pendAbertas, existing] = await Promise.all([
-          fetchMaintenancePeriodPlan({ contractId: contratoId, clienteId, periodStart, periodEnd, rotation: true }),
-          fetchDevices(clienteId),
-          fetchInventory().catch(() => []),
-          fetchContracts().catch(() => []),
-          fetchPendencias(userRole, { clienteId, status: 'aberta' }).catch(() => []),
-          fetchReportsByAttendanceIds([attendance.id]).catch(() => []),
+          withLoadTimeout(fetchMaintenancePeriodPlan({ contractId: contratoId, clienteId, periodStart, periodEnd, rotation: true }), 'plano de manutenção'),
+          withLoadTimeout(fetchDevices(clienteId), 'dispositivos'),
+          withLoadTimeout(fetchInventory(), 'inventário'),
+          withLoadTimeout(fetchContracts(), 'contratos'),
+          withLoadTimeout(fetchPendencias(userRole, { clienteId, status: 'aberta' }), 'pendências'),
+          withLoadTimeout(fetchReportsByAttendanceIds([attendance.id]), 'relatórios do atendimento'),
         ]);
 
         const base = buildBaseReportCatalog({ inventory: inventory as never, services: [], brands: [], contracts: contracts as never });
@@ -113,12 +145,19 @@ export const SdaiMaintenancePanel: React.FC<{
         setStatus('ready');
       } catch (e) {
         if (!alive) return;
+        console.error('Falha ao preparar manutenção preventiva SDAI:', e);
         setErr(e instanceof Error ? e.message : 'Falha ao preparar a manutenção.');
         setStatus('error');
       }
     })();
     return () => { alive = false; };
-  }, [enabled, status, os, attendance.id, clients, userRole]);
+    // Deps PRIMITIVAS (nunca `status` nem o objeto `os`): re-resolve por origem
+    // real da OS + retry/salvar (reloadKey). `clients` fora das deps de propósito
+    // (usado só p/ nome do cliente; evita re-run por identidade de array).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, os?.contratoId, os?.clienteId, os?.tipo, os?.id, attendance.id, userRole, reloadKey]);
+
+  const retry = () => { setErr(null); setStatus('loading'); setReloadKey((k) => k + 1); };
 
   if (!enabled || status === 'na') return null;
 
@@ -128,7 +167,24 @@ export const SdaiMaintenancePanel: React.FC<{
     return <div style={box}>Preparando manutenção preventiva SDAI…</div>;
   }
   if (status === 'error') {
-    return <div style={box}>Não foi possível preparar a manutenção: {err}</div>;
+    return (
+      <div style={box}>
+        <strong>Não foi possível preparar a manutenção preventiva SDAI.</strong>
+        {err ? <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>{err}</div> : null}
+        <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button type="button" onClick={retry}
+            style={{ padding: '9px 14px', borderRadius: 10, background: 'var(--bg-primary, #0B1E38)', color: '#fff', border: 0, fontWeight: 600 }}>
+            Tentar novamente
+          </button>
+          {onExit ? (
+            <button type="button" onClick={onExit}
+              style={{ padding: '9px 14px', borderRadius: 10, background: 'transparent', color: 'inherit', border: '1px solid var(--border, #e5e7eb)', fontWeight: 600 }}>
+              Sair
+            </button>
+          ) : null}
+        </div>
+      </div>
+    );
   }
   if (!ctx) return null;
 
@@ -152,7 +208,11 @@ export const SdaiMaintenancePanel: React.FC<{
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <div>
             <strong>Manutenção preventiva SDAI</strong>
-            <div style={{ fontSize: 13, opacity: 0.8 }}>{planned} dispositivo(s) planejado(s) neste período.</div>
+            <div style={{ fontSize: 13, opacity: 0.8 }}>
+              {planned > 0
+                ? `${planned} dispositivo(s) planejado(s) neste período.`
+                : '0 dispositivos planejados para este período. O checklist da central ainda pode ser realizado.'}
+            </div>
           </div>
           <button type="button" onClick={() => setOpen(true)}
             style={{ padding: '10px 16px', borderRadius: 10, background: 'var(--bg-primary, #0B1E38)', color: '#fff', border: 0, fontWeight: 600 }}>
@@ -177,7 +237,7 @@ export const SdaiMaintenancePanel: React.FC<{
         devices={ctx.planDevices}
         maintenance={{ serviceAttendanceId: attendance.id, plan: { programadosDeviceIds: ctx.plan.programadosDeviceIds } }}
         onBack={() => setOpen(false)}
-        onSaved={() => { setOpen(false); setStatus('idle'); onSaved?.(); }}
+        onSaved={() => { setOpen(false); setReloadKey((k) => k + 1); onSaved?.(); }}
       />
     </div>
   );

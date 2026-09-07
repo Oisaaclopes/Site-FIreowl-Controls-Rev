@@ -23,6 +23,16 @@ import {
 } from './sdaiMaintenance';
 import { classifyTestResult } from './maintenanceCoverage';
 
+export type SdaiMaintenanceMode = 'off' | 'loading' | 'ready' | 'na' | 'error';
+
+/** O fluxo genérico só aparece quando o motor SDAI não foi habilitado ou
+ * confirmou que a OS não é uma preventiva SDAI contratual. */
+export function shouldShowGenericAttendanceFlow(
+  mode: SdaiMaintenanceMode,
+): boolean {
+  return mode === 'off' || mode === 'na';
+}
+
 /* --------------------------- Resolução de contexto (§2/§3) ----------------- */
 
 /** Código de template do atendimento: o da rotina; fallback ao SDAI contratual

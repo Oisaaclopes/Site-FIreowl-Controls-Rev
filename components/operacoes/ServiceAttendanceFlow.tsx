@@ -39,7 +39,8 @@ import { fetchOrdemServicoById, fetchOrdensServico, updateOrdemServicoStatus } f
 import { fetchClientById } from '@/lib/clients';
 import { capturePosition } from '@/lib/fieldPhotoGeo';
 import { fetchOsMission, missionHasContent, missionIsSdai, OsMission } from '@/lib/osMission';
-import { attendanceMayBeContractualSdai } from '@/lib/sdaiAttendanceWiring';
+import { attendanceMayBeContractualSdai, shouldShowGenericAttendanceFlow } from '@/lib/sdaiAttendanceWiring';
+import type { SdaiMaintenanceMode } from '@/lib/sdaiAttendanceWiring';
 import { AttendanceEvidence, EvidenceState } from '@/components/operacoes/AttendanceEvidence';
 import { resolveLogoDataUrls } from '@/lib/institucional';
 import { getClientOperationalName } from '@/lib/utils';
@@ -561,6 +562,23 @@ export const AttendanceScreen: React.FC<{
   // contrato_id + tipo (a confirmação autoritativa por rotina/template acontece
   // dentro do SdaiMaintenancePanel, que some se não casar). §3/§4.
   const sdaiMaintenanceEnabled = isSdai || attendanceMayBeContractualSdai({ contratoId: os?.contratoId, osTipo: os?.tipo });
+  // Modo reportado pelo painel SDAI (§7): enquanto loading/ready/error, o fluxo
+  // genérico (Diagnóstico/Serviço/Resultado + finalizar genérico) NÃO compete.
+  // Só volta ao genérico quando o painel resolve 'na' (não é preventiva SDAI).
+  const sdaiModeKey = `${attendance.id}:${sdaiMaintenanceEnabled ? 'candidate' : 'generic'}`;
+  const [reportedSdai, setReportedSdai] = useState<{ key: string; mode: SdaiMaintenanceMode }>(() => ({
+    key: sdaiModeKey,
+    mode: sdaiMaintenanceEnabled ? 'loading' : 'off',
+  }));
+  // Se a OS/attendance mudar, o valor reportado pela tela anterior nunca pode
+  // liberar um frame do genérico antes que o novo painel se pronuncie.
+  const sdaiMode: SdaiMaintenanceMode = reportedSdai.key === sdaiModeKey
+    ? reportedSdai.mode
+    : sdaiMaintenanceEnabled ? 'loading' : 'off';
+  const handleSdaiModeChange = useCallback((mode: SdaiMaintenanceMode) => {
+    setReportedSdai({ key: sdaiModeKey, mode });
+  }, [sdaiModeKey]);
+  const showGeneric = shouldShowGenericAttendanceFlow(sdaiMode);
 
   // Estado das evidências (reportado pela seção inline) p/ validar finalização.
   const [evidence, setEvidence] = useState<EvidenceState>({
@@ -731,8 +749,6 @@ export const AttendanceScreen: React.FC<{
         </div>
 
         <div className="overflow-y-auto p-4 sm:p-5 flex flex-col gap-4">
-          {/* SERVIÇO / MISSÃO DA OS (§14–§22) — o que veio fazer, sem preços */}
-          <OsMissionPanel osId={attendance.workOrderId} osDescricao={os?.descricao} />
           {/* Manutenção Preventiva SDAI (contratual) — entrada canônica. Self-gate
               adicional em contrato/cliente dentro do painel. Só SDAI. */}
           <SdaiMaintenancePanel
@@ -741,7 +757,21 @@ export const AttendanceScreen: React.FC<{
             os={os}
             clients={clients}
             technicianName={technicianName}
+            onExit={handleClose}
+            onModeChange={handleSdaiModeChange}
           />
+
+          {/* Fluxo GENÉRICO/corretivo (§7): só quando NÃO é preventiva SDAI (o
+              painel resolveu 'na') ou o motor SDAI está desabilitado. Evita os
+              dois competindo enquanto a preventiva prepara/está pronta. */}
+          {!showGeneric && sdaiMode !== 'error' && (
+            <p className="text-[11px] text-fg-muted">
+              Este atendimento é uma manutenção preventiva SDAI contratual. Use “Executar manutenção” acima.
+            </p>
+          )}
+          {showGeneric && (<>
+          {/* SERVIÇO / MISSÃO genérica da OS (§14–§22). */}
+          <OsMissionPanel osId={attendance.workOrderId} osDescricao={os?.descricao} />
 
           {/* DIAGNÓSTICO (§10) */}
           <label className="block">
@@ -831,23 +861,28 @@ export const AttendanceScreen: React.FC<{
               </ul>
             </div>
           )}
+          </>)}
         </div>
 
         {/* FINALIZAÇÃO (§17–§20/§28) — abre a etapa de assinatura antes do fecho.
             [SAIR] só fecha (não pausa); [PAUSAR] é ação explícita (§11). */}
         <div className="p-4 border-t border-border flex flex-col gap-2">
           <div className="flex items-center justify-between gap-2">
-            <button onClick={handleClose} className="px-4 py-2.5 rounded-lg bg-surface-3 text-xs font-bold uppercase text-fg-secondary hover:bg-surface-2">
-              Sair
-            </button>
-            <button
-              onClick={requestFinalize}
-              disabled={finishing || !result}
-              className="flex-1 min-h-[48px] rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold uppercase tracking-wide flex items-center justify-center gap-2 disabled:opacity-60 transition-colors"
-            >
-              <span className="material-symbols-outlined text-xl">check_circle</span>
-              {finishing ? 'Finalizando…' : 'Assinar e finalizar'}
-            </button>
+            {sdaiMode !== 'error' && (
+              <button onClick={handleClose} className="px-4 py-2.5 rounded-lg bg-surface-3 text-xs font-bold uppercase text-fg-secondary hover:bg-surface-2">
+                Sair
+              </button>
+            )}
+            {showGeneric && (
+              <button
+                onClick={requestFinalize}
+                disabled={finishing || !result}
+                className="flex-1 min-h-[48px] rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold uppercase tracking-wide flex items-center justify-center gap-2 disabled:opacity-60 transition-colors"
+              >
+                <span className="material-symbols-outlined text-xl">check_circle</span>
+                {finishing ? 'Finalizando…' : 'Assinar e finalizar'}
+              </button>
+            )}
           </div>
           {attStatus === 'EM_EXECUCAO' && (
             <button

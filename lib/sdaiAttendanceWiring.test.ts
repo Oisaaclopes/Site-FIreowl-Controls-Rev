@@ -12,8 +12,23 @@ import {
   resolveAttendanceTemplateCodigo,
   resolveSdaiPreventiveRoutine,
   sdaiPreventiveApplies,
+  shouldShowGenericAttendanceFlow,
   stableVerificationId,
 } from './sdaiAttendanceWiring';
+
+describe('visibilidade do fluxo genérico no atendimento', () => {
+  it.each(['loading', 'ready', 'error'] as const)('oculta o genérico quando o painel SDAI está em %s', (mode) => {
+    expect(shouldShowGenericAttendanceFlow(mode)).toBe(false);
+  });
+
+  it('mostra o genérico quando o painel confirma na', () => {
+    expect(shouldShowGenericAttendanceFlow('na')).toBe(true);
+  });
+
+  it('mantém o genérico para OS que nem ativa o painel', () => {
+    expect(shouldShowGenericAttendanceFlow('off')).toBe(true);
+  });
+});
 
 const plan = (ids: string[]): Pick<MaintenancePeriodPlan, 'programadosDeviceIds'> => ({ programadosDeviceIds: ids });
 
@@ -105,6 +120,11 @@ describe('attendancePlanDevices (§4 — só planejados, sem duplicar)', () => {
     ];
     const full = { ...plan(['d1', 'd3']), contractId: 'C', periodStart: '2026-09-01', periodEnd: '2026-09-30', routines: [], devices: [], conflicts: [] } as unknown as MaintenancePeriodPlan;
     expect(attendancePlanDevices(full, devices).map((d) => d.id)).toEqual(['d1', 'd3']);
+  });
+
+  it('aceita plano com 0 dispositivos sem transformar a preventiva em erro', () => {
+    const empty = { ...plan([]), contractId: 'C', periodStart: '2026-09-01', periodEnd: '2026-09-30', routines: [], devices: [], conflicts: [] } as unknown as MaintenancePeriodPlan;
+    expect(attendancePlanDevices(empty, [])).toEqual([]);
   });
 });
 

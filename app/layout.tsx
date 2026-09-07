@@ -45,6 +45,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { themeColor: '#1A1A72', viewportFit: 'cover' };
 
+const buildSha = process.env.NEXT_PUBLIC_BUILD_SHA?.slice(0, 7) || 'local';
+
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="pt-BR" className={`${poppins.variable} ${roboto.variable} ${montserrat.variable}`} suppressHydrationWarning>
@@ -57,6 +59,12 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
           <FeedbackProvider>{children}</FeedbackProvider>
         </ThemeProvider>
         <PwaClient />
+        <div
+          aria-label="Versão de QA do build"
+          style={{ position: 'fixed', right: 4, bottom: 2, zIndex: 9999, fontSize: 9, lineHeight: 1, opacity: 0.45, pointerEvents: 'none' }}
+        >
+          BUILD QA: {buildSha} · SDAI PANEL V2
+        </div>
       </body>
     </html>
   );
