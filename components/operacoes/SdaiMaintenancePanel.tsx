@@ -2,14 +2,16 @@
 import React, { useEffect, useState } from 'react';
 import type { Client, Device, OrdemServico, ReportInstance, ServiceAttendance, UserRole } from '@/lib/types';
 import type { TemplateSchema } from '@/lib/reportSchema';
-import { ReportForm, type MaintenanceReportContext } from '@/components/reports/ReportForm';
+import { ReportForm, type MaintenanceReportContext, type MaintenanceCentral } from '@/components/reports/ReportForm';
 import { buildBaseReportCatalog, augmentCatalogForSdaiMaintenance } from '@/lib/reportCatalog';
 import type { CatalogSources } from '@/components/reports/FormEngine';
 import { fetchMaintenancePeriodPlan } from '@/lib/maintenancePlan';
 import { fetchReportsByAttendanceIds } from '@/lib/reports';
 import { pickAttendanceReport } from '@/lib/maintenanceReports';
-import { attendancePlanDevices, resolveSdaiPreventiveRoutine, periodicidadeLabel, competenciaFromPeriodStart } from '@/lib/sdaiAttendanceWiring';
+import { attendancePlanDevices, resolveSdaiPreventiveRoutine, periodicidadeLabel, competenciaFromPeriodStart, resolveSdaiCentrals, centralDisplayLabel } from '@/lib/sdaiAttendanceWiring';
 import { friendlyContractRef } from '@/lib/contracts';
+import { extractCentralChecklistRecords, resolveCentralChecklist } from '@/lib/sdaiMaintenance';
+import { fetchReports, fetchAnswers } from '@/lib/reports';
 import type { SdaiMaintenanceMode } from '@/lib/sdaiAttendanceWiring';
 import { PREVENTIVA_SDAI_CONTRATO_CODIGO } from '@/lib/sdaiMaintenance';
 import { fetchContractRoutines } from '@/lib/contractRoutines';
@@ -116,13 +118,16 @@ export const SdaiMaintenancePanel: React.FC<{
           || ALL_TEMPLATES.find((t) => t.codigo === codigo);
         if (!template) throw new Error('Template da preventiva SDAI não encontrado.');
 
-        const [plan, devicesCliente, inventory, contracts, pendAbertas, existing] = await Promise.all([
+        const [plan, devicesCliente, inventory, contracts, pendAbertas, existing, clienteReports] = await Promise.all([
           withLoadTimeout(fetchMaintenancePeriodPlan({ contractId: contratoId, clienteId, periodStart, periodEnd, rotation: true }), 'plano de manutenção'),
           withLoadTimeout(fetchDevices(clienteId), 'dispositivos'),
           withLoadTimeout(fetchInventory(), 'inventário'),
           withLoadTimeout(fetchContracts(), 'contratos'),
           withLoadTimeout(fetchPendencias(userRole, { clienteId, status: 'aberta' }), 'pendências'),
           withLoadTimeout(fetchReportsByAttendanceIds([attendance.id]), 'relatórios do atendimento'),
+          // Status do checklist mensal por central (§7/§9): relatórios finalizados
+          // do cliente para derivar o concluído-no-período. Não-fatal.
+          withLoadTimeout(fetchReports({ clienteId }).catch(() => [] as never[]), 'relatórios do cliente'),
         ]);
 
         const base = buildBaseReportCatalog({ inventory: inventory as never, services: [], brands: [], contracts: contracts as never });
@@ -153,6 +158,50 @@ export const SdaiMaintenancePanel: React.FC<{
             criadaEm: p.criadaEm,
             status: p.status,
           }));
+        // CENTRAL SDAI (§1/§2): SOMENTE ativos classificados como central pela
+        // taxonomia canônica (grupo 'Central SDAI'), da Base Técnica do cliente.
+        // NUNCA lista detectores/acionadores/sirenes/módulos.
+        const centraisDevices = resolveSdaiCentrals(devicesCliente);
+        // Registros de checklist mensal concluído no período (por central), via o
+        // adapter canônico. Falha aqui é não-fatal (central sem "concluído").
+        let checklistRecords: ReturnType<typeof extractCentralChecklistRecords> = [];
+        try {
+          const periodReports = (clienteReports as ReportInstance[]).filter(
+            (r) => r.templateCodigo === PREVENTIVA_SDAI_CONTRATO_CODIGO && r.status === 'finalizado'
+              && r.id !== finalizedReport?.id, // não conta o próprio, se houver
+          );
+          if (periodReports.length > 0) {
+            const answersByReport = new Map<string, { fieldKey: string; valor: unknown }[]>();
+            await Promise.all(periodReports.map(async (r) => {
+              try { answersByReport.set(r.id, (await fetchAnswers(r.id)).map((a) => ({ fieldKey: a.fieldKey, valor: a.valor }))); }
+              catch { answersByReport.set(r.id, []); }
+            }));
+            checklistRecords = extractCentralChecklistRecords(
+              periodReports.map((r) => ({ id: r.id, status: r.status, tecnicoId: r.tecnicoId, finalizadoEm: r.finalizadoEm, iniciadoEm: r.iniciadoEm })),
+              answersByReport,
+            );
+          }
+        } catch { /* não-fatal: segue sem "concluído no período" */ }
+        const tecnicoNomePorId = new Map((clienteReports as ReportInstance[]).map((r) => [r.tecnicoId || '', r.tecnicoNome || '']));
+        const centrais: MaintenanceCentral[] = centraisDevices.map((d) => {
+          const status = resolveCentralChecklist(checklistRecords, d.id, periodStart, periodEnd);
+          const attrs = (d.technicalAttributes || {}) as Record<string, unknown>;
+          const lacos = Number(attrs.qtd_lacos);
+          return {
+            id: d.id,
+            label: centralDisplayLabel(d),
+            fabricante: d.fabricante,
+            modelo: d.modelo,
+            tipoCentral: (attrs.tecnologia as string) || undefined,
+            identificador: d.technicalIdentifier || (d.central ? `Central ${d.central}` : undefined),
+            localizacao: d.localizacao,
+            qtdLacos: Number.isFinite(lacos) && lacos > 0 ? lacos : undefined,
+            checklistDone: status.done,
+            checklistDate: status.record?.date,
+            checklistTecnico: status.record?.tecnicoId ? (tecnicoNomePorId.get(status.record.tecnicoId) || undefined) : undefined,
+          };
+        });
+
         const identity: MaintenanceReportContext = {
           contratoRef: contrato ? friendlyContractRef(contrato) : (contratoId ? friendlyContractRef({ id: contratoId }) : '—'),
           contratoEscopo: contrato?.contractType,
@@ -161,6 +210,7 @@ export const SdaiMaintenancePanel: React.FC<{
           osNumero: os?.numero,
           tecnico: technicianName,
           pendencias: pendenciasCtx,
+          centrais,
         };
 
         if (!alive) return;

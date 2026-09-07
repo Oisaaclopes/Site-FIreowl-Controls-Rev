@@ -6,8 +6,11 @@ import {
   attendanceMayBeContractualSdai,
   attendancePlanDevices,
   buildAttendanceVerification,
+  centralDisplayLabel,
   competenciaFromPeriodStart,
+  isCentralSdaiDevice,
   periodicidadeLabel,
+  resolveSdaiCentrals,
   coverageInProgress,
   finalizationGate,
   parseSdaiChecklistResults,
@@ -58,6 +61,45 @@ describe('competenciaFromPeriodStart', () => {
     expect(competenciaFromPeriodStart('2026-12-31')).toBe('2026-12');
     expect(competenciaFromPeriodStart(undefined)).toBeUndefined();
     expect(competenciaFromPeriodStart('lixo')).toBeUndefined();
+  });
+});
+
+describe('Central SDAI — taxonomia canônica (etapa 2/11)', () => {
+  const dev = (over: Partial<Device>): Device => ({
+    id: 'd', clienteId: 'c', sistema: 'SDAI', status: 'ativo', ...over,
+  } as Device);
+
+  it('classifica central pelo grupo canônico (e legado), nunca por texto', () => {
+    expect(isCentralSdaiDevice(dev({ grupo: 'Central SDAI' }))).toBe(true);
+    expect(isCentralSdaiDevice(dev({ grupo: 'Central' }))).toBe(true); // legado normalizado
+    expect(isCentralSdaiDevice(dev({ grupo: 'Sirene / Sinalizador' }))).toBe(false);
+    expect(isCentralSdaiDevice(dev({ grupo: 'Acionador Manual' }))).toBe(false);
+    expect(isCentralSdaiDevice(dev({ grupo: 'Detector de Fumaça' }))).toBe(false);
+    expect(isCentralSdaiDevice(dev({ grupo: undefined }))).toBe(false); // sem taxonomia → não é central
+    expect(isCentralSdaiDevice(dev({ grupo: 'Central', tipoDispositivo: 'Central Incêndio' } ))).toBe(true);
+  });
+
+  it('ignora centrais de outra área e inativas', () => {
+    expect(isCentralSdaiDevice(dev({ grupo: 'Central', sistema: 'ALARME' }))).toBe(false);
+    expect(isCentralSdaiDevice(dev({ grupo: 'Central SDAI', status: 'inativo' }))).toBe(false);
+    expect(isCentralSdaiDevice(dev({ grupo: 'Central SDAI', status: 'removido' }))).toBe(false);
+  });
+
+  it('resolveSdaiCentrals filtra só centrais (não os 100 dispositivos de campo)', () => {
+    const devices = [
+      dev({ id: 'c1', grupo: 'Central SDAI' }),
+      dev({ id: 's1', grupo: 'Sirene / Sinalizador' }),
+      dev({ id: 'a1', grupo: 'Acionador Manual' }),
+      dev({ id: 'df1', grupo: 'Detector de Fumaça' }),
+    ];
+    expect(resolveSdaiCentrals(devices).map((d) => d.id)).toEqual(['c1']);
+  });
+
+  it('centralDisplayLabel usa fabricante+modelo — localização (dados reais)', () => {
+    expect(centralDisplayLabel({ fabricante: 'Tecnohold', modelo: 'Avalon', localizacao: 'Administração' }))
+      .toBe('Tecnohold Avalon — Administração');
+    expect(centralDisplayLabel({ tipoAtivo: 'Central Endereçável' })).toBe('Central Endereçável');
+    expect(centralDisplayLabel({ central: '01' })).toBe('Central SDAI — Central 01');
   });
 });
 

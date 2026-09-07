@@ -83,6 +83,22 @@ interface PendenciaPreview {
   origem: string;
 }
 
+/** Central SDAI resolvida da Base Técnica (para a etapa 2/11 — read-only/seleção). */
+export interface MaintenanceCentral {
+  id: string;                 // device_id REAL da Base Técnica (valor do campo)
+  label: string;              // rótulo humano (fabricante+modelo — localização)
+  fabricante?: string;
+  modelo?: string;
+  tipoCentral?: string;       // Convencional/Endereçável/Híbrida
+  identificador?: string;     // technicalIdentifier / nº central
+  localizacao?: string;
+  qtdLacos?: number;
+  /** Checklist mensal já concluído para esta central no período (derivado). */
+  checklistDone?: boolean;
+  checklistDate?: string;
+  checklistTecnico?: string;
+}
+
 /** Contexto documental resolvido do atendimento contratual SDAI (read-only). */
 export interface MaintenanceReportContext {
   contratoRef: string;        // referência PÚBLICA (nunca contract.id)
@@ -92,6 +108,8 @@ export interface MaintenanceReportContext {
   osNumero?: string;          // OS-AAAA-NNNN
   tecnico?: string;
   pendencias: { id: string; grupo?: string; descricao?: string; local?: string; criadaEm?: string; status?: string }[];
+  /** Centrais SDAI da Base Técnica do cliente (canônicas). Vazio = nenhuma. */
+  centrais: MaintenanceCentral[];
 }
 
 /** "Aberta há N dias" — a partir da data de origem (YYYY-MM-DD ou ISO). */
@@ -272,6 +290,108 @@ import { PREVENTIVA_SDAI_CONTRATO_CODIGO } from '@/lib/sdaiMaintenance';
 import { reportDraftKey } from '@/lib/reportDraft';
 import { finalizeMaintenanceAttendance, parseSdaiChecklistResults, type SdaiChecklistCard } from '@/lib/sdaiAttendanceWiring';
 
+/**
+ * Etapa "Central de SDAI" (2/11) — seleção canônica da central a partir da Base
+ * Técnica (grupo 'Central SDAI'), NUNCA todos os devices. 0 → estado explícito;
+ * 1 → auto-selecionada e read-only; N → seletor claro. Preserva o device_id real.
+ * "Refazer" só aparece quando já há checklist mensal concluído no período (§9).
+ */
+const CentralPicker: React.FC<{
+  centrais: MaintenanceCentral[];
+  value?: string;
+  onSelect: (deviceId: string) => void;
+  refazer: boolean;
+  onRefazer: (v: boolean) => void;
+}> = ({ centrais, value, onSelect, refazer, onRefazer }) => {
+  const box = 'bg-surface rounded-xl border border-border shadow-sm p-5';
+  if (centrais.length === 0) {
+    return (
+      <div className={box}>
+        <h3 className="text-sm font-bold text-fg uppercase tracking-wide">Central de SDAI</h3>
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+          <p className="text-[12px] font-semibold text-amber-800">Nenhuma Central SDAI cadastrada na Base Técnica deste cliente.</p>
+          <p className="text-[11px] text-fg-secondary mt-1">
+            O checklist mensal precisa estar associado a uma central canônica. Cadastre/identifique a central na Base Técnica — este relatório não cria o ativo.
+          </p>
+        </div>
+      </div>
+    );
+  }
+  const selected = centrais.find((c) => c.id === value);
+  const Data = ({ label, value: v }: { label: string; value?: string | number }) => (
+    <div>
+      <p className="text-[10px] font-semibold uppercase text-fg-secondary">{label}</p>
+      <p className="text-[13px] font-semibold text-fg">{v !== undefined && v !== '' && v !== null ? v : 'Não informado'}</p>
+    </div>
+  );
+  return (
+    <div className={box}>
+      <div className="border-b border-border pb-3 mb-4">
+        <h3 className="text-sm font-bold text-fg uppercase tracking-wide">Central de SDAI</h3>
+        <p className="text-[11px] text-fg-secondary mt-1">
+          {centrais.length === 1
+            ? 'Central resolvida automaticamente pela Base Técnica — somente leitura.'
+            : 'Selecione a central verificada (Base Técnica do cliente).'}
+        </p>
+      </div>
+
+      {centrais.length > 1 && (
+        <div className="mb-4 space-y-2">
+          {centrais.map((c, i) => {
+            const active = c.id === value;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => onSelect(c.id)}
+                className={`w-full text-left rounded-lg border p-3 transition-colors ${active ? 'border-primary bg-navy/5' : 'border-border hover:border-primary/50 hover:bg-surface-2'}`}
+              >
+                <span className="block text-[10px] font-bold uppercase text-fg-muted">Central {String(i + 1).padStart(2, '0')}</span>
+                <span className="block text-[13px] font-bold text-fg">{c.label}</span>
+                {(c.tipoCentral || c.identificador) && (
+                  <span className="block text-[11px] text-fg-secondary">{[c.tipoCentral, c.identificador].filter(Boolean).join(' · ')}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {selected ? (
+        <>
+          <p className="text-[11px] font-semibold uppercase text-fg-secondary mb-2">Central verificada</p>
+          <div className="rounded-lg border border-border bg-surface-2/50 p-3">
+            <p className="text-sm font-bold text-fg">{[selected.fabricante, selected.modelo].filter(Boolean).join(' ') || selected.label}</p>
+            <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <Data label="Tipo" value={selected.tipoCentral} />
+              <Data label="Identificação" value={selected.identificador} />
+              <Data label="Localização" value={selected.localizacao} />
+              <Data label="Laços instalados" value={selected.qtdLacos} />
+            </div>
+          </div>
+          {selected.checklistDone && (
+            <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/70 p-3">
+              <p className="text-[12px] font-semibold text-emerald-800">
+                Checklist mensal concluído{selected.checklistDate ? ` em ${fmtDataBR(selected.checklistDate)}` : ''}{selected.checklistTecnico ? ` por ${selected.checklistTecnico}` : ''}.
+              </p>
+              <button
+                type="button"
+                onClick={() => onRefazer(!refazer)}
+                className={`mt-2 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase border ${refazer ? 'border-amber-500 bg-amber-500 text-white' : 'border-amber-400 text-amber-800 bg-transparent hover:bg-amber-50'}`}
+              >
+                {refazer ? '✓ Refazendo checklist' : 'Refazer checklist'}
+              </button>
+              {!refazer && <p className="text-[10px] text-fg-secondary mt-1.5">Já concluído neste período. Refaça apenas se houve intervenção/nova falha na central.</p>}
+            </div>
+          )}
+        </>
+      ) : (
+        <p className="text-[11px] text-fg-muted italic">Selecione a central verificada acima.</p>
+      )}
+    </div>
+  );
+};
+
 export const ReportForm: React.FC<ReportFormProps> = ({
   template: templateProp,
   templateId,
@@ -326,14 +446,10 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   const template = frozen.template;
   const templateVersion = frozen.version;
 
-  // MANUTENÇÃO CONTRATUAL SDAI: quando o contexto resolvido chega, a etapa de
-  // Identificação vira somente leitura — os selects manuais (contrato/periodicidade/
-  // pendências) NÃO são renderizados; o técnico não escolhe o contrato de origem.
+  // MANUTENÇÃO CONTRATUAL SDAI: quando o contexto resolvido chega, as etapas de
+  // Identificação e Central de SDAI recebem apresentação/seleção canônica; os
+  // selects manuais correspondentes NÃO são renderizados pelo FormEngine.
   const isSdaiContract = !!maintenanceContext && template.codigo === PREVENTIVA_SDAI_CONTRATO_CODIGO;
-  const suppressedIdentKeys = useMemo(
-    () => (isSdaiContract ? new Set(['periodicidade', 'contrato_id', 'pendencias_abertas_ref']) : null),
-    [isSdaiContract]
-  );
 
   const [values, setValues] = useState<FormValues>({});
   const [issues, setIssues] = useState<FinalizeIssue[] | null>(null);
@@ -451,6 +567,30 @@ export const ReportForm: React.FC<ReportFormProps> = ({
     });
   }, [isSdaiContract, maintenanceContext]);
 
+  // Auto-seleção da central quando o cliente tem UMA única Central SDAI (§3):
+  // determinístico, o técnico não precisa escolher. Preserva o device_id real.
+  useEffect(() => {
+    if (!isSdaiContract || !maintenanceContext) return;
+    const centrais = maintenanceContext.centrais;
+    if (centrais.length !== 1) return;
+    setValues((prev) => (prev.central_device_id ? prev : { ...prev, central_device_id: centrais[0].id }));
+  }, [isSdaiContract, maintenanceContext]);
+
+  // Chaves suprimidas do FormEngine por seção (apresentadas fora dele, read-only):
+  // identificação (contrato/periodicidade/pendências) e central (seleção canônica).
+  // "refazer" só entra quando já há checklist concluído no período para a central.
+  const suppressedKeysFor = (section?: SectionSchema): Set<string> | null => {
+    if (!isSdaiContract || !section) return null;
+    if (section.key === 'identificacao') return new Set(['periodicidade', 'contrato_id', 'pendencias_abertas_ref']);
+    if (section.key === 'central') {
+      const keys = new Set(['central_device_id']);
+      const sel = maintenanceContext?.centrais.find((c) => c.id === values.central_device_id);
+      if (!sel?.checklistDone) keys.add('refazer_checklist_central');
+      return keys;
+    }
+    return null;
+  };
+
   // Navegação em passos (uma seção por tela — modo campo, Partes 4.7/8)
   const [showPend, setShowPend] = useState(false);
   const [sectionErr, setSectionErr] = useState<string | null>(null);
@@ -484,14 +624,16 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   );
   const idx = Math.min(currentIdx, Math.max(0, visibleSections.length - 1));
   const currentSection = visibleSections[idx];
-  // Na manutenção contratual SDAI, os campos de identificação (contrato/periodicidade/
-  // pendências) são apresentados read-only fora do FormEngine — removê-los do passo
+  // Na manutenção contratual SDAI, os campos canônicos (identificação e central)
+  // são apresentados read-only/seleção fora do FormEngine — removê-los do passo
   // evita renderizar selects manuais e um card de seção vazio.
-  const stepSection = currentSection && suppressedIdentKeys
-    ? { ...currentSection, campos: currentSection.campos.filter((f) => !suppressedIdentKeys.has(f.key)) }
+  const stepSuppressed = suppressedKeysFor(currentSection);
+  const stepSection = currentSection && stepSuppressed
+    ? { ...currentSection, campos: currentSection.campos.filter((f) => !stepSuppressed.has(f.key)) }
     : currentSection;
   const stepTemplate = { ...effectiveTemplate, secoes: stepSection ? [stepSection] : [] };
   const showIdentityCard = isSdaiContract && currentSection?.key === 'identificacao';
+  const showCentralPicker = isSdaiContract && currentSection?.key === 'central';
   const isLast = idx >= visibleSections.length - 1;
   const etapaRapida: Record<string, string> = {
     chamado: 'Chamado', diagnostico: 'Diagnóstico', servico_executado: 'Execução', materiais: 'Execução',
@@ -519,7 +661,9 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   const goNext = () => {
     // Bloqueia avanço com obrigatório faltando na seção atual (sem modal).
     // Campo oculto por condição NÃO bloqueia; obrigatoriedade é condicional.
+    const suppressed = suppressedKeysFor(currentSection);
     const faltando = (currentSection?.campos || []).find((f) => {
+      if (suppressed?.has(f.key)) return false; // apresentado read-only fora do FormEngine
       if (!isFieldVisible(f, values)) return false;
       if (!isFieldRequired(f, values)) return false;
       const v = values[f.key];
@@ -1133,6 +1277,15 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         )}
         {showIdentityCard && maintenanceContext && (
           <MaintenanceIdentityCard ctx={maintenanceContext} clienteNome={cliente?.name} />
+        )}
+        {showCentralPicker && maintenanceContext && (
+          <CentralPicker
+            centrais={maintenanceContext.centrais}
+            value={typeof values.central_device_id === 'string' ? values.central_device_id : undefined}
+            onSelect={(id) => handleChange('central_device_id', id)}
+            refazer={values.refazer_checklist_central === 'Sim'}
+            onRefazer={(v) => handleChange('refazer_checklist_central', v ? 'Sim' : 'Não')}
+          />
         )}
         {(stepTemplate.secoes[0]?.campos.length ?? 0) > 0 && (
           <FormEngine

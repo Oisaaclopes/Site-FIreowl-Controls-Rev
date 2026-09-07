@@ -22,6 +22,7 @@ import {
   shouldCreatePendencia,
 } from './sdaiMaintenance';
 import { classifyTestResult } from './maintenanceCoverage';
+import { legacyGroupLabel } from './technicalBase';
 
 export type SdaiMaintenanceMode = 'off' | 'loading' | 'ready' | 'na' | 'error';
 
@@ -69,6 +70,33 @@ export function competenciaFromPeriodStart(periodStart?: string): string | undef
   if (!periodStart) return undefined;
   const m = /^(\d{4})-(\d{2})/.exec(periodStart);
   return m ? `${m[1]}-${m[2]}` : undefined;
+}
+
+/* --------------------------- Central SDAI (Base Técnica) ------------------- */
+
+/**
+ * Um device é uma CENTRAL SDAI pela TAXONOMIA CANÔNICA (§1/§2): sistema SDAI,
+ * ativo e grupo 'Central SDAI' (legado 'Central' normalizado por legacyGroupLabel).
+ * NUNCA por texto do nome. Detectores/acionadores/sirenes/módulos NÃO casam. PURO.
+ */
+export function isCentralSdaiDevice(d: Pick<Device, 'sistema' | 'grupo' | 'status'>): boolean {
+  if (d.status && d.status !== 'ativo') return false;
+  if (d.sistema !== 'SDAI') return false;
+  return legacyGroupLabel('SDAI', d.grupo) === 'Central SDAI';
+}
+
+/** Centrais SDAI da Base Técnica do cliente (ativas). Sem fallback para devices. */
+export function resolveSdaiCentrals<T extends Pick<Device, 'sistema' | 'grupo' | 'status'>>(devices: T[]): T[] {
+  return devices.filter(isCentralSdaiDevice);
+}
+
+/** Rótulo humano da central para seleção/leitura: fabricante+modelo — localização. */
+export function centralDisplayLabel(
+  d: Pick<Device, 'fabricante' | 'modelo' | 'tipoAtivo' | 'tipoDispositivo' | 'localizacao' | 'central' | 'technicalIdentifier'>
+): string {
+  const nome = [d.fabricante, d.modelo].filter(Boolean).join(' ') || d.tipoAtivo || d.tipoDispositivo || 'Central SDAI';
+  const loc = d.localizacao || d.technicalIdentifier || (d.central ? `Central ${d.central}` : '');
+  return loc ? `${nome} — ${loc}` : nome;
 }
 
 /**
