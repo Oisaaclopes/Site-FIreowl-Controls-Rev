@@ -1593,8 +1593,27 @@ export interface FieldOperationAssignment {
   updatedAt?: string;
 }
 
-export type AttendanceStatus = 'EM_EXECUCAO' | 'FINALIZADO';
+export type AttendanceStatus = 'EM_EXECUCAO' | 'PAUSADO' | 'FINALIZADO';
 export type AttendanceResult = 'RESOLVIDO' | 'PARCIALMENTE_RESOLVIDO' | 'NAO_RESOLVIDO';
+
+/** Motivo canônico da pausa (0108). Label amigável em ATTENDANCE_PAUSE_REASON_LABEL. */
+export type AttendancePauseReason =
+  | 'AGUARDANDO_MATERIAL' | 'CONDICAO_CLIMATICA' | 'AGUARDANDO_ACESSO'
+  | 'DEPENDENCIA_TERCEIRO' | 'RETORNO_SOLICITADO_CLIENTE' | 'FIM_JORNADA'
+  | 'IMPEDIMENTO_TECNICO' | 'OUTRO';
+
+/** Evento operacional imutável do atendimento (0108): linha do tempo canônica. */
+export type AttendanceEventType = 'STARTED' | 'PAUSED' | 'RESUMED' | 'FINALIZED';
+export interface ServiceAttendanceEvent {
+  id: string;
+  serviceAttendanceId: string;
+  technicianId?: string;
+  type: AttendanceEventType;
+  reason?: AttendancePauseReason;
+  note?: string;
+  createdBy?: string;
+  createdAt: string;
+}
 /** Estado da assinatura do responsável no atendimento (0091). */
 export type AttendanceSignatureStatus = 'SIGNED' | 'UNAVAILABLE' | 'REFUSED';
 

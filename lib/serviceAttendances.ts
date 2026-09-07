@@ -1,5 +1,5 @@
 import { getSupabaseClient } from './supabaseClient';
-import { ServiceAttendance, AttendanceResult, AttendanceStatus, AttendanceSignatureStatus } from './types';
+import { ServiceAttendance, AttendanceResult, AttendanceStatus, AttendanceSignatureStatus, ServiceAttendanceEvent, AttendanceEventType, AttendancePauseReason } from './types';
 
 /* ===================================================================
  * ETAPA 3A — ATENDIMENTO: execução/visita real de UMA OS. Uma OS pode
@@ -274,4 +274,86 @@ export async function deleteServiceAttendance(id: string): Promise<void> {
   const supabase = getSupabaseClient() as any;
   const { error } = await supabase.from(TABLE).delete().eq('id', id);
   if (error) throw error;
+}
+
+/* ===================================================================
+ * PAUSA / RETOMADA (0108) — o atendimento pode ficar PAUSADO (aberto) sem
+ * ocupar o técnico. Histórico imutável em service_attendance_events.
+ * =================================================================== */
+
+const EVENTS_TABLE = 'service_attendance_events';
+
+function rowToEvent(r: any): ServiceAttendanceEvent {
+  return {
+    id: String(r.id),
+    serviceAttendanceId: String(r.service_attendance_id),
+    technicianId: r.technician_id ?? undefined,
+    type: r.type as AttendanceEventType,
+    reason: (r.reason ?? undefined) as AttendancePauseReason | undefined,
+    note: r.note ?? undefined,
+    createdBy: r.created_by ?? undefined,
+    createdAt: r.created_at,
+  };
+}
+
+/** Linha do tempo (STARTED/PAUSED/RESUMED/FINALIZED) de um atendimento, em ordem
+ *  cronológica. Vazio para atendimentos anteriores à 0108 (§8: usar started_at). */
+export async function fetchAttendanceEvents(serviceAttendanceId: string): Promise<ServiceAttendanceEvent[]> {
+  if (!serviceAttendanceId) return [];
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase
+    .from(EVENTS_TABLE)
+    .select('*')
+    .eq('service_attendance_id', serviceAttendanceId)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data || []).map(rowToEvent);
+}
+
+/** Atendimentos PAUSADOS do técnico (continuam abertos; aparecem em Meus
+ *  Atendimentos com [RETOMAR]). Não contam para a exclusividade. */
+export async function fetchPausedAttendancesForTechnician(technicianId: string): Promise<ServiceAttendance[]> {
+  if (!technicianId) return [];
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select('*')
+    .eq('technician_id', technicianId)
+    .eq('status', 'PAUSADO')
+    .order('started_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(rowToAttendance);
+}
+
+/** Pausa o atendimento (RPC atômica 0108): EM_EXECUCAO → PAUSADO, registrando o
+ *  evento PAUSED com motivo/observação. Preserva tudo já salvo. */
+export async function pauseServiceAttendance(input: {
+  id: string;
+  reason: AttendancePauseReason;
+  note?: string;
+}): Promise<ServiceAttendance> {
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase.rpc('pause_service_attendance', {
+    p_attendance_id: input.id,
+    p_reason: input.reason,
+    p_note: input.note ?? null,
+  });
+  if (error) throw error;
+  if (!data?.attendance) throw new Error('A pausa não retornou o atendimento atualizado.');
+  return rowToAttendance(data.attendance);
+}
+
+/** Retoma o atendimento (RPC atômica 0108): PAUSADO → EM_EXECUCAO. Se o técnico
+ *  já tiver OUTRO atendimento EM_EXECUCAO, lança ActiveAttendanceExistsError com
+ *  o atendimento bloqueador (a UI mostra Cliente/OS/Serviço). Não cria OS/
+ *  atendimento/relatório/draft. */
+export async function resumeServiceAttendance(id: string): Promise<ServiceAttendance> {
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase.rpc('resume_service_attendance', { p_attendance_id: id });
+  if (error) throw error;
+  if (data?.success === false && data?.reason === 'ACTIVE_EXISTS') {
+    throw new ActiveAttendanceExistsError(data.active ? rowToAttendance(data.active) : null);
+  }
+  if (!data?.attendance) throw new Error('A retomada não retornou o atendimento atualizado.');
+  return rowToAttendance(data.attendance);
 }

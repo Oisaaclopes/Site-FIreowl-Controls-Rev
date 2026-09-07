@@ -6,12 +6,23 @@ import {
   ActiveAttendanceExistsError,
   activeAttendanceBlockMessage,
   fetchActiveAttendanceForTechnician,
+  fetchAttendanceEvents,
   fetchServiceAttendances,
   finishServiceAttendance,
+  pauseServiceAttendance,
+  resumeServiceAttendance,
   saveAttendanceProgress,
   saveAttendanceSignature,
   startServiceAttendance,
 } from '@/lib/serviceAttendances';
+import {
+  ATTENDANCE_PAUSE_REASONS,
+  ATTENDANCE_PAUSE_REASON_LABEL,
+  computeEffectiveMs,
+  currentPauseInfo,
+  formatDurationShort,
+} from '@/lib/attendanceTime';
+import type { AttendancePauseReason, ServiceAttendanceEvent } from '@/lib/types';
 import type { AttendanceSignatureStatus } from '@/lib/types';
 import { fetchTimeClockParticipants } from '@/lib/users';
 import {
@@ -287,11 +298,58 @@ export const OsAttendanceCta: React.FC<{
   punches?: TimePunch[];
 }> = ({ os, technicianId, technicianName, clients, usesTimeClock = false, punches = [] }) => {
   const { attendance } = useActiveAttendance(technicianId);
+  const toast = useToast();
+  const confirm = useConfirm();
   const [screen, setScreen] = useState<ServiceAttendance | null>(null);
+  const [resuming, setResuming] = useState(false);
+  // Atendimento PAUSADO deste técnico NESTA OS (continua aberto → Retomar, §12).
+  const [paused, setPaused] = useState<ServiceAttendance | null>(null);
+  const [pauseInfo, setPauseInfo] = useState<ReturnType<typeof currentPauseInfo>>(null);
   const osTerminal = os.status === 'concluida' || os.status === 'cancelada';
+
+  const loadPaused = useCallback(() => {
+    if (!technicianId) { setPaused(null); return; }
+    fetchServiceAttendances({ workOrderId: os.id, technicianId, status: 'PAUSADO' })
+      .then((list) => {
+        const p = list[0] || null;
+        setPaused(p);
+        if (p) fetchAttendanceEvents(p.id).then((ev) => setPauseInfo(currentPauseInfo(ev))).catch(() => setPauseInfo(null));
+        else setPauseInfo(null);
+      })
+      .catch(() => setPaused(null));
+  }, [os.id, technicianId]);
+  useEffect(() => { loadPaused(); }, [loadPaused]);
+  useDomainRefresh('fieldOps', loadPaused);
 
   // Já existe atendimento EM_EXECUCAO deste técnico NESTA OS → Continuar.
   const activeHere = attendance && attendance.workOrderId === os.id ? attendance : null;
+
+  const doResume = useCallback(async () => {
+    if (!paused || resuming) return;
+    setResuming(true);
+    try {
+      const resumed = await resumeServiceAttendance(paused.id);
+      setPaused(null);
+      setScreen(resumed);
+    } catch (e) {
+      if (e instanceof ActiveAttendanceExistsError) {
+        // Exclusividade pelo technician_id (§13): há OUTRO EM_EXECUCAO. Não retoma.
+        const other = e.existing;
+        const otherOs = other ? await fetchOrdemServicoById(other.workOrderId).catch(() => null) : null;
+        const clienteNome = clients.find((c) => c.id === otherOs?.clienteId)?.name;
+        await confirm({
+          title: 'Você já tem um atendimento em andamento',
+          message: activeAttendanceBlockMessage({ isSelf: true, osNumero: otherOs?.numero, osTitulo: otherOs?.titulo, clienteNome })
+            + '\n\nPause ou finalize o atendimento em andamento antes de retomar este.',
+          confirmLabel: 'Entendi',
+        });
+      } else {
+        toast.error(e instanceof Error ? e.message : 'Não foi possível retomar o atendimento.');
+      }
+    } finally {
+      setResuming(false);
+    }
+  }, [paused, resuming, clients, confirm, toast]);
 
   if (!technicianId || osTerminal) return null;
 
@@ -304,6 +362,36 @@ export const OsAttendanceCta: React.FC<{
         >
           <span className="material-symbols-outlined text-xl">arrow_forward</span>
           Continuar atendimento
+        </button>
+        {screen && (
+          <AttendanceScreen attendance={screen} os={os} clients={clients} technicianId={technicianId} technicianName={technicianName} onClose={() => setScreen(null)} />
+        )}
+      </>
+    );
+  }
+
+  // Atendimento PAUSADO nesta OS: Retomar (nunca "Iniciar" um novo, §12).
+  if (paused) {
+    return (
+      <>
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 mb-2">
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+            <span className="material-symbols-outlined text-[15px]">pause_circle</span>Pausado
+          </span>
+          {pauseInfo?.reason && (
+            <p className="mt-0.5 text-[11px] text-amber-900">Motivo: {ATTENDANCE_PAUSE_REASON_LABEL[pauseInfo.reason]}</p>
+          )}
+          {pauseInfo?.pausedAt && (
+            <p className="text-[10px] text-amber-700">Pausado em {formatStartedAt(pauseInfo.pausedAt)}</p>
+          )}
+        </div>
+        <button
+          onClick={doResume}
+          disabled={resuming}
+          className="w-full min-h-[52px] rounded-xl bg-primary hover:bg-primary-hover text-white text-sm font-bold uppercase tracking-wide flex items-center justify-center gap-2 disabled:opacity-60 transition-colors"
+        >
+          <span className="material-symbols-outlined text-xl">play_circle</span>
+          {resuming ? 'Retomando…' : 'Retomar atendimento'}
         </button>
         {screen && (
           <AttendanceScreen attendance={screen} os={os} clients={clients} technicianId={technicianId} technicianName={technicianName} onClose={() => setScreen(null)} />
@@ -446,6 +534,16 @@ export const AttendanceScreen: React.FC<{
   const [docKind, setDocKind] = useState<OsDocKind | null>(null);
   const [company, setCompany] = useState<CompanyProfile | null>(null);
   const [tick, setTick] = useState(0);
+  // Pausa/retomada (0108): status local + eventos p/ tempo efetivo + diálogo.
+  const [attStatus, setAttStatus] = useState(attendance.status);
+  const [events, setEvents] = useState<ServiceAttendanceEvent[]>([]);
+  const [pauseOpen, setPauseOpen] = useState(false);
+  const [pausing, setPausing] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    fetchAttendanceEvents(attendance.id).then((e) => { if (alive) setEvents(e); }).catch(() => {});
+    return () => { alive = false; };
+  }, [attendance.id]);
   const savedRef = useRef({ diagnosis: attendance.diagnosis || '', execution: attendance.executionNotes || '' });
 
   // Missão da OS (para saber se é SDAI, de forma ESTRUTURADA §28) + área.
@@ -496,7 +594,7 @@ export const AttendanceScreen: React.FC<{
     const t = window.setInterval(() => setTick((v) => v + 1), 60000);
     return () => window.clearInterval(t);
   }, []);
-  void tick;
+  void tick; // força recomputo do tempo efetivo a cada minuto
 
   // Autosave com debounce (§12): grava diagnóstico/execução sem o técnico perder
   // trabalho ao sair da tela. Só dispara quando algo mudou de fato.
@@ -527,6 +625,26 @@ export const AttendanceScreen: React.FC<{
     await flushSave();
     onClose();
   }, [flushSave, onClose]);
+
+  // PAUSAR (§5/§11): preserva o que foi preenchido (flushSave), registra o evento
+  // e libera o técnico. Fecha a tela; Meus Atendimentos reflete via realtime.
+  // "Sair" NÃO pausa; pausar é ação explícita.
+  const doPause = useCallback(async (reason: AttendancePauseReason, note: string) => {
+    if (pausing) return;
+    setPausing(true);
+    try {
+      await flushSave();
+      await pauseServiceAttendance({ id: attendance.id, reason, note: note || undefined });
+      setAttStatus('PAUSADO');
+      toast.success('Atendimento pausado. Você está liberado para iniciar outro.');
+      setPauseOpen(false);
+      onClose();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Não foi possível pausar o atendimento.');
+    } finally {
+      setPausing(false);
+    }
+  }, [attendance.id, flushSave, onClose, pausing, toast]);
 
   // §28/§29/§55 — a assinatura acontece DEPOIS do resultado e antes do fecho.
   // Aqui só validamos e abrimos a etapa de assinatura; o fecho real é runFinalize.
@@ -582,8 +700,6 @@ export const AttendanceScreen: React.FC<{
     }
   }, [attendance.id, confirm, diagnosis, execution, finishing, os, result, toast]);
 
-  const elapsed = formatAttendanceElapsed(attendance.startedAt);
-
   return (
     <div className="fixed inset-0 z-[80] bg-slate-900/60 backdrop-blur-sm flex items-stretch sm:items-center justify-center sm:p-4">
       <div className="bg-surface w-full sm:max-w-lg sm:max-h-[92vh] sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
@@ -591,7 +707,9 @@ export const AttendanceScreen: React.FC<{
         <div className="p-4 sm:p-5 border-b border-border bg-navy text-white">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-white/60">Atendimento em execução</p>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-white/60">
+                {attStatus === 'PAUSADO' ? 'Atendimento pausado' : 'Atendimento em execução'}
+              </p>
               <h3 className="font-bold text-base truncate mt-0.5">{cliente}</h3>
               <p className="text-[11px] font-data-mono text-white/70 truncate">
                 {os?.numero || attendance.workOrderId.slice(0, 8)}{os?.titulo ? ` · ${os.titulo}` : ''}
@@ -599,8 +717,10 @@ export const AttendanceScreen: React.FC<{
             </div>
             <button onClick={handleClose} className="text-white/70 hover:text-white text-2xl leading-none shrink-0">×</button>
           </div>
+          {/* Tempo EFETIVO (§8/§10): exclui pausas. Não mostra "há 65h" como se
+              fosse trabalho contínuo. void elapsed (decorrido) — não exibido aqui. */}
           <p className="mt-2 text-[11px] text-white/80">
-            Iniciado {formatStartedAt(attendance.startedAt)}{elapsed ? ` · em atendimento há ${elapsed}` : ''}
+            Iniciado {formatStartedAt(attendance.startedAt)} · Tempo efetivo: {formatDurationShort(computeEffectiveMs(attendance.startedAt, events))}
           </p>
         </div>
 
@@ -707,21 +827,42 @@ export const AttendanceScreen: React.FC<{
           )}
         </div>
 
-        {/* FINALIZAÇÃO (§17–§20/§28) — abre a etapa de assinatura antes do fecho */}
-        <div className="p-4 border-t border-border flex items-center justify-between gap-2">
-          <button onClick={handleClose} className="px-4 py-2.5 rounded-lg bg-surface-3 text-xs font-bold uppercase text-fg-secondary hover:bg-surface-2">
-            Sair
-          </button>
-          <button
-            onClick={requestFinalize}
-            disabled={finishing || !result}
-            className="flex-1 min-h-[48px] rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold uppercase tracking-wide flex items-center justify-center gap-2 disabled:opacity-60 transition-colors"
-          >
-            <span className="material-symbols-outlined text-xl">check_circle</span>
-            {finishing ? 'Finalizando…' : 'Assinar e finalizar'}
-          </button>
+        {/* FINALIZAÇÃO (§17–§20/§28) — abre a etapa de assinatura antes do fecho.
+            [SAIR] só fecha (não pausa); [PAUSAR] é ação explícita (§11). */}
+        <div className="p-4 border-t border-border flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <button onClick={handleClose} className="px-4 py-2.5 rounded-lg bg-surface-3 text-xs font-bold uppercase text-fg-secondary hover:bg-surface-2">
+              Sair
+            </button>
+            <button
+              onClick={requestFinalize}
+              disabled={finishing || !result}
+              className="flex-1 min-h-[48px] rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold uppercase tracking-wide flex items-center justify-center gap-2 disabled:opacity-60 transition-colors"
+            >
+              <span className="material-symbols-outlined text-xl">check_circle</span>
+              {finishing ? 'Finalizando…' : 'Assinar e finalizar'}
+            </button>
+          </div>
+          {attStatus === 'EM_EXECUCAO' && (
+            <button
+              onClick={() => setPauseOpen(true)}
+              disabled={pausing}
+              className="w-full min-h-[44px] rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 text-xs font-bold uppercase tracking-wide flex items-center justify-center gap-2 disabled:opacity-60 transition-colors"
+            >
+              <span className="material-symbols-outlined text-lg">pause_circle</span>
+              Pausar atendimento
+            </button>
+          )}
         </div>
       </div>
+
+      {pauseOpen && (
+        <PauseAttendanceDialog
+          busy={pausing}
+          onCancel={() => setPauseOpen(false)}
+          onConfirm={(reason, note) => doPause(reason, note)}
+        />
+      )}
 
       {/* ETAPA 3D.4 — Atualização da Base Técnica antes da assinatura (§10). */}
       {baseUpdateOpen && os && os.clienteId && (
@@ -765,6 +906,62 @@ export const AttendanceScreen: React.FC<{
       {docKind && os && (
         <OsDocumentsView os={os} company={company} client={clients.find((c) => c.id === os.clienteId)} initialKind={docKind} onClose={() => setDocKind(null)} />
       )}
+    </div>
+  );
+};
+
+/* -------------------------------------------------------------------------- */
+/* Diálogo PAUSAR ATENDIMENTO (§4/§11) — motivo canônico + observação opcional  */
+/* -------------------------------------------------------------------------- */
+const PauseAttendanceDialog: React.FC<{
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: (reason: AttendancePauseReason, note: string) => void;
+}> = ({ busy, onCancel, onConfirm }) => {
+  const [reason, setReason] = useState<AttendancePauseReason | ''>('');
+  const [note, setNote] = useState('');
+  return (
+    <div className="fixed inset-0 z-[82] flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4">
+      <div className="bg-surface w-full max-w-sm rounded-2xl shadow-2xl p-5">
+        <p className="text-base font-bold text-fg">Pausar atendimento</p>
+        <p className="mt-0.5 text-[11px] text-fg-secondary">O atendimento continua aberto e você fica liberado para outro. Nada preenchido é perdido.</p>
+        <label className="mt-4 block">
+          <span className="text-[10px] font-bold uppercase tracking-wide text-fg-secondary">Motivo *</span>
+          <select
+            value={reason}
+            onChange={(e) => setReason(e.target.value as AttendancePauseReason)}
+            className="mt-1 w-full rounded-lg border border-border bg-surface text-fg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25"
+          >
+            <option value="">Selecione…</option>
+            {ATTENDANCE_PAUSE_REASONS.map((r) => (
+              <option key={r} value={r}>{ATTENDANCE_PAUSE_REASON_LABEL[r]}</option>
+            ))}
+          </select>
+        </label>
+        <label className="mt-3 block">
+          <span className="text-[10px] font-bold uppercase tracking-wide text-fg-secondary">Observação</span>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={2}
+            placeholder="Opcional"
+            className="mt-1 w-full rounded-lg border border-border bg-surface text-fg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25"
+          />
+        </label>
+        <div className="mt-4 flex items-center justify-between gap-2">
+          <button onClick={onCancel} disabled={busy} className="px-4 py-2.5 rounded-lg bg-surface-3 text-xs font-bold uppercase text-fg-secondary hover:bg-surface-2 disabled:opacity-60">
+            Cancelar
+          </button>
+          <button
+            onClick={() => reason && onConfirm(reason, note)}
+            disabled={busy || !reason}
+            className="flex-1 min-h-[44px] rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold uppercase tracking-wide flex items-center justify-center gap-2 disabled:opacity-60 transition-colors"
+          >
+            <span className="material-symbols-outlined text-lg">pause_circle</span>
+            {busy ? 'Pausando…' : 'Pausar atendimento'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
