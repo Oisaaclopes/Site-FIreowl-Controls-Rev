@@ -75,6 +75,9 @@ export interface FieldResolution {
   readonly?: boolean;   // valor determinístico → somente leitura
   emptyState?: string;  // sem opções na Base
   manual?: boolean;     // com emptyState: permite entrada manual (texto)
+  control?: 'binary';   // controle binário rápido (2 opções)
+  optionSemantics?: Record<string, 'normal' | 'alert' | 'neutral'>; // cor por opção
+  writeToKey?: string;  // grava em outra chave (repeater) — não em field.key
 }
 export type ResolveFieldOptions = (args: {
   field: FieldSchema;
@@ -180,6 +183,36 @@ const FieldControl: React.FC<{
     if (empty && value !== autoValue) onValueRaw(autoValue);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoValue]);
+
+  // Rota A — controle BINÁRIO rápido (Sim/Não, Conforme/Não conforme) com cor
+  // semântica (verde=normal, laranja=alert, neutro antes de responder). §2/§3/§6.
+  if (resolution?.control === 'binary') {
+    const opts = field.opcoes || (field.tipo === 'passfail' ? ['Aprovado', 'Reprovado'] : []);
+    const sem = resolution.optionSemantics || {};
+    const cur = (value as string) || '';
+    return (
+      <>
+        <div className="grid grid-cols-2 gap-2">
+          {opts.map((o) => {
+            const active = cur === o;
+            const s = sem[o] || 'neutral';
+            const cls = active
+              ? (s === 'alert' ? 'border-amber-500 bg-amber-500 text-white'
+                : s === 'normal' ? 'border-emerald-600 bg-emerald-600 text-white'
+                : 'border-primary bg-navy text-white')
+              : 'border-border bg-surface text-fg-secondary hover:bg-surface-2';
+            return (
+              <button key={o} type="button" aria-pressed={active} disabled={disabled}
+                onClick={() => onValue(o)}
+                className={`min-h-11 rounded-lg border text-xs font-bold uppercase tracking-wide transition-colors disabled:opacity-50 ${cls}`}>
+                {o}
+              </button>
+            );
+          })}
+        </div>
+      </>
+    );
+  }
 
   // Rota A — opções resolvidas pelo contexto substituem a lista genérica.
   if (resolution?.options) {
@@ -608,17 +641,22 @@ const Repeater: React.FC<{
                         ));
                       })()}
                     </select>
-                  ) : (
-                    <FieldControl
-                      field={f}
-                      value={card[f.key]}
-                      onValue={(v) => updateCard(idx, f.key, v)}
-                      catalog={catalog}
-                      onCreateCatalogo={onCreateCatalogo}
-                      filtroValor={f.filtro_por ? String(card[f.filtro_por] ?? '') : undefined}
-                      resolution={resolveFieldOptions?.({ field: f, repeaterKey: field.key, itemIndex: idx, itemValues: card, formValues })}
-                    />
-                  )}
+                  ) : (() => {
+                    const res = resolveFieldOptions?.({ field: f, repeaterKey: field.key, itemIndex: idx, itemValues: card, formValues });
+                    // writeToKey: o valor é gravado em OUTRA chave do card (ex.: perfil).
+                    const boundKey = res?.writeToKey || f.key;
+                    return (
+                      <FieldControl
+                        field={f}
+                        value={card[boundKey]}
+                        onValue={(v) => updateCard(idx, boundKey, v)}
+                        catalog={catalog}
+                        onCreateCatalogo={onCreateCatalogo}
+                        filtroValor={f.filtro_por ? String(card[f.filtro_por] ?? '') : undefined}
+                        resolution={res}
+                      />
+                    );
+                  })()}
                 </div>
               ))}
           </div>

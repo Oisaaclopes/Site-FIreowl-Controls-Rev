@@ -11,11 +11,24 @@ import {
   resolveLoopAddresses,
   resolveDeviceByLoopAddress,
   resolveCentralBatteries,
+  resolveDistinctDeviceProfiles,
+  deviceProfileLabel,
 } from './sdaiMaintenance';
 import { legacyGroupLabel } from './technicalBase';
 
+/** Campo mínimo consumido pelo adapter (evita depender do React/schema completo). */
+export interface FieldLike {
+  key: string;
+  tipo?: string;
+  opcoes?: string[];
+  abre_pendencia_se?: string[];
+}
+
 /** Opção genérica de select (consumida pelo FormEngine sem saber o significado). */
 export interface FieldOption { value: string; label: string }
+
+/** Semântica visual de uma opção (derivada de metadata; NÃO hardcoded no motor). */
+export type OptionSemantic = 'normal' | 'alert' | 'neutral';
 
 /** Resolução genérica de um campo (contrato com o FormEngine — Rota A). */
 export interface ResolvedField {
@@ -27,6 +40,32 @@ export interface ResolvedField {
   readonly?: boolean;
   /** Mensagem quando não há opções na Base — a UI cai para entrada manual. */
   emptyState?: string;
+  /** com emptyState: permite entrada manual (texto). */
+  manual?: boolean;
+  /** Renderizar como controle binário rápido (Sim/Não, Conforme/Não conforme). */
+  control?: 'binary';
+  /** Cor semântica por opção (verde=normal, laranja=alert, neutro=neutral). */
+  optionSemantics?: Record<string, OptionSemantic>;
+  /** Grava o valor em OUTRA chave do card (ex.: perfil, sem tocar device_id §13). */
+  writeToKey?: string;
+}
+
+/* --------------------------- Semântica binária (§2/§3/§4) ------------------ */
+
+// Gates onde "Sim" é a ANORMALIDADE (não têm abre_pendencia_se — a pendência vem
+// do detalhe). Override MÍNIMO de domínio; o motor continua genérico.
+const ALERT_WHEN_SIM = new Set(['alarme_ativo', 'falha_ativa', 'evento_anormal']);
+
+/** Deriva a semântica das opções a partir de metadata EXISTENTE (abre_pendencia_se)
+ *  + override dos gates. Sem metadata → neutro (binário rápido, sem cor). */
+function binarySemantics(field: FieldLike): ResolvedField | undefined {
+  const opts = field.opcoes || (field.tipo === 'passfail' ? ['Aprovado', 'Reprovado'] : []);
+  if (opts.length !== 2) return undefined;
+  const alert = new Set<string>(field.abre_pendencia_se && field.abre_pendencia_se.length ? field.abre_pendencia_se : []);
+  if (alert.size === 0 && ALERT_WHEN_SIM.has(field.key)) alert.add('Sim');
+  const optionSemantics: Record<string, OptionSemantic> = {};
+  for (const o of opts) optionSemantics[o] = alert.has(o) ? 'alert' : (alert.size > 0 ? 'normal' : 'neutral');
+  return { control: 'binary', optionSemantics };
 }
 
 /** Chaves de repeater/campo governadas pela cascata SDAI (mapeamento fica AQUI). */
@@ -36,6 +75,8 @@ export const SDAI_REPEATER_LACOS = 'lacos';
 export const FALHA_LOOP_KEY = 'laco';
 export const FALHA_ADDR_KEY = 'endereco';
 export const FALHA_DEVICE_KEY = 'device_id';
+export const FALHA_PERFIL_KEY = 'dispositivo_perfil'; // TIPO/MODELO quando não há endereço (§13)
+export const FALHA_DIVERGENCIA_KEY = 'divergencia_base'; // perfil ≠ device do endereço (§14)
 export const BATERIA_DEVICE_KEY = 'device_id';
 export const LACO_ID_KEY = 'identificacao';
 
@@ -61,7 +102,7 @@ export function deviceShortLabel(d: Device): string {
 export function resolveFalhaLoopField(ctx: SdaiCentralContext): ResolvedField {
   if (!ctx.central) return { emptyState: 'Selecione a central para resolver os laços.' };
   const loops = resolveCentralLoops(ctx.central, ctx.devices);
-  if (loops.length === 0) return { emptyState: 'Nenhum laço cadastrado na Base para esta central. Informe manualmente.' };
+  if (loops.length === 0) return { emptyState: 'Nenhum laço cadastrado na Base para esta central. Informe manualmente.', manual: true };
   if (loops.length === 1) return { options: toOptions(loops), autoValue: loops[0], readonly: true };
   return { options: toOptions(loops) };
 }
@@ -70,19 +111,30 @@ export function resolveFalhaAddressField(ctx: SdaiCentralContext, loop?: string)
   const l = (loop || '').trim();
   if (!ctx.central || !l) return {};
   const addrs = resolveLoopAddresses(ctx.central, l, ctx.devices);
-  if (addrs.length === 0) return { emptyState: 'Endereço não cadastrado neste laço. Informe manualmente.' };
+  if (addrs.length === 0) return { emptyState: 'Endereço não cadastrado neste laço. Informe manualmente.', manual: true };
   if (addrs.length === 1) return { options: toOptions(addrs), autoValue: addrs[0] };
   return { options: toOptions(addrs) };
 }
 
-/** Device resolvido por (central, laço, endereço) — inequívoco → readonly + label. */
+/**
+ * Campo "Dispositivo" da falha (§8–§13). Duas situações:
+ *  A) COM endereço e device único → device_id auto/readonly (identidade exata);
+ *  B) SEM endereço (ou endereço sem match) → PERFIS DISTINTOS (tipo/modelo) —
+ *     grava em `dispositivo_perfil`, NÃO em device_id (§13). Nunca lista os N
+ *     devices individuais. Rótulos canônicos (§12).
+ */
 export function resolveFalhaDeviceField(ctx: SdaiCentralContext, loop?: string, address?: string): ResolvedField {
+  if (!ctx.central) return {};
   const l = (loop || '').trim();
   const a = (address || '').trim();
-  if (!ctx.central || !l || !a) return {};
-  const dev = resolveDeviceByLoopAddress(ctx.central, l, a, ctx.devices);
-  if (!dev) return { emptyState: 'Dispositivo não identificado na Base para este laço/endereço. Registre manualmente.' };
-  return { options: [{ value: dev.id, label: deviceShortLabel(dev) }], autoValue: dev.id, readonly: true };
+  if (l && a) {
+    const dev = resolveDeviceByLoopAddress(ctx.central, l, a, ctx.devices);
+    if (dev) return { options: [{ value: dev.id, label: deviceShortLabel(dev) }], autoValue: dev.id, readonly: true };
+  }
+  // Sem endereço (ou sem match): oferecer TIPO/MODELO distintos — não seta device_id.
+  const profiles = resolveDistinctDeviceProfiles(ctx.central, l || undefined, ctx.devices);
+  if (profiles.length === 0) return { emptyState: 'Nenhum dispositivo na Base para esta central/laço. Registre manualmente.' };
+  return { options: profiles.map((p) => ({ value: p.label, label: p.label })), writeToKey: FALHA_PERFIL_KEY };
 }
 
 /* --------------------------- Bateria da central --------------------------- */
@@ -101,7 +153,7 @@ export function resolveBatteryDeviceField(ctx: SdaiCentralContext): ResolvedFiel
 export function resolveLacoIdField(ctx: SdaiCentralContext): ResolvedField {
   if (!ctx.central) return {};
   const loops = resolveCentralLoops(ctx.central, ctx.devices);
-  if (loops.length === 0) return { emptyState: 'Nenhum laço estruturado na Base. Informe manualmente.' };
+  if (loops.length === 0) return { emptyState: 'Nenhum laço estruturado na Base. Informe manualmente.', manual: true };
   if (loops.length === 1) return { options: toOptions(loops), autoValue: loops[0], readonly: true };
   return { options: toOptions(loops) };
 }
@@ -115,18 +167,20 @@ export function resolveLacoIdField(ctx: SdaiCentralContext): ResolvedField {
 export function resolveSdaiFieldOptions(
   ctx: SdaiCentralContext,
   repeaterKey: string | undefined,
-  fieldKey: string,
+  field: FieldLike,
   item: Record<string, unknown> | undefined,
 ): ResolvedField | undefined {
+  const fieldKey = field.key;
   if (repeaterKey === SDAI_REPEATER_FALHAS) {
     if (fieldKey === FALHA_LOOP_KEY) return resolveFalhaLoopField(ctx);
     if (fieldKey === FALHA_ADDR_KEY) return resolveFalhaAddressField(ctx, item?.[FALHA_LOOP_KEY] as string);
     if (fieldKey === FALHA_DEVICE_KEY) return resolveFalhaDeviceField(ctx, item?.[FALHA_LOOP_KEY] as string, item?.[FALHA_ADDR_KEY] as string);
-    return undefined;
   }
   if (repeaterKey === SDAI_REPEATER_BATERIAS && fieldKey === BATERIA_DEVICE_KEY) return resolveBatteryDeviceField(ctx);
   if (repeaterKey === SDAI_REPEATER_LACOS && fieldKey === LACO_ID_KEY) return resolveLacoIdField(ctx);
-  return undefined;
+  // Fallback GENÉRICO (todo o template contratual): campos de 2 opções viram
+  // controle binário com cor semântica derivada da metadata (§2/§3).
+  return binarySemantics(field);
 }
 
 /**
@@ -145,14 +199,26 @@ export function resolveSdaiItemPatch(
   if (repeaterKey !== SDAI_REPEATER_FALHAS) return undefined;
   if (fieldKey === FALHA_LOOP_KEY) {
     // Trocar o laço zera endereço/device e derivados do endereço anterior (§7).
-    return { [FALHA_ADDR_KEY]: '', [FALHA_DEVICE_KEY]: '', codigo: '', local: '' };
+    return { [FALHA_ADDR_KEY]: '', [FALHA_DEVICE_KEY]: '', codigo: '', local: '', [FALHA_PERFIL_KEY]: '', [FALHA_DIVERGENCIA_KEY]: '' };
   }
   if (fieldKey === FALHA_ADDR_KEY) {
     const loop = String(item?.[FALHA_LOOP_KEY] ?? '');
     const addr = String(newValue ?? '');
     const dev = ctx.central && loop && addr ? resolveDeviceByLoopAddress(ctx.central, loop, addr, ctx.devices) : undefined;
-    if (dev) return { [FALHA_DEVICE_KEY]: dev.id, codigo: dev.technicalIdentifier || '', local: dev.localizacao || '' };
-    return { [FALHA_DEVICE_KEY]: '', codigo: '', local: '' };
+    if (dev) {
+      // Device do endereço é AUTORITATIVO (§14). Se havia perfil informado que
+      // diverge, registra a divergência (não sobrescreve silenciosamente).
+      const perfilInformado = String(item?.[FALHA_PERFIL_KEY] ?? '').trim();
+      const perfilReal = deviceProfileLabel(dev);
+      const divergente = !!perfilInformado && perfilInformado !== perfilReal;
+      return {
+        [FALHA_DEVICE_KEY]: dev.id,
+        codigo: dev.technicalIdentifier || '',
+        local: dev.localizacao || '',
+        [FALHA_DIVERGENCIA_KEY]: divergente ? `Perfil informado (${perfilInformado}) difere do dispositivo do endereço (${perfilReal}).` : '',
+      };
+    }
+    return { [FALHA_DEVICE_KEY]: '', codigo: '', local: '', [FALHA_DIVERGENCIA_KEY]: '' };
   }
   return undefined;
 }

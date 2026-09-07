@@ -17,6 +17,7 @@ import type {
   Pendencia,
 } from './types';
 import type { LastTestInfo } from './maintenanceAssets';
+import { legacyGroupLabel } from './technicalBase';
 
 /** Código estável do template (convenção do repo: PREVENTIVA_<AREA>_<escopo>). */
 export const PREVENTIVA_SDAI_CONTRATO_CODIGO = 'PREVENTIVA_SDAI_CONTRATO';
@@ -285,6 +286,41 @@ export function isBatteryDevice(d: Pick<Device, 'grupo' | 'tipoAtivo' | 'tipoDis
  *  (a UI NÃO faz fallback para dispositivos de campo; usa catálogo/manual). */
 export function resolveCentralBatteries(central: Device, devices: Device[]): Device[] {
   return siblingsOfCentral(central, devices).filter(isBatteryDevice);
+}
+
+/* --------------------------- Perfis distintos (§9B/§10/§11) ---------------- */
+
+/** Rótulo canônico do PERFIL (grupo/tipo + fabricante + modelo). Usa SEMPRE o
+ *  grupo canônico (legacyGroupLabel) — nunca o tipo legado/importado com typo. */
+export function deviceProfileLabel(d: Pick<Device, 'grupo' | 'tipoAtivo' | 'tipoDispositivo' | 'fabricante' | 'modelo'>): string {
+  const grupo = legacyGroupLabel('SDAI', d.grupo) || d.tipoAtivo || d.tipoDispositivo || 'Dispositivo';
+  const fm = [d.fabricante, d.modelo].filter(Boolean).join(' ');
+  return fm ? `${grupo} — ${fm}` : grupo;
+}
+
+export interface DeviceProfile { key: string; label: string; grupo?: string; fabricante?: string; modelo?: string; count: number }
+
+/**
+ * Perfis DISTINTOS (tipo/modelo) de uma central (opcionalmente de um laço) —
+ * agrupa por grupo canônico + fabricante + modelo e deduplica (§10/§11). Para o
+ * técnico escolher o TIPO quando não há endereço, SEM listar N devices. NÃO
+ * expõe device_id (§13). Rótulo sempre canônico (corrige o "Sireme" legado §12).
+ */
+export function resolveDistinctDeviceProfiles(central: Device, loop: string | undefined, devices: Device[]): DeviceProfile[] {
+  const l = (loop || '').trim();
+  const sibs = siblingsOfCentral(central, devices).filter((d) => !l || String(d.laco ?? '').trim() === l);
+  const map = new Map<string, DeviceProfile>();
+  for (const d of sibs) {
+    const grupo = legacyGroupLabel('SDAI', d.grupo) || d.tipoAtivo || d.tipoDispositivo || 'Dispositivo';
+    const fab = (d.fabricante || '').trim();
+    const mod = (d.modelo || '').trim();
+    const label = deviceProfileLabel(d);
+    const key = label; // rótulo canônico é a identidade do perfil (dedupe)
+    const cur = map.get(key);
+    if (cur) cur.count++;
+    else map.set(key, { key, label, grupo, fabricante: fab || undefined, modelo: mod || undefined, count: 1 });
+  }
+  return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
 }
 
 /** Item de catálogo mínimo (produtos do Estoque) para o seletor de bateria. */

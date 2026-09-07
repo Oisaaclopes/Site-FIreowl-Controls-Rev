@@ -7,6 +7,7 @@
 import type { CatalogSources } from '@/components/reports/FormEngine';
 import type { Device } from './types';
 import { GRUPOS_FALHA } from './catalogoFalhas';
+import { legacyGroupLabel } from './technicalBase';
 
 const uniq = (arr: string[]) => Array.from(new Set(arr.filter(Boolean)));
 const uniqCI = (arr: string[]): string[] => {
@@ -82,9 +83,11 @@ export function buildBaseReportCatalog(input: BaseCatalogInput): CatalogSources 
   };
 }
 
-/** Rótulo de um device para os selects `origem: 'devices'` (central/falha). */
+/** Rótulo de um device para os selects `origem: 'devices'` (central/falha).
+ *  Usa o GRUPO CANÔNICO atual (legacyGroupLabel) — nunca o tipo legado/importado
+ *  (ex.: evita exibir o typo "Sireme / Sinalizador" já corrigido na Base). */
 export function deviceLabel(d: Device): string {
-  const tipo = d.tipoAtivo || d.tipoDispositivo || 'Dispositivo';
+  const tipo = legacyGroupLabel(d.sistema, d.grupo) || d.tipoAtivo || d.tipoDispositivo || 'Dispositivo';
   const loc = [d.central, d.laco, d.endereco].filter(Boolean).join('/');
   return loc ? `${tipo} · ${loc}` : tipo;
 }

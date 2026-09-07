@@ -592,13 +592,31 @@ export const ReportForm: React.FC<ReportFormProps> = ({
 
   const resolveFieldOptions = useMemo<ResolveFieldOptions | undefined>(() => {
     if (!isSdaiContract) return undefined;
-    return ({ field, repeaterKey, itemValues }) => resolveSdaiFieldOptions(sdaiCtx, repeaterKey, field.key, itemValues as Record<string, unknown> | undefined);
+    return ({ field, repeaterKey, itemValues }) => resolveSdaiFieldOptions(
+      sdaiCtx, repeaterKey,
+      { key: field.key, tipo: field.tipo, opcoes: field.opcoes, abre_pendencia_se: field.abre_pendencia_se },
+      itemValues as Record<string, unknown> | undefined,
+    );
   }, [isSdaiContract, sdaiCtx]);
 
   const resolveItemPatch = useMemo<ResolveItemPatch | undefined>(() => {
     if (!isSdaiContract) return undefined;
     return ({ field, newValue, repeaterKey, itemValues }) => resolveSdaiItemPatch(sdaiCtx, repeaterKey, field.key, newValue, itemValues as Record<string, unknown> | undefined);
   }, [isSdaiContract, sdaiCtx]);
+
+  // Quantidade de falhas → N cards (§19). Aumentar cria cards vazios; REDUZIR
+  // NÃO apaga (preserva dados até remoção manual pelo técnico).
+  useEffect(() => {
+    if (!isSdaiContract) return;
+    const n = Number(values.falhas_qtd);
+    if (!Number.isFinite(n) || n <= 0) return;
+    setValues((prev) => {
+      const cards = Array.isArray(prev.falhas) ? (prev.falhas as RepeaterCard[]) : [];
+      if (cards.length >= n) return prev;
+      const blanks = Array.from({ length: n - cards.length }, () => ({} as RepeaterCard));
+      return { ...prev, falhas: [...cards, ...blanks] };
+    });
+  }, [isSdaiContract, values.falhas_qtd]);
 
   // Semeia o repeater de laços (medição) com um card por laço REAL da central (§17).
   useEffect(() => {
