@@ -62,13 +62,28 @@ jobs:
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
           FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
         run: |
+          # O servidor falha ao sobrescrever via arquivo oculto temporário.
+          # Gera uma lista exata: remove somente cada arquivo presente em out/
+          # e o reenvia; não apaga arquivos remotos fora do build.
+          : > /tmp/fireowl-upload.lftp
+          find ./out -type d | sort | while IFS= read -r dir; do
+            rel="${dir#./out}"
+            [ -z "$rel" ] || printf 'mkdir -p "/public_html%s";\n' "$rel" >> /tmp/fireowl-upload.lftp
+          done
+          find ./out -type f | sort | while IFS= read -r file; do
+            rel="${file#./out/}"
+            remote="/public_html/$rel"
+            remote_dir="${remote%/*}/"
+            printf 'rm -f "%s";\nput -O "%s" "%s";\n' "$remote" "$remote_dir" "$file" >> /tmp/fireowl-upload.lftp
+          done
+
           lftp -c "
             set ftp:ssl-force true;
             set ftp:ssl-protect-data true;
             set ssl:verify-certificate no;
-            set xfer:use-temp-file false;
+            set cmd:fail-exit true;
             set net:max-retries 2;
             set net:timeout 20;
             open -p 21 -u \"$FTP_USERNAME\",\"$FTP_PASSWORD\" \"$FTP_SERVER\";
-            mirror --reverse --only-newer --no-perms --parallel=2 --verbose ./out/ /public_html/;
+            source /tmp/fireowl-upload.lftp;
           "
