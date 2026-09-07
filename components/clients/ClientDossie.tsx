@@ -40,6 +40,10 @@ import { nomeFantasiaCliente, razaoSocialCliente } from '@/lib/utils';
 import { usePagination } from '@/lib/usePagination';
 import { PaginatedListControls } from '@/components/ui/PaginatedListControls';
 import { ClientTechnicalBase } from '@/components/clients/ClientTechnicalBase';
+import { ContractDetailPanel } from '@/components/contratos/ContractDetailPanel';
+import { AttendanceScreen } from '@/components/operacoes/ServiceAttendanceFlow';
+import { fetchOrdensServico } from '@/lib/ordensServico';
+import type { ServiceAttendance } from '@/lib/types';
 
 /* ==========================================================================
  * CLIENT 360 — Dossiê operacional do cliente (página cheia).
@@ -77,6 +81,11 @@ interface ClientDossieProps {
   onOpenReport: (name: string) => void;
   onNavigateToTab: (tab: TabPath) => void;
   userRole: UserRole;
+  /** Usuário atual (técnico que iniciaria o atendimento contratual). */
+  currentUserId?: string;
+  currentUserName?: string;
+  /** Recarrega os contratos após criar/excluir/encerrar (thread do CRM). */
+  onReloadContracts?: () => void | Promise<void>;
 }
 
 const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -173,8 +182,20 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
   onOpenReport,
   onNavigateToTab,
   userRole,
+  currentUserId,
+  currentUserName,
+  onReloadContracts,
 }) => {
   const { maskMoney } = usePrivacy();
+  // Gestão contratual inline (§1/§5): painel do contrato e atendimento dentro do 360.
+  const [contractPanel, setContractPanel] = useState<Contract | null>(null);
+  const [attendanceView, setAttendanceView] = useState<{ attendance: ServiceAttendance; os?: OrdemServico } | null>(null);
+  const abrirAtendimentoContratual = async (info: { attendance: ServiceAttendance; workOrderId: string }) => {
+    let os: OrdemServico | undefined;
+    try { os = (await fetchOrdensServico({ clienteId: client.id })).find((o) => o.id === info.workOrderId); } catch { /* degrada sem OS */ }
+    setContractPanel(null);
+    setAttendanceView({ attendance: info.attendance, os });
+  };
   const brlM = (n: number) => maskMoney(brl(n));
   const [tab, setTab] = useState<DossieTab>('overview');
 
@@ -685,8 +706,8 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
           </SectionWrap>
           <SectionWrap
             title={`Contratos (${clientContracts.length})`}
-            actionLabel="Abrir módulo de Contratos"
-            onAction={() => onNavigateToTab('contratos')}
+            actionLabel={userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR' ? 'Novo contrato' : undefined}
+            onAction={userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR' ? () => onNavigateToTab('contratos') : undefined}
           >
             {clientContracts.length === 0 ? (
               <EmptyState variant="generico" title="Nenhum contrato" description="Este cliente não possui contratos vinculados." />
@@ -709,10 +730,10 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
                     <div className="shrink-0 text-right">
                       <p className="font-data-mono text-sm font-bold text-emerald-600">{brlM(c.monthlyValue || 0)}<span className="text-[10px] text-fg-muted">/mês</span></p>
                       <button
-                        onClick={() => onNavigateToTab('contratos')}
+                        onClick={() => setContractPanel(c)}
                         className="mt-1 rounded-lg border border-primary px-3 py-1 text-xs font-bold text-primary transition-colors hover:bg-navy hover:text-white"
                       >
-                        Abrir
+                        Gerenciar
                       </button>
                     </div>
                   </div>
@@ -748,6 +769,29 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
         )}
       </div>
 
+      {/* Gestão do contrato DENTRO do Cliente 360 (§1/§2): mesmo ContractDetailPanel
+          (overlay). onClose = "Voltar para contratos". */}
+      {contractPanel && (
+        <ContractDetailPanel
+          contract={contractPanel}
+          userRole={userRole}
+          technicianId={currentUserId}
+          onClose={() => setContractPanel(null)}
+          onChanged={() => { setContractPanel(null); void onReloadContracts?.(); }}
+          onOpenAttendance={abrirAtendimentoContratual}
+        />
+      )}
+      {/* Atendimento contratual aberto diretamente (§5/§6). */}
+      {attendanceView && (
+        <AttendanceScreen
+          attendance={attendanceView.attendance}
+          os={attendanceView.os}
+          clients={[client]}
+          technicianId={currentUserId}
+          technicianName={currentUserName}
+          onClose={() => { setAttendanceView(null); void onReloadContracts?.(); }}
+        />
+      )}
     </div>
   );
 };

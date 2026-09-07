@@ -52,6 +52,9 @@ interface CrmViewProps {
   onSelectClientForReport?: (clientName: string) => void;
   onNavigateToTab?: (tab: TabPath) => void;
   userRole?: UserRole;
+  currentUserId?: string;
+  currentUserName?: string;
+  onReloadContracts?: () => void | Promise<void>;
 }
 
 const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -113,6 +116,9 @@ export const CrmView: React.FC<CrmViewProps> = ({
   onSelectClientForReport,
   onNavigateToTab,
   userRole = 'ADMINISTRATIVO',
+  currentUserId,
+  currentUserName,
+  onReloadContracts,
 }) => {
   const { maskMoney } = usePrivacy();
   // O CRM não clona o menu lateral: mostra só a base de Clientes. (Estoque,
@@ -421,6 +427,9 @@ export const CrmView: React.FC<CrmViewProps> = ({
           onNavigateToTab?.(tab);
         }}
         userRole={userRole}
+        currentUserId={currentUserId}
+        currentUserName={currentUserName}
+        onReloadContracts={onReloadContracts}
       />
     );
   }

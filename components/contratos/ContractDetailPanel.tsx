@@ -6,7 +6,7 @@ import { resolveAttendanceTemplateCodigo } from '@/lib/sdaiAttendanceWiring';
 import { PREVENTIVA_SDAI_CONTRATO_CODIGO } from '@/lib/sdaiMaintenance';
 
 import React, { useEffect, useState } from 'react';
-import { Contract, ContractRoutine, ContractRoutineExecution, ContractHourEntry, ContractAttachment, ContractExecutionStatus, UserRole } from '@/lib/types';
+import { Contract, ContractRoutine, ContractRoutineExecution, ContractHourEntry, ContractAttachment, ContractExecutionStatus, ServiceAttendance, UserRole } from '@/lib/types';
 import { isSupabaseConfigured } from '@/lib/inventory';
 import { FieldOperationsManager } from '@/components/operacoes/FieldOperationsManager';
 import {
@@ -16,6 +16,7 @@ import {
   fetchContractAttachments,
   uploadContractAttachment, signedContractAttachmentUrl, removeContractAttachment,
   proximaExecucaoRotina, generateOsFromExecution,
+  competenciaDe, intervaloMesesRotina,
 } from '@/lib/contractRoutines';
 
 const inp = 'w-full border border-border rounded-lg p-2 text-xs text-fg bg-surface focus:outline-none focus:ring-2 focus:ring-danger/20';
@@ -38,7 +39,7 @@ export const ContractDetailPanel: React.FC<{
   /** Chamado após excluir/encerrar (o host recarrega a lista). */
   onChanged?: () => void;
   /** Abre o atendimento criado/reutilizado (host renderiza o AttendanceScreen). */
-  onOpenAttendance?: (info: { attendanceId: string; workOrderId: string }) => void;
+  onOpenAttendance?: (info: { attendance: ServiceAttendance; workOrderId: string }) => void;
 }> = ({ contract, onClose, userRole, initialTab = 'rotinas', technicianId, onChanged, onOpenAttendance }) => {
   const online = isSupabaseConfigured();
   const canManageOps = userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR';
@@ -84,13 +85,16 @@ export const ContractDetailPanel: React.FC<{
     setBusy(true); setErro(null);
     try {
       const res = await startContractualAttendance({ routine: r, technicianId });
-      if (onOpenAttendance) onOpenAttendance({ attendanceId: res.attendance.id, workOrderId: res.workOrderId });
+      if (onOpenAttendance) onOpenAttendance({ attendance: res.attendance, workOrderId: res.workOrderId });
       else showToast(res.reused ? 'Atendimento em andamento — continue em Atendimentos.' : 'Atendimento iniciado — continue em Atendimentos.');
     } catch (e) { setErro(e instanceof Error ? e.message : 'Falha ao iniciar atendimento.'); } finally { setBusy(false); }
   };
   const rotinaPreventivaSdai = (r: ContractRoutine) =>
     r.area === 'SDAI' && (r.tipo || 'preventiva') === 'preventiva'
     && resolveAttendanceTemplateCodigo(r) === PREVENTIVA_SDAI_CONTRATO_CODIGO;
+  /** Execução da competência corrente da rotina (base do estado do botão). */
+  const execAtual = (r: ContractRoutine): ContractRoutineExecution | undefined =>
+    execs.find((e) => e.routineId === r.id && e.competencia === competenciaDe(new Date(), intervaloMesesRotina(r)));
 
   // ---- Nova rotina ----
   const [nova, setNova] = useState<Partial<ContractRoutine>>({ tipo: 'preventiva', frequencia: 'mensal', diaRegra: 'primeiro_dia_util', qtdTecnicos: 1, ativo: true });
@@ -230,9 +234,14 @@ export const ContractDetailPanel: React.FC<{
                             <p className="text-[11px] text-fg-secondary">{[r.diaRegra?.replace(/_/g, ' '), r.horarioInicio && `${r.horarioInicio}–${r.horarioFim || ''}`, r.qtdTecnicos && `${r.qtdTecnicos} técnico(s)`, r.visitasMes && `${r.visitasMes} visita(s)/mês`, r.sla && `SLA: ${r.sla}`].filter(Boolean).join(' · ')}</p>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
-                            {rotinaPreventivaSdai(r) && (
-                              <button disabled={busy || !technicianId} onClick={() => iniciarAtendimento(r)} title={!technicianId ? 'Sem técnico para iniciar' : undefined} className="text-[10px] font-bold uppercase text-white bg-navy-3 hover:bg-[#13315C] disabled:opacity-40 rounded-lg px-2.5 py-1.5 inline-flex items-center gap-1"><span className="material-symbols-outlined text-sm">play_arrow</span>Iniciar atendimento</button>
-                            )}
+                            {rotinaPreventivaSdai(r) && (() => {
+                              const ex = execAtual(r);
+                              if (ex && (ex.status === 'executado' || ex.status === 'relatorio_emitido')) {
+                                return <span className="text-[10px] font-bold uppercase text-emerald-700 inline-flex items-center gap-1"><span className="material-symbols-outlined text-sm">task_alt</span>Concluído no período</span>;
+                              }
+                              const label = ex && ex.status === 'os_gerada' ? 'Continuar atendimento' : 'Iniciar atendimento';
+                              return <button disabled={busy || !technicianId} onClick={() => iniciarAtendimento(r)} title={!technicianId ? 'Sem técnico para iniciar' : undefined} className="text-[10px] font-bold uppercase text-white bg-navy-3 hover:bg-[#13315C] disabled:opacity-40 rounded-lg px-2.5 py-1.5 inline-flex items-center gap-1"><span className="material-symbols-outlined text-sm">play_arrow</span>{label}</button>;
+                            })()}
                             <button disabled={busy} onClick={() => gerarProxima(r)} className="text-[10px] font-bold uppercase text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 rounded-lg px-2.5 py-1.5 inline-flex items-center gap-1"><span className="material-symbols-outlined text-sm">event_available</span>Programar próxima</button>
                             <button onClick={() => removerRotina(r.id)} className="text-fg-muted hover:text-danger p-1"><span className="material-symbols-outlined text-base">delete</span></button>
                           </div>

@@ -1347,6 +1347,9 @@ export function CrmApp({
               onSelectClientForReport={handleSelectClientForReport}
               onNavigateToTab={setCurrentTab}
               userRole={userRole}
+              currentUserId={userId}
+              currentUserName={userName}
+              onReloadContracts={async () => setContracts(await fetchContracts())}
             />
           )}
 
