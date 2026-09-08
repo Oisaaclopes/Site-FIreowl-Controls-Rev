@@ -18,8 +18,6 @@ import {
   findEquivalentOpenPendencia,
   mapDeviceResultToCondicao,
   resultFromLabel,
-  resultOpensPendencia,
-  shouldCreatePendencia,
 } from './sdaiMaintenance';
 import { classifyTestResult } from './maintenanceCoverage';
 import { legacyGroupLabel } from './technicalBase';
@@ -378,16 +376,17 @@ export interface MaintenanceFinalizeSummary {
 
 /**
  * Orquestra a persistência de manutenção ao finalizar o atendimento SDAI (§5/§6/
- * §7/§17): grava device_verifications idempotentes por device e cria/reutiliza
- * pendências (sem duplicar), devolvendo a cobertura. Só para o template
- * contratual — o chamador gateia por template_codigo. I/O fino; reusa o motor.
+ * §17): grava device_verifications idempotentes por device e devolve a cobertura.
+ * NÃO cria pendência aqui (§22 dedupe): a pendência do dispositivo programado
+ * reprovado é criada UMA ÚNICA VEZ pelo bundle offline (buildPendencias, branch
+ * checklist_dispositivos), evitando a dupla pendência (grupo 'SDAI' aqui × 'SDAI
+ * > Dispositivo' no bundle). Só para o template contratual — gateado pelo chamador.
  */
 export async function finalizeMaintenanceAttendance(
   ctx: MaintenanceAttendanceContext,
   results: ParsedDeviceResult[]
 ): Promise<MaintenanceFinalizeSummary> {
   let verifications = 0;
-  let pendencias = 0;
   const resultsByDevice = new Map<string, SdaiDeviceResult>();
   for (const r of results) {
     resultsByDevice.set(r.deviceId, r.result);
@@ -396,15 +395,7 @@ export async function finalizeMaintenanceAttendance(
       result: r.result, notes: r.notes,
     });
     if (v) verifications++;
-    if (resultOpensPendencia(r.result)) {
-      await createOrReuseDevicePendencia({
-        clienteId: ctx.clienteId, contratoId: ctx.contratoId, serviceAttendanceId: ctx.serviceAttendanceId,
-        reportOrigemId: ctx.reportOrigemId, deviceId: r.deviceId, grupo: 'SDAI',
-        descricao: r.notes, acaoRecomendada: 'investigar',
-      });
-      pendencias++;
-    }
   }
   const coverage = ctx.plan ? coverageInProgress(ctx.plan, resultsByDevice) : undefined;
-  return { verifications, pendencias, coverage };
+  return { verifications, pendencias: 0, coverage };
 }

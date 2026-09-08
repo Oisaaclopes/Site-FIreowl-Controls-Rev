@@ -113,6 +113,13 @@ const inputCls =
   'w-full border border-border rounded-lg p-2.5 text-fg bg-surface text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40';
 const labelCls = 'block text-fg-secondary mb-1 font-semibold uppercase text-[11px]';
 
+// Rótulos ABREVIADOS do toggle segmentado compacto (o valor persistido é o full).
+const BINARY_SHORT: Record<string, string> = {
+  'Sim': 'SIM', 'Não': 'NÃO',
+  'Conforme': 'OK', 'Não conforme': 'NC',
+  'Aprovado': 'OK', 'Reprovado': 'NC',
+};
+
 function catalogOptions(field: FieldSchema, catalog: CatalogSources, filtroValor?: string): string[] {
   switch (field.origem) {
     case 'categorias':
@@ -184,33 +191,29 @@ const FieldControl: React.FC<{
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoValue]);
 
-  // Rota A — controle BINÁRIO rápido (Sim/Não, Conforme/Não conforme) com cor
-  // semântica (verde=normal, laranja=alert, neutro antes de responder). §2/§3/§6.
+  // Rota A — TOGGLE SEGMENTADO COMPACTO (Sim/Não, OK/NC) com cor semântica
+  // (verde=normal, laranja=alert, neutro antes de responder). ~28px, inline —
+  // não é CTA. §2/§3/§4. Rótulos abreviados p/ caber; valor persistido é o full.
   if (resolution?.control === 'binary') {
     const opts = field.opcoes || (field.tipo === 'passfail' ? ['Aprovado', 'Reprovado'] : []);
     const sem = resolution.optionSemantics || {};
     const cur = (value as string) || '';
     return (
-      <>
-        <div className="grid grid-cols-2 gap-2">
-          {opts.map((o) => {
-            const active = cur === o;
-            const s = sem[o] || 'neutral';
-            const cls = active
-              ? (s === 'alert' ? 'border-amber-500 bg-amber-500 text-white'
-                : s === 'normal' ? 'border-emerald-600 bg-emerald-600 text-white'
-                : 'border-primary bg-navy text-white')
-              : 'border-border bg-surface text-fg-secondary hover:bg-surface-2';
-            return (
-              <button key={o} type="button" aria-pressed={active} disabled={disabled}
-                onClick={() => onValue(o)}
-                className={`min-h-11 md:min-h-9 rounded-lg border px-2 text-[13px] font-semibold transition-colors disabled:opacity-50 ${cls}`}>
-                {o}
-              </button>
-            );
-          })}
-        </div>
-      </>
+      <div role="group" className="inline-flex shrink-0 overflow-hidden rounded-md border border-border text-[11px] font-semibold leading-none">
+        {opts.map((o, i) => {
+          const active = cur === o;
+          const s = sem[o] || 'neutral';
+          const activeCls = s === 'alert' ? 'bg-amber-500 text-white' : s === 'normal' ? 'bg-emerald-600 text-white' : 'bg-navy text-white';
+          return (
+            <button key={o} type="button" aria-pressed={active} disabled={disabled}
+              title={o}
+              onClick={() => onValue(o)}
+              className={`h-7 min-w-[36px] px-2.5 transition-colors disabled:opacity-50 ${i > 0 ? 'border-l border-border' : ''} ${active ? activeCls : 'bg-surface text-fg-secondary hover:bg-surface-2'}`}>
+              {BINARY_SHORT[o] || o}
+            </button>
+          );
+        })}
+      </div>
     );
   }
 
@@ -610,20 +613,44 @@ const Repeater: React.FC<{
   };
   const removeCard = (idx: number) => onCards(cards.filter((_, i) => i !== idx));
 
+  // Cards RECOLHÍVEIS (§17/§18): quando o card já tem conteúdo (semeado/preenchido)
+  // mostra um resumo de 1 linha e fica FECHADO; vazio/novo abre para preencher.
+  const [openIdx, setOpenIdx] = useState<Set<number>>(() => new Set());
+  const summarize = (card: RepeaterCard): string => {
+    const parts: string[] = [];
+    for (const f of schema) {
+      if (['foto', 'assinatura', 'select_falha'].includes(f.tipo) || f.multilinha) continue;
+      if (['device_id', 'base_status', 'pertence_central'].includes(f.key)) continue;
+      const v = card[f.key];
+      if (v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0)) continue;
+      parts.push(String(v));
+      if (parts.length >= 4) break;
+    }
+    return parts.join(' · ');
+  };
+  const cardOpen = (idx: number, card: RepeaterCard) => openIdx.has(idx) || !summarize(card);
+  const toggleCard = (idx: number) => setOpenIdx((s) => { const n = new Set(s); n.has(idx) ? n.delete(idx) : n.add(idx); return n; });
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {cards.length === 0 && <p className="text-[11px] text-fg-muted italic">Nenhum item adicionado.</p>}
-      {cards.map((card, idx) => (
-        <div key={idx} className="border border-border rounded-xl p-3 bg-surface-2/50">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold text-fg-muted uppercase tracking-wider">
-              {field.label} #{idx + 1}
-            </span>
-            <button type="button" onClick={() => removeCard(idx)} className="text-fg-muted hover:text-danger" title="Remover">
+      {cards.map((card, idx) => {
+        const open = cardOpen(idx, card);
+        const summary = summarize(card);
+        return (
+        <div key={idx} className="border border-border rounded-xl bg-surface-2/50">
+          <div className="flex items-center justify-between gap-2 px-3 py-2 cursor-pointer" onClick={() => toggleCard(idx)}>
+            <div className="min-w-0 flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-base text-fg-muted shrink-0">{open ? 'expand_more' : 'chevron_right'}</span>
+              <span className="text-[10px] font-bold text-fg-muted uppercase tracking-wider shrink-0">{field.label} #{idx + 1}</span>
+              {!open && summary && <span className="text-[11px] text-fg-secondary truncate">{summary}</span>}
+            </div>
+            <button type="button" onClick={(e) => { e.stopPropagation(); removeCard(idx); }} className="text-fg-muted hover:text-danger shrink-0" title="Remover">
               <span className="material-symbols-outlined text-lg">delete</span>
             </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {open && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 px-3 pb-3">
             {schema
               // Visibilidade por item: condicionais internas do card avaliam
               // contra as respostas DO PRÓPRIO card (contexto do item) — FASE 7.
@@ -687,8 +714,10 @@ const Repeater: React.FC<{
                 </div>
               ))}
           </div>
+          )}
         </div>
-      ))}
+        );
+      })}
       <div className="flex flex-col sm:flex-row gap-2">
         {showPadrao && (
           <button
@@ -821,6 +850,36 @@ const Section: React.FC<{
             const isWide = isRepeater || field.multilinha || field.tipo === 'multiselect';
             const required = isFieldRequired(field, values);
             const disabled = isFieldDisabled(field, values);
+            const res = isRepeater ? undefined : resolveFieldOptions?.({ field, formValues: values });
+            const control = res && !isRepeater ? (
+              <FieldControl
+                field={field}
+                value={values[field.key]}
+                disabled={disabled}
+                onValue={(v) => {
+                  onChange(field.key, v);
+                  if(field.key==='central_fabricante') { onChange('central_modelo',''); onChange('tipo_central',''); }
+                  if(field.key==='central_modelo') onChange('tipo_central', catalog.detalhesModelo?.[String(v)]?.tipoCentral || 'Não identificado');
+                }}
+                catalog={catalog}
+                onCreateCatalogo={onCreateCatalogo}
+                filtroValor={field.filtro_por ? String(values[field.filtro_por] ?? '') : undefined}
+                resolution={res}
+              />
+            ) : null;
+
+            // COMPACTO (§2/§5/§6): binário = label à esquerda + toggle à direita na
+            // MESMA linha; texto longo quebra e o toggle desce só se não couber.
+            if (res?.control === 'binary') {
+              return (
+                <div key={field.key} className="flex items-center justify-between gap-2 min-h-[34px] border-b border-border/50 py-1 md:border-0 md:py-0">
+                  <label className="text-[12px] font-medium text-fg-secondary leading-snug">
+                    {field.label || field.key} {required && <span className="text-danger">*</span>}
+                  </label>
+                  <div className={disabled ? 'opacity-60 pointer-events-none' : ''}>{control}</div>
+                </div>
+              );
+            }
             return (
               <div key={field.key} className={isWide ? 'md:col-span-2' : ''}>
                 <label className={labelCls}>
@@ -841,6 +900,7 @@ const Section: React.FC<{
                   />
                 ) : (
                   <div className={disabled ? 'opacity-60 pointer-events-none' : ''}>
+                  {control ?? (
                   <FieldControl
                     field={field}
                     value={values[field.key]}
@@ -853,8 +913,9 @@ const Section: React.FC<{
                     catalog={catalog}
                     onCreateCatalogo={onCreateCatalogo}
                     filtroValor={field.filtro_por ? String(values[field.filtro_por] ?? '') : undefined}
-                    resolution={resolveFieldOptions?.({ field, formValues: values })}
+                    resolution={res}
                   />
+                  )}
                   </div>
                 )}
               </div>
