@@ -50,33 +50,22 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_BUILD_SHA: ${{ github.sha }}
 
-      # A action anterior fazia upload para arquivos ocultos `.in.*` e depois
-      # RNFR/RNTO. O FTP da Hostinger passou a responder 550 nesse rename.
-      # lftp envia diretamente (xfer:use-temp-file=false), no mesmo destino.
-      - name: Instalar cliente FTPS
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
-
-      - name: Publicar out/ via FTPS no Hostinger
-        env:
-          FTP_SERVER: ${{ secrets.FTP_SERVER }}
-          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
-          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
-        run: |
-          # CAUSA RAIZ (confirmada em 2 rounds): (1) `xfer:use-temp-file false`
-          # eliminou o `.in.*`+rename recusado pela Hostinger; (2) restou a criação
-          # da árvore de diretórios, que o put manual não faz e o `mkdir` avulso do
-          # lftp não vinha criando de forma confiável → 550 "No such file".
-          # `mirror -R` cria os diretórios e grava direto (com use-temp-file false),
-          # mantendo FTPS/porta 21/secrets/destino. SEM --delete (não apaga nada
-          # fora de out/); --no-perms (Hostinger recusa chmod 550).
-          lftp -c "
-            set ftp:ssl-force true;
-            set ftp:ssl-protect-data true;
-            set ssl:verify-certificate no;
-            set xfer:use-temp-file false;
-            set cmd:fail-exit true;
-            set net:max-retries 2;
-            set net:timeout 20;
-            open -p 21 -u \"$FTP_USERNAME\",\"$FTP_PASSWORD\" \"$FTP_SERVER\";
-            mirror -R --no-perms --no-symlinks --overwrite --parallel=1 ./out /public_html;
-          "
+      # TESTE CONTROLADO: transporte restaurado EXATAMENTE ao último deploy verde
+      # (commit c2a094d, run 268, 04/09/2026). Sem lftp/mirror/workarounds.
+      - name: Publicar via FTP no Hostinger
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          # Hostinger aceita FTPS (mais seguro). Se der erro de conexão,
+          # troque para: protocol: ftp
+          protocol: ftps
+          port: 21
+          security: loose
+          # Sobe o conteúdo do build para a raiz do site.
+          local-dir: ./out/
+          # Se a sua conta de FTP já abre dentro do public_html, troque para: /
+          server-dir: /public_html/
+          # Só envia o que mudou (sync incremental); remove arquivos apagados.
+          dangerous-clean-slate: false
