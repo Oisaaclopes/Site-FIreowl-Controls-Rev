@@ -15,7 +15,7 @@ import { blobToCapturedFile, CameraFacing, cameraConstraints, cameraErrorMessage
  * =================================================================== */
 
 interface Props {
-  onCapture: (file: File) => void;
+  onCapture: (file: File) => void | Promise<void>;
   onClose: () => void;
   title?: string;
 }
@@ -28,6 +28,24 @@ export const CameraCapture: React.FC<Props> = ({ onCapture, onClose, title = 'Ad
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState<{ file: File; url: string; source: 'camera' | 'gallery' } | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
+  const confirmedRef = useRef(false);
+
+  const replacePreview = useCallback((file: File, source: 'camera' | 'gallery') => {
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    const url = URL.createObjectURL(file);
+    previewUrlRef.current = url;
+    setPreview({ file, url, source });
+    setBusy(false);
+  }, []);
+
+  const discardPreview = useCallback(() => {
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    previewUrlRef.current = null;
+    setPreview(null);
+    confirmedRef.current = false;
+  }, []);
 
   const stop = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -54,7 +72,11 @@ export const CameraCapture: React.FC<Props> = ({ onCapture, onClose, title = 'Ad
 
   useEffect(() => {
     start(facing);
-    return () => stop();
+    return () => {
+      stop();
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [facing]);
 
@@ -72,9 +94,9 @@ export const CameraCapture: React.FC<Props> = ({ onCapture, onClose, title = 'Ad
     canvas.toBlob((blob) => {
       if (!blob) { setBusy(false); return; }
       stop();
-      onCapture(blobToCapturedFile(blob));
+      replacePreview(blobToCapturedFile(blob), 'camera');
     }, 'image/jpeg', 0.9);
-  }, [ready, busy, onCapture, stop]);
+  }, [ready, busy, replacePreview, stop]);
 
   const onGallery = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -82,10 +104,22 @@ export const CameraCapture: React.FC<Props> = ({ onCapture, onClose, title = 'Ad
     if (!file) return;
     if (!file.type.startsWith('image/')) { setError('Selecione uma imagem válida.'); return; }
     stop();
-    onCapture(file);
+    replacePreview(file, 'gallery');
   };
 
-  const close = () => { stop(); onClose(); };
+  const retake = () => {
+    discardPreview();
+    start(facing);
+  };
+
+  const usePhoto = () => {
+    if (!preview || confirmedRef.current) return;
+    confirmedRef.current = true;
+    setBusy(true);
+    onCapture(preview.file);
+  };
+
+  const close = () => { stop(); discardPreview(); onClose(); };
 
   // A câmera pode ser montada dentro de formulários e overlays com fechamento
   // por backdrop. Isole todos os gestos no boundary do componente para que um
@@ -113,7 +147,14 @@ export const CameraCapture: React.FC<Props> = ({ onCapture, onClose, title = 'Ad
 
       {/* Área da câmera / erro */}
       <div className="flex-1 min-h-0 flex items-center justify-center relative">
-        {error ? (
+        {preview ? (
+          <div
+            className="h-full w-full bg-contain bg-center bg-no-repeat"
+            style={{ backgroundImage: `url(${preview.url})` }}
+            role="img"
+            aria-label="Pré-visualização da foto"
+          />
+        ) : error ? (
           <div className="max-w-xs text-center px-6">
             <span className="material-symbols-outlined text-5xl text-white/70">no_photography</span>
             <p className="mt-3 text-sm text-white/90">{error}</p>
@@ -129,7 +170,16 @@ export const CameraCapture: React.FC<Props> = ({ onCapture, onClose, title = 'Ad
       </div>
 
       {/* Controles inferiores: [galeria] [capturar] [trocar] */}
-      {!error && (
+      {preview ? (
+        <div className="grid grid-cols-2 gap-3 px-4 py-6">
+          <button type="button" onClick={preview.source === 'gallery' ? () => galleryRef.current?.click() : retake} disabled={busy} className="min-h-[52px] rounded-xl border border-white/40 text-sm font-bold text-white disabled:opacity-50">
+            {preview.source === 'gallery' ? 'Escolher outra' : 'Tirar novamente'}
+          </button>
+          <button type="button" onClick={usePhoto} disabled={busy} className="min-h-[52px] rounded-xl bg-primary text-sm font-bold text-white disabled:opacity-50">
+            {busy ? 'Processando…' : 'Usar foto'}
+          </button>
+        </div>
+      ) : !error && (
         <div className="px-8 py-6 flex items-center justify-between">
           <button type="button" onClick={() => galleryRef.current?.click()} className="w-12 h-12 rounded-lg border border-white/40 bg-white/10 text-white flex items-center justify-center" aria-label="Galeria">
             <span className="material-symbols-outlined">photo_library</span>

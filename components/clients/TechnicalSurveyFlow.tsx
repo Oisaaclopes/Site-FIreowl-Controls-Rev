@@ -1,12 +1,12 @@
 'use client';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Device, UserRole, AssetConditionValue, TechnicalSurvey } from '@/lib/types';
 import {
   TechArea, AREA_LABEL, CONDITIONS, CONDITION_LABEL, SURVEY_MODE_LABEL,
   groupsForArea, assetDisplayIdentifier, findIdentityMatches,
 } from '@/lib/technicalBase';
 import { SurveyMode } from '@/lib/technicalBase';
-import { AssetFormValues, emptyAssetValues, firstInvalidField, buildDevicePatch } from '@/lib/technicalAssetForm';
+import { AssetFormValues, emptyAssetValues, firstInvalidField, buildDevicePatch, deviceToAssetValues } from '@/lib/technicalAssetForm';
 import { TechnicalAssetFields } from '@/components/clients/TechnicalAssetFields';
 import { upsertSurvey, finalizeSurvey } from '@/lib/technicalSurveys';
 import { persistSurveyAsset, newAssetId } from '@/lib/surveyCapture';
@@ -55,8 +55,9 @@ interface Draft {
   grupo: string;
   vals: AssetFormValues;   // valores do formulário contextual (fonte única §54)
   photos: number;          // fotos já capturadas para este rascunho
+  photoPreviews: string[]; // previews locais para conferência durante a visita
 }
-const emptyDraft = (): Draft => ({ assetId: newAssetId(), grupo: '', vals: emptyAssetValues(), photos: 0 });
+const emptyDraft = (): Draft => ({ assetId: newAssetId(), grupo: '', vals: emptyAssetValues(), photos: 0, photoPreviews: [] });
 
 export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientName, existingDevices, userRole, currentUserId, catalog = [], onClose, onChanged }) => {
   const [phase, setPhase] = useState<'config' | 'capture' | 'finish'>('config');
@@ -76,11 +77,22 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientNa
   const knownPool = useMemo(() => [...baseInArea, ...createdThisVisit], [baseInArea, createdThisVisit]);
 
   const [draft, setDraft] = useState<Draft>(emptyDraft());
+  const [savedPhotoPreviews, setSavedPhotoPreviews] = useState<Record<string, string[]>>({});
+  const [editingCreatedId, setEditingCreatedId] = useState<string | null>(null);
+  const [viewingPhoto, setViewingPhoto] = useState<string | null>(null);
+  const newAssetRef = useRef<HTMLDivElement>(null);
+  const groupRef = useRef<HTMLSelectElement>(null);
+  const localPreviewUrlsRef = useRef<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [keepNext, setKeepNext] = useState(false);       // §26 — manter dados no próximo
   const [recordKind, setRecordKind] = useState<'ativo' | 'observacao'>('ativo');
   const [obs, setObs] = useState<{ assunto: string; localizacao: string; texto: string; criarPendencia: boolean; photos: number }>({ assunto: '', localizacao: '', texto: '', criarPendencia: false, photos: 0 });
   const [pendingMatch, setPendingMatch] = useState<{ draftAsset: any; matches: Device[] } | null>(null);
+
+  useEffect(() => () => {
+    localPreviewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    localPreviewUrlsRef.current.clear();
+  }, []);
 
   const start = async () => {
     if (!isSupabaseConfigured()) { showToast('Supabase não configurado.'); return; }
@@ -117,8 +129,26 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientNa
   const nextDraft = (): Draft => {
     if (!keepNext) return emptyDraft();
     const v = draft.vals;
-    return { assetId: newAssetId(), grupo: draft.grupo, photos: 0,
-      vals: { attrs: {}, condicao: v.condicao, fabricante: v.fabricante, modelo: v.modelo, catalogItemId: v.catalogItemId, central: v.central, laco: v.laco } };
+    return { assetId: newAssetId(), grupo: draft.grupo, photos: 0, photoPreviews: [],
+      vals: { attrs: {}, condicao: 'NORMAL', fabricante: v.fabricante, modelo: v.modelo, catalogItemId: v.catalogItemId, equipManual: v.equipManual, central: v.central, laco: v.laco } };
+  };
+
+  const focusCurrentAsset = () => window.requestAnimationFrame(() => {
+    newAssetRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    groupRef.current?.focus({ preventScroll: true });
+  });
+
+  const editCreatedAsset = (device: Device) => {
+    setEditingCreatedId(device.id);
+    setRecordKind('ativo');
+    setDraft({
+      assetId: device.id,
+      grupo: device.grupo || '',
+      vals: deviceToAssetValues(device),
+      photos: savedPhotoPreviews[device.id]?.length || 0,
+      photoPreviews: savedPhotoPreviews[device.id] || [],
+    });
+    focusCurrentAsset();
   };
 
   const onCapture = async (file: File) => {
@@ -129,8 +159,9 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientNa
         await captureSurveyEvidence({ file, session, clientId: clienteId, clientName: clientName || 'Cliente', technicalSurveyId: survey?.id, note: obs.texto || obs.assunto });
         setObs((p) => ({ ...p, photos: p.photos + 1 }));
       } else {
-        await captureSurveyEvidence({ file, session, clientId: clienteId, clientName: clientName || 'Cliente', deviceId: draft.assetId, technicalSurveyId: survey?.id });
-        setDraft((p) => ({ ...p, photos: p.photos + 1 }));
+        const captured = await captureSurveyEvidence({ file, session, clientId: clienteId, clientName: clientName || 'Cliente', deviceId: draft.assetId, technicalSurveyId: survey?.id });
+        localPreviewUrlsRef.current.add(captured.previewUrl);
+        setDraft((p) => ({ ...p, photos: p.photos + 1, photoPreviews: [...p.photoPreviews, captured.previewUrl] }));
       }
       showToast('Foto anexada.');
     } catch (e: any) { showToast(`Falha na foto: ${e?.message || e}`); }
@@ -147,11 +178,14 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientNa
         // §34 — observação técnica vai junto da verificação, não fica presa ao survey.
         verification: { deviceId: id, clienteId, surveyId: survey?.id, condicao: draft.vals.condicao || 'NORMAL', reconciliation, notes: draft.vals.attrs['observacao'] || undefined },
       });
-      setCreatedThisVisit((p) => [...p, res.device]);
-      if (reconciliation) setRecords((p) => [...p, { deviceId: id, reconciliation }]);
+      setCreatedThisVisit((p) => editingCreatedId ? p.map((d) => d.id === id ? res.device : d) : [...p, res.device]);
+      setSavedPhotoPreviews((p) => ({ ...p, [id]: draft.photoPreviews }));
+      if (reconciliation && !editingCreatedId) setRecords((p) => [...p, { deviceId: id, reconciliation }]);
       showToast(res.mode === 'offline' ? 'Salvo offline (sincroniza depois).' : 'Ativo adicionado à Base Técnica.');
       onChanged();
+      setEditingCreatedId(null);
       setDraft(goNext ? nextDraft() : emptyDraft());
+      if (goNext) focusCurrentAsset();
     } catch (e: any) { showToast(`Falha: ${e?.message || e}`); } finally { setSaving(false); }
   };
 
@@ -169,7 +203,9 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientNa
       showToast(`Verificação registrada (${reconciliation === 'ALTERADO' ? 'alterado' : 'verificado'}).`);
       onChanged();
       setPendingMatch(null);
+      setEditingCreatedId(null);
       setDraft(goNext ? nextDraft() : emptyDraft());
+      if (goNext) focusCurrentAsset();
     } catch (e: any) { showToast(`Falha: ${e?.message || e}`); } finally { setSaving(false); }
   };
 
@@ -178,7 +214,7 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientNa
     const inv = invalidField();
     if (inv) { showToast(`Valor inválido em "${inv.label}".`); return; }
     const asset = draftAsset();
-    const matches = findIdentityMatches(area, asset, knownPool);
+    const matches = findIdentityMatches(area, asset, knownPool).filter((d) => d.id !== draft.assetId);
     if (matches.length >= 1) { setPendingMatch({ draftAsset: asset, matches }); return; }
     doSaveNew(goNext);
   };
@@ -290,19 +326,52 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientNa
                 <button onClick={() => setRecordKind('observacao')} className={`rounded-lg border px-2 py-2 text-xs font-bold ${recordKind === 'observacao' ? 'border-primary bg-navy/5 text-primary' : 'border-border text-fg-secondary'}`}>+ Observação geral</button>
               </div>
 
-              {/* Câmera como ação de topo (§18/§27): captura rápida. */}
-              {session && (
-                <button onClick={() => setShowCamera(true)} className="flex items-center justify-center gap-2 rounded-lg border border-primary bg-navy/5 px-3 py-3 text-sm font-bold text-primary">
-                  <span className="material-symbols-outlined text-lg">photo_camera</span>
-                  {(recordKind === 'ativo' ? draft.photos : obs.photos) > 0 ? `Foto anexada (${recordKind === 'ativo' ? draft.photos : obs.photos}) · adicionar outra` : 'Abrir câmera'}
-                </button>
+              {recordKind === 'ativo' && createdThisVisit.length > 0 && (
+                <section className="rounded-xl border border-border bg-surface-2" aria-label="Equipamentos salvos nesta visita">
+                  <p className="border-b border-border px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-fg-muted">Salvos nesta visita ({createdThisVisit.length})</p>
+                  <div className="divide-y divide-border">
+                    {createdThisVisit.map((device, index) => {
+                      const ident = assetDisplayIdentifier(area, { central: device.central, laco: device.laco, endereco: device.endereco, technicalAttributes: device.technicalAttributes });
+                      const previews = savedPhotoPreviews[device.id] || [];
+                      return (
+                        <div key={device.id} className="flex items-center gap-3 px-3 py-2">
+                          {previews.length > 0 ? (
+                            <button type="button" onClick={() => setViewingPhoto(previews[0])} className="h-10 w-10 shrink-0 rounded-md bg-cover bg-center" style={{ backgroundImage: `url(${previews[0]})` }} aria-label={`Ver foto do equipamento ${index + 1}`} />
+                          ) : (
+                            <span className="material-symbols-outlined flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-surface text-fg-muted">check_circle</span>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-xs font-bold text-fg">Equipamento {index + 1} — salvo ✓</p>
+                            <p className="truncate text-[11px] text-fg-muted">{[device.grupo, ident || device.modelo, device.localizacao].filter(Boolean).join(' · ') || 'Ativo registrado'}{previews.length ? ` · ${previews.length} foto(s)` : ''}</p>
+                          </div>
+                          <button type="button" onClick={() => editCreatedAsset(device)} className="shrink-0 rounded-lg border border-border px-2 py-1 text-[11px] font-semibold text-primary">Editar</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
               )}
 
-              {recordKind === 'ativo' ? (
-                <>
+              {/* Câmera como ação de topo (§18/§27): captura rápida. */}
+              <div ref={recordKind === 'ativo' ? newAssetRef : undefined} className="flex scroll-mt-4 flex-col gap-4">
+                {recordKind === 'ativo' && (
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-bold text-fg">{editingCreatedId ? 'Editar equipamento salvo' : 'Novo equipamento'}</h4>
+                    {!editingCreatedId && createdThisVisit.length > 0 && <Badge color="blue">Próximo registro</Badge>}
+                  </div>
+                )}
+                {session && (
+                  <button type="button" onClick={() => setShowCamera(true)} className="flex items-center justify-center gap-2 rounded-lg border border-primary bg-navy/5 px-3 py-3 text-sm font-bold text-primary">
+                    <span className="material-symbols-outlined text-lg">photo_camera</span>
+                    {(recordKind === 'ativo' ? draft.photos : obs.photos) > 0 ? `Foto anexada (${recordKind === 'ativo' ? draft.photos : obs.photos}) · adicionar outra` : 'Abrir câmera'}
+                  </button>
+                )}
+
+                {recordKind === 'ativo' ? (
+                  <>
                   {/* Grupo → formulário CONTEXTUAL único (§4/§7/§54) */}
                   <Field label="O que você está registrando?">
-                    <select value={draft.grupo} onChange={(e) => setDraft((p) => ({ ...p, grupo: e.target.value }))} className={inputCls}>
+                    <select ref={groupRef} value={draft.grupo} onChange={(e) => setDraft((p) => ({ ...p, grupo: e.target.value }))} className={inputCls}>
                       <option value="">Selecione o grupo…</option>
                       {groupsForArea(area).map((g) => <option key={g} value={g}>{g}</option>)}
                     </select>
@@ -312,8 +381,8 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientNa
                     <input type="checkbox" checked={keepNext} onChange={(e) => setKeepNext(e.target.checked)} />
                     Manter grupo/fabricante/modelo/central/laço no próximo (não repete endereço, §26)
                   </label>
-                </>
-              ) : (
+                  </>
+                ) : (
                 /* Observação geral (§17): não cria device */
                 <div className="grid grid-cols-1 gap-3">
                   <Field label="Assunto / categoria"><input value={obs.assunto} onChange={(e) => setObs((p) => ({ ...p, assunto: e.target.value }))} placeholder="Ex.: Área sem cobertura, acesso bloqueado…" className={inputCls} /></Field>
@@ -325,7 +394,8 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientNa
                   </label>
                   <p className="text-[10px] text-fg-muted">Observação pertence ao levantamento; não cria ativo (§17).</p>
                 </div>
-              )}
+                )}
+              </div>
 
               {/* COMPLETO: checklist de reconciliação */}
               {mode === 'COMPLETO' && baseInArea.length > 0 && (
@@ -407,6 +477,15 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientNa
       </div>
 
       {showCamera && <CameraCapture onCapture={onCapture} onClose={() => setShowCamera(false)} title="Foto do ativo" />}
+
+      {viewingPhoto && (
+        <div className="fixed inset-0 z-[98] flex flex-col bg-black" role="dialog" aria-modal="true" aria-label="Foto do equipamento salvo">
+          <div className="flex justify-end p-3">
+            <button type="button" onClick={() => setViewingPhoto(null)} className="material-symbols-outlined rounded-full bg-white/10 p-2 text-white" aria-label="Fechar foto">close</button>
+          </div>
+          <div className="min-h-0 flex-1 bg-contain bg-center bg-no-repeat" style={{ backgroundImage: `url(${viewingPhoto})` }} role="img" aria-label="Foto do equipamento" />
+        </div>
+      )}
 
       {showPdf && (
         <LevantamentoPdfInner

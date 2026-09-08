@@ -7,74 +7,116 @@ const camera = read('components/ui/CameraCapture.tsx');
 const survey = read('components/clients/TechnicalSurveyFlow.tsx');
 const attendance = read('components/operacoes/AttendanceEvidence.tsx');
 
-describe('CameraCapture — isolamento de modal e formulário pai', () => {
+describe('CameraCapture — confirmação explícita e isolamento', () => {
   it('contém click, pointer e touch no boundary da câmera', () => {
-    expect(camera).toContain('onClick={containInteraction}');
-    expect(camera).toContain('onPointerDown={containInteraction}');
-    expect(camera).toContain('onPointerUp={containInteraction}');
-    expect(camera).toContain('onTouchStart={containInteraction}');
-    expect(camera).toContain('onTouchEnd={containInteraction}');
+    for (const handler of ['onClick', 'onPointerDown', 'onPointerUp', 'onTouchStart', 'onTouchEnd']) expect(camera).toContain(`${handler}={containInteraction}`);
     expect(camera).toContain('event.stopPropagation()');
   });
 
-  it('todos os botões da câmera são type="button" e não submetem formulário ancestral', () => {
+  it('todos os botões são type="button" e não submetem formulário ancestral', () => {
     const buttons = [...camera.matchAll(/<button\b[^>]*>/g)].map(([tag]) => tag);
-    expect(buttons).toHaveLength(6);
+    expect(buttons).toHaveLength(8);
     expect(buttons.every((tag) => /\btype="button"/.test(tag))).toBe(true);
   });
 
-  it('captura, galeria e troca de câmera não invocam onClose', () => {
-    expect(camera).toContain('onClick={capture}');
-    expect(camera).toContain('onChange={onGallery}');
+  it('capturar e selecionar na galeria criam preview sem chamar onCapture', () => {
+    const captureHandler = camera.slice(camera.indexOf('const capture = useCallback'), camera.indexOf('const onGallery'));
+    const galleryHandler = camera.slice(camera.indexOf('const onGallery'), camera.indexOf('const retake'));
+    expect(captureHandler).toContain("replacePreview(blobToCapturedFile(blob), 'camera')");
+    expect(galleryHandler).toContain("replacePreview(file, 'gallery')");
+    expect(captureHandler).not.toContain('onCapture(');
+    expect(galleryHandler).not.toContain('onCapture(');
+    expect(camera).toContain('aria-label="Pré-visualização da foto"');
+  });
+
+  it('Tirar novamente descarta somente o preview e reabre a câmera', () => {
+    expect(camera).toMatch(/const retake = \(\) => \{\s*discardPreview\(\);\s*start\(facing\);/);
+    expect(camera).toContain('Tirar novamente');
+  });
+
+  it('Usar foto é a única confirmação e possui trava contra chamada dupla', () => {
+    expect(camera).toContain('onClick={usePhoto}');
+    expect(camera).toContain('onCapture(preview.file)');
+    expect(camera).toContain('confirmedRef.current = true');
+    expect(camera.match(/onCapture\(/g)).toHaveLength(1);
+  });
+
+  it('galeria permite escolher outra antes de confirmar', () => {
+    expect(camera).toContain("preview.source === 'gallery'");
+    expect(camera).toContain('Escolher outra');
+    expect(camera).toContain('Usar foto');
+  });
+
+  it('trocar câmera não fecha; fechar descarta somente preview/câmera', () => {
     expect(camera).toContain("setFacing((f) => (f === 'environment' ? 'user' : 'environment'))");
     expect(camera.match(/onClose\(\)/g)).toHaveLength(1);
-    expect(camera).toContain('const close = () => { stop(); onClose(); };');
+    expect(camera).toContain('const close = () => { stop(); discardPreview(); onClose(); };');
   });
 });
 
-describe('Levantamento Técnico — preservação do fluxo e do estado', () => {
-  it('não fecha por backdrop; somente a ação explícita chama onClose', () => {
+describe('Levantamento Técnico — preservação e cadastro sequencial', () => {
+  it('não fecha por backdrop; câmera altera somente showCamera', () => {
     expect(survey).not.toMatch(/bg-black\/50 sm:items-center sm:p-4" onClick=\{onClose\}/);
     expect(survey).toContain('aria-label="Sair do levantamento"');
-    expect(survey).toContain('onClose={() => setShowCamera(false)}');
-  });
-
-  it('abrir/fechar a câmera altera somente showCamera e mantém o rascunho montado', () => {
     expect(survey).toContain('onClick={() => setShowCamera(true)}');
     expect(survey).toContain('onClose={() => setShowCamera(false)}');
-    expect(survey).toContain('const [draft, setDraft] = useState<Draft>(emptyDraft());');
-    expect(survey).toContain('const [obs, setObs] = useState<');
   });
 
-  it('falha de foto/upload é tratada sem fechar ou reiniciar o levantamento', () => {
-    expect(survey).toMatch(/catch \(e: any\) \{ showToast\(`Falha na foto:/);
+  it('erro de câmera/foto/upload não fecha nem reinicia o levantamento', () => {
+    expect(camera).toContain('setError(cameraErrorMessage(e))');
     const captureHandler = survey.slice(survey.indexOf('const onCapture = async'), survey.indexOf('const doSaveNew'));
+    expect(captureHandler).toMatch(/catch \(e: any\) \{ showToast\(`Falha na foto:/);
     expect(captureHandler).not.toContain('onClose()');
     expect(captureHandler).not.toContain('setDraft(emptyDraft())');
   });
 
-  it('erro/permissão da câmera permanece no componente e oferece galeria', () => {
-    expect(camera).toContain('setError(cameraErrorMessage(e))');
-    expect(camera).toContain('Escolher da galeria');
-    expect(camera).not.toMatch(/catch \(e\)[\s\S]{0,120}onClose/);
+  it('persiste antes de preparar o próximo registro', () => {
+    const saveHandler = survey.slice(survey.indexOf('const doSaveNew'), survey.indexOf('const doVerifyExisting'));
+    expect(saveHandler.indexOf('await persistSurveyAsset')).toBeLessThan(saveHandler.indexOf('setDraft(goNext ? nextDraft() : emptyDraft())'));
+    const catchBlock = saveHandler.slice(saveHandler.indexOf('catch'));
+    expect(catchBlock).not.toContain('setDraft(');
+    expect(catchBlock).not.toContain('focusCurrentAsset()');
+  });
+
+  it('próximo registro recebe nova identidade e limpa campos específicos/fotos/condição', () => {
+    const next = survey.slice(survey.indexOf('const nextDraft'), survey.indexOf('const focusCurrentAsset'));
+    for (const expected of ['assetId: newAssetId()', 'photos: 0', 'photoPreviews: []', "condicao: 'NORMAL'"]) expect(next).toContain(expected);
+    for (const forbidden of ['endereco: v.endereco', 'serial: v.serial', 'localizacao: v.localizacao', 'attrs: v.attrs', 'condicao: v.condicao']) expect(next).not.toContain(forbidden);
+  });
+
+  it('mantém somente a repetição explícita e posiciona o novo formulário', () => {
+    const next = survey.slice(survey.indexOf('const nextDraft'), survey.indexOf('const focusCurrentAsset'));
+    for (const retained of ['grupo: draft.grupo', 'fabricante: v.fabricante', 'modelo: v.modelo', 'central: v.central', 'laco: v.laco']) expect(next).toContain(retained);
+    expect(survey).toContain("scrollIntoView({ behavior: 'smooth', block: 'start' })");
+    expect(survey).toContain("focus({ preventScroll: true })");
+  });
+
+  it('mantém anteriores em resumo com foto e edição', () => {
+    expect(survey).toContain('Equipamentos salvos nesta visita');
+    expect(survey).toContain('Equipamento {index + 1} — salvo ✓');
+    expect(survey).toContain('setViewingPhoto(previews[0])');
+    expect(survey).toContain('editCreatedAsset(device)');
+  });
+
+  it('edição atualiza sem duplicar e múltiplos sucessos acumulam', () => {
+    expect(survey).toContain('editingCreatedId ? p.map((d) => d.id === id ? res.device : d) : [...p, res.device]');
   });
 });
 
-describe('auditoria dos consumidores compartilhados', () => {
-  it('o levantamento usa um único CameraCapture para todas as áreas técnicas', () => {
+describe('auditoria dos consumidores e permissões', () => {
+  it('o mesmo levantamento cobre todas as áreas técnicas', () => {
+    const areas = read('lib/technicalBase.ts');
     expect(survey).toContain('<CameraCapture');
-    for (const area of ['SDAI', 'CFTV', 'ALARME', 'BMS', 'CONTROLE_ACESSO']) {
-      expect(read('lib/technicalBase.ts')).toContain(area);
-    }
+    for (const area of ['SDAI', 'CFTV', 'ALARME', 'BMS', 'CONTROLE_ACESSO']) expect(areas).toContain(area);
   });
 
-  it('Atendimentos/evidências fecha somente a câmera e mantém sua configuração', () => {
+  it('Atendimentos/evidências recebe o arquivo somente após confirmação', () => {
     expect(attendance).toContain('<CameraCapture');
     expect(attendance).toContain('setCameraOpen(false); receiveFile(file);');
     expect(attendance).toContain('setCameraOpen(false); pendingCfgRef.current = null;');
   });
 
-  it('a câmera não introduz regra de papel e preserva permissões existentes', () => {
+  it('não altera regras de papel existentes', () => {
     expect(camera).not.toMatch(/ADMINISTRATIVO|TECNICO|GESTOR|FINANCEIRO/);
     expect(survey).toContain('userRole: UserRole;');
   });
