@@ -115,8 +115,16 @@ export const SdaiMaintenancePanel: React.FC<{
         const codigo = PREVENTIVA_SDAI_CONTRATO_CODIGO;
 
         const dbTpl = await withLoadTimeout(fetchTemplateByCodigo(codigo), 'template SDAI');
-        const template = (dbTpl?.schema as TemplateSchema | undefined)
-          || ALL_TEMPLATES.find((t) => t.codigo === codigo);
+        const codeTpl = ALL_TEMPLATES.find((t) => t.codigo === codigo);
+        // O schema RENDERIZADO é o de MAIOR versão entre banco e código. Sem isso,
+        // uma linha desatualizada em report_templates (ex.: alarme/desabilitado
+        // legados) venceria o código novo e nunca renderizaria a cascata. Ao
+        // publicar a versão nova no banco, ambos convergem (mesmo schema/versão).
+        const dbVer = dbTpl ? (dbTpl.versao ?? 1) : -1;
+        const codeVer = codeTpl?.versao ?? 1;
+        const template = (dbTpl?.schema && dbVer >= codeVer)
+          ? (dbTpl.schema as TemplateSchema)
+          : codeTpl;
         if (!template) throw new Error('Template da preventiva SDAI não encontrado.');
 
         const [plan, devicesCliente, inventory, contracts, pendAbertas, existing, clienteReports] = await Promise.all([
@@ -216,7 +224,7 @@ export const SdaiMaintenancePanel: React.FC<{
 
         if (!alive) return;
         setCtx({
-          template: { ...template, versao: dbTpl?.versao ?? template.versao },
+          template: { ...template, versao: Math.max(dbVer, codeVer, 1) },
           templateId: dbTpl?.id,
           plan,
           planDevices: attendancePlanDevices(plan, devicesCliente),
@@ -318,6 +326,7 @@ export const SdaiMaintenancePanel: React.FC<{
         userRole={userRole}
         currentUserName={technicianName}
         contexto={{ osId: os?.id, contratoId: os?.contratoId }}
+        topOffset={0}
         devices={ctx.planDevices}
         maintenance={{ serviceAttendanceId: attendance.id, plan: { programadosDeviceIds: ctx.plan.programadosDeviceIds } }}
         maintenanceContext={ctx.identity}

@@ -732,7 +732,9 @@ export const PREVENTIVA_SDAI_CONTRATO: TemplateSchema = {
   nome: 'Manutenção Preventiva SDAI (Contrato)',
   area: 'SDAI',
   tipo: 'PREVENTIVA',
-  versao: 1,
+  // v2: alarme/desabilitado passam a repeaters estruturados (cascata Base Técnica),
+  // microsseções do checklist e sugestões de causa. Bump publica no banco (0075).
+  versao: 2,
   secoes: [
     // A. IDENTIFICAÇÃO
     { key: 'identificacao', titulo: 'Identificação do atendimento', campos: [
@@ -744,11 +746,12 @@ export const PREVENTIVA_SDAI_CONTRATO: TemplateSchema = {
     { key: 'central', titulo: 'Central de SDAI', descricao: 'Checklist mensal da central. Uma vez por central por período; refazer quando houver intervenção/nova falha.', campos: [
       { key: 'central_device_id', tipo: 'select_catalogo', origem: 'devices', label: 'Central verificada (Base Técnica)', obrigatorio: true },
       { key: 'refazer_checklist_central', tipo: 'select', label: 'Refazer checklist da central', opcoes: ['Não', 'Sim'], default: 'Não' },
-      { key: 'foto_geral', tipo: 'foto', label: 'Foto geral da central', obrigatorio: true, fotos: 1 },
-      snPendSeNao('central_energizada', 'Central energizada?', 'SDAI > Central', 'reparar'),
-      snPendSeNao('operacao_normal', 'Central em operação normal?'),
-      { key: 'alarme_ativo', tipo: 'select', label: 'Existe alarme de incêndio ativo?', opcoes: ['Não', 'Sim'] },
-      { key: 'alarmes', tipo: 'repeater', label: 'Dispositivos em alarme', botao_adicionar: '+ Adicionar dispositivo',
+      { key: 'foto_geral', tipo: 'foto', label: 'Foto geral da central', obrigatorio: true, fotos: 1, subsecao: 'Registro da central' },
+      { ...snPendSeNao('central_energizada', 'Central energizada?', 'SDAI > Central', 'reparar'), subsecao: 'Estado da central' },
+      { ...snPendSeNao('operacao_normal', 'Central em operação normal?'), subsecao: 'Estado da central' },
+      { ...snPendSeNao('data_hora_ok', 'Data/hora da central corretas?', 'SDAI > Central', 'reprogramar'), subsecao: 'Estado da central' },
+      { key: 'alarme_ativo', tipo: 'select', label: 'Existe alarme de incêndio ativo?', opcoes: ['Não', 'Sim'], subsecao: 'Eventos ativos' },
+      { key: 'alarmes', tipo: 'repeater', label: 'Dispositivos em alarme', botao_adicionar: '+ Adicionar dispositivo', subsecao: 'Eventos ativos',
         show_if: { field: 'alarme_ativo', operator: 'equals', value: 'Sim' },
         card_schema: [
           { key: 'pertence_central', tipo: 'select', label: 'A ocorrência pertence à própria Central?', opcoes: ['Não', 'Sim'], default: 'Não' },
@@ -763,9 +766,9 @@ export const PREVENTIVA_SDAI_CONTRATO: TemplateSchema = {
           { key: 'foto', tipo: 'foto', label: 'Foto', fotos: 1 },
         ],
       },
-      { key: 'falha_ativa', tipo: 'select', label: 'Existe falha ativa?', opcoes: ['Não', 'Sim'] },
-      { key: 'falhas_qtd', tipo: 'numero', label: 'Quantidade de falhas', show_if: { field: 'falha_ativa', operator: 'equals', value: 'Sim' } },
-      { key: 'falhas', tipo: 'repeater', label: 'Falhas', botao_adicionar: '+ Adicionar falha', gera_pendencia: true,
+      { key: 'falha_ativa', tipo: 'select', label: 'Existe falha ativa?', opcoes: ['Não', 'Sim'], subsecao: 'Eventos ativos' },
+      { key: 'falhas_qtd', tipo: 'numero', label: 'Quantidade de falhas', subsecao: 'Eventos ativos', show_if: { field: 'falha_ativa', operator: 'equals', value: 'Sim' } },
+      { key: 'falhas', tipo: 'repeater', label: 'Falhas', botao_adicionar: '+ Adicionar falha', gera_pendencia: true, subsecao: 'Eventos ativos',
         show_if: { field: 'falha_ativa', operator: 'equals', value: 'Sim' },
         card_schema: [
           { key: 'pertence_central', tipo: 'select', label: 'A ocorrência pertence à própria Central?', opcoes: ['Não', 'Sim'], default: 'Não' },
@@ -781,8 +784,8 @@ export const PREVENTIVA_SDAI_CONTRATO: TemplateSchema = {
           { key: 'foto', tipo: 'foto', label: 'Foto', fotos: 1 },
         ],
       },
-      { key: 'dispositivos_desabilitados', tipo: 'select', label: 'Existem dispositivos desabilitados?', opcoes: ['Não', 'Sim'] },
-      { key: 'desabilitados', tipo: 'repeater', label: 'Dispositivos desabilitados', botao_adicionar: '+ Adicionar dispositivo',
+      { key: 'dispositivos_desabilitados', tipo: 'select', label: 'Existem dispositivos desabilitados?', opcoes: ['Não', 'Sim'], subsecao: 'Eventos ativos' },
+      { key: 'desabilitados', tipo: 'repeater', label: 'Dispositivos desabilitados', botao_adicionar: '+ Adicionar dispositivo', subsecao: 'Eventos ativos',
         show_if: { field: 'dispositivos_desabilitados', operator: 'equals', value: 'Sim' },
         card_schema: [
           { key: 'pertence_central', tipo: 'select', label: 'A ocorrência pertence à própria Central?', opcoes: ['Não', 'Sim'], default: 'Não' },
@@ -797,13 +800,12 @@ export const PREVENTIVA_SDAI_CONTRATO: TemplateSchema = {
           { key: 'foto', tipo: 'foto', label: 'Foto', fotos: 1 },
         ],
       },
-      { key: 'evento_anormal', tipo: 'select', label: 'Evento/anormalidade adicional?', opcoes: ['Não', 'Sim'] },
-      { key: 'evento_descricao', tipo: 'texto', label: 'Descrição do evento', multilinha: true, show_if: { field: 'evento_anormal', operator: 'equals', value: 'Sim' } },
-      snPendSeNao('data_hora_ok', 'Data/hora da central corretas?', 'SDAI > Central', 'reprogramar'),
-      conformePend('teste_leds', 'Teste de LEDs', 'SDAI > Central', 'reparar'),
-      conformePend('teste_buzzer', 'Teste do buzzer', 'SDAI > Central', 'reparar'),
-      { key: 'backup_programacao', tipo: 'select', label: 'Backup da programação', opcoes: ['Realizado', 'Não realizado', 'Não aplicável'], help: 'Procedimento técnico/operacional (não é requisito normativo).' },
-      { key: 'checklist_central_concluido', tipo: 'select', label: 'Checklist da central concluído', opcoes: ['Sim', 'Não'], default: 'Sim', help: 'Marca a conclusão do checklist mensal desta central (derivação por período).' },
+      { key: 'evento_anormal', tipo: 'select', label: 'Evento/anormalidade adicional?', opcoes: ['Não', 'Sim'], subsecao: 'Eventos ativos' },
+      { key: 'evento_descricao', tipo: 'texto', label: 'Descrição do evento', multilinha: true, subsecao: 'Eventos ativos', show_if: { field: 'evento_anormal', operator: 'equals', value: 'Sim' } },
+      { ...conformePend('teste_leds', 'Teste de LEDs', 'SDAI > Central', 'reparar'), subsecao: 'Testes locais' },
+      { ...conformePend('teste_buzzer', 'Teste do buzzer', 'SDAI > Central', 'reparar'), subsecao: 'Testes locais' },
+      { key: 'backup_programacao', tipo: 'select', label: 'Backup da programação', opcoes: ['Realizado', 'Não realizado', 'Não aplicável'], help: 'Procedimento técnico/operacional (não é requisito normativo).', subsecao: 'Procedimentos' },
+      { key: 'checklist_central_concluido', tipo: 'select', label: 'Checklist da central concluído', opcoes: ['Sim', 'Não'], default: 'Sim', help: 'Marca a conclusão do checklist mensal desta central (derivação por período).', subsecao: 'Procedimentos' },
     ]},
     // D. INTEGRIDADE FÍSICA
     { key: 'integridade', titulo: 'Integridade física', campos: [

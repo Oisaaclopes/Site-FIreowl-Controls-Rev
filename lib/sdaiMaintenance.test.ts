@@ -22,6 +22,37 @@ import {
 } from './sdaiMaintenance';
 import { ALL_TEMPLATES, PREVENTIVA_SDAI_CONTRATO } from './reportTemplatesData';
 
+/* --------- Template contratual: alarme/desabilitado ESTRUTURADOS (§16) ------ */
+describe('PREVENTIVA_SDAI_CONTRATO — alarme/desabilitado repeaters (não legado)', () => {
+  const central = PREVENTIVA_SDAI_CONTRATO.secoes.find((s) => s.key === 'central')!;
+  const byKey = (k: string) => central.campos.find((c) => c.key === k);
+  it('versão bumpada para 2 (publica no banco via 0075)', () => {
+    expect((PREVENTIVA_SDAI_CONTRATO.versao ?? 1) >= 2).toBe(true);
+  });
+  it('ALARME é repeater estruturado, sem campos legados', () => {
+    expect(byKey('alarmes')?.tipo).toBe('repeater');
+    // legados que NÃO devem mais existir:
+    expect(byKey('alarme_motivo')).toBeUndefined();
+    expect(byKey('alarme_laco')).toBeUndefined();
+    expect(byKey('alarme_endereco')).toBeUndefined();
+    expect(byKey('alarme_device_id')).toBeUndefined();
+    // card com cascata + causa:
+    const keys = (byKey('alarmes')?.card_schema || []).map((c) => c.key);
+    expect(keys).toEqual(expect.arrayContaining(['laco', 'endereco', 'device_id', 'causa']));
+  });
+  it('DESABILITADO é repeater estruturado, sem quantidade/textarea legado', () => {
+    expect(byKey('desabilitados')?.tipo).toBe('repeater');
+    expect(byKey('desabilitados_qtd')).toBeUndefined();
+    expect(byKey('desabilitados_lista')).toBeUndefined();
+    const keys = (byKey('desabilitados')?.card_schema || []).map((c) => c.key);
+    expect(keys).toEqual(expect.arrayContaining(['laco', 'endereco', 'device_id', 'causa']));
+  });
+  it('microsseções presentes nos campos (hierarquia visual)', () => {
+    const subs = new Set(central.campos.map((c) => c.subsecao).filter(Boolean));
+    expect(subs).toEqual(new Set(['Registro da central', 'Estado da central', 'Eventos ativos', 'Testes locais', 'Procedimentos']));
+  });
+});
+
 /* --------------------------- Resultado → condição --------------------------- */
 describe('mapDeviceResultToCondicao (enum canônico 0095)', () => {
   it('mapeia os 7 resultados', () => {

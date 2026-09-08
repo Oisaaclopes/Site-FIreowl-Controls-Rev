@@ -55,6 +55,11 @@ export interface FieldSchema {
   visivel_para?: string[];
   /** Referência normativa fica no help text, nunca no corpo da pergunta. */
   help?: string;
+  /** MICROSSEÇÃO visual dentro da seção (ex.: "Estado da central", "Eventos
+   *  ativos"). O FormEngine insere um divisor quando muda — dá hierarquia sem
+   *  criar novos passos de navegação. Campos da mesma microsseção devem ser
+   *  contíguos. Puramente apresentacional. */
+  subsecao?: string;
 
   /* --- foto --- */
   /** foto: a quantidade/rotulagem é definida pelo template, nunca por toggle em tela. */

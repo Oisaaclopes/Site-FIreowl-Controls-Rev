@@ -44,6 +44,10 @@ interface ReportFormProps {
   userRole: UserRole;
   currentUserName?: string;
   contexto?: { osId?: string; contratoId?: string };
+  /** Deslocamento (px) do topo para o cabeçalho sticky. 64 = abaixo da barra do
+   *  app (uso em página); 0 = dentro de overlay próprio (SDAI). Evita o vazamento
+   *  de conteúdo atrás do header quando não há barra de 64px acima. */
+  topOffset?: number;
   /** Experiência de campo: simplifica a orientação sem alterar regras/dados. */
   fieldMode?: 'rapido' | 'completo';
   /** Rótulo operacional local; não altera o tipo persistido do relatório. */
@@ -408,6 +412,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   userRole,
   currentUserName = '',
   contexto,
+  topOffset = 64,
   fieldMode = 'completo',
   attendanceTitle,
   devices,
@@ -1211,8 +1216,9 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         </div>
       )}
 
-      {/* Topo fixo: contexto operacional, progresso e geolocalização. */}
-      <div className="sticky top-16 z-20 bg-surface border-b border-border px-4 py-3">
+      {/* Topo fixo: contexto operacional, progresso e geolocalização. bg OPACO,
+          `top` = topOffset (0 em overlay próprio) — impede conteúdo por trás. */}
+      <div className="sticky z-30 bg-surface border-b border-border px-4 py-3" style={{ top: topOffset }}>
         <div className="max-w-3xl mx-auto w-full flex items-center gap-3">
         <button onClick={onBack} title="Sair" className="w-9 h-9 rounded-lg flex items-center justify-center text-fg-secondary hover:bg-surface-3 shrink-0">
           <span className="material-symbols-outlined">arrow_back</span>
@@ -1237,7 +1243,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         <span className="text-[11px] font-data-mono text-fg-secondary shrink-0">{idx + 1}/{visibleSections.length}</span>
         </div>
       </div>
-      <div className="h-1 bg-surface-3 sticky top-[calc(4rem+57px)] z-20">
+      <div className="h-1 bg-surface-3 sticky z-30" style={{ top: topOffset + 57 }}>
         <div className="h-full bg-navy transition-all" style={{ width: `${progresso}%` }} />
       </div>
 

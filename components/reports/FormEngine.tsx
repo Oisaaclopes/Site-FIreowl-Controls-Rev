@@ -843,9 +843,24 @@ const Section: React.FC<{
         {section.descricao && <p className="text-[11px] text-fg-secondary mt-1">{section.descricao}</p>}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
-        {section.campos
-          .filter((f) => isFieldVisibleForRole(f, role) && isFieldVisible(f, values))
-          .map((field) => {
+        {(() => {
+          const visiveis = section.campos.filter((f) => isFieldVisibleForRole(f, role) && isFieldVisible(f, values));
+          let lastSub: string | undefined;
+          const out: React.ReactNode[] = [];
+          for (const field of visiveis) {
+            // Divisor de MICROSSEÇÃO (§8/§9) quando muda a subseção (full-width).
+            if (field.subsecao && field.subsecao !== lastSub) {
+              out.push(
+                <div key={`sub:${field.subsecao}`} className="md:col-span-2 mt-2 first:mt-0 flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-fg-muted">{field.subsecao}</span>
+                  <span className="h-px flex-1 bg-border" />
+                </div>
+              );
+              lastSub = field.subsecao;
+            } else if (!field.subsecao) {
+              lastSub = undefined;
+            }
+            out.push((() => {
             const isRepeater = field.tipo === 'repeater' || field.tipo === 'checklist_dispositivos' || field.tipo === 'checklist_pendencias';
             const isWide = isRepeater || field.multilinha || field.tipo === 'multiselect';
             const required = isFieldRequired(field, values);
@@ -920,7 +935,10 @@ const Section: React.FC<{
                 )}
               </div>
             );
-          })}
+            })());
+          }
+          return out;
+        })()}
       </div>
     </div>
   );
