@@ -67,10 +67,13 @@ jobs:
           # → escreve direto no nome final, sem rename. Sem mirror, sem clean
           # slate: remove só cada arquivo do build e o reenvia (não apaga nada
           # fora de out/). chmod desativado (Hostinger também recusa 550).
+          # find | sort garante o PAI antes do FILHO (o caminho do pai é prefixo do
+          # filho), então criamos um nível por vez SEM depender de `mkdir -p` do
+          # lftp (que não vinha criando a árvore → put caía com 550 "No such file").
           : > /tmp/fireowl-mkdirs.lftp
           find ./out -type d | sort | while IFS= read -r dir; do
             rel="${dir#./out}"
-            [ -z "$rel" ] || printf 'mkdir -p "/public_html%s";\n' "$rel" >> /tmp/fireowl-mkdirs.lftp
+            [ -z "$rel" ] || printf 'mkdir "/public_html%s";\n' "$rel" >> /tmp/fireowl-mkdirs.lftp
           done
           : > /tmp/fireowl-puts.lftp
           find ./out -type f | sort | while IFS= read -r file; do
@@ -80,7 +83,7 @@ jobs:
             printf 'rm -f "%s";\nput -O "%s" "%s";\n' "$remote" "$remote_dir" "$file" >> /tmp/fireowl-puts.lftp
           done
 
-          SETTINGS="set ftp:ssl-force true; set ftp:ssl-protect-data true; set ssl:verify-certificate no; set xfer:use-temp-file false; set ftp:use-site-utime false; set net:max-retries 2; set net:timeout 20;"
+          SETTINGS="set ftp:ssl-force true; set ftp:ssl-protect-data true; set ssl:verify-certificate no; set xfer:use-temp-file false; set net:max-retries 2; set net:timeout 20;"
 
           # Fase 1 — cria diretórios; `mkdir -p` em diretório JÁ EXISTENTE responde
           # 550, mas aqui NÃO é fatal (fail-exit false + || true), então não aborta.
