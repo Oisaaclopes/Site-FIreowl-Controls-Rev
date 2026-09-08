@@ -74,9 +74,12 @@ jobs:
             set ftp:ssl-protect-data true;
             set ssl:verify-certificate no;
             set xfer:use-temp-file false;
+            set ftp:use-site-utime false;
+            set ftp:use-site-utime2 false;
+            set ftp:use-mdtm false;
             set cmd:fail-exit true;
             set net:max-retries 2;
             set net:timeout 20;
             open -p 21 -u \"$FTP_USERNAME\",\"$FTP_PASSWORD\" \"$FTP_SERVER\";
-            mirror -R --no-perms --no-symlinks --overwrite --parallel=1 ./out /public_html;
+            mirror -R --no-perms --no-symlinks --overwrite --ignore-time --parallel=1 ./out /public_html;
           "
