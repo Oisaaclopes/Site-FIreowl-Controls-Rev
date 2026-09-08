@@ -62,29 +62,30 @@ jobs:
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
           FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
         run: |
-          # O servidor falha ao sobrescrever via arquivo oculto temporário.
-          # Gera uma lista exata: remove somente cada arquivo presente em out/
-          # e o reenvia; não apaga arquivos remotos fora do build.
-          : > /tmp/fireowl-upload.lftp
+          # CAUSA RAIZ: o put via arquivo temporário oculto `.in.*` + rename é
+          # recusado (550) pela Hostinger. Correção: `xfer:use-temp-file false`
+          # → escreve direto no nome final, sem rename. Sem mirror, sem clean
+          # slate: remove só cada arquivo do build e o reenvia (não apaga nada
+          # fora de out/). chmod desativado (Hostinger também recusa 550).
+          : > /tmp/fireowl-mkdirs.lftp
           find ./out -type d | sort | while IFS= read -r dir; do
             rel="${dir#./out}"
-            [ -z "$rel" ] || printf 'mkdir -p -f "/public_html%s";\n' "$rel" >> /tmp/fireowl-upload.lftp
+            [ -z "$rel" ] || printf 'mkdir -p "/public_html%s";\n' "$rel" >> /tmp/fireowl-mkdirs.lftp
           done
+          : > /tmp/fireowl-puts.lftp
           find ./out -type f | sort | while IFS= read -r file; do
             rel="${file#./out/}"
             remote="/public_html/$rel"
             remote_dir="${remote%/*}/"
-            printf 'rm -f "%s";\nput -O "%s" "%s";\n' "$remote" "$remote_dir" "$file" >> /tmp/fireowl-upload.lftp
+            printf 'rm -f "%s";\nput -O "%s" "%s";\n' "$remote" "$remote_dir" "$file" >> /tmp/fireowl-puts.lftp
           done
 
-          lftp -c "
-            set ftp:ssl-force true;
-            set ftp:ssl-protect-data true;
-            set ssl:verify-certificate no;
-            set xfer:use-temp-file false;
-            set cmd:fail-exit true;
-            set net:max-retries 2;
-            set net:timeout 20;
-            open -p 21 -u \"$FTP_USERNAME\",\"$FTP_PASSWORD\" \"$FTP_SERVER\";
-            source /tmp/fireowl-upload.lftp;
-          "
+          SETTINGS="set ftp:ssl-force true; set ftp:ssl-protect-data true; set ssl:verify-certificate no; set xfer:use-temp-file false; set ftp:use-site-utime false; set net:max-retries 2; set net:timeout 20;"
+
+          # Fase 1 — cria diretórios; `mkdir -p` em diretório JÁ EXISTENTE responde
+          # 550, mas aqui NÃO é fatal (fail-exit false + || true), então não aborta.
+          lftp -c "$SETTINGS set cmd:fail-exit false; open -p 21 -u \"$FTP_USERNAME\",\"$FTP_PASSWORD\" \"$FTP_SERVER\"; source /tmp/fireowl-mkdirs.lftp;" || true
+
+          # Fase 2 — envia os arquivos DIRETO (sem `.in.*`/rename). Falha real aqui
+          # aborta o deploy (fail-exit true), sem mascarar erro de upload.
+          lftp -c "$SETTINGS set cmd:fail-exit true; open -p 21 -u \"$FTP_USERNAME\",\"$FTP_PASSWORD\" \"$FTP_SERVER\"; source /tmp/fireowl-puts.lftp;"
