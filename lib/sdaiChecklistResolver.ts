@@ -42,8 +42,8 @@ export interface ResolvedField {
   emptyState?: string;
   /** com emptyState: permite entrada manual (texto). */
   manual?: boolean;
-  /** Renderizar como controle binário rápido (Sim/Não, Conforme/Não conforme). */
-  control?: 'binary';
+  /** binary = Sim/Não; suggest = input livre + chips de sugestão (§5). */
+  control?: 'binary' | 'suggest';
   /** Cor semântica por opção (verde=normal, laranja=alert, neutro=neutral). */
   optionSemantics?: Record<string, OptionSemantic>;
   /** Grava o valor em OUTRA chave do card (ex.: perfil, sem tocar device_id §13). */
@@ -68,8 +68,16 @@ function binarySemantics(field: FieldLike): ResolvedField | undefined {
   return { control: 'binary', optionSemantics };
 }
 
+/* --------------------------- Causas/motivos sugeridos (§5) ----------------- */
+// Atalhos de preenchimento — NUNCA causa confirmada. Sempre há "Outro" (texto livre).
+const CAUSAS_FALHA = ['Falha de comunicação', 'Curto-circuito no laço', 'Circuito aberto', 'Dispositivo removido', 'Endereço duplicado', 'Falha de alimentação', 'Bateria/fonte', 'Dispositivo danificado', 'Obstrução/sujeira', 'Programação/configuração', 'Cabeamento/infraestrutura', 'Outro'];
+const CAUSAS_ALARME = ['Acionamento manual', 'Detecção de fumaça', 'Detecção térmica', 'Detector linear', 'Chave de fluxo', 'Interface externa', 'Teste/manutenção', 'Alarme indevido/falso alarme', 'Causa não identificada', 'Outro'];
+const CAUSAS_DESABILITADO = ['Manutenção', 'Falha do dispositivo', 'Falha de comunicação', 'Obra/intervenção', 'Dispositivo removido', 'Programação temporária', 'Solicitação do cliente', 'Motivo não identificado', 'Outro'];
+const suggest = (opts: string[]): ResolvedField => ({ control: 'suggest', options: opts.map((o) => ({ value: o, label: o })) });
+
 /** Chaves de repeater/campo governadas pela cascata SDAI (mapeamento fica AQUI). */
 export const SDAI_REPEATER_FALHAS = 'falhas';
+export const SDAI_REPEATER_DISPOSITIVOS = 'dispositivos';
 export const SDAI_REPEATER_ALARMES = 'alarmes';
 export const SDAI_REPEATER_DESABILITADOS = 'desabilitados';
 export const SDAI_REPEATER_BATERIAS = 'baterias';
@@ -178,6 +186,16 @@ export function resolveSdaiFieldOptions(
     if (fieldKey === FALHA_LOOP_KEY) return resolveFalhaLoopField(ctx);
     if (fieldKey === FALHA_ADDR_KEY) return resolveFalhaAddressField(ctx, item?.[FALHA_LOOP_KEY] as string);
     if (fieldKey === FALHA_DEVICE_KEY) return resolveFalhaDeviceField(ctx, item?.[FALHA_LOOP_KEY] as string, item?.[FALHA_ADDR_KEY] as string);
+    // Causa/motivo com sugestões por tipo de ocorrência (§5).
+    if (fieldKey === 'causa_provavel' || fieldKey === 'causa') {
+      if (repeaterKey === SDAI_REPEATER_FALHAS) return suggest(CAUSAS_FALHA);
+      if (repeaterKey === SDAI_REPEATER_ALARMES) return suggest(CAUSAS_ALARME);
+      if (repeaterKey === SDAI_REPEATER_DESABILITADOS) return suggest(CAUSAS_DESABILITADO);
+    }
+  }
+  // Dispositivo programado: cabeçalho READONLY quando veio do plano (device_id). §7
+  if (repeaterKey === SDAI_REPEATER_DISPOSITIVOS && fieldKey === 'dispositivo' && item?.device_id) {
+    return { readonly: true };
   }
   if (repeaterKey === SDAI_REPEATER_BATERIAS && fieldKey === BATERIA_DEVICE_KEY) return resolveBatteryDeviceField(ctx);
   if (repeaterKey === SDAI_REPEATER_LACOS && fieldKey === LACO_ID_KEY) return resolveLacoIdField(ctx);

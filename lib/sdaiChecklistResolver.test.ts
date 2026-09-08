@@ -111,6 +111,37 @@ describe('controle binário + semântica de cor (§2/§3/§4)', () => {
   });
 });
 
+describe('causas/motivos sugeridos + alarme/desabilitado com cascata (§3/§4/§5)', () => {
+  it('falha: causa_provavel vira control suggest com lista de falha', () => {
+    const r = resolveSdaiFieldOptions(ctx, 'falhas', F('causa_provavel', { tipo: 'texto' }), {})!;
+    expect(r.control).toBe('suggest');
+    expect(r.options?.map((o) => o.value)).toContain('Falha de comunicação');
+    expect(r.options?.map((o) => o.value)).toContain('Outro');
+  });
+  it('alarme: mesma cascata da falha (laço/endereço/device) + causa de alarme', () => {
+    expect(resolveSdaiFieldOptions(ctx, 'alarmes', F('laco'), {})!.autoValue).toBe('1');
+    expect(resolveSdaiFieldOptions(ctx, 'alarmes', F('endereco'), { laco: '1' })!.options?.map((o) => o.value)).toContain('2');
+    expect(resolveSdaiFieldOptions(ctx, 'alarmes', F('device_id'), { laco: '1', endereco: '2' })!.autoValue).toBe('d2');
+    const causa = resolveSdaiFieldOptions(ctx, 'alarmes', F('causa', { tipo: 'texto' }), {})!;
+    expect(causa.control).toBe('suggest');
+    expect(causa.options?.map((o) => o.value)).toContain('Acionamento manual');
+  });
+  it('desabilitado: cascata + causa de desabilitação', () => {
+    expect(resolveSdaiFieldOptions(ctx, 'desabilitados', F('device_id'), { laco: '1', endereco: '2' })!.autoValue).toBe('d2');
+    const causa = resolveSdaiFieldOptions(ctx, 'desabilitados', F('causa', { tipo: 'texto' }), {})!;
+    expect(causa.options?.map((o) => o.value)).toContain('Manutenção');
+  });
+});
+
+describe('dispositivo programado — cabeçalho readonly quando veio do plano (§7)', () => {
+  it('com device_id → readonly (não vira campo vazio editável)', () => {
+    expect(resolveSdaiFieldOptions(ctx, 'dispositivos', F('dispositivo', { tipo: 'texto' }), { device_id: 'd2', dispositivo: 'Acionador Manual — Laço 1 · End. 2' })!.readonly).toBe(true);
+  });
+  it('sem device_id (fora do plano) → não força readonly', () => {
+    expect(resolveSdaiFieldOptions(ctx, 'dispositivos', F('dispositivo', { tipo: 'texto' }), {})).toBeUndefined();
+  });
+});
+
 describe('baterias + laços de medição (§12/§14/§17)', () => {
   it('baterias: só as da central; sem bateria → emptyState', () => {
     const bat = resolveSdaiFieldOptions(ctx, 'baterias', F('device_id'), {})!;

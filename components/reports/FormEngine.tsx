@@ -75,7 +75,7 @@ export interface FieldResolution {
   readonly?: boolean;   // valor determinístico → somente leitura
   emptyState?: string;  // sem opções na Base
   manual?: boolean;     // com emptyState: permite entrada manual (texto)
-  control?: 'binary';   // controle binário rápido (2 opções)
+  control?: 'binary' | 'suggest'; // binário rápido (2 opções) | input+chips de sugestão
   optionSemantics?: Record<string, 'normal' | 'alert' | 'neutral'>; // cor por opção
   writeToKey?: string;  // grava em outra chave (repeater) — não em field.key
 }
@@ -204,13 +204,35 @@ const FieldControl: React.FC<{
             return (
               <button key={o} type="button" aria-pressed={active} disabled={disabled}
                 onClick={() => onValue(o)}
-                className={`min-h-11 rounded-lg border text-xs font-bold uppercase tracking-wide transition-colors disabled:opacity-50 ${cls}`}>
+                className={`min-h-11 md:min-h-9 rounded-lg border px-2 text-[13px] font-semibold transition-colors disabled:opacity-50 ${cls}`}>
                 {o}
               </button>
             );
           })}
         </div>
       </>
+    );
+  }
+
+  // Rota A — SUGESTÕES rápidas (§5): input livre + chips que preenchem o texto.
+  // Atalho de preenchimento — NÃO é causa confirmada; "Outro" = digitar livre.
+  if (resolution?.control === 'suggest') {
+    const cur = (value as string) || '';
+    const opts = resolution.options || [];
+    return (
+      <div className="flex flex-col gap-1.5">
+        {field.multilinha
+          ? <textarea rows={2} className={inputCls} value={cur} onChange={(e) => onValue(e.target.value)} />
+          : <input type="text" className={inputCls} value={cur} onChange={(e) => onValue(e.target.value)} />}
+        <div className="flex flex-wrap gap-1">
+          {opts.map((o) => (
+            <button key={o.value} type="button" disabled={disabled} onClick={() => onValue(o.value)}
+              className={`rounded-full border px-2 py-0.5 text-[11px] transition-colors ${cur === o.value ? 'border-primary bg-navy text-white' : 'border-border bg-surface text-fg-secondary hover:bg-surface-2'}`}>
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
     );
   }
 
@@ -230,6 +252,11 @@ const FieldControl: React.FC<{
         </select>
       </>
     );
+  }
+  // Rota A — somente leitura sem opções (ex.: base_status, header do device).
+  if (resolution?.readonly) {
+    const v = (value as string) || (resolution.autoValue || '');
+    return <div className={`${inputCls} bg-surface-2/60`} aria-readonly>{v || '—'}</div>;
   }
   // Rota A — sem opções na Base: manual (texto) com aviso, ou apenas o aviso.
   if (resolution?.emptyState) {
@@ -781,12 +808,12 @@ const Section: React.FC<{
   if (!isSectionVisible(section, values)) return null;
 
   return (
-    <div className="bg-surface rounded-xl border border-border shadow-sm p-5">
-      <div className="border-b border-border pb-3 mb-4">
-        <h3 className="text-sm font-bold text-fg uppercase tracking-wide">{section.titulo}</h3>
+    <div className="bg-surface rounded-xl border border-border shadow-sm p-4 md:p-5">
+      <div className="border-b border-border pb-2.5 mb-3">
+        <h3 className="text-[13px] font-bold text-fg uppercase tracking-wide">{section.titulo}</h3>
         {section.descricao && <p className="text-[11px] text-fg-secondary mt-1">{section.descricao}</p>}
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
         {section.campos
           .filter((f) => isFieldVisibleForRole(f, role) && isFieldVisible(f, values))
           .map((field) => {

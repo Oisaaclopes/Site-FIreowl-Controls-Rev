@@ -25,10 +25,12 @@ export function extractSdaiOccurrenceDrafts(values: Record<string, unknown>): Oc
     const cards = Array.isArray(values[key]) ? values[key] as Record<string, unknown>[] : [];
     for (const c of cards) {
       const loop = text(c.laco), address = text(c.endereco), deviceId = text(c.device_id);
-      if (!deviceId && !loop && !address && !text(c.descricao) && !text(c.observacao)) continue;
+      const causa = text(c.causa) || text(c.causa_provavel);
+      if (!deviceId && !loop && !address && !text(c.descricao) && !text(c.observacao) && !causa) continue;
+      const base = text(c.descricao) || text(c.observacao);
       out.push({ occurrenceType, deviceId, loop, address,
         identification: text(c.codigo) || text(c.dispositivo_perfil), manufacturer: text(c.fabricante), model: text(c.modelo),
-        location: text(c.local), notes: text(c.descricao) || text(c.observacao) });
+        location: text(c.local), notes: [base, causa ? `Motivo/causa: ${causa}` : ''].filter(Boolean).join(' — ') || undefined });
     }
   };
   addCards('falha_ativa', 'falhas', 'FAULT');

@@ -17,6 +17,7 @@ import {
 import { isFieldVisible, isFieldRequired, isSectionVisible } from '@/lib/formConditions';
 import { FormEngine, CatalogSources, type ResolveFieldOptions, type ResolveItemPatch } from '@/components/reports/FormEngine';
 import { resolveSdaiFieldOptions, resolveSdaiItemPatch, seedLacoCards, SDAI_REPEATER_LACOS, type SdaiCentralContext } from '@/lib/sdaiChecklistResolver';
+import { legacyGroupLabel } from '@/lib/technicalBase';
 import { isSupabaseConfigured } from '@/lib/inventory';
 import { getCapturedPhoto, getPhotoPreview, isPhotoId, registerPhoto, clearPhotoRegistry } from '@/lib/reportMedia';
 import { getSignature, isSignatureId, clearSignatureRegistry } from '@/lib/signatures';
@@ -528,12 +529,15 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       const ordenados = [...devices].sort((a, b) =>
         (a.ultimoTesteFuncional || '').localeCompare(b.ultimoTesteFuncional || '')
       );
-      const cards: RepeaterCard[] = ordenados.map((d) => ({
-        device_id: d.id, // vínculo oculto p/ registrar o teste funcional no fecho
-        dispositivo: `${d.tipoDispositivo || 'Dispositivo'} · ${[d.central, d.laco, d.endereco]
-          .filter(Boolean)
-          .join('/')}`,
-      }));
+      const cards: RepeaterCard[] = ordenados.map((d) => {
+        // Cabeçalho RICO da Base Técnica (§7): grupo canônico + fab/modelo +
+        // laço/endereço + localização; NUNCA o tipo legado (§16, sem "Sireme").
+        const grupo = legacyGroupLabel('SDAI', d.grupo) || d.tipoAtivo || d.tipoDispositivo || 'Dispositivo';
+        const fm = [d.fabricante, d.modelo].filter(Boolean).join(' ');
+        const loc = [d.laco ? `Laço ${d.laco}` : '', d.endereco ? `End. ${d.endereco}` : ''].filter(Boolean).join(' · ');
+        const dispositivo = [grupo, fm, loc, d.localizacao].filter(Boolean).join(' — ');
+        return { device_id: d.id, dispositivo };
+      });
       return { ...prev, [field.key]: cards };
     });
   }, [devices, template]);
