@@ -1,4 +1,5 @@
-import { ReportInstance, ReportTipo, Pendencia, GeoPoint, ReportSignature } from '../types';
+import { ReportInstance, ReportTipo, Pendencia, GeoPoint, ReportSignature, DeviceOccurrence } from '../types';
+import type { OccurrenceDraft } from '../deviceOccurrences';
 import { TemplateSchema } from '../reportSchema';
 import { createReport, fetchReportByClientUuid, resetIncompleteReportChildren, updateReport, upsertAnswer, insertMedia, attachTemplateSnapshot } from '../reports';
 import { uploadReportPhoto } from '../reportMedia';
@@ -76,6 +77,8 @@ export interface ReportBundle {
     templateSnapshot?: TemplateSchema;
   };
   answers: BundleAnswer[];
+  /** Ocorrências operacionais extraídas do checklist; serializáveis/offline. */
+  occurrences?: OccurrenceDraft[];
   pendencias: Pendencia[];
   media: BundleMedia[];
   signatures: BundleSignature[];
@@ -268,6 +271,32 @@ export async function persistReportBundle(b: ReportBundle): Promise<{ reportId?:
     await insertPendencia({ ...p, id: stableBundleUuid(b.clientUuid, 'pendencia', index), reportOrigemId: report.id });
   }
 
+  // Ocorrências fazem parte do bundle: retry usa ids/dedupe_key estáveis e não
+  // duplica. `devices` nunca é alterado; a pendência existente é reutilizada.
+  for (const [index, o] of (b.occurrences || []).entries()) {
+    const { upsertDeviceOccurrence, OCCURRENCE_LABEL } = await import('../deviceOccurrences');
+    const { createOrReuseDevicePendencia } = await import('../sdaiAttendanceWiring');
+    const pend = await createOrReuseDevicePendencia({
+      clienteId: b.report.clienteId, contratoId: b.report.contratoId,
+      serviceAttendanceId: b.report.serviceAttendanceId || b.clientUuid,
+      reportOrigemId: report.id, deviceId: o.deviceId, grupo: `SDAI > ${OCCURRENCE_LABEL[o.occurrenceType]}`,
+      descricao: `${o.deviceId ? '' : 'Não vinculado à Base Técnica — '}${o.notes || `${OCCURRENCE_LABEL[o.occurrenceType]}${o.address ? ` — endereço ${o.address}` : ''}`}`,
+      acaoRecomendada: o.occurrenceType === 'DISABLED' ? 'reprogramar' : 'investigar', local: o.location,
+    });
+    const occurrence: DeviceOccurrence = {
+      id: stableBundleUuid(b.clientUuid, 'occurrence', index),
+      dedupeKey: `${b.clientUuid}:occurrence:${index}`,
+      clienteId: b.report.clienteId, deviceId: o.deviceId,
+      occurrenceType: o.occurrenceType, status: 'OPEN', observedAt: b.createdAt,
+      sourceType: 'PREVENTIVA', reportId: report.id, workOrderId: b.report.osId,
+      serviceAttendanceId: b.report.serviceAttendanceId, pendenciaId: pend.id,
+      loopSnapshot: o.loop, addressSnapshot: o.address, identificationSnapshot: o.identification,
+      manufacturerSnapshot: o.manufacturer, modelSnapshot: o.model,
+      locationSnapshot: o.location, notes: o.notes,
+    };
+    await upsertDeviceOccurrence(occurrence);
+  }
+
   await updateReport({
     ...report,
     status: 'finalizado',
@@ -299,6 +328,10 @@ export async function persistReportBundle(b: ReportBundle): Promise<{ reportId?:
     for (const u of b.pendenciaUpdates) {
       try {
         await updatePendenciaStatus(u.id, u.status as PendenciaStatus, { resolvidaEm });
+        if (u.status === 'corrigida') {
+          const { resolveOccurrencesByPendenciaId } = await import('../deviceOccurrences');
+          await resolveOccurrencesByPendenciaId(u.id, resolvidaEm);
+        }
       } catch (e) {
         console.warn('Pendência não atualizada na sincronização:', e);
       }

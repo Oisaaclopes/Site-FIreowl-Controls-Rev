@@ -5,6 +5,7 @@ const fx = vi.hoisted(() => ({
   updateReport: vi.fn(), upsertAnswer: vi.fn(), insertMedia: vi.fn(), attachSnapshot: vi.fn(),
   uploadPhoto: vi.fn(), uploadSignature: vi.fn(), insertSignature: vi.fn(),
   fetchPendencias: vi.fn(), insertPendencia: vi.fn(), replaceRequirements: vi.fn(),
+  upsertOccurrence: vi.fn(), createOrReusePendencia: vi.fn(),
   idbGet: vi.fn(), idbPut: vi.fn(), idbDelete: vi.fn(), removeOfflineJob: vi.fn(),
 }));
 
@@ -20,6 +21,8 @@ vi.mock('../surveyRequirements', () => ({ replaceSurveyRequirements: fx.replaceR
 vi.mock('../ordensServico', () => ({ updateOrdemServicoStatus: vi.fn() }));
 vi.mock('../devices', () => ({ marcarTesteFuncional: vi.fn() }));
 vi.mock('../ciclos', () => ({ fetchCicloAtivo: vi.fn(), registrarTestesNoCiclo: vi.fn() }));
+vi.mock('../deviceOccurrences', () => ({ upsertDeviceOccurrence: fx.upsertOccurrence, resolveOccurrencesByPendenciaId: vi.fn(), OCCURRENCE_LABEL: { FAULT: 'Em falha', DISABLED: 'Desabilitado', ALARM: 'Em alarme' } }));
+vi.mock('../sdaiAttendanceWiring', () => ({ createOrReuseDevicePendencia: fx.createOrReusePendencia }));
 vi.mock('./fieldPhotoSync', () => ({}));
 vi.mock('./idb', () => ({
   STORE_OUTBOX: 'report_outbox', STORE_REPORT_TOMBSTONES: 'report_tombstones',
@@ -47,6 +50,8 @@ beforeEach(() => {
   fx.upsertAnswer.mockImplementation(async (value) => value);
   fx.replaceRequirements.mockResolvedValue(undefined);
   fx.fetchPendencias.mockResolvedValue([]);
+  fx.createOrReusePendencia.mockResolvedValue({ id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', status: 'aberta' });
+  fx.upsertOccurrence.mockImplementation(async (value) => value);
 });
 
 describe('persistReportBundle', () => {
@@ -80,6 +85,18 @@ describe('persistReportBundle', () => {
     expect(first).toBe(stableBundleUuid(bundle().clientUuid, 'answer', 0));
     expect(first).not.toBe(stableBundleUuid(bundle().clientUuid, 'answer', 1));
     expect(first).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('retry offline usa a mesma identidade e dedupe_key da ocorrência', async () => {
+    const b = bundle();
+    b.occurrences = [{ occurrenceType: 'DISABLED', deviceId: 'dev-1', address: '41' }];
+    await persistReportBundle(b);
+    await persistReportBundle(b);
+    expect(fx.upsertOccurrence).toHaveBeenCalledTimes(2);
+    const first = fx.upsertOccurrence.mock.calls[0][0];
+    const retry = fx.upsertOccurrence.mock.calls[1][0];
+    expect(retry.id).toBe(first.id);
+    expect(retry.dedupeKey).toBe(first.dedupeKey);
   });
 
   it('delete confirmado grava tombstone e remove as duas versões da fila local', async () => {

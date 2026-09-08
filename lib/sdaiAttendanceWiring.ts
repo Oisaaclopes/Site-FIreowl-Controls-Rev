@@ -228,7 +228,7 @@ export async function createOrReuseDevicePendencia(input: AutoPendenciaInput): P
   if (equivalente) return equivalente; // reutiliza a aberta — não duplica
   const nova: Pendencia = {
     id: input.deviceId && input.grupo ? stableAutoPendenciaId(input.serviceAttendanceId, input.deviceId, input.grupo) : (undefined as unknown as string),
-    clienteId: input.clienteId, deviceId: input.deviceId, grupo: input.grupo,
+    clienteId: input.clienteId, deviceId: input.deviceId, reportOrigemId: input.reportOrigemId, grupo: input.grupo,
     descricao: input.descricao, acaoRecomendada: input.acaoRecomendada, local: input.local,
     status: 'aberta',
   };

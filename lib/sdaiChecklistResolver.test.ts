@@ -135,3 +135,20 @@ describe('sem central / label canônico', () => {
     expect(deviceShortLabel(devices.find((d) => d.id === 'd2')!)).toBe('Acionador Manual · Tecnohold AME07 · AM-025');
   });
 });
+
+describe('reuso da cascata em alarme e desabilitados', () => {
+  it.each(['alarmes', 'desabilitados'])('%s resolve o device por laço+endereço', (repeater) => {
+    const r = resolveSdaiFieldOptions(ctx, repeater, F('device_id'), { laco: '1', endereco: '2' })!;
+    expect(r.autoValue).toBe('d2');
+    expect(r.readonly).toBe(true);
+  });
+  it('endereço fora da Base fica explicitamente não localizado e sem device_id', () => {
+    const patch = resolveSdaiItemPatch(ctx, 'desabilitados', 'endereco', '52', { laco: '1' })!;
+    expect(patch.device_id).toBe('');
+    expect(patch.base_status).toBe('Dispositivo não localizado na Base Técnica');
+  });
+  it('ocorrência da própria central vincula a central canônica', () => {
+    const patch = resolveSdaiItemPatch(ctx, 'alarmes', 'pertence_central', 'Sim', {})!;
+    expect(patch.device_id).toBe('C1');
+  });
+});

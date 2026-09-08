@@ -70,6 +70,8 @@ function binarySemantics(field: FieldLike): ResolvedField | undefined {
 
 /** Chaves de repeater/campo governadas pela cascata SDAI (mapeamento fica AQUI). */
 export const SDAI_REPEATER_FALHAS = 'falhas';
+export const SDAI_REPEATER_ALARMES = 'alarmes';
+export const SDAI_REPEATER_DESABILITADOS = 'desabilitados';
 export const SDAI_REPEATER_BATERIAS = 'baterias';
 export const SDAI_REPEATER_LACOS = 'lacos';
 export const FALHA_LOOP_KEY = 'laco';
@@ -171,7 +173,8 @@ export function resolveSdaiFieldOptions(
   item: Record<string, unknown> | undefined,
 ): ResolvedField | undefined {
   const fieldKey = field.key;
-  if (repeaterKey === SDAI_REPEATER_FALHAS) {
+  if ([SDAI_REPEATER_FALHAS, SDAI_REPEATER_ALARMES, SDAI_REPEATER_DESABILITADOS].includes(repeaterKey || '')) {
+    if (fieldKey === 'base_status') return { readonly: true, autoValue: String(item?.base_status || '') };
     if (fieldKey === FALHA_LOOP_KEY) return resolveFalhaLoopField(ctx);
     if (fieldKey === FALHA_ADDR_KEY) return resolveFalhaAddressField(ctx, item?.[FALHA_LOOP_KEY] as string);
     if (fieldKey === FALHA_DEVICE_KEY) return resolveFalhaDeviceField(ctx, item?.[FALHA_LOOP_KEY] as string, item?.[FALHA_ADDR_KEY] as string);
@@ -196,7 +199,16 @@ export function resolveSdaiItemPatch(
   newValue: unknown,
   item: Record<string, unknown> | undefined,
 ): Record<string, unknown> | undefined {
-  if (repeaterKey !== SDAI_REPEATER_FALHAS) return undefined;
+  if (![SDAI_REPEATER_FALHAS, SDAI_REPEATER_ALARMES, SDAI_REPEATER_DESABILITADOS].includes(repeaterKey || '')) return undefined;
+  if (fieldKey === 'pertence_central') {
+    if (newValue === 'Sim' && ctx.central) return {
+      [FALHA_DEVICE_KEY]: ctx.central.id,
+      codigo: ctx.central.technicalIdentifier || '', local: ctx.central.localizacao || '',
+      fabricante: ctx.central.fabricante || '', modelo: ctx.central.modelo || '',
+      base_status: 'Central vinculada à Base Técnica',
+    };
+    return { [FALHA_DEVICE_KEY]: '', codigo: '', local: '', fabricante: '', modelo: '', base_status: '' };
+  }
   if (fieldKey === FALHA_LOOP_KEY) {
     // Trocar o laço zera endereço/device e derivados do endereço anterior (§7).
     return { [FALHA_ADDR_KEY]: '', [FALHA_DEVICE_KEY]: '', codigo: '', local: '', [FALHA_PERFIL_KEY]: '', [FALHA_DIVERGENCIA_KEY]: '' };
@@ -215,10 +227,13 @@ export function resolveSdaiItemPatch(
         [FALHA_DEVICE_KEY]: dev.id,
         codigo: dev.technicalIdentifier || '',
         local: dev.localizacao || '',
+        fabricante: dev.fabricante || '',
+        modelo: dev.modelo || '',
+        base_status: 'Dispositivo vinculado à Base Técnica',
         [FALHA_DIVERGENCIA_KEY]: divergente ? `Perfil informado (${perfilInformado}) difere do dispositivo do endereço (${perfilReal}).` : '',
       };
     }
-    return { [FALHA_DEVICE_KEY]: '', codigo: '', local: '', [FALHA_DIVERGENCIA_KEY]: '' };
+    return { [FALHA_DEVICE_KEY]: '', codigo: '', local: '', fabricante: '', modelo: '', base_status: 'Dispositivo não localizado na Base Técnica', [FALHA_DIVERGENCIA_KEY]: '' };
   }
   return undefined;
 }

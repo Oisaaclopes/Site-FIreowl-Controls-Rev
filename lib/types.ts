@@ -1014,6 +1014,37 @@ export interface Device {
 export type AssetConditionValue = 'NORMAL' | 'COM_AVARIA' | 'INOPERANTE' | 'NAO_TESTADO' | 'NAO_LOCALIZADO' | 'INADEQUADO';
 export type AssetSourceValue = 'LEVANTAMENTO' | 'IMPORTACAO' | 'MANUAL' | 'ATENDIMENTO';
 
+export type DeviceOccurrenceType = 'FAULT' | 'DISABLED' | 'ALARM';
+export type DeviceOccurrenceStatus = 'OPEN' | 'RESOLVED';
+export type OperationalStatus = 'NORMAL' | DeviceOccurrenceType;
+
+/** Ocorrência operacional; não altera cadastro, lifecycle ou identidade do ativo. */
+export interface DeviceOccurrence {
+  id: string;
+  dedupeKey: string;
+  clienteId?: string;
+  deviceId?: string;
+  occurrenceType: DeviceOccurrenceType;
+  status: DeviceOccurrenceStatus;
+  observedAt: string;
+  resolvedAt?: string;
+  resolvedBy?: string;
+  sourceType: 'PREVENTIVA' | 'CORRETIVA' | 'ATENDIMENTO' | 'MANUAL';
+  reportId?: string;
+  workOrderId?: string;
+  serviceAttendanceId?: string;
+  pendenciaId?: string;
+  loopSnapshot?: string;
+  addressSnapshot?: string;
+  identificationSnapshot?: string;
+  manufacturerSnapshot?: string;
+  modelSnapshot?: string;
+  locationSnapshot?: string;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 /* ===================================================================
  * MANUTENÇÃO CONTRATUAL (migration 0106) — política de periodicidade
  * configurável e multidisciplinar. NÃO duplica a Base Técnica: os filtros

@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Client, Device, UserRole, ClientTechnicalCredential, TechnicalBackup, DeviceVerification, AssetConditionValue } from '@/lib/types';
+import { Client, Device, UserRole, ClientTechnicalCredential, TechnicalBackup, DeviceVerification, AssetConditionValue, DeviceOccurrence, OperationalStatus } from '@/lib/types';
 import {
   TechArea, AREAS, AREA_LABEL, CONDITIONS, CONDITION_LABEL, SOURCE_LABEL,
   groupsForArea, assetDisplayIdentifier, legacyGroupLabel,
@@ -29,6 +29,7 @@ import { PickerField } from '@/components/ui/PickerField';
 import { TechnicalAssetFields } from '@/components/clients/TechnicalAssetFields';
 import { AssetFormValues, emptyAssetValues, firstInvalidField, buildDevicePatch, deviceToAssetValues } from '@/lib/technicalAssetForm';
 import { FILE_TYPES, fileTypeLabel, fileTypeIcon, fmtFileSize, deviceOptionLabel } from '@/lib/technicalFiles';
+import { fetchDeviceOccurrences, filterByOperationalStatus, operationalCounts, operationalStatusForDevice, OCCURRENCE_LABEL } from '@/lib/deviceOccurrences';
 
 /* ==========================================================================
  * ETAPA 3D — BASE TÉCNICA PERMANENTE (Cliente 360).
@@ -77,6 +78,8 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
   const [viewMode, setViewMode] = useState<'lista' | 'hierarquia'>('lista');
   const [centralFilter, setCentralFilter] = useState('');
   const [lacoFilter, setLacoFilter] = useState('');
+  const [occurrences, setOccurrences] = useState<DeviceOccurrence[]>([]);
+  const [operationalFilter, setOperationalFilter] = useState<OperationalStatus | 'ALL'>('ALL');
   const canManage = isGestao(userRole);
 
   // Ao trocar de área/aba, zera seleção e filtros específicos (evita ids órfãos).
@@ -89,6 +92,13 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
     fetchTechnicalCatalog().then((c) => { if (alive) setCatalog(c); }).catch(() => {});
     return () => { alive = false; };
   }, []);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    let alive = true;
+    fetchDeviceOccurrences({ clienteId: client.id }).then((rows) => { if (alive) setOccurrences(rows); }).catch(() => { if (alive) setOccurrences([]); });
+    return () => { alive = false; };
+  }, [client.id, devices]);
 
   const matchesLifecycle = (d: Device): boolean => {
     if (lifecycle === 'todos') return true;
@@ -137,6 +147,7 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
     });
     if (centralFilter) list = list.filter((d) => (d.central || '').trim() === centralFilter);
     if (lacoFilter) list = list.filter((d) => (d.laco || '').trim() === lacoFilter);
+    list = filterByOperationalStatus(list, occurrences, operationalFilter);
     // Filtros rápidos da revisão de importação (§12) — escopo: importados ativos.
     if (special) list = list.filter((d) => {
       if (d.source !== 'IMPORTACAO') return false;
@@ -155,7 +166,9 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
     });
     return sortDevicesForArea(area, list);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [devices, area, search, lifecycle, groupFilter, fabFilter, origem, condFilter, verif, special, inconsistentIds, centralFilter, lacoFilter]);
+  }, [devices, area, search, lifecycle, groupFilter, fabFilter, origem, condFilter, verif, special, inconsistentIds, centralFilter, lacoFilter, occurrences, operationalFilter]);
+
+  const operationalSummary = useMemo(() => operationalCounts(areaAll, occurrences), [areaAll, occurrences]);
 
   const sdaiHierarchy = useMemo(() => (area === 'SDAI' ? buildSdaiHierarchy(areaAll) : { centrals: [] }), [area, areaAll]);
 
@@ -278,6 +291,22 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
         activeGroup={groupFilter} onPickGroup={(g) => { setShowDup(false); setGroupFilter((cur) => (cur === g ? '' : g)); }}
       />
 
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+        {([
+          ['ALL', 'Base técnica', operationalSummary.total],
+          ['NORMAL', 'Normal', operationalSummary.NORMAL],
+          ['FAULT', 'Em falha', operationalSummary.FAULT],
+          ['DISABLED', 'Desabilitados', operationalSummary.DISABLED],
+          ['ALARM', 'Em alarme', operationalSummary.ALARM],
+        ] as const).map(([key, label, count]) => (
+          <button key={key} type="button" onClick={() => setOperationalFilter(key)}
+            className={`rounded-xl border px-3 py-2 text-left ${operationalFilter === key ? 'border-amber-500 bg-amber-50' : 'border-border bg-surface'}`}>
+            <span className="block text-[9px] font-bold uppercase tracking-wide text-fg-muted">{label}</span>
+            <span className="font-data-mono text-xl font-bold text-fg">{count}</span>
+          </button>
+        ))}
+      </div>
+
       {/* Revisão pós-importação (§9–§13) — contadores clicáveis, estado dinâmico (§19) */}
       {review.importados > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface-2 px-3 py-2 text-[11px]">
@@ -390,6 +419,7 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
       ) : (
         <AssetTable
           area={area} devices={visible} selected={selected} canManage={canManage}
+          occurrences={occurrences}
           hideSingleCentral={hideSingleCentral} catalog={catalog}
           onInlineSave={inlineSave} onCopy={copyDevices}
           onToggleRow={toggleRow} onToggleAll={toggleAll}
@@ -449,6 +479,7 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
           client={client}
           userRole={userRole}
           allDevices={devices || []}
+          occurrences={occurrences.filter((o) => o.deviceId === detailDevice.id)}
           onOpenDevice={(d) => setDetailDevice(d)}
           onClose={() => setDetailDevice(null)}
           onChanged={onDevicesChanged}
@@ -591,12 +622,13 @@ const BulkBar: React.FC<{
 /* ------------------------- Tabela adaptativa (seleção + ações) ------------------------- */
 const AssetTable: React.FC<{
   area: TechArea; devices: Device[]; selected: Set<string>; canManage: boolean;
+  occurrences: DeviceOccurrence[];
   hideSingleCentral?: boolean; catalog?: TechnicalCatalogItem[];
   onToggleRow: (id: string) => void; onToggleAll: () => void;
   onVerify: (d: Device) => void; onOpen: (d: Device) => void; onEdit: (d: Device) => void;
   onRemove: (d: Device) => void; onHistory: (d: Device) => void; onPendencia: (d: Device) => void;
   onInlineSave?: (d: Device, patch: Partial<Device>) => void; onCopy?: (list: Device[]) => void;
-}> = ({ area, devices, selected, canManage, hideSingleCentral, catalog = [], onToggleRow, onToggleAll, onVerify, onOpen, onEdit, onRemove, onHistory, onPendencia, onInlineSave, onCopy }) => {
+}> = ({ area, devices, selected, canManage, occurrences, hideSingleCentral, catalog = [], onToggleRow, onToggleAll, onVerify, onOpen, onEdit, onRemove, onHistory, onPendencia, onInlineSave, onCopy }) => {
   // Célula em edição inline (id do device + campo). null = nenhuma.
   const [editCell, setEditCell] = useState<{ id: string; field: 'localizacao' | 'condicao' | 'grupo' | 'fabricante' | 'modelo' } | null>(null);
   // Modo texto manual (equipamento desconhecido) para fabricante/modelo.
@@ -641,6 +673,7 @@ const AssetTable: React.FC<{
         const v = assetCardView(area, d);
         const ident = assetDisplayIdentifier(area, { central: d.central, laco: d.laco, endereco: d.endereco, technicalAttributes: d.technicalAttributes }, { hideSingleCentral });
         const sel = selected.has(d.id);
+        const operational = operationalStatusForDevice(d.id, occurrences);
         return (
           <div key={d.id} className={`rounded-xl border p-3 ${sel ? 'border-primary bg-navy/5' : 'border-border bg-surface'}`}>
             <div className="flex items-start gap-2">
@@ -653,6 +686,7 @@ const AssetTable: React.FC<{
               </button>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {operational !== 'NORMAL' && <Badge color="amber">{OCCURRENCE_LABEL[operational]}</Badge>}
               {v.condition ? <Badge color={CONDITION_COLOR[v.condition]}>{v.conditionLabel}</Badge> : <span className="rounded bg-surface-3 px-1.5 py-0.5 text-[10px] text-fg-muted">{v.verifiedLabel}</span>}
               {v.originLabel && <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-fg-muted">{v.originLabel}</span>}
             </div>
@@ -684,6 +718,7 @@ const AssetTable: React.FC<{
           {devices.map((d) => {
             const ident = assetDisplayIdentifier(area, { central: d.central, laco: d.laco, endereco: d.endereco, technicalAttributes: d.technicalAttributes }, { hideSingleCentral });
             const sel = selected.has(d.id);
+            const operational = operationalStatusForDevice(d.id, occurrences);
             return (
               <tr key={d.id} className={`bg-surface hover:bg-surface-2 ${sel ? 'bg-navy/5' : ''}`}>
                 <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={sel} onChange={() => onToggleRow(d.id)} aria-label="Selecionar ativo" /></td>
@@ -785,7 +820,12 @@ const AssetTable: React.FC<{
                     </select>
                   </td>
                 ) : (
-                  <td className={`px-3 py-2 ${canInline ? 'cursor-pointer hover:bg-navy/5' : ''}`} title={canInline ? 'Clique para editar a condição' : undefined} onClick={() => canInline && setEditCell({ id: d.id, field: 'condicao' })}>{d.condicao ? <Badge color={CONDITION_COLOR[d.condicao]}>{CONDITION_LABEL[d.condicao]}</Badge> : <span className="text-fg-muted">—</span>}</td>
+                  <td className={`px-3 py-2 ${canInline ? 'cursor-pointer hover:bg-navy/5' : ''}`} title={canInline ? 'Clique para editar a condição' : undefined} onClick={() => canInline && setEditCell({ id: d.id, field: 'condicao' })}>
+                    <div className="flex flex-wrap gap-1">
+                      {operational !== 'NORMAL' && <Badge color="amber">{OCCURRENCE_LABEL[operational]}</Badge>}
+                      {d.condicao ? <Badge color={CONDITION_COLOR[d.condicao]}>{CONDITION_LABEL[d.condicao]}</Badge> : operational === 'NORMAL' ? <span className="text-fg-muted">—</span> : null}
+                    </div>
+                  </td>
                 )}
                 <td className="px-3 py-2 text-[10px] uppercase tracking-wide text-fg-muted">{d.source ? SOURCE_LABEL[d.source] : '—'}</td>
                 <td className="px-3 py-2">

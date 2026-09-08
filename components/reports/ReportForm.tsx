@@ -33,6 +33,7 @@ import {
   persistReportBundle,
   removeBundle,
 } from '@/lib/offline/reportSync';
+import { extractSdaiOccurrenceDrafts } from '@/lib/deviceOccurrences';
 
 interface ReportFormProps {
   template: TemplateSchema;
@@ -241,6 +242,7 @@ function buildPendencias(
         });
       }
       if (field.tipo === 'repeater' && field.gera_pendencia) {
+        if (template.codigo === PREVENTIVA_SDAI_CONTRATO_CODIGO && ['falhas', 'alarmes', 'desabilitados'].includes(field.key)) continue;
         const cards = Array.isArray(values[field.key]) ? (values[field.key] as RepeaterCard[]) : [];
         cards.forEach((c) => {
           if (!(c.descricao || c.grupo)) return;
@@ -250,6 +252,7 @@ function buildPendencias(
             id: '',
             status: 'aberta',
             clienteId: clienteId || undefined,
+            deviceId: c.device_id ? String(c.device_id) : undefined,
             grupo: c.grupo as string | undefined,
             descricao: (c.descricao as string) || 'Apontamento',
             local: c.local as string | undefined,
@@ -855,6 +858,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
           });
         }
         if (field.tipo === 'repeater' && field.gera_pendencia) {
+          if (template.codigo === PREVENTIVA_SDAI_CONTRATO_CODIGO && ['falhas', 'alarmes', 'desabilitados'].includes(field.key)) continue;
           const cards = Array.isArray(values[field.key]) ? (values[field.key] as RepeaterCard[]) : [];
           cards.forEach((c) => {
             if (c.descricao || c.grupo) {
@@ -885,8 +889,16 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         }
       }
     }
+    if (template.codigo === PREVENTIVA_SDAI_CONTRATO_CODIGO) {
+      extractSdaiOccurrenceDrafts(values as Record<string, unknown>).forEach((o) => list.push({
+        grupo: `SDAI > ${o.occurrenceType === 'FAULT' ? 'Em falha' : o.occurrenceType === 'DISABLED' ? 'Desabilitado' : 'Em alarme'}`,
+        descricao: `${o.deviceId ? '' : 'Não vinculado à Base Técnica — '}${o.notes || o.identification || `Endereço ${o.address || 'não informado'}`}`,
+        local: o.location,
+        origem: 'Preventiva',
+      }));
+    }
     return list;
-  }, [effectiveTemplate, values]);
+  }, [effectiveTemplate, values, template.codigo]);
 
   const surveySummary = useMemo(() => {
     const countCards = (key: string) => Array.isArray(values[key]) ? (values[key] as RepeaterCard[]).length : 0;
@@ -1017,6 +1029,8 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       if (corrigidas.length > 0) pendenciaUpdates = corrigidas;
     }
 
+    const occurrences = template.codigo === PREVENTIVA_SDAI_CONTRATO_CODIGO
+      ? extractSdaiOccurrenceDrafts(values as Record<string, unknown>) : undefined;
     const prefix = template.tipo === 'LEVANTAMENTO' ? 'LEV' : template.tipo === 'CORRETIVA' ? 'COR' : 'PRE';
     const numero = `${prefix}-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
 
@@ -1042,6 +1056,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
         templateVersion,
       },
       answers,
+      occurrences,
       pendencias: pends,
       media,
       signatures,
@@ -1050,7 +1065,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       deviceTests,
       pendenciaUpdates,
       ciclo: cicloInfo,
-      pendCount: pends.length,
+      pendCount: pends.length + (occurrences?.length || 0),
     };
   };
 

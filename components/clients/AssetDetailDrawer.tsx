@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Client, Device, UserRole, DeviceVerification, AssetConditionValue, Pendencia } from '@/lib/types';
+import { Client, Device, UserRole, DeviceVerification, AssetConditionValue, Pendencia, DeviceOccurrence } from '@/lib/types';
 import {
   TechArea, AREA_LABEL, CONDITION_LABEL, SOURCE_LABEL, identifierFields, fieldValue, assetDisplayIdentifier, legacyGroupLabel,
 } from '@/lib/technicalBase';
@@ -11,6 +11,7 @@ import { insertPendencia } from '@/lib/pendencias';
 import { Badge } from '@/components/DataListRow';
 import { showToast } from '@/components/ui/Feedback';
 import { isSupabaseConfigured } from '@/lib/inventory';
+import { OCCURRENCE_LABEL } from '@/lib/deviceOccurrences';
 
 /* ==========================================================================
  * ETAPA 3D.3 (Partes E/H) — Detalhe do ativo da Base Técnica.
@@ -31,6 +32,7 @@ interface Props {
   client: Client;
   userRole: UserRole;
   allDevices?: Device[];
+  occurrences?: DeviceOccurrence[];
   onOpenDevice?: (d: Device) => void;
   onClose: () => void;
   onChanged: () => void;
@@ -39,7 +41,7 @@ interface Props {
 
 const STATUS_LABEL: Record<string, string> = { ativo: 'Ativo', inativo: 'Inativo', substituido: 'Substituído', removido: 'Removido' };
 
-export const AssetDetailDrawer: React.FC<Props> = ({ area, device, client, allDevices = [], onOpenDevice, onClose, onChanged, onVerify }) => {
+export const AssetDetailDrawer: React.FC<Props> = ({ area, device, client, allDevices = [], occurrences = [], onOpenDevice, onClose, onChanged, onVerify }) => {
   // §27/§28 — navegação entre ativo anterior ↔ substituto.
   const replacement = device.replacedByDeviceId ? allDevices.find((d) => d.id === device.replacedByDeviceId) : undefined;
   const previous = allDevices.find((d) => d.replacedByDeviceId === device.id);
@@ -122,6 +124,21 @@ export const AssetDetailDrawer: React.FC<Props> = ({ area, device, client, allDe
             )}
           </Section>
 
+          <Section title="Status atual">
+            {occurrences.filter((o) => o.status === 'OPEN').length === 0 ? <Badge color="emerald">Normal</Badge> : (
+              <div className="flex flex-col gap-2">
+                {occurrences.filter((o) => o.status === 'OPEN').map((o) => (
+                  <div key={o.id} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs">
+                    <Badge color="amber">{OCCURRENCE_LABEL[o.occurrenceType]}</Badge>
+                    <p className="mt-1 text-fg-secondary">Origem: {o.sourceType === 'PREVENTIVA' ? 'Preventiva' : o.sourceType}</p>
+                    <p className="text-[10px] text-fg-muted">{new Date(o.observedAt).toLocaleString('pt-BR')}{o.serviceAttendanceId ? ' · Atendimento vinculado' : ''}{o.workOrderId ? ' · OS vinculada' : ''}</p>
+                    {o.notes && <p className="mt-1 text-fg-secondary">{o.notes}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+
           {/* Galeria (§38) */}
           <Section title={`Fotos ${thumbs ? `(${thumbs.length})` : ''}`}>
             {thumbs === null ? <p className="text-xs italic text-fg-muted">Carregando…</p>
@@ -160,6 +177,18 @@ export const AssetDetailDrawer: React.FC<Props> = ({ area, device, client, allDe
                   ))}
                 </div>
               )}
+          </Section>
+
+          <Section title={`Histórico operacional (${occurrences.length})`}>
+            {occurrences.length === 0 ? <p className="text-xs italic text-fg-muted">Sem ocorrências registradas.</p> : (
+              <div className="flex flex-col gap-2">
+                {occurrences.map((o) => <div key={o.id} className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs">
+                  <div className="flex items-center justify-between gap-2"><Badge color={o.status === 'OPEN' ? 'amber' : 'emerald'}>{OCCURRENCE_LABEL[o.occurrenceType]} · {o.status === 'OPEN' ? 'Aberta' : 'Resolvida'}</Badge><span className="font-data-mono text-[10px] text-fg-muted">{new Date(o.observedAt).toLocaleDateString('pt-BR')}</span></div>
+                  {o.resolvedAt && <p className="mt-1 text-[10px] text-emerald-700">Normalizada em {new Date(o.resolvedAt).toLocaleString('pt-BR')}</p>}
+                  {o.notes && <p className="mt-1 text-fg-secondary">{o.notes}</p>}
+                </div>)}
+              </div>
+            )}
           </Section>
 
           {showPend && (
