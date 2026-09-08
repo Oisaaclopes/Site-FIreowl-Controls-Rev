@@ -87,11 +87,26 @@ export const CameraCapture: React.FC<Props> = ({ onCapture, onClose, title = 'Ad
 
   const close = () => { stop(); onClose(); };
 
+  // A câmera pode ser montada dentro de formulários e overlays com fechamento
+  // por backdrop. Isole todos os gestos no boundary do componente para que um
+  // tap/click nunca alcance o modal pai (especialmente no Safari/Chrome mobile).
+  const containInteraction = (event: React.SyntheticEvent) => event.stopPropagation();
+
   return (
-    <div className="fixed inset-0 z-[97] flex flex-col bg-black">
+    <div
+      className="fixed inset-0 z-[97] flex flex-col bg-black"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onClick={containInteraction}
+      onPointerDown={containInteraction}
+      onPointerUp={containInteraction}
+      onTouchStart={containInteraction}
+      onTouchEnd={containInteraction}
+    >
       {/* Barra superior */}
       <div className="flex items-center justify-between px-4 py-3 text-white">
-        <button onClick={close} className="text-white/85 hover:text-white text-2xl leading-none" aria-label="Fechar">×</button>
+        <button type="button" onClick={close} className="text-white/85 hover:text-white text-2xl leading-none" aria-label="Fechar">×</button>
         <span className="text-xs font-bold uppercase tracking-wide text-white/80">{title}</span>
         <span className="w-6" />
       </div>
@@ -102,8 +117,8 @@ export const CameraCapture: React.FC<Props> = ({ onCapture, onClose, title = 'Ad
           <div className="max-w-xs text-center px-6">
             <span className="material-symbols-outlined text-5xl text-white/70">no_photography</span>
             <p className="mt-3 text-sm text-white/90">{error}</p>
-            <button onClick={() => galleryRef.current?.click()} className="mt-5 w-full min-h-[52px] rounded-xl bg-primary hover:bg-primary-hover text-white text-sm font-bold uppercase tracking-wide">Escolher da galeria</button>
-            <button onClick={() => start(facing)} className="mt-2 w-full min-h-[44px] rounded-xl border border-white/30 text-white/85 text-xs font-bold uppercase">Tentar câmera novamente</button>
+            <button type="button" onClick={() => galleryRef.current?.click()} className="mt-5 w-full min-h-[52px] rounded-xl bg-primary hover:bg-primary-hover text-white text-sm font-bold uppercase tracking-wide">Escolher da galeria</button>
+            <button type="button" onClick={() => start(facing)} className="mt-2 w-full min-h-[44px] rounded-xl border border-white/30 text-white/85 text-xs font-bold uppercase">Tentar câmera novamente</button>
           </div>
         ) : (
           <>
@@ -116,13 +131,13 @@ export const CameraCapture: React.FC<Props> = ({ onCapture, onClose, title = 'Ad
       {/* Controles inferiores: [galeria] [capturar] [trocar] */}
       {!error && (
         <div className="px-8 py-6 flex items-center justify-between">
-          <button onClick={() => galleryRef.current?.click()} className="w-12 h-12 rounded-lg border border-white/40 bg-white/10 text-white flex items-center justify-center" aria-label="Galeria">
+          <button type="button" onClick={() => galleryRef.current?.click()} className="w-12 h-12 rounded-lg border border-white/40 bg-white/10 text-white flex items-center justify-center" aria-label="Galeria">
             <span className="material-symbols-outlined">photo_library</span>
           </button>
-          <button onClick={capture} disabled={!ready || busy} className="w-18 h-18 rounded-full bg-white disabled:opacity-50 flex items-center justify-center" aria-label="Capturar" style={{ width: 72, height: 72 }}>
+          <button type="button" onClick={capture} disabled={!ready || busy} className="w-18 h-18 rounded-full bg-white disabled:opacity-50 flex items-center justify-center" aria-label="Capturar" style={{ width: 72, height: 72 }}>
             <span className="w-16 h-16 rounded-full border-4 border-navy/80" />
           </button>
-          <button onClick={() => setFacing((f) => (f === 'environment' ? 'user' : 'environment'))} className="w-12 h-12 rounded-lg border border-white/40 bg-white/10 text-white flex items-center justify-center" aria-label="Trocar câmera">
+          <button type="button" onClick={() => setFacing((f) => (f === 'environment' ? 'user' : 'environment'))} className="w-12 h-12 rounded-lg border border-white/40 bg-white/10 text-white flex items-center justify-center" aria-label="Trocar câmera">
             <span className="material-symbols-outlined">cameraswitch</span>
           </button>
         </div>

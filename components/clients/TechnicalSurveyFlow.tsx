@@ -244,14 +244,14 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientNa
 
   /* ------------------------- Render ------------------------- */
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/50 sm:items-center sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/50 sm:items-center sm:p-4">
       <div className="flex max-h-screen w-full max-w-lg flex-col overflow-hidden bg-surface sm:max-h-[92vh] sm:rounded-2xl sm:border sm:border-border" onClick={(e) => e.stopPropagation()}>
         <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
           <div>
             <h3 className="text-base font-bold text-fg">Levantamento — {AREA_LABEL[area]}</h3>
             {phase !== 'config' && <p className="text-[11px] text-fg-muted">{SURVEY_MODE_LABEL[mode]} · {createdThisVisit.length} novos · {records.length} verificações</p>}
           </div>
-          <button onClick={onClose} className="material-symbols-outlined text-fg-muted hover:text-fg">close</button>
+          <button type="button" onClick={onClose} className="material-symbols-outlined text-fg-muted hover:text-fg" aria-label="Sair do levantamento">close</button>
         </header>
 
         <div className="flex-1 overflow-y-auto p-4">
