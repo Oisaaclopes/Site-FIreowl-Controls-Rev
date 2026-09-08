@@ -12,6 +12,7 @@ import { Badge } from '@/components/DataListRow';
 import { showToast } from '@/components/ui/Feedback';
 import { isSupabaseConfigured } from '@/lib/inventory';
 import { OCCURRENCE_LABEL } from '@/lib/deviceOccurrences';
+import { PhotoViewer } from '@/components/ui/PhotoViewer';
 
 /* ==========================================================================
  * ETAPA 3D.3 (Partes E/H) — Detalhe do ativo da Base Técnica.
@@ -49,6 +50,7 @@ export const AssetDetailDrawer: React.FC<Props> = ({ area, device, client, allDe
   const [history, setHistory] = useState<DeviceVerification[] | null>(null);
   const [thumbs, setThumbs] = useState<{ id: string; url: string; note?: string; at?: string }[] | null>(null);
   const [showPend, setShowPend] = useState(false);
+  const [viewingPhoto, setViewingPhoto] = useState<{ url: string; label: string } | null>(null);
 
   const ident = assetDisplayIdentifier(area, { central: device.central, laco: device.laco, endereco: device.endereco, technicalAttributes: device.technicalAttributes });
 
@@ -146,10 +148,10 @@ export const AssetDetailDrawer: React.FC<Props> = ({ area, device, client, allDe
               : (
                 <div className="grid grid-cols-3 gap-2">
                   {thumbs.map((t) => (
-                    <a key={t.id} href={t.url} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-lg border border-border">
+                    <button type="button" key={t.id} onClick={() => setViewingPhoto({ url: t.url, label: t.note || 'Evidência do ativo' })} className="block w-full overflow-hidden rounded-lg border border-border">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={t.url} alt={t.note || 'Evidência'} className="h-24 w-full object-cover" loading="lazy" />
-                    </a>
+                    </button>
                   ))}
                 </div>
               )}
@@ -200,6 +202,7 @@ export const AssetDetailDrawer: React.FC<Props> = ({ area, device, client, allDe
           <button onClick={() => onVerify(device)} className="flex-1 rounded-lg bg-primary px-3 py-2.5 text-sm font-bold text-white hover:bg-navy">Verificar</button>
           <button onClick={() => setShowPend(true)} className={`flex-1 rounded-lg border px-3 py-2.5 text-sm font-bold ${device.condicao && PROBLEM_CONDITIONS.includes(device.condicao) ? 'border-danger text-danger hover:bg-danger/10' : 'border-border-strong text-primary hover:border-primary hover:bg-navy hover:text-white'}`}>Criar pendência</button>
         </footer>
+        {viewingPhoto && <PhotoViewer src={viewingPhoto.url} alt={viewingPhoto.label} onClose={() => setViewingPhoto(null)} />}
       </div>
     </div>
   );

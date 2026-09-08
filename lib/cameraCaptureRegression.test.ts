@@ -94,7 +94,8 @@ describe('Levantamento Técnico — preservação e cadastro sequencial', () => 
   it('mantém anteriores em resumo com foto e edição', () => {
     expect(survey).toContain('Equipamentos salvos nesta visita');
     expect(survey).toContain('Equipamento {index + 1} — salvo ✓');
-    expect(survey).toContain('setViewingPhoto(previews[0])');
+    expect(survey).toContain('<PhotoStrip urls={previews}');
+    expect(survey).toContain('setViewingPhoto({ url, label:');
     expect(survey).toContain('editCreatedAsset(device)');
   });
 

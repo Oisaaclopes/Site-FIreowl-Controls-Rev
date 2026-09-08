@@ -18,6 +18,7 @@ import { showToast } from '@/components/ui/Feedback';
 import { isSupabaseConfigured } from '@/lib/inventory';
 import { TechnicalCatalogItem } from '@/lib/technicalCatalog';
 import { CameraCapture } from '@/components/ui/CameraCapture';
+import { PhotoViewer } from '@/components/ui/PhotoViewer';
 import { ensureSurveySession, captureSurveyEvidence } from '@/lib/fieldPhotoCapture';
 import { FieldPhotoSession } from '@/lib/fieldPhotos';
 import { getOutboxOwner } from '@/lib/offline/outbox';
@@ -79,7 +80,7 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientNa
   const [draft, setDraft] = useState<Draft>(emptyDraft());
   const [savedPhotoPreviews, setSavedPhotoPreviews] = useState<Record<string, string[]>>({});
   const [editingCreatedId, setEditingCreatedId] = useState<string | null>(null);
-  const [viewingPhoto, setViewingPhoto] = useState<string | null>(null);
+  const [viewingPhoto, setViewingPhoto] = useState<{ url: string; label: string } | null>(null);
   const newAssetRef = useRef<HTMLDivElement>(null);
   const groupRef = useRef<HTMLSelectElement>(null);
   const localPreviewUrlsRef = useRef<Set<string>>(new Set());
@@ -334,17 +335,16 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientNa
                       const ident = assetDisplayIdentifier(area, { central: device.central, laco: device.laco, endereco: device.endereco, technicalAttributes: device.technicalAttributes });
                       const previews = savedPhotoPreviews[device.id] || [];
                       return (
-                        <div key={device.id} className="flex items-center gap-3 px-3 py-2">
-                          {previews.length > 0 ? (
-                            <button type="button" onClick={() => setViewingPhoto(previews[0])} className="h-10 w-10 shrink-0 rounded-md bg-cover bg-center" style={{ backgroundImage: `url(${previews[0]})` }} aria-label={`Ver foto do equipamento ${index + 1}`} />
-                          ) : (
-                            <span className="material-symbols-outlined flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-surface text-fg-muted">check_circle</span>
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-xs font-bold text-fg">Equipamento {index + 1} — salvo ✓</p>
-                            <p className="truncate text-[11px] text-fg-muted">{[device.grupo, ident || device.modelo, device.localizacao].filter(Boolean).join(' · ') || 'Ativo registrado'}{previews.length ? ` · ${previews.length} foto(s)` : ''}</p>
+                        <div key={device.id} className="px-3 py-2">
+                          <div className="flex items-center gap-3">
+                            <span className="material-symbols-outlined flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-surface text-emerald-600">check_circle</span>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-xs font-bold text-fg">Equipamento {index + 1} — salvo ✓</p>
+                              <p className="truncate text-[11px] text-fg-muted">{[device.grupo, ident || device.modelo, device.localizacao].filter(Boolean).join(' · ') || 'Ativo registrado'}{previews.length ? ` · ${previews.length} foto(s)` : ''}</p>
+                            </div>
+                            <button type="button" onClick={() => editCreatedAsset(device)} className="shrink-0 rounded-lg border border-border px-2 py-1 text-[11px] font-semibold text-primary">Editar</button>
                           </div>
-                          <button type="button" onClick={() => editCreatedAsset(device)} className="shrink-0 rounded-lg border border-border px-2 py-1 text-[11px] font-semibold text-primary">Editar</button>
+                          <PhotoStrip urls={previews} label={`Equipamento ${index + 1}`} onOpen={(url, photoIndex) => setViewingPhoto({ url, label: `Equipamento ${index + 1} · Foto ${photoIndex + 1}` })} />
                         </div>
                       );
                     })}
@@ -365,6 +365,9 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientNa
                     <span className="material-symbols-outlined text-lg">photo_camera</span>
                     {(recordKind === 'ativo' ? draft.photos : obs.photos) > 0 ? `Foto anexada (${recordKind === 'ativo' ? draft.photos : obs.photos}) · adicionar outra` : 'Abrir câmera'}
                   </button>
+                )}
+                {recordKind === 'ativo' && (
+                  <PhotoStrip urls={draft.photoPreviews} label="Equipamento atual" onOpen={(url, index) => setViewingPhoto({ url, label: `Equipamento atual · Foto ${index + 1}` })} />
                 )}
 
                 {recordKind === 'ativo' ? (
@@ -478,14 +481,7 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientNa
 
       {showCamera && <CameraCapture onCapture={onCapture} onClose={() => setShowCamera(false)} title="Foto do ativo" />}
 
-      {viewingPhoto && (
-        <div className="fixed inset-0 z-[98] flex flex-col bg-black" role="dialog" aria-modal="true" aria-label="Foto do equipamento salvo">
-          <div className="flex justify-end p-3">
-            <button type="button" onClick={() => setViewingPhoto(null)} className="material-symbols-outlined rounded-full bg-white/10 p-2 text-white" aria-label="Fechar foto">close</button>
-          </div>
-          <div className="min-h-0 flex-1 bg-contain bg-center bg-no-repeat" style={{ backgroundImage: `url(${viewingPhoto})` }} role="img" aria-label="Foto do equipamento" />
-        </div>
-      )}
+      {viewingPhoto && <PhotoViewer src={viewingPhoto.url} alt={viewingPhoto.label} onClose={() => setViewingPhoto(null)} />}
 
       {showPdf && (
         <LevantamentoPdfInner
@@ -544,3 +540,24 @@ const Stat: React.FC<{ label: string; value: number; tone?: 'emerald' | 'amber' 
     <p className={`font-data-mono text-xl font-bold ${tone === 'red' ? 'text-danger' : tone === 'amber' ? 'text-amber-600' : tone === 'blue' ? 'text-blue-600' : tone === 'emerald' ? 'text-emerald-600' : 'text-fg'}`}>{value}</p>
   </div>
 );
+
+const PhotoStrip: React.FC<{ urls: string[]; label: string; onOpen: (url: string, index: number) => void }> = ({ urls, label, onOpen }) => {
+  if (urls.length === 0) return null;
+  return (
+    <div className="mt-2">
+      <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-fg-muted">Fotos</p>
+      <div className="flex flex-wrap gap-2">
+        {urls.map((url, index) => (
+          <button
+            key={`${url}-${index}`}
+            type="button"
+            onClick={() => onOpen(url, index)}
+            className="h-14 w-14 shrink-0 rounded-lg border border-border bg-cover bg-center"
+            style={{ backgroundImage: `url(${url})` }}
+            aria-label={`Visualizar ${label}, foto ${index + 1}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
