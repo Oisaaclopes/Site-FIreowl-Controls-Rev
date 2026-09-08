@@ -256,6 +256,41 @@ export function resolveSdaiItemPatch(
   return undefined;
 }
 
+/**
+ * MIGRAÇÃO de respostas de rascunho LEGADO (v1) → estrutura v2 (§7). Quando um
+ * atendimento ABERTO adota o schema novo, converte as chaves planas de alarme/
+ * desabilitado em cards de repeater, PRESERVANDO os dados já preenchidos e
+ * limpando as chaves órfãs. Idempotente: se já há cards, não sobrescreve. PURO.
+ */
+export function migrateLegacySdaiAnswers(values: Record<string, unknown>): Record<string, unknown> {
+  const txt = (v: unknown) => (v === undefined || v === null ? '' : String(v));
+  const v = { ...values };
+  let changed = false;
+
+  const alarmesVazio = !Array.isArray(v.alarmes) || (v.alarmes as unknown[]).length === 0;
+  if (alarmesVazio && (v.alarme_motivo || v.alarme_laco || v.alarme_endereco || v.alarme_device_id || v.alarme_foto)) {
+    v.alarmes = [{
+      laco: txt(v.alarme_laco), endereco: txt(v.alarme_endereco), device_id: txt(v.alarme_device_id),
+      causa: txt(v.alarme_motivo), observacao: txt(v.alarme_motivo),
+      ...(v.alarme_foto ? { foto: v.alarme_foto } : {}),
+    }];
+    if (v.alarme_ativo === undefined || v.alarme_ativo === '') v.alarme_ativo = 'Sim';
+    for (const k of ['alarme_motivo', 'alarme_laco', 'alarme_endereco', 'alarme_device_id', 'alarme_foto']) delete v[k];
+    changed = true;
+  }
+
+  const desVazio = !Array.isArray(v.desabilitados) || (v.desabilitados as unknown[]).length === 0;
+  if (desVazio && (v.desabilitados_lista || v.desabilitados_qtd)) {
+    const nota = txt(v.desabilitados_lista) || (v.desabilitados_qtd ? `Quantidade informada: ${txt(v.desabilitados_qtd)}` : '');
+    v.desabilitados = [{ observacao: nota, causa: txt(v.desabilitados_lista) }];
+    if (v.dispositivos_desabilitados === undefined || v.dispositivos_desabilitados === '') v.dispositivos_desabilitados = 'Sim';
+    for (const k of ['desabilitados_qtd', 'desabilitados_lista']) delete v[k];
+    changed = true;
+  }
+
+  return changed ? v : values;
+}
+
 /** Laços reais para SEMEAR o repeater de medição (um card por laço). §17. */
 export function seedLacoCards(ctx: SdaiCentralContext): Array<{ identificacao: string }> {
   if (!ctx.central) return [];

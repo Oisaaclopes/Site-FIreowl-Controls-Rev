@@ -5,9 +5,32 @@ import {
   resolveSdaiItemPatch,
   seedLacoCards,
   deviceShortLabel,
+  migrateLegacySdaiAnswers,
   type SdaiCentralContext,
   type FieldLike,
 } from './sdaiChecklistResolver';
+
+describe('migrateLegacySdaiAnswers — rascunho v1 → v2 preservando dados (§7)', () => {
+  it('alarme plano legado vira alarmes[0] e limpa chaves órfãs', () => {
+    const out = migrateLegacySdaiAnswers({ alarme_ativo: 'Sim', alarme_motivo: 'Fumaça', alarme_laco: '1', alarme_endereco: '37', alarme_device_id: 'd2' }) as any;
+    expect(Array.isArray(out.alarmes)).toBe(true);
+    expect(out.alarmes[0]).toMatchObject({ laco: '1', endereco: '37', device_id: 'd2', causa: 'Fumaça' });
+    expect(out.alarme_motivo).toBeUndefined();
+    expect(out.alarme_laco).toBeUndefined();
+  });
+  it('desabilitado legado (qtd/textarea) vira desabilitados[0]', () => {
+    const out = migrateLegacySdaiAnswers({ dispositivos_desabilitados: 'Sim', desabilitados_qtd: 3, desabilitados_lista: 'Sirene corredor' }) as any;
+    expect(out.desabilitados[0].observacao).toContain('Sirene corredor');
+    expect(out.desabilitados_qtd).toBeUndefined();
+    expect(out.desabilitados_lista).toBeUndefined();
+  });
+  it('não sobrescreve cards já estruturados nem mexe quando não há legado', () => {
+    const jaEstruturado = { alarmes: [{ laco: '2' }] };
+    expect(migrateLegacySdaiAnswers(jaEstruturado)).toBe(jaEstruturado);
+    const semLegado = { central_energizada: 'Sim' };
+    expect(migrateLegacySdaiAnswers(semLegado)).toBe(semLegado);
+  });
+});
 
 const C1: Device = { id: 'C1', clienteId: 'A', sistema: 'SDAI', status: 'ativo', grupo: 'Central SDAI', central: 'EST-01' };
 const C2: Device = { id: 'C2', clienteId: 'A', sistema: 'SDAI', status: 'ativo', grupo: 'Central SDAI', central: 'EST-02' };

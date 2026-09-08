@@ -299,8 +299,9 @@ function buildPendencias(
 import { TriagemFotos, UnclassifiedPhoto } from '@/components/reports/TriagemFotos';
 import { buildSurveyTemplate, surveyBlockSections, SurveyMode, SURVEY_BLOCKS_KEY, SURVEY_MODE_KEY } from '@/lib/surveyMode';
 import { PREVENTIVA_SDAI_CONTRATO_CODIGO } from '@/lib/sdaiMaintenance';
-import { reportDraftKey } from '@/lib/reportDraft';
+import { reportDraftKey, pickActiveTemplate } from '@/lib/reportDraft';
 import { finalizeMaintenanceAttendance, parseSdaiChecklistResults, type SdaiChecklistCard } from '@/lib/sdaiAttendanceWiring';
+import { migrateLegacySdaiAnswers } from '@/lib/sdaiChecklistResolver';
 
 /**
  * Etapa "Central de SDAI" (2/11) — seleção canônica da central a partir da Base
@@ -440,18 +441,19 @@ export const ReportForm: React.FC<ReportFormProps> = ({
     osId: contexto?.osId,
   });
 
-  // CAMPO 2B — CONGELAMENTO no INÍCIO: se já existe rascunho com snapshot, o
-  // atendimento continua PRESO àquela definição/versão (FASE 4/11); senão,
-  // congela a versão vigente recebida. O sync/reload nunca troca de versão.
+  // CAMPO 2B — DEFINIÇÃO ativa: um atendimento ABERTO NÃO fica preso a um schema
+  // legado do rascunho. `pickActiveTemplate` adota a versão MAIS NOVA (código/DB
+  // vigente) quando ela supera a do rascunho; respostas são restauradas à parte
+  // (e migradas de v1→v2 quando preciso). Relatório FINALIZADO nem reabre aqui
+  // (o painel mostra "concluída"), então seu snapshot histórico é preservado.
   const [frozen] = useState<{ template: TemplateSchema; version: number }>(() => {
     try {
       if (typeof window !== 'undefined') {
         const raw = window.localStorage.getItem(rascunhoKey);
         if (raw) {
           const s = JSON.parse(raw) as { templateSnapshot?: TemplateSchema; templateVersion?: number };
-          if (s.templateSnapshot && Array.isArray(s.templateSnapshot.secoes)) {
-            return { template: s.templateSnapshot, version: s.templateVersion ?? s.templateSnapshot.versao ?? 1 };
-          }
+          const chosen = pickActiveTemplate<TemplateSchema>({ draftSnapshot: s.templateSnapshot, draftVersion: s.templateVersion, current: templateProp });
+          return { template: chosen.template, version: chosen.version };
         }
       }
     } catch { /* rascunho inválido: usa a versão vigente */ }
@@ -489,7 +491,14 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       const raw = window.localStorage.getItem(rascunhoKey);
       if (!raw) return;
       const saved = JSON.parse(raw) as { values?: FormValues; currentIdx?: number };
-      if (saved.values) setValues((prev) => ({ ...saved.values, ...prev }));
+      if (saved.values) {
+        // Rascunho pode ter respostas LEGADAS (v1). Ao adotar o schema atual,
+        // migra alarme/desabilitado planos → repeaters, preservando os dados.
+        const restored = template.codigo === PREVENTIVA_SDAI_CONTRATO_CODIGO
+          ? (migrateLegacySdaiAnswers(saved.values as Record<string, unknown>) as FormValues)
+          : saved.values;
+        setValues((prev) => ({ ...restored, ...prev }));
+      }
       if (typeof saved.currentIdx === 'number') setCurrentIdx(saved.currentIdx);
       setRascunhoRestaurado(true);
     } catch { /* rascunho inválido não bloqueia o atendimento */ }
