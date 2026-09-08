@@ -18,6 +18,7 @@ import { registerPhoto, getPhotoPreview, setPhotoMarkup, hasMarkup } from '@/lib
 import { MarkupCanvas } from '@/components/reports/MarkupCanvas';
 import { Combobox } from '@/components/reports/Combobox';
 import { falhasPorArea, AreaFalha, falhaLabel, findFalhaByLabel } from '@/lib/catalogoFalhas';
+import { numberedRepeaterLabel, summarizeRepeaterCard } from '@/lib/reportPresentation';
 
 // Rótulo da criticidade (bate com as opções do campo select_interno).
 const CRIT_LABEL: Record<1 | 2 | 3, string> = {
@@ -75,7 +76,7 @@ export interface FieldResolution {
   readonly?: boolean;   // valor determinístico → somente leitura
   emptyState?: string;  // sem opções na Base
   manual?: boolean;     // com emptyState: permite entrada manual (texto)
-  control?: 'binary' | 'suggest'; // binário rápido (2 opções) | input+chips de sugestão
+  control?: 'binary' | 'compact-select';
   optionSemantics?: Record<string, 'normal' | 'alert' | 'neutral'>; // cor por opção
   writeToKey?: string;  // grava em outra chave (repeater) — não em field.key
 }
@@ -217,25 +218,17 @@ const FieldControl: React.FC<{
     );
   }
 
-  // Rota A — SUGESTÕES rápidas (§5): input livre + chips que preenchem o texto.
-  // Atalho de preenchimento — NÃO é causa confirmada; "Outro" = digitar livre.
-  if (resolution?.control === 'suggest') {
+  // Seletor compacto: mantém somente a escolha atual visível e fecha ao selecionar.
+  if (resolution?.control === 'compact-select') {
     const cur = (value as string) || '';
     const opts = resolution.options || [];
+    const legacyValue = cur && !opts.some((option) => option.value === cur) ? cur : undefined;
     return (
-      <div className="flex flex-col gap-1.5">
-        {field.multilinha
-          ? <textarea rows={2} className={inputCls} value={cur} onChange={(e) => onValue(e.target.value)} />
-          : <input type="text" className={inputCls} value={cur} onChange={(e) => onValue(e.target.value)} />}
-        <div className="flex flex-wrap gap-1">
-          {opts.map((o) => (
-            <button key={o.value} type="button" disabled={disabled} onClick={() => onValue(o.value)}
-              className={`rounded-full border px-2 py-0.5 text-[11px] transition-colors ${cur === o.value ? 'border-primary bg-navy text-white' : 'border-border bg-surface text-fg-secondary hover:bg-surface-2'}`}>
-              {o.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <select className={inputCls} value={cur} disabled={disabled} onChange={(e) => onValue(e.target.value)}>
+        <option value="">Selecione o motivo</option>
+        {legacyValue && <option value={legacyValue}>{legacyValue}</option>}
+        {opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
     );
   }
 
@@ -616,18 +609,7 @@ const Repeater: React.FC<{
   // Cards RECOLHÍVEIS (§17/§18): quando o card já tem conteúdo (semeado/preenchido)
   // mostra um resumo de 1 linha e fica FECHADO; vazio/novo abre para preencher.
   const [openIdx, setOpenIdx] = useState<Set<number>>(() => new Set());
-  const summarize = (card: RepeaterCard): string => {
-    const parts: string[] = [];
-    for (const f of schema) {
-      if (['foto', 'assinatura', 'select_falha'].includes(f.tipo) || f.multilinha) continue;
-      if (['device_id', 'base_status', 'pertence_central'].includes(f.key)) continue;
-      const v = card[f.key];
-      if (v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0)) continue;
-      parts.push(String(v));
-      if (parts.length >= 4) break;
-    }
-    return parts.join(' · ');
-  };
+  const summarize = (card: RepeaterCard): string => summarizeRepeaterCard(card, schema);
   const cardOpen = (idx: number, card: RepeaterCard) => openIdx.has(idx) || !summarize(card);
   const toggleCard = (idx: number) => setOpenIdx((s) => { const n = new Set(s); n.has(idx) ? n.delete(idx) : n.add(idx); return n; });
 
@@ -642,7 +624,7 @@ const Repeater: React.FC<{
           <div className="flex items-center justify-between gap-2 px-3 py-2 cursor-pointer" onClick={() => toggleCard(idx)}>
             <div className="min-w-0 flex items-center gap-1.5">
               <span className="material-symbols-outlined text-base text-fg-muted shrink-0">{open ? 'expand_more' : 'chevron_right'}</span>
-              <span className="text-[10px] font-bold text-fg-muted uppercase tracking-wider shrink-0">{field.label} #{idx + 1}</span>
+              <span className="text-[10px] font-bold text-fg-muted uppercase tracking-wider shrink-0">{numberedRepeaterLabel(field, idx)}</span>
               {!open && summary && <span className="text-[11px] text-fg-secondary truncate">{summary}</span>}
             </div>
             <button type="button" onClick={(e) => { e.stopPropagation(); removeCard(idx); }} className="text-fg-muted hover:text-danger shrink-0" title="Remover">
@@ -851,9 +833,9 @@ const Section: React.FC<{
             // Divisor de MICROSSEÇÃO (§8/§9) quando muda a subseção (full-width).
             if (field.subsecao && field.subsecao !== lastSub) {
               out.push(
-                <div key={`sub:${field.subsecao}`} className="md:col-span-2 mt-2 first:mt-0 flex items-center gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-fg-muted">{field.subsecao}</span>
-                  <span className="h-px flex-1 bg-border" />
+                <div key={`sub:${field.subsecao}`} className="md:col-span-2 mt-1 first:mt-0 flex items-center gap-2.5 py-0.5">
+                  <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-primary/80">{field.subsecao}</span>
+                  <span className="h-px flex-1 bg-border/70" />
                 </div>
               );
               lastSub = field.subsecao;

@@ -16,6 +16,12 @@ const ACOES = [
   'limpar', 'desobstruir', 'reprogramar', 'investigar',
 ];
 
+const BINARIO_OK = { controle: 'binario', semantica_opcoes: { Sim: 'normal', Não: 'alert' } } as const;
+const BINARIO_ALERTA_SIM = { controle: 'binario', semantica_opcoes: { Não: 'normal', Sim: 'alert' } } as const;
+const CAUSAS_FALHA = ['Falha de comunicação', 'Curto-circuito no laço', 'Circuito aberto', 'Dispositivo removido', 'Endereço duplicado', 'Falha de alimentação', 'Bateria/fonte', 'Dispositivo danificado', 'Obstrução/sujeira', 'Programação/configuração', 'Cabeamento/infraestrutura', 'Outro'];
+const CAUSAS_ALARME = ['Acionamento manual', 'Detecção de fumaça', 'Detecção térmica', 'Detector linear', 'Chave de fluxo', 'Interface externa', 'Teste/manutenção', 'Alarme indevido/falso alarme', 'Causa não identificada', 'Outro'];
+const CAUSAS_DESABILITADO = ['Manutenção', 'Falha do dispositivo', 'Falha de comunicação', 'Obra/intervenção', 'Dispositivo removido', 'Programação temporária', 'Solicitação do cliente', 'Alarmes falsos recorrentes', 'Motivo não identificado', 'Outro'];
+
 const CRITICIDADE_FIELD: FieldSchema = {
   key: 'criticidade_operacional',
   tipo: 'select_interno',
@@ -718,12 +724,12 @@ export const PREVENTIVA_ALARME: TemplateSchema = {
 
 // Sim/Não que abre pendência quando "Não".
 const snPendSeNao = (key: string, label: string, grupo?: string, acao?: string): FieldSchema => ({
-  key, tipo: 'select', label, opcoes: ['Sim', 'Não'], abre_pendencia_se: ['Não'],
+  key, tipo: 'select', label, opcoes: ['Sim', 'Não'], abre_pendencia_se: ['Não'], ...BINARIO_OK,
   ...(grupo ? { pendencia_sugerida: { grupo, acao: acao as never } } : {}),
 });
 // Conforme/Não conforme que abre pendência quando "Não conforme".
 const conformePend = (key: string, label: string, grupo?: string, acao?: string): FieldSchema => ({
-  key, tipo: 'passfail', label, opcoes: ['Conforme', 'Não conforme'], abre_pendencia_se: ['Não conforme'],
+  key, tipo: 'passfail', label, opcoes: ['Conforme', 'Não conforme'], abre_pendencia_se: ['Não conforme'], controle: 'binario', semantica_opcoes: { Conforme: 'normal', 'Não conforme': 'alert' },
   ...(grupo ? { pendencia_sugerida: { grupo, acao: acao as never } } : {}),
 });
 
@@ -734,7 +740,7 @@ export const PREVENTIVA_SDAI_CONTRATO: TemplateSchema = {
   tipo: 'PREVENTIVA',
   // v2: alarme/desabilitado passam a repeaters estruturados (cascata Base Técnica),
   // microsseções do checklist e sugestões de causa. Bump publica no banco (0075).
-  versao: 2,
+  versao: 3,
   secoes: [
     // A. IDENTIFICAÇÃO
     { key: 'identificacao', titulo: 'Identificação do atendimento', campos: [
@@ -750,8 +756,8 @@ export const PREVENTIVA_SDAI_CONTRATO: TemplateSchema = {
       { ...snPendSeNao('central_energizada', 'Central energizada?', 'SDAI > Central', 'reparar'), subsecao: 'Estado da central' },
       { ...snPendSeNao('operacao_normal', 'Central em operação normal?'), subsecao: 'Estado da central' },
       { ...snPendSeNao('data_hora_ok', 'Data/hora da central corretas?', 'SDAI > Central', 'reprogramar'), subsecao: 'Estado da central' },
-      { key: 'alarme_ativo', tipo: 'select', label: 'Existe alarme de incêndio ativo?', opcoes: ['Não', 'Sim'], subsecao: 'Eventos ativos' },
-      { key: 'alarmes', tipo: 'repeater', label: 'Dispositivos em alarme', botao_adicionar: '+ Adicionar dispositivo', subsecao: 'Eventos ativos',
+      { key: 'alarme_ativo', tipo: 'select', label: 'Existe alarme de incêndio ativo?', opcoes: ['Não', 'Sim'], ...BINARIO_ALERTA_SIM, subsecao: 'Eventos ativos' },
+      { key: 'alarmes', tipo: 'repeater', label: 'Dispositivos em alarme', item_label: 'Dispositivo em alarme', botao_adicionar: '+ Adicionar dispositivo', subsecao: 'Eventos ativos',
         show_if: { field: 'alarme_ativo', operator: 'equals', value: 'Sim' },
         card_schema: [
           { key: 'pertence_central', tipo: 'select', label: 'A ocorrência pertence à própria Central?', opcoes: ['Não', 'Sim'], default: 'Não' },
@@ -761,14 +767,15 @@ export const PREVENTIVA_SDAI_CONTRATO: TemplateSchema = {
           { key: 'codigo', tipo: 'texto', label: 'Código / identificação' },
           { key: 'local', tipo: 'texto', label: 'Localização' },
           { key: 'base_status', tipo: 'texto', label: 'Vínculo com a Base Técnica' },
-          { key: 'causa', tipo: 'texto', label: 'Motivo do alarme' },
+          { key: 'causa', tipo: 'select', label: 'Motivo do alarme', opcoes: CAUSAS_ALARME, controle: 'seletor_compacto' },
+          { key: 'causa_outro', tipo: 'texto', label: 'Especifique', show_if: { field: 'causa', operator: 'equals', value: 'Outro' }, required_if: { field: 'causa', operator: 'equals', value: 'Outro' } },
           { key: 'observacao', tipo: 'texto', label: 'Observação', multilinha: true },
           { key: 'foto', tipo: 'foto', label: 'Foto', fotos: 1 },
         ],
       },
-      { key: 'falha_ativa', tipo: 'select', label: 'Existe falha ativa?', opcoes: ['Não', 'Sim'], subsecao: 'Eventos ativos' },
+      { key: 'falha_ativa', tipo: 'select', label: 'Existe falha ativa?', opcoes: ['Não', 'Sim'], ...BINARIO_ALERTA_SIM, subsecao: 'Eventos ativos' },
       { key: 'falhas_qtd', tipo: 'numero', label: 'Quantidade de falhas', subsecao: 'Eventos ativos', show_if: { field: 'falha_ativa', operator: 'equals', value: 'Sim' } },
-      { key: 'falhas', tipo: 'repeater', label: 'Falhas', botao_adicionar: '+ Adicionar falha', gera_pendencia: true, subsecao: 'Eventos ativos',
+      { key: 'falhas', tipo: 'repeater', label: 'Falhas', item_label: 'Falha', botao_adicionar: '+ Adicionar falha', gera_pendencia: true, subsecao: 'Eventos ativos',
         show_if: { field: 'falha_ativa', operator: 'equals', value: 'Sim' },
         card_schema: [
           { key: 'pertence_central', tipo: 'select', label: 'A ocorrência pertence à própria Central?', opcoes: ['Não', 'Sim'], default: 'Não' },
@@ -779,13 +786,14 @@ export const PREVENTIVA_SDAI_CONTRATO: TemplateSchema = {
           { key: 'codigo', tipo: 'texto', label: 'Código' },
           { key: 'local', tipo: 'texto', label: 'Localização' },
           { key: 'base_status', tipo: 'texto', label: 'Vínculo com a Base Técnica' },
-          { key: 'causa_provavel', tipo: 'texto', label: 'Causa provável' },
+          { key: 'causa_provavel', tipo: 'select', label: 'Causa provável', opcoes: CAUSAS_FALHA, controle: 'seletor_compacto' },
+          { key: 'causa_provavel_outro', tipo: 'texto', label: 'Especifique', show_if: { field: 'causa_provavel', operator: 'equals', value: 'Outro' }, required_if: { field: 'causa_provavel', operator: 'equals', value: 'Outro' } },
           { key: 'acao_recomendada', tipo: 'select', label: 'Ação recomendada', opcoes: ACOES },
           { key: 'foto', tipo: 'foto', label: 'Foto', fotos: 1 },
         ],
       },
-      { key: 'dispositivos_desabilitados', tipo: 'select', label: 'Existem dispositivos desabilitados?', opcoes: ['Não', 'Sim'], subsecao: 'Eventos ativos' },
-      { key: 'desabilitados', tipo: 'repeater', label: 'Dispositivos desabilitados', botao_adicionar: '+ Adicionar dispositivo', subsecao: 'Eventos ativos',
+      { key: 'dispositivos_desabilitados', tipo: 'select', label: 'Existem dispositivos desabilitados?', opcoes: ['Não', 'Sim'], ...BINARIO_ALERTA_SIM, subsecao: 'Eventos ativos' },
+      { key: 'desabilitados', tipo: 'repeater', label: 'Dispositivos desabilitados', item_label: 'Dispositivo desabilitado', botao_adicionar: '+ Adicionar dispositivo', subsecao: 'Eventos ativos',
         show_if: { field: 'dispositivos_desabilitados', operator: 'equals', value: 'Sim' },
         card_schema: [
           { key: 'pertence_central', tipo: 'select', label: 'A ocorrência pertence à própria Central?', opcoes: ['Não', 'Sim'], default: 'Não' },
@@ -795,17 +803,18 @@ export const PREVENTIVA_SDAI_CONTRATO: TemplateSchema = {
           { key: 'codigo', tipo: 'texto', label: 'Código / identificação' },
           { key: 'local', tipo: 'texto', label: 'Localização' },
           { key: 'base_status', tipo: 'texto', label: 'Vínculo com a Base Técnica' },
-          { key: 'causa', tipo: 'texto', label: 'Motivo da desabilitação' },
+          { key: 'causa', tipo: 'select', label: 'Motivo da desabilitação', opcoes: CAUSAS_DESABILITADO, controle: 'seletor_compacto' },
+          { key: 'causa_outro', tipo: 'texto', label: 'Especifique', show_if: { field: 'causa', operator: 'equals', value: 'Outro' }, required_if: { field: 'causa', operator: 'equals', value: 'Outro' } },
           { key: 'observacao', tipo: 'texto', label: 'Observação', multilinha: true },
           { key: 'foto', tipo: 'foto', label: 'Foto', fotos: 1 },
         ],
       },
-      { key: 'evento_anormal', tipo: 'select', label: 'Evento/anormalidade adicional?', opcoes: ['Não', 'Sim'], subsecao: 'Eventos ativos' },
+      { key: 'evento_anormal', tipo: 'select', label: 'Evento/anormalidade adicional?', opcoes: ['Não', 'Sim'], ...BINARIO_ALERTA_SIM, subsecao: 'Eventos ativos' },
       { key: 'evento_descricao', tipo: 'texto', label: 'Descrição do evento', multilinha: true, subsecao: 'Eventos ativos', show_if: { field: 'evento_anormal', operator: 'equals', value: 'Sim' } },
       { ...conformePend('teste_leds', 'Teste de LEDs', 'SDAI > Central', 'reparar'), subsecao: 'Testes locais' },
       { ...conformePend('teste_buzzer', 'Teste do buzzer', 'SDAI > Central', 'reparar'), subsecao: 'Testes locais' },
       { key: 'backup_programacao', tipo: 'select', label: 'Backup da programação', opcoes: ['Realizado', 'Não realizado', 'Não aplicável'], help: 'Procedimento técnico/operacional (não é requisito normativo).', subsecao: 'Procedimentos' },
-      { key: 'checklist_central_concluido', tipo: 'select', label: 'Checklist da central concluído', opcoes: ['Sim', 'Não'], default: 'Sim', help: 'Marca a conclusão do checklist mensal desta central (derivação por período).', subsecao: 'Procedimentos' },
+      { key: 'checklist_central_concluido', tipo: 'select', label: 'Checklist da central concluído', opcoes: ['Sim', 'Não'], ...BINARIO_OK, default: 'Sim', help: 'Marca a conclusão do checklist mensal desta central (derivação por período).', subsecao: 'Procedimentos' },
     ]},
     // D. INTEGRIDADE FÍSICA
     { key: 'integridade', titulo: 'Integridade física', campos: [
@@ -856,12 +865,12 @@ export const PREVENTIVA_SDAI_CONTRATO: TemplateSchema = {
     ]},
     // G/H. DISPOSITIVOS PROGRAMADOS (injetados do MaintenancePeriodPlan)
     { key: 'dispositivos', titulo: 'Dispositivos programados', descricao: 'Lista vem do plano de manutenção do período (não manual). Resultado por dispositivo atualiza o histórico do ativo.', campos: [
-      { key: 'dispositivos', tipo: 'checklist_dispositivos', label: 'Dispositivos', botao_adicionar: '+ Adicionar dispositivo fora do plano', gera_pendencia: true, card_schema: [
+      { key: 'dispositivos', tipo: 'checklist_dispositivos', label: 'Dispositivos', item_label: 'Dispositivo', botao_adicionar: '+ Adicionar dispositivo fora do plano', gera_pendencia: true, card_schema: [
         { key: 'dispositivo', tipo: 'texto', label: 'Dispositivo' },
         { key: 'resultado', tipo: 'select', label: 'Resultado do teste', opcoes: SDAI_DEVICE_RESULT_OPCOES, obrigatorio: true, abre_pendencia_se: SDAI_DEVICE_RESULT_PENDENCIA_LABELS },
         { key: 'acionou', tipo: 'select', label: 'Acionou corretamente na central?', opcoes: ['Sim', 'Não', 'N/A'], show_if: { field: 'resultado', operator: 'equals', value: 'Testado e aprovado' } },
-        { key: 'endereco_confere', tipo: 'select', label: 'Endereço confere?', opcoes: ['Sim', 'Não'] },
-        { key: 'descricao_confere', tipo: 'select', label: 'Descrição confere?', opcoes: ['Sim', 'Não'] },
+        { key: 'endereco_confere', tipo: 'select', label: 'Endereço confere?', opcoes: ['Sim', 'Não'], ...BINARIO_OK },
+        { key: 'descricao_confere', tipo: 'select', label: 'Descrição confere?', opcoes: ['Sim', 'Não'], ...BINARIO_OK },
         { key: 'led_ok', tipo: 'select', label: 'LED/indicador funcionando?', opcoes: ['Sim', 'Não', 'N/A'] },
         { key: 'integridade', tipo: 'passfail', label: 'Integridade física', opcoes: ['Conforme', 'Não conforme'], abre_pendencia_se: ['Não conforme'] },
         { key: 'obstruido', tipo: 'select', label: 'Obstruído', opcoes: ['Não', 'Sim'], abre_pendencia_se: ['Sim'] },

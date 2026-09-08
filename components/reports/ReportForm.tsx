@@ -302,6 +302,8 @@ import { PREVENTIVA_SDAI_CONTRATO_CODIGO } from '@/lib/sdaiMaintenance';
 import { reportDraftKey, pickActiveTemplate } from '@/lib/reportDraft';
 import { finalizeMaintenanceAttendance, parseSdaiChecklistResults, type SdaiChecklistCard } from '@/lib/sdaiAttendanceWiring';
 import { migrateLegacySdaiAnswers } from '@/lib/sdaiChecklistResolver';
+import { missingRepeaterPhotoMessage } from '@/lib/reportPresentation';
+import { OfficialLogo } from '@/components/OfficialLogo';
 
 /**
  * Etapa "Central de SDAI" (2/11) — seleção canônica da central a partir da Base
@@ -316,7 +318,7 @@ const CentralPicker: React.FC<{
   refazer: boolean;
   onRefazer: (v: boolean) => void;
 }> = ({ centrais, value, onSelect, refazer, onRefazer }) => {
-  const box = 'bg-surface rounded-xl border border-border shadow-sm p-5';
+  const box = 'bg-surface rounded-xl border border-border shadow-sm p-4';
   if (centrais.length === 0) {
     return (
       <div className={box}>
@@ -331,15 +333,9 @@ const CentralPicker: React.FC<{
     );
   }
   const selected = centrais.find((c) => c.id === value);
-  const Data = ({ label, value: v }: { label: string; value?: string | number }) => (
-    <div>
-      <p className="text-[10px] font-semibold uppercase text-fg-secondary">{label}</p>
-      <p className="text-[13px] font-semibold text-fg">{v !== undefined && v !== '' && v !== null ? v : 'Não informado'}</p>
-    </div>
-  );
   return (
     <div className={box}>
-      <div className="border-b border-border pb-3 mb-4">
+      <div className="border-b border-border pb-2 mb-3">
         <h3 className="text-sm font-bold text-fg uppercase tracking-wide">Central de SDAI</h3>
         <p className="text-[11px] text-fg-secondary mt-1">
           {centrais.length === 1
@@ -372,15 +368,12 @@ const CentralPicker: React.FC<{
 
       {selected ? (
         <>
-          <p className="text-[11px] font-semibold uppercase text-fg-secondary mb-2">Central verificada</p>
-          <div className="rounded-lg border border-border bg-surface-2/50 p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-fg-secondary mb-1.5">Central verificada</p>
+          <div className="rounded-lg border border-border bg-surface-2/50 px-3 py-2.5">
             <p className="text-sm font-bold text-fg">{[selected.fabricante, selected.modelo].filter(Boolean).join(' ') || selected.label}</p>
-            <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <Data label="Tipo" value={selected.tipoCentral} />
-              <Data label="Identificação" value={selected.identificador} />
-              <Data label="Localização" value={selected.localizacao} />
-              <Data label="Laços instalados" value={selected.qtdLacos} />
-            </div>
+            <p className="mt-1 text-[11px] leading-relaxed text-fg-secondary">
+              {[selected.tipoCentral, selected.identificador, selected.localizacao, selected.qtdLacos ? `${selected.qtdLacos} ${selected.qtdLacos === 1 ? 'laço' : 'laços'}` : undefined].filter(Boolean).join(' · ') || 'Detalhes técnicos não informados'}
+            </p>
           </div>
           {selected.checklistDone && (
             <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/70 p-3">
@@ -753,7 +746,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
     // para a próxima etapa sem postar a evidência, evitando perder o trabalho.
     const faltaFoto = missingPhotoInSection(currentSection);
     if (faltaFoto) {
-      setSectionErr(`Adicione a foto antes de avançar: ${faltaFoto}`);
+      setSectionErr(faltaFoto);
       return;
     }
     setSectionErr(null);
@@ -796,7 +789,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       for (let i = 0; i < cards.length; i++) {
         if (!cardStarted(schema, cards[i])) continue; // card em branco não bloqueia
         const faltando = fotoFields.find((cf) => !cardFotoOk(cards[i], cf.key));
-        if (faltando) return `${f.label || f.key} #${i + 1} — ${faltando.label || 'Foto'}`;
+        if (faltando) return missingRepeaterPhotoMessage(f, i, faltando.label || 'Foto');
       }
     }
     return null;
@@ -1197,7 +1190,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
   const progresso = visibleSections.length > 0 ? ((idx + 1) / visibleSections.length) * 100 : 0;
 
   return (
-    <div className="flex flex-col w-full min-h-[calc(100vh-64px)] relative">
+    <div className={`flex flex-col w-full min-h-[calc(100vh-64px)] relative ${isSdaiContract ? 'bg-[#0b1e38] dark:bg-[#071426]' : ''}`}>
       {/* Sucesso — overlay */}
       {finalized && savedInfo && (
         <div className="fixed inset-0 z-[70] bg-white/95 flex items-center justify-center p-6">
@@ -1227,11 +1220,12 @@ export const ReportForm: React.FC<ReportFormProps> = ({
 
       {/* Topo fixo: contexto operacional, progresso e geolocalização. bg OPACO,
           `top` = topOffset (0 em overlay próprio) — impede conteúdo por trás. */}
-      <div className="sticky z-30 bg-surface border-b border-border px-4 py-3" style={{ top: topOffset }}>
+      <div className="sticky z-30 bg-surface border-b border-border px-4 py-2.5" style={{ top: topOffset }}>
         <div className="max-w-3xl mx-auto w-full flex items-center gap-3">
         <button onClick={onBack} title="Sair" className="w-9 h-9 rounded-lg flex items-center justify-center text-fg-secondary hover:bg-surface-3 shrink-0">
           <span className="material-symbols-outlined">arrow_back</span>
         </button>
+        {isSdaiContract && <OfficialLogo className="w-7 h-7 sm:w-8 sm:h-8 shrink-0" />}
         <div className="min-w-0 flex-1">
           <p className="text-[10px] text-fg-secondary uppercase tracking-wider truncate">{cliente?.name || ''} {contexto?.osId ? '· OS vinculada' : ''}</p>
           <p className="text-sm font-bold text-fg truncate">{attendanceTitle || tituloOperacional}</p>
@@ -1300,7 +1294,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
       )}
 
       {/* Conteúdo: uma seção por vez (centralizado com max-width no desktop) */}
-      <div className="flex-1 w-full max-w-3xl mx-auto p-4 md:p-6 pb-28">
+      <div className="flex-1 w-full max-w-3xl mx-auto p-3 md:p-5 pb-28">
         {/* Seletor Pontual/Parcial/Completo: só para rascunhos LEGADOS já salvos
             nesses modos (compat.). Novas "Visitas para Orçamento" não o exibem
             — o Levantamento Técnico com modos vive no motor 3D (Base Técnica). */}
@@ -1359,7 +1353,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({
             Escolha o modo acima para iniciar. Nenhum campo do levantamento completo será exigido antes disso.
           </div>
         ) : <>
-        {currentSection?.descricao && <p className="text-[11px] text-fg-secondary mb-3">{currentSection.descricao}</p>}
+        {currentSection?.descricao && <p className={`text-[11px] mb-3 ${isSdaiContract ? 'text-slate-200' : 'text-fg-secondary'}`}>{currentSection.descricao}</p>}
         {modoCampo === 'rapido' && template.tipo === 'CORRETIVA' && currentSection && (
           <QuickCorrectiveActions sectionKey={currentSection.key} values={values} onChange={handleChange} />
         )}

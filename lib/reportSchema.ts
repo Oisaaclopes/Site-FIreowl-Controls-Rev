@@ -1,5 +1,6 @@
 import { AcaoRecomendada, ReportTipo } from './types';
 import { Condition, isFieldVisible, isFieldRequired, isSectionVisible } from './formConditions';
+import { numberedRepeaterLabel } from './reportPresentation';
 
 /* =====================================================================
  * Contrato de schema do motor de formulários (Fase 2).
@@ -60,6 +61,9 @@ export interface FieldSchema {
    *  criar novos passos de navegação. Campos da mesma microsseção devem ser
    *  contíguos. Puramente apresentacional. */
   subsecao?: string;
+  /** Apresentação declarativa; o renderer permanece agnóstico ao nome/chave. */
+  controle?: 'binario' | 'seletor_compacto';
+  semantica_opcoes?: Record<string, 'normal' | 'alert' | 'neutral'>;
 
   /* --- foto --- */
   /** foto: a quantidade/rotulagem é definida pelo template, nunca por toggle em tela. */
@@ -69,6 +73,8 @@ export interface FieldSchema {
 
   /* --- repeater --- */
   botao_adicionar?: string;
+  /** Nome singular do card: "Alarme", "Falha", "Intervenção" etc. */
+  item_label?: string;
   gera_pendencia?: boolean;
   card_schema?: FieldSchema[];
 
@@ -191,7 +197,7 @@ export function validateFinalize(
             if (!hasPhoto(field.key, i)) {
               issues.push({
                 secao: secao.titulo,
-                campo: `${field.label || field.key} #${i + 1}`,
+                campo: numberedRepeaterLabel(field, i),
                 motivo: field.gera_pendencia
                   ? 'Apontamento sem foto — foto é obrigatória para sustentar a pendência.'
                   : 'Foto obrigatória não anexada neste item.',
@@ -210,7 +216,7 @@ export function validateFinalize(
           if (reprovou && !hasPhoto(field.key, i)) {
             issues.push({
               secao: secao.titulo,
-              campo: `${(c.dispositivo as string) || (c.pendencia as string) || field.label || field.key} #${i + 1}`,
+              campo: (c.dispositivo as string) || (c.pendencia as string) || numberedRepeaterLabel(field, i),
               motivo: 'Item reprovado/não corrigido sem foto — foto é obrigatória para sustentar a evidência.',
             });
           }

@@ -117,8 +117,8 @@ describe('controle binário + semântica de cor (§2/§3/§4)', () => {
     expect(r.control).toBe('binary');
     expect(r.optionSemantics).toEqual({ Sim: 'normal', 'Não': 'alert' });
   });
-  it('gate sem abre_pendencia_se (falha_ativa): Sim=alert, Não=normal', () => {
-    const r = resolveSdaiFieldOptions(ctx, undefined, F('falha_ativa', { tipo: 'select', opcoes: ['Não', 'Sim'] }), {})!;
+  it('semântica explícita do schema vence o fallback, sem depender da field key', () => {
+    const r = resolveSdaiFieldOptions(ctx, undefined, F('qualquer_nome', { tipo: 'select', opcoes: ['Não', 'Sim'], semantica_opcoes: { 'Não': 'normal', Sim: 'alert' } }), {})!;
     expect(r.optionSemantics).toEqual({ 'Não': 'normal', Sim: 'alert' });
   });
   it('passfail Conforme/Não conforme: Conforme=normal, Não conforme=alert', () => {
@@ -134,10 +134,10 @@ describe('controle binário + semântica de cor (§2/§3/§4)', () => {
   });
 });
 
-describe('causas/motivos sugeridos + alarme/desabilitado com cascata (§3/§4/§5)', () => {
-  it('falha: causa_provavel vira control suggest com lista de falha', () => {
-    const r = resolveSdaiFieldOptions(ctx, 'falhas', F('causa_provavel', { tipo: 'texto' }), {})!;
-    expect(r.control).toBe('suggest');
+describe('causas/motivos compactos + alarme/desabilitado com cascata (§3/§4/§5)', () => {
+  it('campo declarado vira seletor compacto e preserva as opções do schema', () => {
+    const r = resolveSdaiFieldOptions(ctx, 'falhas', F('causa_provavel', { tipo: 'select', controle: 'seletor_compacto', opcoes: ['Falha de comunicação', 'Outro'] }), {})!;
+    expect(r.control).toBe('compact-select');
     expect(r.options?.map((o) => o.value)).toContain('Falha de comunicação');
     expect(r.options?.map((o) => o.value)).toContain('Outro');
   });
@@ -145,14 +145,15 @@ describe('causas/motivos sugeridos + alarme/desabilitado com cascata (§3/§4/§
     expect(resolveSdaiFieldOptions(ctx, 'alarmes', F('laco'), {})!.autoValue).toBe('1');
     expect(resolveSdaiFieldOptions(ctx, 'alarmes', F('endereco'), { laco: '1' })!.options?.map((o) => o.value)).toContain('2');
     expect(resolveSdaiFieldOptions(ctx, 'alarmes', F('device_id'), { laco: '1', endereco: '2' })!.autoValue).toBe('d2');
-    const causa = resolveSdaiFieldOptions(ctx, 'alarmes', F('causa', { tipo: 'texto' }), {})!;
-    expect(causa.control).toBe('suggest');
+    const causa = resolveSdaiFieldOptions(ctx, 'alarmes', F('causa', { tipo: 'select', controle: 'seletor_compacto', opcoes: ['Acionamento manual', 'Outro'] }), {})!;
+    expect(causa.control).toBe('compact-select');
     expect(causa.options?.map((o) => o.value)).toContain('Acionamento manual');
   });
   it('desabilitado: cascata + causa de desabilitação', () => {
     expect(resolveSdaiFieldOptions(ctx, 'desabilitados', F('device_id'), { laco: '1', endereco: '2' })!.autoValue).toBe('d2');
-    const causa = resolveSdaiFieldOptions(ctx, 'desabilitados', F('causa', { tipo: 'texto' }), {})!;
+    const causa = resolveSdaiFieldOptions(ctx, 'desabilitados', F('causa', { tipo: 'select', controle: 'seletor_compacto', opcoes: ['Manutenção', 'Alarmes falsos recorrentes', 'Outro'] }), {})!;
     expect(causa.options?.map((o) => o.value)).toContain('Manutenção');
+    expect(causa.options?.map((o) => o.value)).toContain('Alarmes falsos recorrentes');
   });
 });
 

@@ -22,6 +22,8 @@ export interface FieldLike {
   tipo?: string;
   opcoes?: string[];
   abre_pendencia_se?: string[];
+  controle?: 'binario' | 'seletor_compacto';
+  semantica_opcoes?: Record<string, OptionSemantic>;
 }
 
 /** Opção genérica de select (consumida pelo FormEngine sem saber o significado). */
@@ -42,8 +44,8 @@ export interface ResolvedField {
   emptyState?: string;
   /** com emptyState: permite entrada manual (texto). */
   manual?: boolean;
-  /** binary = Sim/Não; suggest = input livre + chips de sugestão (§5). */
-  control?: 'binary' | 'suggest';
+  /** Controles compactos governados pela metadata do schema. */
+  control?: 'binary' | 'compact-select';
   /** Cor semântica por opção (verde=normal, laranja=alert, neutro=neutral). */
   optionSemantics?: Record<string, OptionSemantic>;
   /** Grava o valor em OUTRA chave do card (ex.: perfil, sem tocar device_id §13). */
@@ -52,29 +54,19 @@ export interface ResolvedField {
 
 /* --------------------------- Semântica binária (§2/§3/§4) ------------------ */
 
-// Gates onde "Sim" é a ANORMALIDADE (não têm abre_pendencia_se — a pendência vem
-// do detalhe). Override MÍNIMO de domínio; o motor continua genérico.
-const ALERT_WHEN_SIM = new Set(['alarme_ativo', 'falha_ativa', 'evento_anormal']);
-
 /** Deriva a semântica das opções a partir de metadata EXISTENTE (abre_pendencia_se)
- *  + override dos gates. Sem metadata → neutro (binário rápido, sem cor). */
+ *  e semântica explícita. Nunca conhece a key ou o texto da pergunta. */
 function binarySemantics(field: FieldLike): ResolvedField | undefined {
   const opts = field.opcoes || (field.tipo === 'passfail' ? ['Aprovado', 'Reprovado'] : []);
-  if (opts.length !== 2) return undefined;
+  if (opts.length !== 2 || field.controle === 'seletor_compacto') return undefined;
+  if (field.semantica_opcoes) return { control: 'binary', optionSemantics: { ...field.semantica_opcoes } };
   const alert = new Set<string>(field.abre_pendencia_se && field.abre_pendencia_se.length ? field.abre_pendencia_se : []);
-  if (alert.size === 0 && ALERT_WHEN_SIM.has(field.key)) alert.add('Sim');
   const optionSemantics: Record<string, OptionSemantic> = {};
   for (const o of opts) optionSemantics[o] = alert.has(o) ? 'alert' : (alert.size > 0 ? 'normal' : 'neutral');
   return { control: 'binary', optionSemantics };
 }
 
 /* --------------------------- Causas/motivos sugeridos (§5) ----------------- */
-// Atalhos de preenchimento — NUNCA causa confirmada. Sempre há "Outro" (texto livre).
-const CAUSAS_FALHA = ['Falha de comunicação', 'Curto-circuito no laço', 'Circuito aberto', 'Dispositivo removido', 'Endereço duplicado', 'Falha de alimentação', 'Bateria/fonte', 'Dispositivo danificado', 'Obstrução/sujeira', 'Programação/configuração', 'Cabeamento/infraestrutura', 'Outro'];
-const CAUSAS_ALARME = ['Acionamento manual', 'Detecção de fumaça', 'Detecção térmica', 'Detector linear', 'Chave de fluxo', 'Interface externa', 'Teste/manutenção', 'Alarme indevido/falso alarme', 'Causa não identificada', 'Outro'];
-const CAUSAS_DESABILITADO = ['Manutenção', 'Falha do dispositivo', 'Falha de comunicação', 'Obra/intervenção', 'Dispositivo removido', 'Programação temporária', 'Solicitação do cliente', 'Motivo não identificado', 'Outro'];
-const suggest = (opts: string[]): ResolvedField => ({ control: 'suggest', options: opts.map((o) => ({ value: o, label: o })) });
-
 /** Chaves de repeater/campo governadas pela cascata SDAI (mapeamento fica AQUI). */
 export const SDAI_REPEATER_FALHAS = 'falhas';
 export const SDAI_REPEATER_DISPOSITIVOS = 'dispositivos';
@@ -186,12 +178,6 @@ export function resolveSdaiFieldOptions(
     if (fieldKey === FALHA_LOOP_KEY) return resolveFalhaLoopField(ctx);
     if (fieldKey === FALHA_ADDR_KEY) return resolveFalhaAddressField(ctx, item?.[FALHA_LOOP_KEY] as string);
     if (fieldKey === FALHA_DEVICE_KEY) return resolveFalhaDeviceField(ctx, item?.[FALHA_LOOP_KEY] as string, item?.[FALHA_ADDR_KEY] as string);
-    // Causa/motivo com sugestões por tipo de ocorrência (§5).
-    if (fieldKey === 'causa_provavel' || fieldKey === 'causa') {
-      if (repeaterKey === SDAI_REPEATER_FALHAS) return suggest(CAUSAS_FALHA);
-      if (repeaterKey === SDAI_REPEATER_ALARMES) return suggest(CAUSAS_ALARME);
-      if (repeaterKey === SDAI_REPEATER_DESABILITADOS) return suggest(CAUSAS_DESABILITADO);
-    }
   }
   // Dispositivo programado: cabeçalho READONLY quando veio do plano (device_id). §7
   if (repeaterKey === SDAI_REPEATER_DISPOSITIVOS && fieldKey === 'dispositivo' && item?.device_id) {
@@ -199,8 +185,11 @@ export function resolveSdaiFieldOptions(
   }
   if (repeaterKey === SDAI_REPEATER_BATERIAS && fieldKey === BATERIA_DEVICE_KEY) return resolveBatteryDeviceField(ctx);
   if (repeaterKey === SDAI_REPEATER_LACOS && fieldKey === LACO_ID_KEY) return resolveLacoIdField(ctx);
-  // Fallback GENÉRICO (todo o template contratual): campos de 2 opções viram
-  // controle binário com cor semântica derivada da metadata (§2/§3).
+  if (field.controle === 'seletor_compacto') {
+    return { control: 'compact-select', options: toOptions(field.opcoes || []) };
+  }
+  // Fallback genérico: todo campo com exatamente duas opções vira toggle; a
+  // semântica vem exclusivamente da metadata, nunca da key/label.
   return binarySemantics(field);
 }
 
