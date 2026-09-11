@@ -34,6 +34,8 @@ import { OS_STATUS_ATIVOS } from '@/lib/ordensServico';
 import { fetchPendencias } from '@/lib/pendencias';
 import { isSupabaseConfigured } from '@/lib/inventory';
 import { fetchClientEvents, insertClientEvent } from '@/lib/clientEvents';
+import { useNavigationEntity } from '@/components/NavigationSession';
+import { fetchClientById } from '@/lib/clients';
 import { ClientDossie } from '@/components/clients/ClientDossie';
 
 interface CrmViewProps {
@@ -131,38 +133,9 @@ export const CrmView: React.FC<CrmViewProps> = ({
   const [filterSegment, setFilterSegment] = useState('');
   const [clientLogoUrls, setClientLogoUrls] = useState<Record<string, string>>({});
   const [showAddClientModal, setShowAddClientModal] = useState(false);
-  const [selectedClientDetail, setSelectedClientDetail] = useState<Client | null>(null);
-
-  // Dossiê do cliente (Client 360) em página cheia. A seleção é refletida na URL
-  // (?cliente=<id>) para que o dossiê seja compartilhável e sobreviva a reload —
-  // sem rota dinâmica de arquivo (incompatível com output:'export').
-  const openClientDossie = React.useCallback((client: Client) => {
-    setSelectedClientDetail(client);
-    if (typeof window !== 'undefined') {
-      const url = new URL(window.location.href);
-      url.searchParams.set('cliente', client.id);
-      window.history.replaceState(window.history.state, '', url.toString());
-    }
-  }, []);
-  const closeClientDossie = React.useCallback(() => {
-    setSelectedClientDetail(null);
-    if (typeof window !== 'undefined') {
-      const url = new URL(window.location.href);
-      url.searchParams.delete('cliente');
-      window.history.replaceState(window.history.state, '', url.toString());
-    }
-  }, []);
-  // Restaura o dossiê a partir de ?cliente=<id> quando os clientes estão prontos.
-  const dossieRestored = React.useRef(false);
-  useEffect(() => {
-    if (dossieRestored.current || clients.length === 0 || typeof window === 'undefined') return;
-    const id = new URLSearchParams(window.location.search).get('cliente');
-    if (id) {
-      const found = clients.find((c) => c.id === id);
-      if (found) setSelectedClientDetail(found);
-    }
-    dossieRestored.current = true;
-  }, [clients]);
+  const [selectedClientDetail, setSelectedClientDetail] = useNavigationEntity<Client>('cliente', fetchClientById, ['aba', 'area', 'levantamento', 'etapa', 'equipamento', 'rascunho', 'sessaoFoto']);
+  const openClientDossie = (client: Client) => setSelectedClientDetail(client);
+  const closeClientDossie = () => setSelectedClientDetail(null);
 
   // Formulário de novo cliente (cadastro completo)
   const [nTipoPessoa, setNTipoPessoa] = useState<'PJ' | 'PF'>('PJ');

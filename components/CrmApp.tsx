@@ -1,6 +1,8 @@
 'use client';
 import { showToast } from '@/components/ui/Feedback';
 
+import { NavigationSession, clearNavigationSession } from '@/components/NavigationSession';
+import { AttendanceNavigationRestore } from '@/components/AttendanceNavigationRestore';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { BottomNav } from '@/components/BottomNav';
@@ -119,7 +121,11 @@ interface CrmAppProps {
   onLogout?: () => void;
 }
 
-export function CrmApp({
+export function CrmApp(props: CrmAppProps) {
+  return <NavigationSession key={props.userId} userId={props.userId}><CrmAppContent {...props} /></NavigationSession>;
+}
+
+function CrmAppContent({
   initialRole = 'ADMINISTRATIVO',
   userId,
   userName = 'Operador Fireowl',
@@ -130,16 +136,17 @@ export function CrmApp({
   initialTab,
   onLogout,
 }: CrmAppProps) {
-  const [currentTab, setCurrentTab] = useState<TabPath>(() =>
-    initialTab && isTabAllowed(initialRole, initialTab) ? initialTab : allowedTabs(initialRole)[0]
-  );
+  const [currentTab, setCurrentTab] = useState<TabPath>(() => {
+    const fromUrl = typeof window !== 'undefined' ? window.location.pathname.split('/').filter(Boolean)[1] as TabPath : initialTab;
+    return fromUrl && isTabAllowed(initialRole, fromUrl) ? fromUrl : allowedTabs(initialRole)[0];
+  });
   const [userRole, setUserRole] = useState<UserRole>(initialRole);
 
   // Home Mobile (Fase 4.1): no mobile, entrada por raiz/pouso abre o Menu Rápido;
   // deep link para um módulo específico vai direto ao destino (§32/§33).
   const isMobile = useIsMobile();
   const [mobileHome, setMobileHome] = useState<boolean>(() =>
-    isHomeEligibleEntry(initialTab, allowedTabs(initialRole)[0])
+    isHomeEligibleEntry(initialTab, allowedTabs(initialRole)[0]) && !(typeof window !== 'undefined' && window.location.search)
   );
   // Qualquer navegação para um módulo sai da Home; tocar "Início" volta a ela.
   const firstTabRun = React.useRef(true);
@@ -185,10 +192,11 @@ export function CrmApp({
     }
     const path = `/funcionarios/${currentTab}/`;
     if (window.location.pathname !== path) {
-      if (firstUrlSync.current) window.history.replaceState({ tab: currentTab }, '', path);
-      else window.history.pushState({ tab: currentTab }, '', path);
+      if (firstUrlSync.current) window.history.replaceState({ ...window.history.state, tab: currentTab }, '', path + (firstUrlSync.current ? window.location.search : ''));
+      else window.history.pushState({ ...window.history.state, tab: currentTab }, '', path + (firstUrlSync.current ? window.location.search : ''));
     }
     firstUrlSync.current = false;
+    window.dispatchEvent(new Event('fireowl-navigation'));
   }, [currentTab]);
 
   useEffect(() => {
@@ -197,13 +205,13 @@ export function CrmApp({
       const seg = window.location.pathname.split('/').filter(Boolean); // ['funcionarios','<aba>']
       const tab = seg[1] as TabPath | undefined;
       if (tab && isTabAllowed(userRole, tab)) {
-        skipUrlSync.current = true;
+        if (tab !== currentTab) skipUrlSync.current = true;
         setCurrentTab(tab);
       }
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
-  }, [userRole]);
+  }, [userRole, currentTab]);
 
   // System State Data
   const [clients, setClients] = useState<Client[]>(isSupabaseConfigured() ? [] : INITIAL_CLIENTS);
@@ -1175,6 +1183,7 @@ export function CrmApp({
 
   return (
     <PrivacyProvider>
+    <AttendanceNavigationRestore userId={userId} userName={userName} clients={clients} />
     <div className="min-h-screen bg-bg font-body-md text-fg">
       {/* Sidebar Navigation (off-canvas no mobile, fixa no desktop) */}
       <Sidebar
@@ -1205,7 +1214,7 @@ export function CrmApp({
           onOpenPedidos={() => setCurrentTab('pedidos')}
           onOpenPonto={() => setCurrentTab('ponto')}
           onOpenConfig={() => setCurrentTab('conta')}
-          onLogout={onLogout}
+          onLogout={() => { clearNavigationSession(); onLogout?.(); }}
         />
 
         {/* View Switcher — padding inferior no mobile p/ o BottomNav (todos os perfis) */}

@@ -1,4 +1,5 @@
 'use client';
+import { useNavigation } from '@/components/NavigationSession';
 import React, { useEffect, useState } from 'react';
 import type { Client, Device, OrdemServico, ReportInstance, ServiceAttendance, UserRole } from '@/lib/types';
 import type { TemplateSchema } from '@/lib/reportSchema';
@@ -81,7 +82,9 @@ export const SdaiMaintenancePanel: React.FC<{
 }> = ({ enabled, attendance, os, clients, userRole = 'TECNICO', technicianName, onSaved, onExit, onModeChange }) => {
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'na' | 'error'>('idle');
   const [ctx, setCtx] = useState<ResolvedCtx | null>(null);
-  const [open, setOpen] = useState(false);
+  const { state: navigation, update: navigate } = useNavigation();
+  const open = navigation.atendimentoEtapa === 'sdai';
+  const setOpen = (value: boolean) => navigate({ atendimentoEtapa: value ? 'sdai' : 'execucao' });
   const [err, setErr] = useState<string | null>(null);
   // reloadKey força re-resolução (retry §8 / após salvar) SEM depender de `status`
   // nas deps do efeito — depender de status causava o loop que travava em loading:

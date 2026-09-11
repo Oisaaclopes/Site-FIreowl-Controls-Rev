@@ -1,4 +1,7 @@
 'use client';
+import { useNavigationScroll } from '@/lib/useNavigationScroll';
+import { useNavigation } from '@/components/NavigationSession';
+import { restoreSurveyNavigation } from '@/lib/surveyNavigation';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Device, UserRole, AssetConditionValue, TechnicalSurvey } from '@/lib/types';
 import {
@@ -61,7 +64,11 @@ interface Draft {
 const emptyDraft = (): Draft => ({ assetId: newAssetId(), grupo: '', vals: emptyAssetValues(), photos: 0, photoPreviews: [] });
 
 export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientName, existingDevices, userRole, currentUserId, catalog = [], onClose, onChanged }) => {
-  const [phase, setPhase] = useState<'config' | 'capture' | 'finish'>('config');
+  const { state: navigation, update: navigate } = useNavigation();
+  const [restoring, setRestoring] = useState(!!navigation.levantamento);
+  const [phase, setPhaseState] = useState<'config' | 'capture' | 'finish'>('config');
+  const setPhase = (value: 'config' | 'capture' | 'finish') => { setPhaseState(value); navigate({ etapa: value }); };
+  const scrollRef = useNavigationScroll('survey:' + navigation.levantamento, !restoring);
   const [mode, setMode] = useState<SurveyMode>('PONTUAL');
   const [scopeText, setScopeText] = useState('');
   const [expectedCount, setExpectedCount] = useState('');
@@ -75,9 +82,9 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientNa
   // Ativos "conhecidos": base da área + os criados nesta visita.
   const [createdThisVisit, setCreatedThisVisit] = useState<Device[]>([]);
   const [records, setRecords] = useState<ReconRecord[]>([]);      // reconciliação (COMPLETO)
-  const knownPool = useMemo(() => [...baseInArea, ...createdThisVisit], [baseInArea, createdThisVisit]);
+  const knownPool = useMemo(() => [...new Map([...baseInArea, ...createdThisVisit].map((d) => [d.id, d])).values()], [baseInArea, createdThisVisit]);
 
-  const [draft, setDraft] = useState<Draft>(emptyDraft());
+  const [draft, setDraft] = useState<Draft>(() => ({ ...emptyDraft(), ...(navigation.rascunho ? { assetId: navigation.rascunho } : {}) }));
   const [savedPhotoPreviews, setSavedPhotoPreviews] = useState<Record<string, string[]>>({});
   const [editingCreatedId, setEditingCreatedId] = useState<string | null>(null);
   const [viewingPhoto, setViewingPhoto] = useState<{ url: string; label: string } | null>(null);
@@ -95,6 +102,50 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientNa
     localPreviewUrlsRef.current.clear();
   }, []);
 
+  useEffect(() => {
+    const id = navigation.levantamento;
+    if (!id || survey?.id === id) return;
+    let alive = true;
+    setRestoring(true);
+    restoreSurveyNavigation({ id, clientId: clienteId, area, owner: currentUserId || getOutboxOwner() || '', sessionId: navigation.sessaoFoto }).then((saved) => {
+      if (!alive) { saved?.localUrls.forEach((url) => URL.revokeObjectURL(url)); return; }
+      if (!saved) throw new Error('unavailable');
+      setSurvey(saved.survey);
+      setMode(saved.survey.mode);
+      setScopeText(String(saved.survey.scope?.descricao || ''));
+      setExpectedCount(saved.survey.expectedCount === undefined ? '' : String(saved.survey.expectedCount));
+      setCreatedThisVisit(saved.devices.filter((d) => d.sourceSurveyId === id));
+      setRecords(saved.verifications.filter((v) => v.reconciliation).map((v) => ({ deviceId: v.deviceId, reconciliation: v.reconciliation as ReconStatus })));
+      setSession(saved.session);
+      setSavedPhotoPreviews(saved.previews);
+      saved.localUrls.forEach((url) => localPreviewUrlsRef.current.add(url));
+      const device = saved.devices.find((d) => d.id === navigation.rascunho);
+      const previews = saved.previews[navigation.rascunho || ''] || [];
+      if (device) {
+        setEditingCreatedId(device.id);
+        setDraft({ assetId: device.id, grupo: device.grupo || '', vals: deviceToAssetValues(device), photos: previews.length, photoPreviews: previews });
+      } else {
+        setDraft((d) => ({ ...d, photos: previews.length, photoPreviews: previews }));
+        if (navigation.rascunho) showToast('Contexto e fotos recuperados. Campos que ainda não foram salvos precisam ser preenchidos novamente.');
+      }
+      setPhaseState(navigation.etapa === 'finish' ? 'finish' : 'capture');
+      setRestoring(false);
+    }).catch(() => {
+      if (!alive) return;
+      showToast('Levantamento encerrado, indisponível ou sem acesso. Retornamos à Base Técnica.');
+      navigate({ levantamento: null, etapa: null, rascunho: null, sessaoFoto: null });
+      onClose();
+    });
+    return () => { alive = false; };
+    // Only a different survey identity should reload canonical data.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigation.levantamento]);
+
+  useEffect(() => {
+    if (restoring || !survey) return;
+    navigate({ rascunho: draft.assetId, sessaoFoto: session?.id || null });
+  }, [draft.assetId, session?.id, restoring, survey, navigate]);
+
   const start = async () => {
     if (!isSupabaseConfigured()) { showToast('Supabase não configurado.'); return; }
     try {
@@ -105,6 +156,7 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientNa
         expectedCount: exp, verifiedCount: 0,
       });
       setSurvey(s);
+      navigate({ levantamento: s.id, etapa: 'capture' });
       // Sessão de fotos do levantamento (best-effort; sem técnico, segue sem foto).
       const techId = currentUserId || getOutboxOwner();
       if (techId) {
@@ -279,6 +331,8 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientNa
     onClose();
   };
 
+  if (restoring) return <div role="status" className="fixed inset-0 z-50 bg-surface p-6">Restaurando levantamento…</div>;
+
   /* ------------------------- Render ------------------------- */
   return (
     <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/50 sm:items-center sm:p-4">
@@ -291,7 +345,7 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientNa
           <button type="button" onClick={onClose} className="material-symbols-outlined text-fg-muted hover:text-fg" aria-label="Sair do levantamento">close</button>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4">
           {phase === 'config' && (
             <div className="flex flex-col gap-4">
               <Field label="Modo do levantamento">

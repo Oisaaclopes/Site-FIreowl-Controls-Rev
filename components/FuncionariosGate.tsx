@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { clearNavigationSession } from '@/components/NavigationSession';
 import { CrmApp } from '@/components/CrmApp';
 import { OfficialLogo } from '@/components/OfficialLogo';
 import { signIn, signOut, getSessionUser, onSessionLost, authErrorMessage, AuthUser } from '@/lib/auth';
@@ -45,7 +46,7 @@ export function FuncionariosGate({ initialTab }: { initialTab?: TabPath }) {
   // tela anterior acessível (§6). Também cobre logout em outra aba.
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
-    return onSessionLost(() => setAuthUser(null));
+    return onSessionLost(() => { clearNavigationSession(); setAuthUser(null); });
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {

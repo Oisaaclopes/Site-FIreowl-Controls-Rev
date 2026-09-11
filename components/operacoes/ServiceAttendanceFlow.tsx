@@ -1,5 +1,7 @@
 'use client';
 
+import { useNavigationScroll } from '@/lib/useNavigationScroll';
+import { useNavigation } from '@/components/NavigationSession';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AttendanceResult, Client, OrdemServico, ServiceAttendance, TimePunch } from '@/lib/types';
 import {
@@ -512,6 +514,15 @@ export const AttendanceScreen: React.FC<{
   technicianName?: string;
   onClose: () => void;
 }> = ({ attendance, os: osProp, clients, technicianId, technicianName = '', onClose }) => {
+  const { state: navigation, update: navigate } = useNavigation();
+  const scrollRef = useNavigationScroll('attendance:' + attendance.id);
+  useEffect(() => { navigate({ atendimento: attendance.id }); }, [attendance.id, navigate]);
+  useEffect(() => {
+    const onPop = () => { if (new URLSearchParams(window.location.search).get('atendimento') !== attendance.id) onClose(); };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [attendance.id, onClose]);
+  const closeNavigation = useCallback(() => { navigate({ atendimento: null, atendimentoEtapa: null }); onClose(); }, [navigate, onClose]);
   const toast = useToast();
   const confirm = useConfirm();
   // A tela é AUTOSSUFICIENTE (§1 do QA): resolve a OS e o cliente por conta
@@ -530,8 +541,10 @@ export const AttendanceScreen: React.FC<{
   const [result, setResult] = useState<AttendanceResult | undefined>(attendance.result);
   const [saving, setSaving] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [finishing, setFinishing] = useState(false);
-  const [signOpen, setSignOpen] = useState(false);         // etapa de assinatura antes de finalizar
-  const [baseUpdateOpen, setBaseUpdateOpen] = useState(false); // 3D.4 — atualização da Base antes da assinatura
+  const [signOpen, setSignOpenState] = useState(navigation.atendimentoEtapa === 'assinatura' && !!attendance.result);
+  const setSignOpen = useCallback((open: boolean) => { setSignOpenState(open); navigate({ atendimentoEtapa: open ? 'assinatura' : 'execucao' }); }, [navigate]);
+  const [baseUpdateOpen, setBaseUpdateOpenState] = useState(navigation.atendimentoEtapa === 'base' && !!attendance.result);
+  const setBaseUpdateOpen = useCallback((open: boolean) => { setBaseUpdateOpenState(open); navigate({ atendimentoEtapa: open ? 'base' : 'execucao' }); }, [navigate]);
   const [finalized, setFinalized] = useState(false);        // pós-finalização (baixar docs)
   const [docKind, setDocKind] = useState<OsDocKind | null>(null);
   const [company, setCompany] = useState<CompanyProfile | null>(null);
@@ -647,8 +660,8 @@ export const AttendanceScreen: React.FC<{
 
   const handleClose = useCallback(async () => {
     await flushSave();
-    onClose();
-  }, [flushSave, onClose]);
+    closeNavigation();
+  }, [flushSave, closeNavigation]);
 
   // PAUSAR (§5/§11): preserva o que foi preenchido (flushSave), registra o evento
   // e libera o técnico. Fecha a tela; Meus Atendimentos reflete via realtime.
@@ -662,13 +675,13 @@ export const AttendanceScreen: React.FC<{
       setAttStatus('PAUSADO');
       toast.success('Atendimento pausado. Você está liberado para iniciar outro.');
       setPauseOpen(false);
-      onClose();
+      closeNavigation();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Não foi possível pausar o atendimento.');
     } finally {
       setPausing(false);
     }
-  }, [attendance.id, flushSave, onClose, pausing, toast]);
+  }, [attendance.id, flushSave, closeNavigation, pausing, toast]);
 
   // §28/§29/§55 — a assinatura acontece DEPOIS do resultado e antes do fecho.
   // Aqui só validamos e abrimos a etapa de assinatura; o fecho real é runFinalize.
@@ -691,7 +704,7 @@ export const AttendanceScreen: React.FC<{
     // (§10). O passo se auto-encerra quando não há equipamento a decidir (§41).
     // Sem cliente resolvido, segue direto para a assinatura (fluxo preservado).
     if (os?.clienteId) setBaseUpdateOpen(true); else setSignOpen(true);
-  }, [blockers, confirm, diagnosis, execution, finishing, result, toast, os]);
+  }, [blockers, confirm, diagnosis, execution, finishing, result, toast, os, setBaseUpdateOpen, setSignOpen]);
 
   // Persiste a assinatura (ou a exceção) e finaliza o atendimento. Ao final,
   // mantém a tela em modo pós-finalização (baixar OS/Relatório).
@@ -722,7 +735,7 @@ export const AttendanceScreen: React.FC<{
       toast.error((e as Error)?.message || 'Não foi possível finalizar o atendimento.');
       setFinishing(false);
     }
-  }, [attendance.id, confirm, diagnosis, execution, finishing, os, result, toast]);
+  }, [attendance.id, confirm, diagnosis, execution, finishing, os, result, toast, setSignOpen]);
 
   return (
     <div className="fixed inset-0 z-[80] bg-slate-900/60 backdrop-blur-sm flex items-stretch sm:items-center justify-center sm:p-4">
@@ -748,7 +761,7 @@ export const AttendanceScreen: React.FC<{
           </p>
         </div>
 
-        <div className="overflow-y-auto p-4 sm:p-5 flex flex-col gap-4">
+        <div data-attendance-id={attendance.id} ref={scrollRef} className="overflow-y-auto p-4 sm:p-5 flex flex-col gap-4">
           {/* Manutenção Preventiva SDAI (contratual) — entrada canônica. Self-gate
               adicional em contrato/cliente dentro do painel. Só SDAI. */}
           <SdaiMaintenancePanel
@@ -938,7 +951,7 @@ export const AttendanceScreen: React.FC<{
             <div className="mt-4 flex flex-col gap-2">
               <button onClick={() => setDocKind('os')} className="min-h-[48px] rounded-lg bg-primary hover:bg-primary-hover text-white text-sm font-bold uppercase tracking-wide flex items-center justify-center gap-2"><span className="material-symbols-outlined text-lg">description</span>Baixar Ordem de Serviço</button>
               <button onClick={() => setDocKind('relatorio')} className="min-h-[48px] rounded-lg border border-border text-fg-secondary text-sm font-bold uppercase tracking-wide flex items-center justify-center gap-2 hover:border-border-strong"><span className="material-symbols-outlined text-lg">article</span>Baixar Relatório Técnico</button>
-              <button onClick={onClose} className="min-h-[44px] rounded-lg text-fg-muted text-xs font-bold uppercase">Voltar</button>
+              <button onClick={closeNavigation} className="min-h-[44px] rounded-lg text-fg-muted text-xs font-bold uppercase">Voltar</button>
             </div>
           </div>
         </div>

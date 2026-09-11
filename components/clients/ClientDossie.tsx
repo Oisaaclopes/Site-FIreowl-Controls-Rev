@@ -1,4 +1,5 @@
 'use client';
+import { useNavigationValue } from '@/components/NavigationSession';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Client,
@@ -202,7 +203,7 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
     setAttendanceView({ attendance: info.attendance, os });
   };
   const brlM = (n: number) => maskMoney(brl(n));
-  const [tab, setTab] = useState<DossieTab>('overview');
+  const [tab, setTab] = useNavigationValue<DossieTab>('aba', 'overview', ['overview', 'os', 'pedidos', 'relatorios', 'pendencias', 'fotos', 'base_tecnica', 'contratos', 'historico'], true);
 
   // ------- Dados vindos das props (já em memória, sem nova query) -------
   const clientContracts = useMemo(
@@ -301,6 +302,8 @@ export const ClientDossie: React.FC<ClientDossieProps> = ({
     }).catch(() => {});
     return () => { alive = false; };
   }, [photos]);
+
+  useEffect(() => { if (tab === 'fotos') loadPhotos(); }, [tab, loadPhotos]);
 
   const goTab = (t: DossieTab) => {
     setTab(t);

@@ -1,6 +1,8 @@
 'use client';
 import { showToast, requestConfirm, requestText } from '@/components/ui/Feedback';
 
+import { useNavigationScroll } from '@/lib/useNavigationScroll';
+import { useNavigation } from '@/components/NavigationSession';
 import React, { useState, useMemo } from 'react';
 import {
   Pedido,
@@ -282,17 +284,18 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   // registro `proposal` anterior; nesse caso os textos-padrão são copiados para
   // os campos editáveis (visíveis antes do PDF). Propostas históricas mostram o
   // texto padrão para leitura, mas só o gravam após ação do usuário (textosTouched).
+  const scrollRef = useNavigationScroll('pedido:' + initialPedido?.id, isOpen && !!initialPedido);
   const initialProposal = initialPedido?.proposal;
   const ehNovaProposta = !initialProposal;
   const jaMaterializada = !!initialProposal?.textosMaterializados;
 
   // Sanfonas abertas (por padrão as principais abertas).
-  const [open, setOpen] = useState<Record<string, boolean>>({
-    materiais: true,
-    servicos: true,
-    garantia: true,
-    basicas: true,
-  });
+  const { state: navigation, update: navigate } = useNavigation();
+  const open: Record<string, boolean> = navigation.secoes ? Object.fromEntries(navigation.secoes.split(',').map((key) => [key, true])) : { materiais: true, servicos: true, garantia: true, basicas: true };
+  const setOpen = (action: (previous: Record<string, boolean>) => Record<string, boolean>) => {
+    const next = action(open);
+    navigate({ secoes: Object.keys(next).filter((key) => next[key]).join(',') || 'nenhuma' });
+  };
   const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }));
 
   // ----------------- estado do formulário -----------------
@@ -982,7 +985,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         </div>
 
         {/* Corpo: rolagem vertical contínua com sanfonas */}
-        <div className="p-4 md:p-6 overflow-y-auto flex-1 space-y-4">
+        <div ref={scrollRef} className="p-4 md:p-6 overflow-y-auto flex-1 space-y-4">
           {initialPedido?.proposal?.surveyOrigin && (
             <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 flex items-start gap-2 text-xs text-indigo-950">
               <span className="material-symbols-outlined text-indigo-700">fact_check</span>

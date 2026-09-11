@@ -1,6 +1,9 @@
 'use client';
 import { showToast, requestConfirm, requestText } from '@/components/ui/Feedback';
 
+import { useNavigationEntity, useNavigationValue } from '@/components/NavigationSession';
+import { fetchOrdemServicoById } from '@/lib/ordensServico';
+import { fetchPedidos } from '@/lib/pedidos';
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { usePagination } from '@/lib/usePagination';
 import { PaginatedListControls } from '@/components/ui/PaginatedListControls';
@@ -191,16 +194,14 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   const [purchasingOrder, setPurchasingOrder] = useState<SupplyOrder | null>(null);
   const [detailOrder, setDetailOrder] = useState<SupplyOrder | null>(null);
   // OS exibida em modal de detalhe (a partir do card ou da subview).
-  const [osDetail, setOsDetail] = useState<OrdemServico | null>(null);
+  const [osDetail, setOsDetail] = useNavigationEntity<OrdemServico>('os', fetchOrdemServicoById);
   // Alvos dos modais de lifecycle (cancelar / hard delete).
   const [osCancelTarget, setOsCancelTarget] = useState<OrdemServico | null>(null);
   const [osDeleteTarget, setOsDeleteTarget] = useState<OrdemServico | null>(null);
   const isTecnico = userRole === 'TECNICO';
 
   // Aba inicial: atalho "Nova OS" força OS; técnico começa em OS; demais em propostas
-  const [viewTab, setViewTab] = useState<'propostas' | 'ordens_servico' | 'fornecimento'>(
-    initialView ?? (isTecnico ? 'ordens_servico' : 'propostas')
-  );
+  const [viewTab, setViewTab] = useNavigationValue<'propostas' | 'ordens_servico' | 'fornecimento'>('pedidosAba', initialView ?? (isTecnico ? 'ordens_servico' : 'propostas'), ['propostas', 'ordens_servico', 'fornecimento']);
   // Abre o detalhe do fornecimento quando solicitado por outra tela (ex.: Estoque → Origem).
   useEffect(() => {
     if (!initialDetailOrderId) return;
@@ -239,8 +240,13 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   }, [clients]);
 
   // Modais & Overlays
-  const [isProposalModalOpen, setIsProposalModalOpen] = useState(false);
-  const [editingPedido, setEditingPedido] = useState<Pedido | null>(null);
+  const [newProposalOpen, setNewProposalOpen] = useState(false);
+  const [editingPedido, setEditingPedido] = useNavigationEntity<Pedido>('pedido', async (id) => (await fetchPedidos()).find((p) => p.id === id) || null, ['secoes']);
+  const isProposalModalOpen = newProposalOpen || !!editingPedido;
+  const setIsProposalModalOpen = (open: boolean) => {
+    setNewProposalOpen(open && !new URLSearchParams(window.location.search).get('pedido'));
+    if (!open) setEditingPedido(null);
+  };
   const [externalPedido, setExternalPedido] = useState<Pedido | null>(null);
   useEffect(() => {
     if (!isProposalModalOpen || !editingPedido) { setExternalPedido(null); return; }

@@ -1,4 +1,6 @@
 'use client';
+import { useNavigation, useNavigationValue, useNavigationEntity } from '@/components/NavigationSession';
+import { fetchDevices } from '@/lib/devices';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Client, Device, UserRole, ClientTechnicalCredential, TechnicalBackup, DeviceVerification, AssetConditionValue, DeviceOccurrence, OperationalStatus } from '@/lib/types';
 import {
@@ -54,13 +56,15 @@ interface Props {
 }
 
 export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices, onDevicesChanged }) => {
-  const [area, setArea] = useState<TechArea>('SDAI');
+  const [area, setArea] = useNavigationValue<TechArea>('area', 'SDAI', AREAS);
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
-  const [showSurvey, setShowSurvey] = useState(false);
+  const { state: navigation, userId: navigationUserId, update: navigate } = useNavigation();
+  const showSurvey = !!navigation.levantamento || navigation.etapa === 'config';
+  const setShowSurvey = (show: boolean) => navigate({ etapa: show ? 'config' : null, levantamento: null, rascunho: null, sessaoFoto: null, equipamento: null }, show);
   const [showImport, setShowImport] = useState(false);
   const [verifDevice, setVerifDevice] = useState<Device | null>(null);
-  const [detailDevice, setDetailDevice] = useState<Device | null>(null);
+  const [detailDevice, setDetailDevice] = useNavigationEntity<Device>('equipamento', async (id) => (await fetchDevices(client.id)).find((d) => d.id === id) || null);
   const [editDevice, setEditDevice] = useState<Device | null>(null);
   const [catalog, setCatalog] = useState<TechnicalCatalogItem[]>([]);
   // §33 — filtro de ciclo de vida (padrão: só ativos instalados).
@@ -460,8 +464,9 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
           onSaved={() => { setEditDevice(null); onDevicesChanged(); }}
         />
       )}
-      {showSurvey && (
+      {showSurvey && devices !== null && (
         <TechnicalSurveyFlow
+          currentUserId={navigationUserId}
           area={area}
           clienteId={client.id}
           clientName={client.name}
