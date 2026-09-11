@@ -17,7 +17,7 @@ import type { SdaiMaintenanceMode } from '@/lib/sdaiAttendanceWiring';
 import { PREVENTIVA_SDAI_CONTRATO_CODIGO } from '@/lib/sdaiMaintenance';
 import { fetchContractRoutines } from '@/lib/contractRoutines';
 import { fetchDevices } from '@/lib/devices';
-import { fetchInventory } from '@/lib/inventory';
+import { fetchTechnicalCatalog } from '@/lib/technicalCatalog';
 import { fetchContracts } from '@/lib/contracts';
 import { fetchPendencias } from '@/lib/pendencias';
 import { fetchTemplateByCodigo } from '@/lib/reportTemplates';
@@ -133,7 +133,9 @@ export const SdaiMaintenancePanel: React.FC<{
         const [plan, devicesCliente, inventory, contracts, pendAbertas, existing, clienteReports] = await Promise.all([
           withLoadTimeout(fetchMaintenancePeriodPlan({ contractId: contratoId, clienteId, periodStart, periodEnd, rotation: true }), 'plano de manutenção'),
           withLoadTimeout(fetchDevices(clienteId), 'dispositivos'),
-          withLoadTimeout(fetchInventory(), 'inventário'),
+          // Catálogo TÉCNICO (price-free) em vez do estoque financeiro: o técnico
+          // lê fabricante/modelo sem dado comercial e sem bloqueio de RLS (0110).
+          withLoadTimeout(fetchTechnicalCatalog(), 'catálogo técnico'),
           withLoadTimeout(fetchContracts(), 'contratos'),
           withLoadTimeout(fetchPendencias(userRole, { clienteId, status: 'aberta' }), 'pendências'),
           withLoadTimeout(fetchReportsByAttendanceIds([attendance.id]), 'relatórios do atendimento'),
