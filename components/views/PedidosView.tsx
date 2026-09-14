@@ -4,6 +4,8 @@ import { showToast, requestConfirm, requestText } from '@/components/ui/Feedback
 import { useNavigationEntity, useNavigationValue } from '@/components/NavigationSession';
 import { fetchOrdemServicoById } from '@/lib/ordensServico';
 import { fetchPedidos } from '@/lib/pedidos';
+import { semearNotaFiscalAoConcluir } from '@/lib/notaFiscal';
+import { NotaFiscalPendencias } from '@/components/views/NotaFiscalPendencias';
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { usePagination } from '@/lib/usePagination';
 import { PaginatedListControls } from '@/components/ui/PaginatedListControls';
@@ -478,11 +480,11 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   // Conclui a proposta (recebida): grava o recebimento e lança as receitas
   // (parcelas viram lançamentos com vencimento) no Financeiro.
   const handleConcluir = (ped: Pedido, receb: RecebimentoProposta) => {
-    const atualizado: Pedido = {
+    const atualizado: Pedido = semearNotaFiscalAoConcluir({
       ...ped,
       status: 'concluido',
       proposal: { ...ped.proposal, recebimento: receb },
-    };
+    });
     onSavePedido(atualizado);
 
     if (onAddTransaction) {
@@ -1269,6 +1271,14 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
             <InsightCard label="Volume em análise" value={maskMoney(brl(volumeFiltrado))} detail={`${filteredPedidos.length} proposta(s) no filtro`} tone="navy" />
             <InsightCard label="Tempo até aceite" value={commercialInsights.averageApprovalDays === null ? '—' : `${commercialInsights.averageApprovalDays} d`} detail="Média estimada pelo histórico" tone="slate" />
           </div>
+
+          {/* Pendência administrativa de NF — oculta p/ técnico (RBAC no componente) */}
+          <NotaFiscalPendencias
+            pedidos={pedidos}
+            userRole={userRole}
+            currentUserName={currentUserName}
+            onSavePedido={onSavePedido}
+          />
 
           {/* Lista / Timeline */}
           {filteredPedidos.length === 0 ? (

@@ -44,6 +44,27 @@ export interface RecebimentoProposta {
   parcelas?: { numero: number; total: number; valor: number; vencimento: string }[];
 }
 
+/** Estados do lembrete administrativo de Nota Fiscal (§8). */
+export type NotaFiscalStatus = 'pendente' | 'emitida' | 'nao_aplicavel';
+
+/** Lembrete administrativo de NF — pendência simples, sem emissão fiscal real.
+ * Persistido no JSONB do pedido; a identidade é o próprio pedido (idempotente). */
+export interface NotaFiscalLembrete {
+  status: NotaFiscalStatus;
+  /** Número da NF quando emitida (opcional). */
+  numero?: string;
+  /** Data de emissão (ISO) quando emitida (opcional). */
+  dataEmissao?: string;
+  /** Observação livre do Administrativo/Financeiro. */
+  observacao?: string;
+  /** Quando a pendência foi sinalizada (na conclusão do pedido). */
+  criadaEm?: string;
+  /** Última atualização de estado. */
+  atualizadaEm?: string;
+  /** Quem resolveu (nome/id) — auditoria leve. */
+  atualizadaPor?: string;
+}
+
 export interface PedidoEquipmentItem {
   itemNumero: number;
   descricao: string;
@@ -182,6 +203,9 @@ export interface CommercialProposalData {
   };
   /** Dados do recebimento quando a proposta é concluída (à vista/parcelado). */
   recebimento?: RecebimentoProposta;
+  /** Lembrete administrativo de Nota Fiscal (NÃO é emissão real de NF-e).
+   * Pendência derivada do pedido concluído/faturável; ver [[lib/notaFiscal]]. */
+  notaFiscal?: NotaFiscalLembrete;
   /** Documento Personalizado: título e campos livres (rótulo + valor). */
   tituloPersonalizado?: string;
   camposPersonalizados?: { rotulo: string; valor: string }[];
