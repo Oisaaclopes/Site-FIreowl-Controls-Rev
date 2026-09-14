@@ -1,0 +1,62 @@
+-- Endurecimento dos PRIVILÉGIOS da view public.technical_catalog.
+--
+-- CONTEXTO: a 0110 recriou a view como SECURITY DEFINER (security_invoker=false)
+-- para o TÉCNICO poder LER identificação (fabricante/modelo/família) sem abrir a
+-- RLS de inventory_items. Porém, ao recriar a view (`create or replace view`) o
+-- Postgres PRESERVA os grants pré-existentes do objeto e, no Supabase, os
+-- DEFAULT PRIVILEGES do schema public concedem privilégios amplos a anon/
+-- authenticated. Auditoria (somente leitura) da view em produção encontrou
+-- INSERT/UPDATE/DELETE residuais para `authenticated` e SELECT para `anon`.
+--
+-- RISCO: uma view SIMPLES é ATUALIZÁVEL e, sendo SECURITY DEFINER, roda com os
+-- privilégios do proprietário. Privilégio de ESCRITA na view seria uma superfície
+-- de escalonamento (gravar em inventory_items por baixo da RLS). A view deve ser
+-- ESTRITAMENTE somente-leitura para `authenticated` e NADA para `anon`/PUBLIC.
+--
+-- CORREÇÃO MÍNIMA: revoga TODOS os privilégios de PUBLIC/anon/authenticated e
+-- reconcede SOMENTE SELECT para authenticated. NÃO altera a definição da view
+-- (0110 é a fonte), NÃO toca inventory_items nem sua RLS, NÃO cria/derruba
+-- objetos. Idempotente (revoke/grant repetíveis).
+
+begin;
+revoke all privileges on table public.technical_catalog from public, anon, authenticated;
+grant select on table public.technical_catalog to authenticated;
+commit;
+
+-- =====================================================================
+-- VALIDAÇÃO (rodar APÓS o commit; são SELECTs, não alteram nada):
+--
+-- (1) Grants efetivos na view — esperado: só (authenticated, SELECT).
+--     Nenhuma linha para anon; nenhum INSERT/UPDATE/DELETE/TRUNCATE/
+--     REFERENCES/TRIGGER para ninguém.
+--
+-- select grantee, privilege_type
+--   from information_schema.role_table_grants
+--  where table_schema = 'public' and table_name = 'technical_catalog'
+--  order by grantee, privilege_type;
+--
+-- (2) Acesso efetivo do TÉCNICO — deve LER identificação e receber
+--     fabricantes/modelos, sem tocar inventory_items:
+--
+-- set local role authenticated;                         -- papel do PostgREST
+-- -- (opcional) simular um técnico específico:
+-- -- select set_config('request.jwt.claims',
+-- --   json_build_object('sub','<uuid_do_tecnico>','role','authenticated')::text, true);
+-- select count(*)                                   as itens,
+--        count(distinct brand)                      as fabricantes,
+--        count(distinct model) filter (where model is not null) as modelos
+--   from public.technical_catalog;                       -- deve vir > 0
+-- reset role;
+--
+-- (3) Escrita NEGADA na view para authenticated (deve FALHAR com permission
+--     denied — rode em transação e faça rollback):
+--
+-- begin;
+-- set local role authenticated;
+-- insert into public.technical_catalog (id) values (gen_random_uuid()); -- ERRO esperado
+-- rollback;
+--
+-- (4) ADM segue igual (mesmo conjunto de identificação): a leitura do ADM não
+--     muda — a view continua price-free e o ADM lê inventory_items por RLS
+--     própria como antes.
+-- =====================================================================

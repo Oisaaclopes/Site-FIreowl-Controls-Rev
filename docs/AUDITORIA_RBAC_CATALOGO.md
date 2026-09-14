@@ -90,3 +90,26 @@ Validação: `tsc --noEmit` limpo; ESLint 0 erros; 1221 testes passando.
 Pendência de banco (migration 0111) permanece **pendente de autorização** —
 ver SQL acima. Não reconfirmada live nesta retomada (sem `DATABASE_URL` direto
 no working tree); o achado vem da consulta somente-leitura da sessão anterior.
+
+## Endurecimento aprovado — migration 0111 criada (14/09/2026)
+
+Isaac aprovou o endurecimento. Criado `lib/db/migrations/0111_technical_catalog_lockdown.sql`
+(revoke all de public/anon/authenticated + grant select só a authenticated;
+não altera a definição da view nem `inventory_items`; idempotente).
+
+**Aplicação/validação do BANCO é MANUAL** (deploy é estático; não há
+`DATABASE_URL`/CLI no working tree, e o service_role via PostgREST não executa
+DDL nem lê `information_schema`). O arquivo 0111 traz, comentadas, as queries de
+validação (grants efetivos, leitura do técnico, escrita negada) para rodar no
+SQL editor após o commit.
+
+**Checagem live possível desta máquina (somente leitura, chave anon):**
+`GET /rest/v1/technical_catalog` com a chave **anon** retornou **HTTP 401
+`42501 permission denied for view technical_catalog`**. Ou seja, no estado
+ATUAL de produção o `anon` **NÃO** tem SELECT na view (o `revoke ... from anon`
+da 0110 está valendo) — o resíduo "anon SELECT" da auditoria anterior não está
+mais presente. O privilégio de **escrita de `authenticated`** (INSERT/UPDATE/
+DELETE) **não pôde ser reconfirmado daqui** (exige sessão autenticada/técnico;
+service_role burla RLS; PostgREST não expõe grants). A 0111 é idempotente e
+garante o estado-alvo (só SELECT p/ authenticated) independentemente do resíduo;
+a query (1) do arquivo confirma isso de forma definitiva no SQL editor.
