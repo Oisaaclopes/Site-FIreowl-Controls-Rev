@@ -349,7 +349,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     }
   };
 
-  const openPdf = (ped: Pedido) => {
+  const openPdf = (ped: Pedido, opts?: { preview?: boolean }) => {
     const base = {
       showLogo: pdfPrefs.showLogo,
       detailedSubtotal: pdfPrefs.detailedSubtotal,
@@ -368,7 +368,8 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     setPdfOptions(base);
     loadCapaIntoOptions(ped);
     buildExperienciaIntoOptions(ped);
-    if (pdfPrefs.configBeforeGenerate) setPdfConfigPedido(ped);
+    // Pré-visualização abre direto; a emissão respeita a preferência de config.
+    if (!opts?.preview && pdfPrefs.configBeforeGenerate) setPdfConfigPedido(ped);
     else setPdfPreviewPedido(ped);
   };
 
@@ -437,12 +438,31 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
     showToast(`O gerador de "${DOCUMENT_TYPE_LABELS[doc]}" entra em uma próxima fase. Por ora, apenas a Proposta comercial é gerada.`);
   };
 
-  // Ponto de entrada ao gerar documento: usa o padrão do tipo do pedido; se não
-  // houver padrão, abre o modal de escolha.
+  // Ponto de entrada ao emitir o documento do Pedido: o TIPO DE PEDIDO é a fonte
+  // de verdade (mapa canônico em resolveDocumentoPadrao). Sem tipo definido, NÃO
+  // abre o antigo modal "Qual documento gerar?" — pede para definir o tipo e leva
+  // o usuário ao editor (foco no campo Tipo de Pedido).
   const handleGenerateDocument = (ped: Pedido) => {
     const padrao = resolveDocumentoPadrao(ped, documentosPadrao);
-    if (padrao) dispatchDocument(ped, padrao);
-    else setDocModalPedido(ped);
+    if (padrao) {
+      dispatchDocument(ped, padrao);
+      return;
+    }
+    showToast('Selecione o Tipo de Pedido antes de emitir o documento.');
+    handleEditProposal(ped);
+  };
+
+  // Pré-visualização a partir do editor: obedece ao Tipo de Pedido, sem perguntar
+  // qual documento e sem passar pela tela de configuração (abre direto).
+  const previewByTipo = (ped: Pedido) => {
+    const doc = resolveDocumentoPadrao(ped, documentosPadrao);
+    if (!doc) {
+      showToast('Selecione o Tipo de Pedido antes de pré-visualizar o documento.');
+      return;
+    }
+    if (doc === 'proposta_comercial') openPdf(ped, { preview: true });
+    else if (doc === 'personalizado') setPersonalizarPedido(ped);
+    else openDocViewer(ped, doc, initialDocOptions());
   };
 
   // Mudança de status na lista: "Concluída" abre o modal de recebimento; os
@@ -1528,7 +1548,8 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
         empresasAtendidas={empresasAtendidas}
         marcasTecnologias={marcasTecnologias}
         onAddClient={onAddClient}
-        onPreviewPDF={(ped) => setPdfPreviewPedido(ped)}
+        onPreviewPDF={(ped) => previewByTipo(ped)}
+        onEmit={(ped) => handleGenerateDocument(ped)}
         nextProposalNumber={nextProposalNumber}
       />
       {externalPedido && isProposalModalOpen && (

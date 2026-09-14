@@ -63,6 +63,26 @@ export const PEDIDO_TIPO_LABELS: Record<PedidoTipo, string> = {
 export const PEDIDO_TIPO_ORDER: PedidoTipo[] = ['orcamento', 'proposta', 'servico', 'fornecimento', 'laudo'];
 
 /**
+ * Mapa canônico TIPO DE PEDIDO → documento gerado. É a FONTE DE VERDADE quando
+ * a empresa não configurou um documento padrão explícito (Conta → PDF). Assim o
+ * Tipo escolhido na Estruturação do Pedido decide a emissão sozinho, sem o modal
+ * "Qual documento gerar?".
+ *
+ * - fornecimento → orcamento: o gerador de Orçamento delega ao documento enxuto
+ *   de fornecimento quando a modalidade é "somente_material" (ver
+ *   [[modalidade-somente-material]] / OrcamentoDocument).
+ * - servico → proposta_comercial: reaproveita o gerador comercial completo.
+ * - laudo → laudo_tecnico: gerador existente.
+ */
+export const DEFAULT_DOC_BY_PEDIDO_TIPO: Record<PedidoTipo, DocumentType> = {
+  orcamento: 'orcamento',
+  proposta: 'proposta_comercial',
+  servico: 'proposta_comercial',
+  fornecimento: 'orcamento',
+  laudo: 'laudo_tecnico',
+};
+
+/**
  * Opções de configuração do documento, escolhidas na tela que abre depois de
  * definir o tipo de documento. Valem para todos os documentos (as que não se
  * aplicam a um documento — ex.: preços numa Lista de Produtos — são ignoradas).
@@ -110,13 +130,16 @@ export function getPedidoTipo(pedido: Pedido): PedidoTipo | undefined {
 }
 
 /**
- * Resolve o documento padrão para um pedido, dada a config da empresa.
- * Retorna o DocumentType padrão, ou null quando não há padrão (deve perguntar).
+ * Resolve o documento a emitir para um pedido. O TIPO DE PEDIDO é a fonte de
+ * verdade: com um tipo definido SEMPRE há documento (override da empresa quando
+ * houver, senão o mapa canônico). Retorna null apenas quando o tipo não está
+ * definido — nesse caso o chamador deve pedir para definir o tipo (não abrir o
+ * antigo modal "Qual documento gerar?").
  */
 export function resolveDocumentoPadrao(pedido: Pedido, config: DocumentosPadrao | undefined): DocumentType | null {
   const tipo = getPedidoTipo(pedido);
-  if (!tipo || !config) return null;
-  const escolhido = config[tipo];
-  if (!escolhido || escolhido === 'nenhum') return null;
-  return escolhido;
+  if (!tipo) return null;
+  const escolhido = config?.[tipo];
+  if (escolhido && escolhido !== 'nenhum') return escolhido;
+  return DEFAULT_DOC_BY_PEDIDO_TIPO[tipo] ?? null;
 }

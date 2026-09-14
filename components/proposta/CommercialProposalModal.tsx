@@ -57,7 +57,7 @@ import {
 interface CommercialProposalModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (pedido: Pedido) => void;
+  onSave: (pedido: Pedido) => void | Promise<void>;
   initialPedido?: Pedido | null;
   clients: Client[];
   inventory: InventoryItem[];
@@ -70,6 +70,8 @@ interface CommercialProposalModalProps {
   onDeleteTemplate?: (templateId: string) => void;
   onAddClient?: (client: Client) => void;
   onPreviewPDF: (pedido: Pedido) => void;
+  /** Emite o documento do Pedido (obedece ao Tipo de Pedido). Chamado após salvar. */
+  onEmit?: (pedido: Pedido) => void | Promise<void>;
   /** Próximo número sequencial para novas propostas (default do campo). */
   nextProposalNumber?: number;
 }
@@ -282,6 +284,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   onSaveTemplate,
   onDeleteTemplate,
   onPreviewPDF,
+  onEmit,
   nextProposalNumber = 249,
 }) => {
   // ETAPA 2 — materialização de textos. Uma proposta é NOVA quando não traz um
@@ -892,23 +895,63 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     onSave(buildCurrentPedido('rascunho'));
     onClose();
   };
-  const handleSaveWithValidation = (targetStatus: PedidoStatus) => {
-    if (targetStatus !== 'rascunho') {
-      if (!selectedClient) {
-        showToast('Selecione o Cliente.');
-        setOpen((o) => ({ ...o, pedido: true }));
-        return;
-      }
-      if (effectiveValorTotal <= 0) {
-        showToast('O valor total da proposta deve ser maior que zero.');
-        setOpen((o) => ({ ...o, valor: true }));
-        return;
-      }
+  // Validação: dados mínimos comuns a salvar-para-emitir e emitir.
+  const validarParaEmissao = (): boolean => {
+    if (!selectedClient) {
+      showToast('Selecione o Cliente.');
+      setOpen((o) => ({ ...o, pedido: true }));
+      return false;
     }
+    if (effectiveValorTotal <= 0) {
+      showToast('O valor total da proposta deve ser maior que zero.');
+      setOpen((o) => ({ ...o, valor: true }));
+      return false;
+    }
+    return true;
+  };
+  // §10 — o Tipo de Pedido é a fonte de verdade da emissão. Sem ele, não emite:
+  // avisa e leva o usuário ao campo Tipo de Pedido (topo da estruturação).
+  const ensureTipoSelecionado = (): boolean => {
+    if (!pedidoTipo) {
+      showToast('Selecione o Tipo de Pedido antes de emitir o documento.');
+      setOpen((o) => ({ ...o, pedido: true }));
+      return false;
+    }
+    return true;
+  };
+  const handleSaveWithValidation = (targetStatus: PedidoStatus) => {
+    if (targetStatus !== 'rascunho' && !validarParaEmissao()) return;
     onSave(buildCurrentPedido(targetStatus));
     onClose();
   };
-  const handlePreview = () => onPreviewPDF(buildCurrentPedido());
+  // Salvar e Emitir: valida Tipo + dados, SALVA e só então EMITE o documento do
+  // Tipo (sem o modal "Qual documento gerar?"). Se o save falhar, não emite.
+  const handleSaveAndEmit = async () => {
+    if (!ensureTipoSelecionado()) return;
+    if (!validarParaEmissao()) return;
+    const built = buildCurrentPedido('enviado_ao_cliente');
+    try {
+      await onSave(built);
+    } catch {
+      showToast('Não foi possível salvar o pedido. O documento não foi emitido.');
+      return;
+    }
+    onClose();
+    onEmit?.(built);
+  };
+  // Pré-visualizar: obedece ao Tipo de Pedido (roteado pelo container).
+  const handlePreview = () => {
+    if (!ensureTipoSelecionado()) return;
+    onPreviewPDF(buildCurrentPedido());
+  };
+
+  // §5 — rótulo contextual do botão de emissão pelo Tipo de Pedido (quando
+  // simples e seguro); caso contrário, neutro "Salvar & Emitir PDF".
+  const emitLabel =
+    pedidoTipo === 'orcamento' ? 'Salvar & Emitir Orçamento'
+    : pedidoTipo === 'proposta' ? 'Salvar & Emitir Proposta'
+    : pedidoTipo === 'fornecimento' ? 'Salvar & Emitir Fornecimento'
+    : 'Salvar & Emitir PDF';
 
   if (!isOpen) return null;
 
@@ -1817,10 +1860,10 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             )}
             <button
               type="button"
-              onClick={() => handleSaveWithValidation('enviado_ao_cliente')}
+              onClick={handleSaveAndEmit}
               className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-colors uppercase tracking-wide shadow-md flex items-center gap-1.5"
             >
-              <CheckCircle className="w-4 h-4" /> Salvar &amp; Emitir Proposta
+              <CheckCircle className="w-4 h-4" /> {emitLabel}
             </button>
           </div>
         </div>
