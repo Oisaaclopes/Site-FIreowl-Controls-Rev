@@ -9,6 +9,7 @@ import { renderWarranty } from '@/lib/commercialWarranty';
 import { normalizeUnitCode } from '@/lib/commercialUnits';
 import { DocOptions } from '@/lib/documentos';
 import { verificationUrl } from '@/lib/documentVerification';
+import { FornecimentoMateriaisDocument } from './FornecimentoMateriaisDocument';
 
 export type OrcamentoPdfOptions = Partial<DocOptions> & {
   capaImagemUrl?: string;
@@ -135,6 +136,10 @@ const ItensTable = ({ titulo, itens, showUnit, showTotal, showMarca, accent }: {
 };
 
 export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido: Pedido; companyProfile: CompanyProfile; options?: OrcamentoPdfOptions }) {
+  // SOMENTE MATERIAL → documento comercial enxuto de fornecimento (mesma engine).
+  if (pedido.proposal?.modalidade === 'somente_material') {
+    return <FornecimentoMateriaisDocument pedido={pedido} companyProfile={companyProfile} options={options} verifKind="orcamento" />;
+  }
   const p = normalizeCommercialProposalData(pedido.proposal);
   const warrantyView = renderWarranty(p.warranty);
   const razao = companyProfile.razaoSocial || 'Fireowl Controls';

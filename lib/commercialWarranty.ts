@@ -48,6 +48,18 @@ export function defaultWarranty(): StructuredWarranty {
   };
 }
 
+/**
+ * Texto-padrão de garantia para venda de materiais (SOMENTE MATERIAL). Não usa
+ * garantia de mão de obra — o fornecimento não inclui execução. Editável.
+ */
+export const GARANTIA_MATERIAL_PADRAO =
+  'Os materiais fornecidos possuem garantia conforme as condições e prazos estabelecidos pelos respectivos fabricantes.';
+
+/** Garantia sugerida ao entrar em SOMENTE MATERIAL (texto de fornecimento). */
+export function defaultWarrantyMaterial(): LegacyWarranty {
+  return { mode: 'legacy_text', text: GARANTIA_MATERIAL_PADRAO };
+}
+
 export function isLegacyWarranty(w: CommercialWarranty | undefined): w is LegacyWarranty {
   return !!w && (w as LegacyWarranty).mode === 'legacy_text';
 }

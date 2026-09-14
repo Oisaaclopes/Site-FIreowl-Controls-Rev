@@ -46,10 +46,15 @@ export function normalizeCommercialProposalData(raw: CommercialProposalData): No
       ? roundMoney(Number(raw.valorTotalManual))
       : null;
 
-  // Total calculado a partir dos itens + mão de obra (sem override).
+  // Total calculado a partir dos itens + mão de obra + frete + impostos (sem
+  // override). Modalidade material-only: só materiais, sem mão de obra.
+  const onlyMaterials = raw.modalidade === 'somente_material';
   const base = calculateCommercialProposalTotals({
     equipmentItems: raw.equipmentItems,
     maoDeObra: raw.maoDeObra,
+    frete: raw.frete,
+    impostosAdicionais: raw.impostosAdicionais,
+    onlyMaterials,
     valorTotalManual: null,
   });
 

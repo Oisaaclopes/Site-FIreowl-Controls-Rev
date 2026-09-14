@@ -18,15 +18,19 @@ import {
   EmpresaAtendida,
   MarcaTecnologia,
   CommercialProposalData,
+  ModalidadeComercial,
+  FreteInfo,
+  ImpostosAdicionaisInfo,
 } from '@/lib/types';
 import { PEDIDO_TIPO_LABELS, PEDIDO_TIPO_ORDER } from '@/lib/documentos';
+import { MODALIDADE_LABELS, MODALIDADE_ORDER, FRETE_MODO_LABELS, IMPOSTO_MODO_LABELS, OBS_DISPONIBILIDADE } from '@/lib/fornecimentoComercial';
 import { AREAS_PROPOSTA, TIPOS_SERVICO, gerarTituloProposta, conclusaoPorTipo, presetPorTipo } from '@/lib/propostaTitulo';
 import { montarEstruturaProposta, ordenarEstrutura, SECOES_FIXAS_INICIO, SECOES_FIXAS_FIM } from '@/lib/propostaEstrutura';
 import { CARTA_APRESENTACAO } from '@/lib/propostaTextos';
 import { SECOES_TEXTO, servicosOfertadosPadrao, restaurarSecaoLista, fonteDaSecaoLista, fonteServicos } from '@/lib/propostaMaterializacao';
 import { normalizeUnitCode } from '@/lib/commercialUnits';
 import { calculateCommercialProposalTotals } from '@/lib/commercialTotals';
-import { CommercialWarranty, StructuredWarranty, WarrantyLeg, WarrantyMode, defaultWarranty, normalizeCommercialWarranty, isLegacyWarranty, isStructuredWarranty, renderWarranty, legText } from '@/lib/commercialWarranty';
+import { CommercialWarranty, StructuredWarranty, WarrantyLeg, WarrantyMode, defaultWarranty, defaultWarrantyMaterial, GARANTIA_MATERIAL_PADRAO, normalizeCommercialWarranty, isLegacyWarranty, isStructuredWarranty, renderWarranty, legText } from '@/lib/commercialWarranty';
 import { COMMERCIAL_SCHEMA_VERSION } from '@/lib/commercialProposal';
 import { ItensCardEditor } from '@/components/proposta/ItensCardEditor';
 import {
@@ -318,6 +322,12 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const toggleArea = (id: string) => setAreaPrincipal((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   const tituloDinamico = gerarTituloProposta(areaPrincipal, tipoServico);
   const [pedidoTipo, setPedidoTipo] = useState<PedidoTipo | ''>(initialPedido?.proposal?.pedidoTipo || '');
+  // Modalidade comercial (natureza). Ausente = fluxo histórico (Material + Serviço).
+  const [modalidade, setModalidade] = useState<ModalidadeComercial>(initialPedido?.proposal?.modalidade || 'material_servico');
+  const [frete, setFrete] = useState<FreteInfo>(initialPedido?.proposal?.frete || { modo: 'incluso' });
+  const [impostosAdicionais, setImpostosAdicionais] = useState<ImpostosAdicionaisInfo>(initialPedido?.proposal?.impostosAdicionais || { modo: 'inclusos' });
+  const [observacoesComerciais, setObservacoesComerciais] = useState<string>(initialPedido?.proposal?.observacoesComerciais || '');
+  const somenteMaterial = modalidade === 'somente_material';
   const [clienteId, setClienteId] = useState<string>(initialPedido?.clienteId || clients[0]?.id || '');
   const [fornecedor, setFornecedor] = useState<string>(initialPedido?.fornecedor || 'Fireowl Controls Ltda.');
   const [dataEmissao, setDataEmissao] = useState<string>(
@@ -586,7 +596,14 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   // (0 por padrão); o botão "Sugerir 70/30" preenche pela regra material 30% /
   // mão de obra 70% quando a proposta for de fornecimento com instalação.
   // Fonte ÚNICA de cálculo (mesma do PDF). Ver [[lib/commercialTotals]].
-  const totals = calculateCommercialProposalTotals({ equipmentItems, maoDeObra, valorTotalManual: manualValorTotal });
+  const totals = calculateCommercialProposalTotals({
+    equipmentItems,
+    maoDeObra,
+    valorTotalManual: manualValorTotal,
+    frete: somenteMaterial ? frete : undefined,
+    impostosAdicionais: somenteMaterial ? impostosAdicionais : undefined,
+    onlyMaterials: somenteMaterial,
+  });
   const subtotalItens = totals.itemsSubtotal;
   const valorBase = totals.calculatedTotal;
   const effectiveValorTotal = totals.finalTotal;
@@ -596,6 +613,29 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   // original de cada um no array para os handlers de edição/remoção.
   const materiaisRows = equipmentItems.map((it, idx) => ({ it, idx })).filter((x) => x.it.tipo !== 'servico');
   const servicosRows = equipmentItems.map((it, idx) => ({ it, idx })).filter((x) => x.it.tipo === 'servico');
+
+  // Troca de modalidade. NUNCA apaga dados em silêncio: ao entrar em SOMENTE
+  // MATERIAL com serviços cadastrados, alerta (os serviços ficam preservados,
+  // fora do documento, e voltam a contar se a modalidade mudar de novo). Ao
+  // entrar em material-only, sugere a garantia de fornecimento quando a garantia
+  // atual ainda é a padrão de serviço (90/12) ou está vazia — sem sobrescrever
+  // texto que o usuário tenha personalizado.
+  const handleModalidadeChange = async (next: ModalidadeComercial) => {
+    if (next === modalidade) return;
+    if (next === 'somente_material' && servicosRows.length > 0) {
+      const ok = await requestConfirm(
+        `Este pedido tem ${servicosRows.length} serviço(s) cadastrado(s). Em "Somente Material" eles não serão exibidos nem somados ao total (permanecem salvos e voltam se você mudar a modalidade). Deseja continuar?`
+      );
+      if (!ok) return;
+    }
+    if (next === 'somente_material') {
+      const padraoServico = isStructuredWarranty(warranty) && warranty.maoDeObra.enabled && warranty.materiais.enabled && !warranty.observacoes;
+      const garantiaVazia = !renderWarranty(warranty).hasAny;
+      if (padraoServico || garantiaVazia) setWarranty(defaultWarrantyMaterial());
+      if (!pedidoTipo) setPedidoTipo('fornecimento');
+    }
+    setModalidade(next);
+  };
 
   // Área(s) da proposta → código(s) de categoria do estoque (para o seletor
   // inteligente de materiais). Áreas sem mapeamento não restringem o catálogo.
@@ -798,6 +838,12 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         capaImagemPath: initialPedido?.proposal?.capaImagemPath,
         surveyOrigin: initialPedido?.proposal?.surveyOrigin,
         pedidoTipo: pedidoTipo || undefined,
+        modalidade,
+        // Frete/impostos só fazem sentido no fornecimento; nas demais modalidades
+        // não gravamos (mantém pedidos de serviço idênticos ao histórico).
+        frete: somenteMaterial ? frete : undefined,
+        impostosAdicionais: somenteMaterial ? impostosAdicionais : undefined,
+        observacoesComerciais: somenteMaterial ? (observacoesComerciais.trim() || undefined) : (initialProposal?.observacoesComerciais),
         diretrizesNormativas: diretrizes,
         escopoServico,
         entregaveis,
@@ -870,13 +916,14 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const valorCard = (
     <div className="bg-navy-3 text-white p-5 rounded-xl shadow-sm space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] font-bold text-[#F2A900] uppercase tracking-widest">Valores da Proposta</span>
-        <span className="text-[10px] text-fg-muted text-right">Serviço puro: use só os itens. Fornecimento + instalação: clique em Sugerir 70/30.</span>
+        <span className="text-[10px] font-bold text-[#F2A900] uppercase tracking-widest">{somenteMaterial ? 'Resumo Financeiro' : 'Valores da Proposta'}</span>
+        <span className="text-[10px] text-fg-muted text-right">{somenteMaterial ? 'Subtotal + frete + impostos − desconto = total geral.' : 'Serviço puro: use só os itens. Fornecimento + instalação: clique em Sugerir 70/30.'}</span>
       </div>
       <div className="flex items-center justify-between text-sm">
-        <span className="text-fg-muted">Subtotal dos itens</span>
-        <span className="font-data-mono font-bold">R$ {subtotalItens.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+        <span className="text-fg-muted">{somenteMaterial ? 'Subtotal dos produtos' : 'Subtotal dos itens'}</span>
+        <span className="font-data-mono font-bold">R$ {(somenteMaterial ? (totals.materialsSubtotal + totals.discountTotal) : subtotalItens).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
       </div>
+      {!somenteMaterial && (
       <div className="flex items-center justify-between gap-2">
         <span className="text-fg-muted text-sm flex items-center gap-1.5">
           Mão de obra / Serviços adicionais
@@ -900,6 +947,63 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           />
         </div>
       </div>
+      )}
+      {somenteMaterial && (
+        <div className="space-y-2.5 border-t border-slate-700 pt-3">
+          {totals.discountTotal > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-fg-muted">Desconto (nos itens)</span>
+              <span className="font-data-mono font-bold text-red-300">− R$ {totals.discountTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            </div>
+          )}
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-fg-muted text-sm">Frete</span>
+            <div className="flex items-center gap-1">
+              <select
+                value={frete.modo}
+                onChange={(e) => setFrete((f) => ({ ...f, modo: e.target.value as FreteInfo['modo'] }))}
+                className="bg-slate-900 border border-slate-700 rounded p-1.5 text-xs font-bold text-slate-200"
+              >
+                {(Object.keys(FRETE_MODO_LABELS) as FreteInfo['modo'][]).map((k) => (
+                  <option key={k} value={k}>{FRETE_MODO_LABELS[k]}</option>
+                ))}
+              </select>
+              {frete.modo === 'valor' && (
+                <input
+                  type="number"
+                  min={0}
+                  value={frete.valor ?? 0}
+                  onChange={(e) => setFrete((f) => ({ ...f, valor: e.target.value === '' ? 0 : Number(e.target.value) }))}
+                  className="w-28 bg-slate-900 border border-slate-700 rounded p-1.5 text-right font-data-mono font-bold text-amber-300"
+                />
+              )}
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-fg-muted text-sm">Impostos adicionais</span>
+            <div className="flex items-center gap-1">
+              <select
+                value={impostosAdicionais.modo}
+                onChange={(e) => setImpostosAdicionais((im) => ({ ...im, modo: e.target.value as ImpostosAdicionaisInfo['modo'] }))}
+                className="bg-slate-900 border border-slate-700 rounded p-1.5 text-xs font-bold text-slate-200"
+              >
+                {(Object.keys(IMPOSTO_MODO_LABELS) as ImpostosAdicionaisInfo['modo'][]).map((k) => (
+                  <option key={k} value={k}>{IMPOSTO_MODO_LABELS[k]}</option>
+                ))}
+              </select>
+              {impostosAdicionais.modo === 'valor' && (
+                <input
+                  type="number"
+                  min={0}
+                  value={impostosAdicionais.valor ?? 0}
+                  onChange={(e) => setImpostosAdicionais((im) => ({ ...im, valor: e.target.value === '' ? 0 : Number(e.target.value) }))}
+                  className="w-28 bg-slate-900 border border-slate-700 rounded p-1.5 text-right font-data-mono font-bold text-amber-300"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       <div className="border-t border-slate-700 pt-3 flex items-center justify-between gap-2">
         <span className="text-[10px] font-bold text-[#F2A900] uppercase tracking-widest flex items-center gap-1.5">
           Valor Total (R$)
@@ -922,7 +1026,8 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           className="w-44 bg-slate-900 border border-slate-700 rounded-lg p-2 text-xl font-black text-amber-400 font-data-mono text-right"
         />
       </div>
-      {/* §15 — Contrato recorrente (valor mensal) */}
+      {/* §15 — Contrato recorrente (valor mensal) — não se aplica a fornecimento */}
+      {!somenteMaterial && (
       <div className="border-t border-slate-700 pt-3 space-y-2">
         <label className="flex items-center gap-2 text-[10px] font-bold text-fg-muted uppercase tracking-widest cursor-pointer">
           <input type="checkbox" checked={recorrente} onChange={(e) => setRecorrente(e.target.checked)} className="accent-[#F2A900] w-3.5 h-3.5" />
@@ -947,6 +1052,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           </div>
         )}
       </div>
+      )}
     </div>
   );
 
@@ -1032,7 +1138,35 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                 </p>
               </div>
 
+              {/* Modalidade comercial (natureza) — decide seções técnicas × fornecimento */}
+              <div className="sm:col-span-2">
+                <label className={labelCls}>Modalidade comercial</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {MODALIDADE_ORDER.map((m) => {
+                    const on = modalidade === m;
+                    const desc = m === 'servico' ? 'Só execução técnica' : m === 'material_servico' ? 'Produtos + execução' : 'Só venda de produtos';
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => handleModalidadeChange(m)}
+                        className={`text-left rounded-lg border px-3 py-2 transition-colors ${on ? 'bg-navy-3 text-white border-navy' : 'bg-surface text-fg-secondary border-border-strong hover:border-navy'}`}
+                      >
+                        <p className="text-xs font-bold">{MODALIDADE_LABELS[m]}</p>
+                        <p className="text-[10px] text-fg-muted">{desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+                {somenteMaterial && (
+                  <p className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 mt-2">
+                    Fornecimento de materiais: o documento sai como <b>Orçamento Comercial — Fornecimento de Materiais</b>, sem seções de execução técnica. Preencha produtos, valores e condições comerciais abaixo.
+                  </p>
+                )}
+              </div>
+
               {/* P1 — Área de atuação (multi) + Tipo de serviço → título dinâmico */}
+              {!somenteMaterial && (<>
               <div className="sm:col-span-2">
                 <label className={labelCls}>Área(s) de atuação</label>
                 <div className="flex flex-wrap gap-1.5">
@@ -1173,6 +1307,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                   </div>
                 )}
               </div>
+              </>)}
 
               <div className="sm:col-span-2">
                 <label className={labelCls}>
@@ -1272,6 +1407,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           </Accordion>
 
           {/* ---- Lista de Serviços (digitado ou do catálogo de Serviços) ---- */}
+          {!somenteMaterial && (
           <Accordion
             title="Lista de Serviços"
             icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />}
@@ -1298,10 +1434,12 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               onMove={handleMoveEquipment}
             />
           </Accordion>
+          )}
 
           {valorCard}
 
-          {/* ---- Accordions de conteúdo ---- */}
+          {/* ---- Accordions de conteúdo (seções técnicas — ocultas em Somente Material) ---- */}
+          {!somenteMaterial && (<>
           <Accordion title="Objetivo da Proposta" icon={<FileText className="w-4 h-4 text-danger" />} open={!!open.objetivo} onToggle={() => toggle('objetivo')}>
             <textarea rows={3} value={objetivo} onChange={(e) => setObjetivo(e.target.value)} placeholder="Objetivo geral da proposta..." className={inputCls} />
           </Accordion>
@@ -1466,6 +1604,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             </div>
             <textarea rows={3} value={conclusao} onChange={(e) => setConclusao(e.target.value)} className={inputCls} />
           </Accordion>
+          </>)}
 
           {/* ---- Condições de Pagamento (tags pré-formatadas) ---- */}
           <Accordion title="Condições de Pagamento" icon={<CreditCard className="w-4 h-4 text-emerald-600" />} open={!!open.pagamento} onToggle={() => toggle('pagamento')}>
@@ -1483,6 +1622,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           </Accordion>
 
           {/* ---- Cláusulas Jurídicas (chaves de ativação) ---- */}
+          {!somenteMaterial && (<>
           <Accordion title="Cláusulas Jurídicas" icon={<Scale className="w-4 h-4 text-danger" />} open={!!open.clausulas} onToggle={() => toggle('clausulas')}>
             <p className="text-[11px] text-fg-secondary mb-2">Marque os blocos que devem sair no PDF. Desmarcado = título e texto totalmente omitidos.</p>
             <div className="space-y-2">
@@ -1562,6 +1702,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               );
             })()}
           </Accordion>
+          </>)}
 
           {/* ---- Garantia (bloco próprio, visível) ---- */}
           <Accordion title="Garantia" icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />} open={!!open.garantia} onToggle={() => toggle('garantia')}>
@@ -1587,11 +1728,13 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           </Accordion>
 
           {/* ---- Informações Básicas (colapsável com +/lixeira) ---- */}
-          <Accordion title="Informações Básicas" icon={<DollarSign className="w-4 h-4 text-emerald-600" />} open={!!open.basicas} onToggle={() => toggle('basicas')}>
+          <Accordion title={somenteMaterial ? 'Condições Comerciais' : 'Informações Básicas'} icon={<DollarSign className="w-4 h-4 text-emerald-600" />} open={!!open.basicas} onToggle={() => toggle('basicas')}>
             <div className="space-y-2.5">
-              <BasicInfoRow label="Prazo de Execução" value={prazoExecucao} onChange={setPrazoExecucao} placeholder="Ex.: 10 dias úteis após liberação" />
-              <BasicInfoRow label="Faturamento" value={faturamento} onChange={setFaturamento} placeholder="Ex.: Nota Fiscal de Serviços" />
+              <BasicInfoRow label={somenteMaterial ? 'Prazo de entrega' : 'Prazo de Execução'} value={prazoExecucao} onChange={setPrazoExecucao} placeholder={somenteMaterial ? 'Ex.: Até 10 dias úteis após a confirmação do pedido' : 'Ex.: 10 dias úteis após liberação'} />
+              <BasicInfoRow label="Faturamento" value={faturamento} onChange={setFaturamento} placeholder={somenteMaterial ? 'Ex.: Nota Fiscal de Venda' : 'Ex.: Nota Fiscal de Serviços'} />
+              {!somenteMaterial && (
               <BasicInfoRow label="Impostos" value={impostos} onChange={setImpostos} placeholder="Ex.: Inclusos, Simples Nacional" />
+              )}
               <div className="flex items-end gap-2 pt-1">
                 <div className="w-28">
                   <label className={labelCls}>Validade (dias)</label>
@@ -1604,6 +1747,22 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               </div>
             </div>
           </Accordion>
+
+          {/* ---- Observações comerciais (SOMENTE MATERIAL) ---- */}
+          {somenteMaterial && (
+            <Accordion title="Observações" icon={<FileText className="w-4 h-4 text-primary" />} open={!!open.observacoes} onToggle={() => toggle('observacoes')}>
+              <textarea
+                rows={3}
+                value={observacoesComerciais}
+                onChange={(e) => setObservacoesComerciais(e.target.value)}
+                placeholder={OBS_DISPONIBILIDADE}
+                className={inputCls}
+              />
+              <p className="text-[11px] text-fg-muted mt-1">
+                Observações livres do orçamento. O aviso de que o fornecimento não inclui instalação/serviços já entra automaticamente no documento.
+              </p>
+            </Accordion>
+          )}
 
           {/* ---- Modelos reutilizáveis ---- */}
           {(templates.length > 0 || onSaveTemplate) && (

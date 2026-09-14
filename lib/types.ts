@@ -160,6 +160,19 @@ export interface CommercialProposalData {
    * migração de coluna). Usado para escolher o documento padrão ao gerar PDF.
    */
   pedidoTipo?: PedidoTipo;
+  /**
+   * Modalidade comercial (natureza da relação). Ausente = fluxo histórico
+   * completo. 'somente_material' aciona o Orçamento Comercial de Fornecimento
+   * (enxuto) e adapta o editor. Guardado no JSONB — sem migração. Ver
+   * [[commercialTotals]] e [[FornecimentoMateriaisDocument]].
+   */
+  modalidade?: ModalidadeComercial;
+  /** SOMENTE MATERIAL — frete. Só 'valor' soma no total geral. */
+  frete?: FreteInfo;
+  /** SOMENTE MATERIAL — impostos adicionais. Só 'valor' soma no total geral. */
+  impostosAdicionais?: ImpostosAdicionaisInfo;
+  /** SOMENTE MATERIAL — observações comerciais livres (bloco "Observações"). */
+  observacoesComerciais?: string;
   /** Rastreabilidade do levantamento que originou este pedido (uso interno). */
   surveyOrigin?: {
     reportId: string;
@@ -355,6 +368,31 @@ export type DocumentType =
 
 /** Classificação do pedido, usada para decidir o documento padrão. */
 export type PedidoTipo = 'orcamento' | 'proposta' | 'servico' | 'fornecimento' | 'laudo';
+
+/**
+ * Modalidade comercial do pedido (natureza da relação). Ausente/undefined =
+ * comportamento histórico (documento comercial completo). 'somente_material'
+ * é a venda pura de produtos: o editor oculta as seções de execução técnica e
+ * o documento sai como "Orçamento Comercial — Fornecimento de Materiais".
+ * 'servico' e 'material_servico' mantêm exatamente o fluxo atual.
+ */
+export type ModalidadeComercial = 'servico' | 'material_servico' | 'somente_material';
+
+/** Frete (usado na modalidade SOMENTE MATERIAL). Só 'valor' entra no total. */
+export type FreteModo = 'incluso' | 'nao_incluso' | 'a_combinar' | 'valor';
+export interface FreteInfo {
+  modo: FreteModo;
+  /** Valor em R$ quando modo = 'valor'. */
+  valor?: number;
+}
+
+/** Impostos adicionais (SOMENTE MATERIAL). Só 'valor' entra no total. */
+export type ImpostoAdicionalModo = 'inclusos' | 'nao_inclusos' | 'valor';
+export interface ImpostosAdicionaisInfo {
+  modo: ImpostoAdicionalModo;
+  /** Valor adicional em R$ quando modo = 'valor'. */
+  valor?: number;
+}
 
 /**
  * Config nível-empresa: documento padrão para cada tipo de pedido.

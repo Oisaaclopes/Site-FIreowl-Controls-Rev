@@ -11,6 +11,7 @@ import { renderWarranty } from '@/lib/commercialWarranty';
 import { normalizeUnitCode } from '@/lib/commercialUnits';
 import { lineTotal } from '@/lib/commercialTotals';
 import { montarEstruturaProposta, ordenarEstrutura } from '@/lib/propostaEstrutura';
+import { FornecimentoMateriaisDocument } from '@/components/documentos/FornecimentoMateriaisDocument';
 import {
   CARTA_APRESENTACAO,
   SERVICOS_OFERTADOS,
@@ -998,6 +999,24 @@ export function PropostaDocument({
   companyProfile: CompanyProfile;
   options?: PropostaPdfOptions;
 }) {
+  // SOMENTE MATERIAL → mesmo documento comercial enxuto usado no orçamento, para
+  // que a pré-visualização e a proposta reflitam a modalidade imediatamente.
+  if (pedido.proposal?.modalidade === 'somente_material') {
+    return (
+      <FornecimentoMateriaisDocument
+        pedido={pedido}
+        companyProfile={companyProfile}
+        verifKind="proposta"
+        options={{
+          showLogo: options?.showLogo,
+          showValorUnitario: options?.detailedSubtotal,
+          showSubtotal: options?.detailedSubtotal,
+          capaImagemUrl: options?.capaImagemUrl,
+          logoUrl: options?.logoUrl,
+        }}
+      />
+    );
+  }
   const p = normalizeCommercialProposalData(pedido.proposal);
   const warrantyView = renderWarranty(p.warranty);
   const razao = companyProfile.razaoSocial || 'Fireowl Controls';
