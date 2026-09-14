@@ -65,12 +65,14 @@ function rowToItem(r: any): TechnicalCatalogItem {
  * com saldo 0 continua selecionável para IDENTIFICAÇÃO (§28). Falha de rede/
  * permissão degrada para lista vazia (a UI oferece identificação manual).
  */
+export const TECHNICAL_CATALOG_COLUMNS = 'id,code,name,category,subcategory,brand,model,product_line,unit,image_url,technologies,short_description,technical_description,recommended_use,datasheet_url,system_type,product_type,catalog_status,market_segment,canonical_taxonomy_id';
+
 export async function fetchTechnicalCatalog(): Promise<TechnicalCatalogItem[]> {
   try {
     const supabase = getSupabaseClient() as any;
     const { data, error } = await supabase
       .from('technical_catalog')
-      .select('*')
+      .select(TECHNICAL_CATALOG_COLUMNS)
       .order('brand', { ascending: true });
     if (error) return [];
     return (data || []).map(rowToItem);

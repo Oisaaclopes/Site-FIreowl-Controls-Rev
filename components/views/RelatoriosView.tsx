@@ -22,6 +22,7 @@ import {
 import { ALL_TEMPLATES, seedReportTemplates } from '@/lib/reportTemplatesData';
 import { TemplateSchema } from '@/lib/reportSchema';
 import { CatalogSources } from '@/components/reports/FormEngine';
+import { canManageCatalog } from '@/lib/rbac';
 import { buildBaseReportCatalog } from '@/lib/reportCatalog';
 import { ReportForm } from '@/components/reports/ReportForm';
 import { isSupabaseConfigured } from '@/lib/inventory';
@@ -195,7 +196,6 @@ const OS_TIPO_LABEL: Record<string, string> = {
 
 export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   clients,
-  inventory,
   services,
   contracts,
   brands,
@@ -217,6 +217,14 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   onNavigateToPedidos,
 }) => {
   const isTecnico = userRole === 'TECNICO';
+  const canEditCatalog = canManageCatalog(userRole);
+  const [technicalItems, setTechnicalItems] = useState<TechnicalCatalogItem[]>([]);
+  useEffect(() => {
+    let active = true;
+    fetchTechnicalCatalog().then((items) => { if (active) setTechnicalItems(items); });
+    return () => { active = false; };
+  }, []);
+
   const isFinanceiro = userRole === 'FINANCEIRO';
   const canCreate = !isFinanceiro; // §6.1 RBAC: criar relatório — admin/gestor/técnico
   const canManage = canHardDeleteReport(userRole); // editar/excluir relatório
@@ -413,6 +421,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const [ppDone, setPpDone] = useState<string | null>(null);
 
   const openProvProduct = (name: string, origem: string) => {
+    if (!canEditCatalog) return;
     // origem 'modelos' → o texto é o modelo (nome fica pro usuário completar);
     // origem 'estoque_servicos' → o texto é o próprio nome do produto.
     setPpName(origem === 'modelos' ? '' : name);
@@ -425,6 +434,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   };
 
   const confirmProvProduct = async () => {
+    if (!canEditCatalog) return;
     const nome = (ppName.trim() || ppModel.trim());
     if (!nome || ppSaving) return;
     const area = (formTemplate?.area as string) || 'SDAI';
@@ -450,7 +460,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 
   // Marcas conhecidas (catálogo de marcas + marcas de produtos do Estoque),
   // deduplicadas ignorando maiúsc./minúsc. — base para evitar duplicatas.
-  const marcaOptions = uniqCI([...(brands?.map((b) => b.name) || []), ...inventory.map((i) => i.brand || '')]);
+  const marcaOptions = uniqCI([...(brands?.map((b) => b.name) || []), ...technicalItems.map((i) => i.brand || '')]);
 
   // Cadastro de MARCA (fabricante) — janela de verdade, disparada ao "Cadastrar
   // nova marca" no relatório. Evita marca solta/duplicada e permite vincular a
@@ -463,6 +473,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   const [bDone, setBDone] = useState<string | null>(null);
 
   const openBrand = (name: string) => {
+    if (!canEditCatalog) return;
     setBName(name);
     setBCategoria((formTemplate?.area as string) || 'SDAI');
     setBFornecedor('');
@@ -475,6 +486,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   // Marcas removíveis (as que têm id, ou seja, vindas do catálogo de marcas).
   const removableBrands = (brands || []).filter((b): b is { id: string; name: string; category?: string } => !!b.id);
   const handleRemoveBrand = async (id: string, nome: string) => {
+    if (!canEditCatalog) return;
     if (!onDeletePartnerBrand) return;
     if (!await requestConfirm(`Remover a marca "${nome}" do catálogo?`)) return;
     onDeletePartnerBrand(id);
@@ -688,8 +700,8 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   // Montagem base extraída para lib/reportCatalog (compartilhada com o
   // AttendanceScreen). Saída idêntica à anterior — nenhuma mudança de wizard.
   const catalog: CatalogSources = useMemo(
-    () => buildBaseReportCatalog({ inventory, services, brands, contracts }),
-    [inventory, services, brands, contracts]
+    () => buildBaseReportCatalog({ inventory: technicalItems, services, brands, contracts }),
+    [technicalItems, services, brands, contracts]
   );
 
   // Contagem de pendências por relatório de origem
@@ -862,14 +874,14 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   // de estoque/serviços (genéricas, sem área) seguem disponíveis.
   const formArea = ((formTemplate?.area as AreaFalha) || 'SDAI') as AreaFalha;
   const gruposDaArea = uniq(falhasPorArea(formArea).map((f) => f.grupo));
-  // Lista pré-pronta de dispositivos (preventiva): produtos do Estoque da mesma
+  // Lista pré-pronta de dispositivos (preventiva): catálogo técnico da mesma
   // disciplina do relatório, agrupados por subcategoria. Assim a preventiva SDAI
   // oferece os dispositivos SDAI cadastrados (ex.: catálogo Intelbras/Vision).
   const areaCategory = AREA_TO_CATEGORY[formArea] || '';
   const dispositivosPadrao = (() => {
     type DefaultDeviceItems = NonNullable<CatalogSources['dispositivosPadrao']>[number]['itens'];
     const grouped: Record<string, DefaultDeviceItems> = {};
-    inventory
+    technicalItems
       .filter((i) => areaCategory && i.category === areaCategory)
       .forEach((i) => {
         const g = i.subcategory || 'Outros';
@@ -880,7 +892,6 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
             nome: i.name,
             marca: i.brand,
             modelo: i.model,
-            quantidade: i.quantity,
             unidade: i.unit,
           });
         }
@@ -891,11 +902,11 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   })();
   const formCatalog: CatalogSources = {
     ...catalog,
-    marcas: manufacturersForArea(inventory, areaCategory),
-    modelosPorMarca: Object.fromEntries(manufacturersForArea(inventory, areaCategory).map(brand=>[brand,centralModelsForBrand(inventory,areaCategory,brand).map(i=>i.model||i.name)])),
-    modelosPorGrupo: {...catalog.modelosPorGrupo,centrais_sdai:inventory.filter(i=>i.category==='SDAI'&&/central/i.test(`${i.subcategory||''} ${i.name}`)).map(i=>i.model||i.name)},
-    detalhesModelo: Object.fromEntries(inventory.map(i=>[i.model||i.name,{marca:i.brand,linha:i.productLine,resumo:i.shortDescription||i.technicalDescription,tecnologias:i.technologies,indicacao:i.recommendedUse,tipoCentral:centralType(i)}])),
-    categorias: uniq([...gruposDaArea, ...inventory.map((i) => i.category), ...services.map((s) => s.category)]),
+    marcas: manufacturersForArea(technicalItems, areaCategory),
+    modelosPorMarca: Object.fromEntries(manufacturersForArea(technicalItems, areaCategory).map(brand=>[brand,centralModelsForBrand(technicalItems,areaCategory,brand).map(i=>i.model||i.name)])),
+    modelosPorGrupo: {...catalog.modelosPorGrupo,centrais_sdai:technicalItems.filter(i=>i.category==='SDAI'&&/central/i.test(`${i.subcategory||''} ${i.name}`)).map(i=>i.model||i.name)},
+    detalhesModelo: Object.fromEntries(technicalItems.map(i=>[i.model||i.name,{marca:i.brand,linha:i.productLine,resumo:i.shortDescription||i.technicalDescription,tecnologias:i.technologies,indicacao:i.recommendedUse,tipoCentral:centralType(i)}])),
+    categorias: uniq([...gruposDaArea, ...technicalItems.map((i) => i.category || ''), ...services.map((s) => s.category)]),
     dispositivosPadrao,
     // Dispositivos da área escolhida (Corretiva) — alimenta "dispositivos afetados".
     devices: formAreaDevices.map((d) => ({
@@ -1178,7 +1189,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         ciclo={formCiclo}
         fieldMode={formTemplate.tipo === 'PREVENTIVA' || formTemplate.tipo === 'LEVANTAMENTO' || (formContext.osId && formTemplate.tipo === 'CORRETIVA') ? 'rapido' : 'completo'}
         attendanceTitle={attendanceMode === 'AUDITORIA' ? 'Auditoria Técnica — SDAI' : undefined}
-        onCreateCatalogo={(origem, name) => {
+        onCreateCatalogo={canEditCatalog ? (origem, name) => {
           // Marca nova → abre a janela de cadastro de marca (não cria nada solto).
           if (origem === 'marcas') {
             openBrand(name);
@@ -1189,7 +1200,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
           if (origem === 'modelos' || origem === 'estoque_servicos') {
             openProvProduct(name, origem);
           }
-        }}
+        } : undefined}
         onBack={() => setMode('index')}
         onSaved={refresh}
         onConsumeMaterials={onConsumeMaterials}

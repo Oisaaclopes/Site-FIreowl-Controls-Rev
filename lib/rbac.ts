@@ -29,4 +29,7 @@ export const allowedTabs = (role: UserRole): TabPath[] => ROLE_TABS[role] || ROL
 /** Redefinir a senha de outro usuário é exclusivo do ADMINISTRATIVO (Fase B). */
 export const canResetUserPassword = (role: UserRole): boolean => role === 'ADMINISTRATIVO';
 
+/** Identificação em campo é leitura; gestão de produtos/marcas segue restrita. */
+export const canManageCatalog = (role: UserRole): boolean => role === 'ADMINISTRATIVO' || role === 'GESTOR';
+
 export const isTabAllowed = (role: UserRole, tab: TabPath): boolean => allowedTabs(role).includes(tab);

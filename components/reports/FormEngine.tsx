@@ -61,7 +61,8 @@ export interface CatalogSources {
       nome: string;
       marca?: string;
       modelo?: string;
-      quantidade: number;
+      /** Catálogo técnico é identificação, não estoque — saldo pode não existir. */
+      quantidade?: number;
       unidade?: string;
     }[];
   }[];
@@ -355,7 +356,7 @@ const FieldControl: React.FC<{
     case 'autocomplete_catalogo': {
       const opts = catalogOptions(field, catalog, filtroValor);
       const known = opts.includes((value as string) || '');
-      const createLabel = createLabelFor(field.origem);
+      const createLabel = onCreateCatalogo ? createLabelFor(field.origem) : undefined;
       const detail = field.origem === 'modelos' ? catalog.detalhesModelo?.[String(value || '')] : undefined;
       return (
         <>
@@ -501,7 +502,6 @@ const Repeater: React.FC<{
   const [pickerQuery, setPickerQuery] = useState('');
   const [pickerSubcategory, setPickerSubcategory] = useState('');
   const [pickerBrand, setPickerBrand] = useState('');
-  const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [selectedDeviceIds, setSelectedDeviceIds] = useState<Set<string>>(() => new Set());
   // Lista pré-pronta só faz sentido no checklist de dispositivos (preventiva).
   const dispositivosPadrao =
@@ -552,10 +552,9 @@ const Repeater: React.FC<{
       const haystack = [item.nome, item.marca, item.modelo, item.grupo].filter(Boolean).join(' ').toLocaleLowerCase('pt-BR');
       return (!pickerSubcategory || item.grupo === pickerSubcategory)
         && (!pickerBrand || item.marca === pickerBrand)
-        && (!onlyAvailable || item.quantidade > 0)
         && (!query || haystack.includes(query));
     });
-  }, [flatDevices, onlyAvailable, pickerBrand, pickerQuery, pickerSubcategory]);
+  }, [flatDevices, pickerBrand, pickerQuery, pickerSubcategory]);
   const toggleDevice = (id: string) => setSelectedDeviceIds((current) => {
     const next = new Set(current);
     next.has(id) ? next.delete(id) : next.add(id);
@@ -708,7 +707,6 @@ const Repeater: React.FC<{
               setPickerQuery('');
               setPickerSubcategory('');
               setPickerBrand('');
-              setOnlyAvailable(false);
               setSelectedDeviceIds(new Set());
               setPickerOpen(true);
             }}
@@ -758,9 +756,6 @@ const Repeater: React.FC<{
                   <option value="">Todas as marcas</option>
                   {brands.map((value) => <option key={value} value={value}>{value}</option>)}
                 </select>
-                <label className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-fg-secondary border border-border rounded-lg cursor-pointer">
-                  <input type="checkbox" checked={onlyAvailable} onChange={(e) => setOnlyAvailable(e.target.checked)} className="accent-[#1A1A72]" /> Em estoque
-                </label>
               </div>
               <div className="flex items-center justify-between text-[11px] text-fg-secondary">
                 <span><strong className="text-fg">{filteredDevices.length}</strong> dispositivo(s) encontrado(s)</span>
@@ -777,7 +772,7 @@ const Repeater: React.FC<{
                         <span className="block text-xs font-semibold text-fg-secondary truncate">{item.nome}</span>
                         <span className="block text-[10px] text-fg-secondary truncate">{[item.grupo, item.marca, item.modelo].filter(Boolean).join(' · ') || 'Sem detalhes de catálogo'}</span>
                       </span>
-                      <span className={`shrink-0 text-[10px] font-bold ${item.quantidade > 0 ? 'text-emerald-700' : 'text-amber-700'}`}>{alreadyAdded ? 'Já adicionado' : `${item.quantidade} ${item.unidade || 'un.'}`}</span>
+                      {alreadyAdded && <span className="shrink-0 text-[10px] font-bold text-fg-muted">Já adicionado</span>}
                     </button>
                   );
                 })}
