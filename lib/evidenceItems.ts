@@ -1,5 +1,5 @@
 import { getSupabaseClient } from './supabaseClient';
-import { EvidenceItemCategory, ServiceAttendanceEvidenceItem } from './types';
+import { EvidenceItemCategory, NaturezaIntervencao, ServiceAttendanceEvidenceItem } from './types';
 import { FieldPhoto, FieldPhotoMoment } from './fieldPhotos';
 import { subcategoriesForArea, TechnicalCatalogItem } from './technicalCatalog';
 
@@ -26,6 +26,7 @@ function rowToItem(r: any): ServiceAttendanceEvidenceItem {
     workOrderId: r.work_order_id ?? undefined,
     title: r.title ?? '',
     category: (r.category || 'EQUIPAMENTO') as EvidenceItemCategory,
+    naturezaIntervencao: (r.natureza_intervencao ?? undefined) as NaturezaIntervencao | undefined,
     equipmentType: r.equipment_type ?? undefined,
     location: r.location ?? undefined,
     deviceAddress: r.device_address ?? undefined,
@@ -56,6 +57,7 @@ function itemToRow(i: Partial<ServiceAttendanceEvidenceItem>): Record<string, un
   if (i.workOrderId !== undefined) row.work_order_id = i.workOrderId ?? null;
   if (i.title !== undefined) row.title = i.title;
   if (i.category !== undefined) row.category = i.category;
+  if (i.naturezaIntervencao !== undefined) row.natureza_intervencao = i.naturezaIntervencao || null;
   if (i.equipmentType !== undefined) row.equipment_type = i.equipmentType || null;
   if (i.location !== undefined) row.location = i.location || null;
   if (i.deviceAddress !== undefined) row.device_address = i.deviceAddress || null;
@@ -214,4 +216,80 @@ export function hasEquipment(e?: EquipmentRef | null): boolean {
 /** "Fabricante · Modelo" (ou vazio). */
 export function equipmentLabel(e?: EquipmentRef | null): string {
   return [e?.brand, e?.model].map((x) => (x || '').trim()).filter(Boolean).join(' · ');
+}
+
+/* ------------- Natureza da intervenção (0112) — helpers PUROS ------------- */
+
+export const NATUREZA_LABEL: Record<NaturezaIntervencao, string> = {
+  MANUTENCAO: 'Manutenção',
+  INSTALACAO: 'Instalação',
+  SUBSTITUICAO: 'Substituição',
+};
+
+/** Natureza efetiva para renderização: item legado (undefined) = MANUTENCAO
+ *  (§11 — nunca reescreve o registro; só interpreta o histórico). */
+export function effectiveNature(nature?: NaturezaIntervencao): NaturezaIntervencao {
+  return nature || 'MANUTENCAO';
+}
+
+/** Um "slot" de foto de um item, já com o rótulo adequado à natureza. O momento
+ *  físico persistido em field_photos continua sendo ANTES/DURANTE/DEPOIS; só o
+ *  rótulo apresentado muda. `optional` marca slots que não são obrigatórios. */
+export interface MomentSlot { moment: FieldPhotoMoment; label: string; short: string; optional?: boolean; }
+
+/** Slots ordenados por natureza. NÃO mostra Antes/Durante/Depois artificialmente
+ *  em instalação (§7/§10): instalação usa "Local antes" (opcional) → "Instalado"
+ *  → "Teste"; substituição usa "Anterior" → "Novo" → "Teste"; manutenção mantém
+ *  Antes/Durante/Depois. Puro e testável. */
+export function momentSlotsForNature(nature?: NaturezaIntervencao): MomentSlot[] {
+  switch (effectiveNature(nature)) {
+    case 'INSTALACAO':
+      return [
+        { moment: 'ANTES', label: 'Local antes da instalação', short: 'Local antes', optional: true },
+        { moment: 'DEPOIS', label: 'Equipamento instalado', short: 'Instalado' },
+        { moment: 'DURANTE', label: 'Teste / comissionamento', short: 'Teste', optional: true },
+      ];
+    case 'SUBSTITUICAO':
+      return [
+        { moment: 'ANTES', label: 'Equipamento anterior', short: 'Anterior' },
+        { moment: 'DEPOIS', label: 'Novo equipamento instalado', short: 'Novo' },
+        { moment: 'DURANTE', label: 'Teste / comissionamento', short: 'Teste', optional: true },
+      ];
+    case 'MANUTENCAO':
+    default:
+      return [
+        { moment: 'ANTES', label: 'Antes', short: 'Antes' },
+        { moment: 'DURANTE', label: 'Durante', short: 'Durante', optional: true },
+        { moment: 'DEPOIS', label: 'Depois', short: 'Depois' },
+      ];
+  }
+}
+
+/** Rótulo de um momento para uma dada natureza (fallback: título canônico). */
+export function momentLabelForNature(nature: NaturezaIntervencao | undefined, moment: FieldPhotoMoment): string {
+  return momentSlotsForNature(nature).find((s) => s.moment === moment)?.label
+    ?? ({ ANTES: 'Antes', DURANTE: 'Durante', DEPOIS: 'Depois', CENTRAL_ANTES: 'Central na chegada', CENTRAL_DEPOIS: 'Central na saída' }[moment]);
+}
+
+/** Instalação NÃO exige foto ANTES (§3/§7): a foto de criação do item só é
+ *  obrigatória/forçada em manutenção. Em instalação/substituição a criação do
+ *  item não deve forçar um "antes". */
+export function requiresBeforePhotoOnCreate(nature?: NaturezaIntervencao): boolean {
+  return effectiveNature(nature) === 'MANUTENCAO';
+}
+
+/** Momento físico da PRIMEIRA foto ao criar o item, por natureza. Manutenção e
+ *  substituição começam pelo estado inicial (ANTES = existente/anterior);
+ *  instalação começa pelo equipamento INSTALADO (DEPOIS) — não há "antes". */
+export function createPhotoMomentForNature(nature?: NaturezaIntervencao): FieldPhotoMoment {
+  return effectiveNature(nature) === 'INSTALACAO' ? 'DEPOIS' : 'ANTES';
+}
+
+/** Rótulo de resultado contextual por natureza, mapeado para o enum canônico
+ *  (§9 — sem enum paralelo). Só apresentação; a persistência continua no enum. */
+export function resultLabelForNature(result: 'RESOLVIDO' | 'PARCIALMENTE_RESOLVIDO' | 'NAO_RESOLVIDO', nature?: NaturezaIntervencao): string {
+  if (effectiveNature(nature) === 'INSTALACAO' || effectiveNature(nature) === 'SUBSTITUICAO') {
+    return { RESOLVIDO: 'Instalado e testado', PARCIALMENTE_RESOLVIDO: 'Instalado com pendência', NAO_RESOLVIDO: 'Não concluído' }[result];
+  }
+  return { RESOLVIDO: 'Resolvido', PARCIALMENTE_RESOLVIDO: 'Parcialmente resolvido', NAO_RESOLVIDO: 'Não resolvido' }[result];
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildEvidenceCategoryOptions, coarseFromSubcategory, countPhotosByMoment, equipmentLabel, equipmentToFinalItemFields, equipmentToItemFields, hasEquipment, itemEquipmentAfter, itemEquipmentBefore, photosForItemMoment } from './evidenceItems';
+import { buildEvidenceCategoryOptions, coarseFromSubcategory, countPhotosByMoment, equipmentLabel, equipmentToFinalItemFields, equipmentToItemFields, hasEquipment, itemEquipmentAfter, itemEquipmentBefore, photosForItemMoment, effectiveNature, momentSlotsForNature, momentLabelForNature, createPhotoMomentForNature, requiresBeforePhotoOnCreate, resultLabelForNature, NATUREZA_LABEL } from './evidenceItems';
 import type { ServiceAttendanceEvidenceItem } from './types';
 import { FieldPhoto, FieldPhotoMoment } from './fieldPhotos';
 import { TechnicalCatalogItem } from './technicalCatalog';
@@ -100,6 +100,60 @@ describe('substituição de equipamento — Antes × Depois (§21P–§21W)', ()
     const it = item({ manufacturer: 'Tecnohold', model: 'SAVE485TH' });
     expect(hasEquipment(itemEquipmentAfter(it))).toBe(false);
     expect(hasEquipment(itemEquipmentBefore(it))).toBe(true);
+  });
+});
+
+describe('natureza da intervenção (0112 — MANUTENCAO × INSTALACAO × SUBSTITUICAO)', () => {
+  it('§11/§14.10 item legado (sem natureza) é tratado como MANUTENCAO na renderização', () => {
+    expect(effectiveNature(undefined)).toBe('MANUTENCAO');
+    // rótulos legados = Antes/Durante/Depois (não reescreve o registro)
+    expect(momentSlotsForNature(undefined).map((s) => s.short)).toEqual(['Antes', 'Durante', 'Depois']);
+  });
+
+  it('§14.1 manutenção mantém o fluxo Antes/Durante/Depois e começa por ANTES', () => {
+    expect(momentSlotsForNature('MANUTENCAO').map((s) => s.moment)).toEqual(['ANTES', 'DURANTE', 'DEPOIS']);
+    expect(createPhotoMomentForNature('MANUTENCAO')).toBe('ANTES');
+    expect(requiresBeforePhotoOnCreate('MANUTENCAO')).toBe(true);
+  });
+
+  it('§3/§14.2 instalação NÃO obriga foto ANTES: a 1ª foto é o equipamento INSTALADO (DEPOIS)', () => {
+    expect(createPhotoMomentForNature('INSTALACAO')).toBe('DEPOIS');
+    expect(requiresBeforePhotoOnCreate('INSTALACAO')).toBe(false);
+    const slots = momentSlotsForNature('INSTALACAO');
+    // "Local antes" existe mas é OPCIONAL; a evidência principal é o instalado.
+    const localAntes = slots.find((s) => s.moment === 'ANTES');
+    expect(localAntes?.optional).toBe(true);
+    expect(localAntes?.short).toBe('Local antes');
+    expect(slots.find((s) => s.moment === 'DEPOIS')?.short).toBe('Instalado');
+    // NÃO aparece "Antes" cru em instalação (§7/§10).
+    expect(slots.some((s) => s.short === 'Antes')).toBe(false);
+    expect(momentLabelForNature('INSTALACAO', 'DEPOIS')).toBe('Equipamento instalado');
+  });
+
+  it('§4/§14.5-6 substituição rotula anterior → novo e começa pelo anterior (ANTES)', () => {
+    const slots = momentSlotsForNature('SUBSTITUICAO');
+    expect(slots.find((s) => s.moment === 'ANTES')?.short).toBe('Anterior');
+    expect(slots.find((s) => s.moment === 'DEPOIS')?.short).toBe('Novo');
+    expect(createPhotoMomentForNature('SUBSTITUICAO')).toBe('ANTES');
+  });
+
+  it('§9 resultado contextual mapeia para o enum canônico, sem enum paralelo', () => {
+    expect(resultLabelForNature('RESOLVIDO', 'INSTALACAO')).toBe('Instalado e testado');
+    expect(resultLabelForNature('PARCIALMENTE_RESOLVIDO', 'INSTALACAO')).toBe('Instalado com pendência');
+    expect(resultLabelForNature('NAO_RESOLVIDO', 'SUBSTITUICAO')).toBe('Não concluído');
+    // manutenção mantém a linguagem canônica
+    expect(resultLabelForNature('RESOLVIDO', 'MANUTENCAO')).toBe('Resolvido');
+    expect(resultLabelForNature('RESOLVIDO', undefined)).toBe('Resolvido');
+  });
+
+  it('rótulos das três naturezas', () => {
+    expect(NATUREZA_LABEL).toEqual({ MANUTENCAO: 'Manutenção', INSTALACAO: 'Instalação', SUBSTITUICAO: 'Substituição' });
+  });
+
+  it('§6/§8 identificação de equipamento nunca traz custo/preço/fornecedor (só catálogo técnico)', () => {
+    // Reforça o RBAC: o mapeamento catálogo→item só expõe fabricante/modelo/id.
+    const mapped = equipmentToItemFields({ catalogItemId: 'inv1', brand: 'Intelbras', model: 'ANM 24' } as any);
+    expect(Object.keys(mapped).sort()).toEqual(['catalogItemId', 'manufacturer', 'model']);
   });
 });
 

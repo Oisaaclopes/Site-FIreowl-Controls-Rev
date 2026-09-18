@@ -1714,12 +1714,20 @@ export type AttendanceSignatureStatus = 'SIGNED' | 'UNAVAILABLE' | 'REFUSED';
  *  agrega N fotos por momento (Antes/Durante/Depois). Ver migração 0088. */
 export type EvidenceItemCategory = 'EQUIPAMENTO' | 'INFRAESTRUTURA' | 'CABEAMENTO' | 'CENTRAL' | 'OUTRO';
 
+/** Natureza da intervenção do ITEM (0112). Pertence à intervenção, não ao
+ *  Atendimento: um mesmo Atendimento pode conter as três ao mesmo tempo.
+ *  undefined = item histórico anterior à 0112 = tratar como MANUTENCAO. */
+export type NaturezaIntervencao = 'MANUTENCAO' | 'INSTALACAO' | 'SUBSTITUICAO';
+
 export interface ServiceAttendanceEvidenceItem {
   id: string;
   serviceAttendanceId: string;
   workOrderId?: string;
   title: string;
   category: EvidenceItemCategory;
+  /** Natureza da intervenção deste item (0112). Escolha explícita do técnico em
+   *  itens novos; undefined em itens legados (renderiza como manutenção). */
+  naturezaIntervencao?: NaturezaIntervencao;
   /** Tipo/família técnica da taxonomia (technical_catalog.subcategory), 3B.4+. */
   equipmentType?: string;
   location?: string;

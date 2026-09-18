@@ -1,4 +1,4 @@
-import { Client, CompanyProfile, OrdemServico, Pedido, ServiceAttendance, ServiceAttendanceEvidenceItem } from './types';
+import { Client, CompanyProfile, NaturezaIntervencao, OrdemServico, Pedido, ServiceAttendance, ServiceAttendanceEvidenceItem } from './types';
 import { fetchServiceAttendances } from './serviceAttendances';
 import { fetchEvidenceItems } from './evidenceItems';
 import { listFieldPhotosForOs, FieldPhoto, FieldPhotoMoment } from './fieldPhotos';
@@ -19,6 +19,9 @@ import { getClientOperationalName, getClientLegalName } from './utils';
 export interface DocEvidencePhoto { id: string; moment?: FieldPhotoMoment; dataUrl?: string; note?: string; brand?: string; model?: string; capturedAt?: string; }
 export interface DocEvidenceItem {
   id: string; title: string; category: string; equipmentType?: string;
+  /** Natureza da intervenção (0112): dirige os rótulos do relatório. undefined =
+   *  item legado = manutenção (Antes/Durante/Depois). */
+  naturezaIntervencao?: NaturezaIntervencao;
   manufacturer?: string; model?: string; deviceAddress?: string; location?: string; notes?: string;
   /** Substituição de equipamento (§21P–§21Y): identificação instalada (depois). */
   equipmentReplaced?: boolean;
@@ -106,6 +109,7 @@ export async function buildOsDocumentData(
   const docAttendances: DocAttendance[] = attendances.map((a, idx) => {
     const its = (itemsByAttendance.get(a.id) || []).map((it): DocEvidenceItem => ({
       id: it.id, title: it.title, category: it.category, equipmentType: it.equipmentType,
+      naturezaIntervencao: it.naturezaIntervencao,
       manufacturer: it.manufacturer, model: it.model, deviceAddress: it.deviceAddress, location: it.location, notes: it.notes,
       equipmentReplaced: it.equipmentReplaced,
       finalManufacturer: it.equipmentFinalManufacturer, finalModel: it.equipmentFinalModel, deviceAddressFinal: it.deviceAddressFinal,

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { EvidenceItemCategory, ServiceAttendanceEvidenceItem } from '@/lib/types';
+import { EvidenceItemCategory, NaturezaIntervencao, ServiceAttendanceEvidenceItem } from '@/lib/types';
 import { FieldPhoto, FieldPhotoMoment, FieldPhotoSession, listFieldPhotosForAttendance, deleteFieldPhoto, updateFieldPhotoMeta } from '@/lib/fieldPhotos';
 import { captureAttendanceEvidence, ensureAttendanceSession } from '@/lib/fieldPhotoCapture';
 import { signedFieldPhotoUrl } from '@/lib/fieldPhotoStorage';
@@ -11,6 +11,7 @@ import { saveAttendanceCentral } from '@/lib/serviceAttendances';
 import {
   buildEvidenceCategoryOptions, createEvidenceItem, deleteEvidenceItem, equipmentToItemFields,
   equipmentToFinalItemFields, EVIDENCE_CATEGORY_LABEL, EvidenceCategoryOption, fetchEvidenceItems, updateEvidenceItem,
+  NATUREZA_LABEL, momentSlotsForNature, momentLabelForNature, createPhotoMomentForNature, effectiveNature,
 } from '@/lib/evidenceItems';
 import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 import { useIsMobile } from '@/lib/useIsMobile';
@@ -65,6 +66,8 @@ export const AttendanceEvidence: React.FC<Props> = ({
   const [catalog, setCatalog] = useState<TechnicalCatalogItem[]>([]);
   const [session, setSession] = useState<FieldPhotoSession | null>(null);
 
+  const [natureSheet, setNatureSheet] = useState(false); // escolha "O que será realizado?"
+  const [pendingNature, setPendingNature] = useState<NaturezaIntervencao>('MANUTENCAO');
   const [newItem, setNewItem] = useState<{ file: File; url: string } | null>(null);
   const [capture, setCapture] = useState<{ file: File; url: string; moment: FieldPhotoMoment; itemId?: string; central?: boolean } | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -199,7 +202,7 @@ export const AttendanceEvidence: React.FC<Props> = ({
       </div>
 
       {items.length === 0 && (
-        <p className="text-[11px] text-fg-muted -mt-1">Registre cada equipamento, infraestrutura ou cabeamento trabalhado como um item, com suas fotos de antes, durante e depois.</p>
+        <p className="text-[11px] text-fg-muted -mt-1">Registre cada equipamento, infraestrutura ou cabeamento como um item e escolha a natureza (manutenção, instalação ou substituição). As fotos se adaptam ao que está sendo feito.</p>
       )}
 
       <div className="flex flex-col gap-2">
@@ -215,12 +218,19 @@ export const AttendanceEvidence: React.FC<Props> = ({
 
       <button
         type="button"
-        onClick={() => trigger({ kind: 'newItem' })}
+        onClick={() => setNatureSheet(true)}
         className="min-h-[48px] rounded-lg border border-dashed border-primary/50 bg-primary-soft/30 text-primary text-sm font-bold uppercase tracking-wide flex items-center justify-center gap-2 hover:bg-primary-soft/50"
       >
-        <span className="material-symbols-outlined text-xl">add_a_photo</span>
+        <span className="material-symbols-outlined text-xl">add</span>
         Novo item
       </button>
+
+      {natureSheet && (
+        <NatureSheet
+          onCancel={() => setNatureSheet(false)}
+          onPick={(nature) => { setPendingNature(nature); setNatureSheet(false); trigger({ kind: 'newItem' }); }}
+        />
+      )}
 
       {isSdai && !naOn && (
         <CentralBlock
@@ -247,7 +257,7 @@ export const AttendanceEvidence: React.FC<Props> = ({
 
       {newItem && (
         <NewItemSheet
-          capture={newItem} catalog={catalog} area={area} categoryOptions={categoryOptions}
+          capture={newItem} nature={pendingNature} catalog={catalog} area={area} categoryOptions={categoryOptions}
           onCancel={() => { URL.revokeObjectURL(newItem.url); setNewItem(null); }}
           onSave={async (form, equipment) => {
             const s = await ensureSession();
@@ -255,12 +265,16 @@ export const AttendanceEvidence: React.FC<Props> = ({
             const created = await createEvidenceItem({
               serviceAttendanceId: attendanceId, workOrderId: osId,
               title: form.title, category: form.category, equipmentType: form.equipmentType,
+              naturezaIntervencao: pendingNature,
               location: form.location || undefined, deviceAddress: form.deviceAddress || undefined,
               notes: form.notes || undefined, ...equipmentToItemFields(equipment),
             });
+            // Momento físico da 1ª foto por natureza (§3/§7): instalação começa
+            // pelo INSTALADO (DEPOIS); manutenção/substituição pelo estado inicial
+            // (ANTES = existente/anterior). Nunca "antes" artificial na instalação.
             const saved = await captureAttendanceEvidence({
               file: newItem.file, session: s, clientId, clientName, osId,
-              serviceAttendanceId: attendanceId, moment: 'ANTES', evidenceItemId: created.id, note: form.notes,
+              serviceAttendanceId: attendanceId, moment: createPhotoMomentForNature(pendingNature), evidenceItemId: created.id, note: form.notes,
               equipmentCatalogItemId: equipment?.catalogItemId, equipmentBrand: equipment?.brand, equipmentModel: equipment?.model,
             });
             addLocal(saved.photo, saved.previewUrl);
@@ -346,13 +360,13 @@ const ItemCard: React.FC<{
   onOpen: () => void; onRegistrarDurante: () => void; onRegistrarDepois: () => void;
 }> = ({ item, photos, previewFor, onOpen, onRegistrarDurante, onRegistrarDepois }) => {
   const mine = photos.filter((p) => p.evidenceItemId === item.id);
-  const nAntes = mine.filter((p) => p.evidenceMoment === 'ANTES').length;
-  const nDurante = mine.filter((p) => p.evidenceMoment === 'DURANTE').length;
-  const nDepois = mine.filter((p) => p.evidenceMoment === 'DEPOIS').length;
-  const thumb = mine.find((p) => p.evidenceMoment === 'ANTES') || mine[0];
+  const slots = momentSlotsForNature(item.naturezaIntervencao);
+  const nOf = (m: FieldPhotoMoment) => mine.filter((p) => p.evidenceMoment === m).length;
+  const thumb = mine.find((p) => p.evidenceMoment === slots[0].moment) || mine[0];
   const thumbUrl = thumb ? previewFor(thumb) : undefined;
   const typeLabel = item.equipmentType || EVIDENCE_CATEGORY_LABEL[item.category];
   const subtitle = [item.model, item.deviceAddress ? `Endereço ${item.deviceAddress}` : '', item.location].filter(Boolean);
+  const nature = effectiveNature(item.naturezaIntervencao);
 
   const Count = ({ label, n }: { label: string; n: number }) => (
     <span className="flex items-center gap-1 text-[10px] font-bold">
@@ -371,15 +385,18 @@ const ItemCard: React.FC<{
             : <span className="material-symbols-outlined text-fg-muted">image</span>}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block font-bold text-fg text-sm truncate">{item.title}</span>
+          <span className="flex items-center gap-1.5">
+            <span className="block font-bold text-fg text-sm truncate">{item.title}</span>
+            <span className="shrink-0 rounded-full bg-surface-3 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-fg-secondary">{NATUREZA_LABEL[nature]}</span>
+          </span>
           <span className="block text-[11px] text-fg-secondary truncate">{typeLabel}</span>
           {subtitle.length > 0 && <span className="block text-[11px] text-fg-muted truncate">{subtitle.join(' · ')}</span>}
         </span>
       </button>
-      <div className="mt-2 flex items-center gap-3"><Count label="Antes" n={nAntes} /><Count label="Durante" n={nDurante} /><Count label="Depois" n={nDepois} /></div>
+      <div className="mt-2 flex items-center gap-3 flex-wrap">{slots.map((s) => <Count key={s.moment} label={s.short} n={nOf(s.moment)} />)}</div>
       <div className="mt-2 flex gap-2">
-        <button type="button" onClick={onRegistrarDurante} className="flex-1 min-h-[40px] rounded-lg border border-border text-fg-secondary text-[11px] font-bold uppercase hover:border-border-strong flex items-center justify-center gap-1"><span className="material-symbols-outlined text-sm">add_a_photo</span>Durante</button>
-        <button type="button" onClick={onRegistrarDepois} className={`flex-1 min-h-[40px] rounded-lg text-[11px] font-bold uppercase flex items-center justify-center gap-1 ${nDepois === 0 ? 'bg-primary text-white hover:bg-primary-hover' : 'border border-border text-fg-secondary hover:border-border-strong'}`}><span className="material-symbols-outlined text-sm">add_a_photo</span>Depois</button>
+        <button type="button" onClick={onRegistrarDurante} className="flex-1 min-h-[40px] rounded-lg border border-border text-fg-secondary text-[11px] font-bold uppercase hover:border-border-strong flex items-center justify-center gap-1"><span className="material-symbols-outlined text-sm">add_a_photo</span>{slots.find((s) => s.moment === 'DURANTE')?.short}</button>
+        <button type="button" onClick={onRegistrarDepois} className={`flex-1 min-h-[40px] rounded-lg text-[11px] font-bold uppercase flex items-center justify-center gap-1 ${nOf('DEPOIS') === 0 ? 'bg-primary text-white hover:bg-primary-hover' : 'border border-border text-fg-secondary hover:border-border-strong'}`}><span className="material-symbols-outlined text-sm">add_a_photo</span>{slots.find((s) => s.moment === 'DEPOIS')?.short}</button>
       </div>
     </div>
   );
@@ -411,13 +428,37 @@ const CentralBlock: React.FC<{
 );
 
 /* -------------------------------------------------------------------------- */
+/* Escolha compacta, mobile-first, da natureza da intervenção deste item (§1).
+ * Linguagem direta, sem burocracia. */
+const NATURE_CHOICES: { nature: NaturezaIntervencao; icon: string; hint: string }[] = [
+  { nature: 'MANUTENCAO', icon: 'build', hint: 'Intervir em equipamento existente' },
+  { nature: 'INSTALACAO', icon: 'add_circle', hint: 'Instalar equipamento novo' },
+  { nature: 'SUBSTITUICAO', icon: 'swap_horiz', hint: 'Trocar equipamento por outro' },
+];
+const NatureSheet: React.FC<{ onCancel: () => void; onPick: (n: NaturezaIntervencao) => void }> = ({ onCancel, onPick }) => (
+  <Sheet title="O que será realizado neste item?" onClose={onCancel}>
+    <div className="flex flex-col gap-2">
+      {NATURE_CHOICES.map((c) => (
+        <button key={c.nature} type="button" onClick={() => onPick(c.nature)}
+          className="flex items-center gap-3 rounded-lg border border-border bg-surface p-3 text-left hover:border-primary hover:bg-primary-soft/30">
+          <span className="material-symbols-outlined text-2xl text-primary">{c.icon}</span>
+          <span className="min-w-0">
+            <span className="block text-sm font-bold text-fg">{NATUREZA_LABEL[c.nature]}</span>
+            <span className="block text-[11px] text-fg-muted">{c.hint}</span>
+          </span>
+        </button>
+      ))}
+    </div>
+  </Sheet>
+);
+
 interface NewItemForm { title: string; category: EvidenceItemCategory; equipmentType?: string; location: string; deviceAddress: string; notes: string; }
 const NewItemSheet: React.FC<{
-  capture: { file: File; url: string };
+  capture: { file: File; url: string }; nature: NaturezaIntervencao;
   catalog: TechnicalCatalogItem[]; area?: string; categoryOptions: EvidenceCategoryOption[];
   onCancel: () => void;
   onSave: (form: NewItemForm, equipment?: EquipmentIdentification) => Promise<void>;
-}> = ({ capture, catalog, area, categoryOptions, onCancel, onSave }) => {
+}> = ({ capture, nature, catalog, area, categoryOptions, onCancel, onSave }) => {
   const toast = useToast();
   const [title, setTitle] = useState('');
   const [titleTouched, setTitleTouched] = useState(false);
@@ -429,6 +470,9 @@ const NewItemSheet: React.FC<{
   const [busy, setBusy] = useState(false);
 
   const showEquipment = !!opt && (opt.coarse === 'EQUIPAMENTO' || opt.coarse === 'CENTRAL');
+  const createSlot = momentSlotsForNature(nature).find((s) => s.moment === createPhotoMomentForNature(nature));
+  const equipmentLabelHint = nature === 'SUBSTITUICAO' ? 'Equipamento anterior (encontrado)'
+    : nature === 'INSTALACAO' ? 'Equipamento a instalar' : 'Equipamento';
 
   const pickCategory = (value: string) => {
     const found = categoryOptions.find((o) => o.value === value);
@@ -445,9 +489,10 @@ const NewItemSheet: React.FC<{
   };
 
   return (
-    <Sheet title="Novo item" onClose={onCancel}>
+    <Sheet title={`Novo item · ${NATUREZA_LABEL[nature]}`} onClose={onCancel}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={capture.url} alt="Prévia" className="max-h-[34vh] w-full rounded-xl bg-slate-900 object-contain" />
+      <p className="-mt-1 text-[10px] font-bold uppercase tracking-wide text-primary">{createSlot?.label || 'Foto'}</p>
       <label className="block">
         <span className="text-[10px] font-bold uppercase text-fg-muted">Categoria</span>
         <PickerField
@@ -465,6 +510,7 @@ const NewItemSheet: React.FC<{
         <label className="block"><span className="text-[10px] font-bold uppercase text-fg-muted">Endereço do dispositivo</span><input value={deviceAddress} onChange={(e) => setDeviceAddress(e.target.value)} placeholder="Ex.: 42" className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25" /></label>
         <label className="block"><span className="text-[10px] font-bold uppercase text-fg-muted">Local / setor</span><input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Ex.: Corredor" className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25" /></label>
       </div>
+      {showEquipment && <p className="text-[10px] font-bold uppercase text-fg-muted -mb-1">{equipmentLabelHint}</p>}
       {showEquipment && <EquipmentIdentifier value={equipment} onChange={setEquipment} catalog={catalog} area={area} subcategory={opt?.subcategory} />}
       <label className="block"><span className="text-[10px] font-bold uppercase text-fg-muted">Observação</span><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Opcional" className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/25" /></label>
       <SheetActions onCancel={onCancel} onConfirm={save} busy={busy} confirmLabel="Salvar item" />
@@ -485,37 +531,52 @@ const CapturePanel: React.FC<{
   const [note, setNote] = useState('');
   const [equipment, setEquipment] = useState<EquipmentIdentification | undefined>();
   const [busy, setBusy] = useState(false);
-  // §21V — no DEPOIS de um item que já tem equipamento identificado, perguntar
-  // se permaneceu o mesmo ou foi substituído (sem redigitar quando não mudou).
+  const nature = effectiveNature(item?.naturezaIntervencao);
+  // Substituição (§4/§21V): no DEPOIS de um item com equipamento identificado,
+  // registra-se o equipamento INSTALADO (novo). Em MANUTENÇÃO perguntamos se
+  // permaneceu o mesmo ou foi trocado; em SUBSTITUIÇÃO a troca já é a natureza
+  // declarada (mostra direto o novo equipamento). Em INSTALAÇÃO não há "antes",
+  // então nunca perguntamos substituição.
   const itemHasEquip = !!item && !!(item.manufacturer || item.model);
-  const askReplacement = capture.moment === 'DEPOIS' && itemHasEquip && !item?.equipmentReplaced;
-  const [subMode, setSubMode] = useState<'same' | 'replaced'>('same');
+  const canReplace = capture.moment === 'DEPOIS' && itemHasEquip && !item?.equipmentReplaced && nature !== 'INSTALACAO';
+  const explicitReplace = nature === 'SUBSTITUICAO';
+  const [subMode, setSubMode] = useState<'same' | 'replaced'>(explicitReplace ? 'replaced' : 'same');
   const [replacement, setReplacement] = useState<EquipmentIdentification | undefined>();
 
   const save = async () => {
     setBusy(true);
     try {
-      const repl = askReplacement && subMode === 'replaced' ? replacement : undefined;
+      const repl = canReplace && subMode === 'replaced' ? replacement : undefined;
       await onSave(note, equipment, repl);
     } catch { setBusy(false); }
   };
   return (
-    <Sheet title={MOMENT_TITLE[capture.moment]} onClose={onCancel}>
+    <Sheet title={momentLabelForNature(item?.naturezaIntervencao, capture.moment)} onClose={onCancel}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={capture.url} alt="Prévia" className="max-h-[40vh] w-full rounded-xl bg-slate-900 object-contain" />
 
-      {askReplacement ? (
+      {canReplace ? (
         <div className="rounded-lg border border-border bg-surface-2 p-2.5 flex flex-col gap-2">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-fg-secondary">O equipamento permaneceu o mesmo?</p>
-          <p className="text-[11px] text-fg-muted -mt-1">{[item?.manufacturer, item?.model].filter(Boolean).join(' · ') || 'Equipamento do item'}</p>
-          <div className="flex gap-2">
-            <button type="button" onClick={() => setSubMode('same')} className={`flex-1 min-h-[40px] rounded-lg text-[11px] font-bold uppercase border ${subMode === 'same' ? 'border-primary bg-primary-soft/50 text-primary' : 'border-border text-fg-secondary'}`}>Sim, o mesmo</button>
-            <button type="button" onClick={() => setSubMode('replaced')} className={`flex-1 min-h-[40px] rounded-lg text-[11px] font-bold uppercase border ${subMode === 'replaced' ? 'border-primary bg-primary-soft/50 text-primary' : 'border-border text-fg-secondary'}`}>Foi substituído</button>
-          </div>
-          {subMode === 'replaced' && (
+          {explicitReplace ? (
             <>
-              <p className="text-[10px] font-bold uppercase text-fg-muted -mb-1">Equipamento instalado (depois)</p>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-fg-secondary">Novo equipamento instalado</p>
+              <p className="text-[11px] text-fg-muted -mt-1">Anterior: {[item?.manufacturer, item?.model].filter(Boolean).join(' · ') || 'equipamento do item'}</p>
               <EquipmentIdentifier value={replacement} onChange={setReplacement} catalog={catalog} area={area} subcategory={item?.equipmentType} />
+            </>
+          ) : (
+            <>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-fg-secondary">O equipamento permaneceu o mesmo?</p>
+              <p className="text-[11px] text-fg-muted -mt-1">{[item?.manufacturer, item?.model].filter(Boolean).join(' · ') || 'Equipamento do item'}</p>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setSubMode('same')} className={`flex-1 min-h-[40px] rounded-lg text-[11px] font-bold uppercase border ${subMode === 'same' ? 'border-primary bg-primary-soft/50 text-primary' : 'border-border text-fg-secondary'}`}>Sim, o mesmo</button>
+                <button type="button" onClick={() => setSubMode('replaced')} className={`flex-1 min-h-[40px] rounded-lg text-[11px] font-bold uppercase border ${subMode === 'replaced' ? 'border-primary bg-primary-soft/50 text-primary' : 'border-border text-fg-secondary'}`}>Foi substituído</button>
+              </div>
+              {subMode === 'replaced' && (
+                <>
+                  <p className="text-[10px] font-bold uppercase text-fg-muted -mb-1">Equipamento instalado (depois)</p>
+                  <EquipmentIdentifier value={replacement} onChange={setReplacement} catalog={catalog} area={area} subcategory={item?.equipmentType} />
+                </>
+              )}
             </>
           )}
         </div>
@@ -567,14 +628,17 @@ const ItemDetail: React.FC<{
   return (
     <Sheet title={item.title} onClose={onClose}>
       <div className="rounded-lg bg-surface-2 p-2.5">
-        <p className="text-[11px] font-bold text-fg">{item.equipmentType || EVIDENCE_CATEGORY_LABEL[item.category]}</p>
-        {subtitle && <p className="text-[11px] text-fg-secondary">{item.equipmentReplaced && (item.equipmentFinalManufacturer || item.equipmentFinalModel) ? <>Antes: {subtitle} <span className="text-fg-muted">→</span> Depois: {[item.equipmentFinalManufacturer, item.equipmentFinalModel].filter(Boolean).join(' ')}</> : subtitle}</p>}
+        <div className="flex items-center gap-1.5">
+          <p className="text-[11px] font-bold text-fg">{item.equipmentType || EVIDENCE_CATEGORY_LABEL[item.category]}</p>
+          <span className="rounded-full bg-surface-3 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-fg-secondary">{NATUREZA_LABEL[effectiveNature(item.naturezaIntervencao)]}</span>
+        </div>
+        {subtitle && <p className="text-[11px] text-fg-secondary">{item.equipmentReplaced && (item.equipmentFinalManufacturer || item.equipmentFinalModel) ? <>Anterior: {subtitle} <span className="text-fg-muted">→</span> Novo: {[item.equipmentFinalManufacturer, item.equipmentFinalModel].filter(Boolean).join(' ')}</> : subtitle}</p>}
         {(item.deviceAddress || item.location) && <p className="text-[11px] text-fg-muted">{[item.deviceAddress ? `Endereço ${item.deviceAddress}` : '', item.location].filter(Boolean).join(' · ')}</p>}
         {item.notes && <p className="mt-1 text-[11px] text-fg-secondary whitespace-pre-wrap">{item.notes}</p>}
       </div>
-      <Row moment="ANTES" label="Antes" />
-      <Row moment="DURANTE" label="Durante" />
-      <Row moment="DEPOIS" label="Depois" />
+      {momentSlotsForNature(item.naturezaIntervencao).map((s) => (
+        <Row key={s.moment} moment={s.moment} label={s.optional ? `${s.label} (opcional)` : s.label} />
+      ))}
       <div className="flex gap-2 pt-1">
         <button type="button" onClick={() => setEditing(true)} className="flex-1 min-h-[44px] rounded-lg border border-border text-fg-secondary text-xs font-bold uppercase hover:border-border-strong">Editar item</button>
         <button type="button" onClick={onDelete} className="min-h-[44px] px-4 rounded-lg bg-red-50 text-red-700 text-xs font-bold uppercase hover:bg-red-100">Excluir</button>
@@ -604,6 +668,7 @@ const ItemEditSheet: React.FC<{
   const [deviceAddressFinal, setDeviceAddressFinal] = useState(item.deviceAddressFinal || '');
   const [busy, setBusy] = useState(false);
   const toast = useToast();
+  const itemNature = effectiveNature(item.naturezaIntervencao);
   const showEquipment = !!opt && (opt.coarse === 'EQUIPAMENTO' || opt.coarse === 'CENTRAL');
   const save = async () => {
     if (!title.trim()) { toast.error('Informe um título.'); return; }
@@ -635,12 +700,14 @@ const ItemEditSheet: React.FC<{
       </div>
       {showEquipment && (
         <>
-          {equipment && <p className="text-[10px] font-bold uppercase text-fg-muted -mb-1">Equipamento encontrado (antes)</p>}
+          {equipment && <p className="text-[10px] font-bold uppercase text-fg-muted -mb-1">{itemNature === 'INSTALACAO' ? 'Equipamento instalado' : itemNature === 'SUBSTITUICAO' ? 'Equipamento anterior' : 'Equipamento encontrado (antes)'}</p>}
           <EquipmentIdentifier value={equipment} onChange={setEquipment} catalog={catalog} area={area} subcategory={opt?.subcategory} />
+          {itemNature !== 'INSTALACAO' && (
           <label className="flex items-center gap-2 text-[12px] font-semibold text-fg-secondary">
             <input type="checkbox" checked={replaced} onChange={(e) => setReplaced(e.target.checked)} className="w-4 h-4 accent-primary" />
             Equipamento foi substituído
           </label>
+          )}
           {replaced && (
             <>
               <p className="text-[10px] font-bold uppercase text-fg-muted -mb-1">Equipamento instalado (depois)</p>
