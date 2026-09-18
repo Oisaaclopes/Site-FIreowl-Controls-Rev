@@ -22,6 +22,22 @@ describe('navigation metadata across reload', () => {
   it('does not serialize operational snapshots', () => {
     expect(navigationUrl('https://fireowl.test/', { pedido: 'p1', diagnosis: 'private' } as never).search).toBe('?pedido=p1');
   });
+  it('opening an attendance over an OS changes the URL (a real history push, not a replace)', () => {
+    // §8/§9/§14: abrir o atendimento a partir do detalhe da OS deve gerar uma
+    // entrada de histórico própria. A URL resultante difere da atual (contém a
+    // OS), então `NavigationSession.update` empurra em vez de substituir — o
+    // Voltar volta à OS, e não ao menu.
+    const base = 'https://fireowl.test/funcionarios/atendimentos/?os=o1';
+    const opened = navigationUrl(base, { atendimento: 'a1' });
+    expect(opened.href).not.toBe(new URL(base).href);
+    expect(parseNavigation(opened.search)).toEqual({ os: 'o1', atendimento: 'a1' });
+  });
+  it('restoring an attendance already in the URL yields no change (no duplicate history entry)', () => {
+    // No reload/deep link a URL já contém o atendimento; reaplicar o mesmo id
+    // produz href idêntico, então `update` não empurra nem duplica a entrada.
+    const current = 'https://fireowl.test/funcionarios/atendimentos/?os=o1&atendimento=a1';
+    expect(navigationUrl(current, { atendimento: 'a1' }).href).toBe(new URL(current).href);
+  });
   it('closing survey retains nearest valid parent', () => {
     const url = navigationUrl('https://fireowl.test/?cliente=c1&aba=base_tecnica&levantamento=s1&etapa=capture', { levantamento: null, etapa: null });
     expect(parseNavigation(url.search)).toEqual({ cliente: 'c1', aba: 'base_tecnica' });

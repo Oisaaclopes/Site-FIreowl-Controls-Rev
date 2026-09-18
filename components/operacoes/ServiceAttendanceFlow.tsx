@@ -516,7 +516,13 @@ export const AttendanceScreen: React.FC<{
 }> = ({ attendance, os: osProp, clients, technicianId, technicianName = '', onClose }) => {
   const { state: navigation, update: navigate } = useNavigation();
   const scrollRef = useNavigationScroll('attendance:' + attendance.id);
-  useEffect(() => { navigate({ atendimento: attendance.id }); }, [attendance.id, navigate]);
+  // Abrir um atendimento é uma NAVEGAÇÃO real (§8/§9/§14): empurra uma entrada
+  // de histórico própria, sem sobrescrever a entrada da OS que a originou. Assim
+  // o Voltar do navegador/celular retorna à OS, não ao módulo/menu. Na
+  // restauração por reload/deep link (AttendanceNavigationRestore) a URL já
+  // contém este `atendimento`; `update` detecta que a URL não muda e não
+  // duplica a entrada. Nunca dispara START/RESUMED — é só sincronização de URL.
+  useEffect(() => { navigate({ atendimento: attendance.id }, true); }, [attendance.id, navigate]);
   useEffect(() => {
     const onPop = () => { if (new URLSearchParams(window.location.search).get('atendimento') !== attendance.id) onClose(); };
     window.addEventListener('popstate', onPop);
