@@ -635,6 +635,10 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
   useDomainRefresh('reports', refresh, mode === 'index');
   useDomainRefresh('pending', refresh, mode === 'index');
   useDomainRefresh('serviceOrders', refresh, mode === 'index');
+  // Levantamentos técnicos finalizados também entram na lista de serviços
+  // finalizados (§5B). Sem esta assinatura, finalizar um survey não invalidava
+  // Relatórios e o documento só aparecia após F5.
+  useDomainRefresh('surveys', refresh, mode === 'index');
 
   // Carrega templates do banco; se vazio e admin, semeia os empacotados.
   const loadTemplates = async () => {
@@ -1850,6 +1854,9 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
           catalog={survey.catalog}
           onClose={() => setSurvey(null)}
           onChanged={() => { if (isSupabaseConfigured()) fetchDevices(survey.clienteId).then((d) => setSurvey((s) => (s ? { ...s, devices: d } : s))).catch(() => {}); }}
+          // Finalização confirmada → recarrega a lista aqui mesmo (garantia direta,
+          // independente do eco do realtime): o levantamento aparece sem F5.
+          onFinalized={() => refresh()}
         />
       )}
 

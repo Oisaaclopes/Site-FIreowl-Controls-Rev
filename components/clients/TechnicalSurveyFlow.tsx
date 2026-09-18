@@ -12,6 +12,7 @@ import { SurveyMode } from '@/lib/technicalBase';
 import { AssetFormValues, emptyAssetValues, firstInvalidField, buildDevicePatch, deviceToAssetValues } from '@/lib/technicalAssetForm';
 import { TechnicalAssetFields } from '@/components/clients/TechnicalAssetFields';
 import { upsertSurvey, finalizeSurvey } from '@/lib/technicalSurveys';
+import { runSurveyFinalize } from '@/lib/surveyFinalize';
 import { persistSurveyAsset, newAssetId } from '@/lib/surveyCapture';
 import { reconcile, summarizeOpenSurvey, ReconRecord, ReconStatus } from '@/lib/reconciliation';
 import { insertPendencia } from '@/lib/pendencias';
@@ -52,6 +53,9 @@ interface Props {
   catalog?: TechnicalCatalogItem[];
   onClose: () => void;
   onChanged: () => void;   // recarrega a base no pai
+  /** Chamado SÓ após finalização confirmada — pai atualiza a listagem de
+   *  Relatórios/levantamentos imediatamente, sem F5. */
+  onFinalized?: () => void;
 }
 
 interface Draft {
@@ -63,7 +67,7 @@ interface Draft {
 }
 const emptyDraft = (): Draft => ({ assetId: newAssetId(), grupo: '', vals: emptyAssetValues(), photos: 0, photoPreviews: [] });
 
-export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientName, existingDevices, userRole, currentUserId, catalog = [], onClose, onChanged }) => {
+export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientName, existingDevices, userRole, currentUserId, catalog = [], onClose, onChanged, onFinalized }) => {
   const { state: navigation, update: navigate } = useNavigation();
   const [restoring, setRestoring] = useState(!!navigation.levantamento);
   const [phase, setPhaseState] = useState<'config' | 'capture' | 'finish'>('config');
@@ -92,6 +96,7 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientNa
   const groupRef = useRef<HTMLSelectElement>(null);
   const localPreviewUrlsRef = useRef<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [finishing, setFinishing] = useState(false);     // §D — trava o botão durante a finalização
   const [keepNext, setKeepNext] = useState(false);       // §26 — manter dados no próximo
   const [recordKind, setRecordKind] = useState<'ativo' | 'observacao'>('ativo');
   const [obs, setObs] = useState<{ assunto: string; localizacao: string; texto: string; criarPendencia: boolean; photos: number }>({ assunto: '', localizacao: '', texto: '', criarPendencia: false, photos: 0 });
@@ -320,15 +325,23 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientNa
     [knownPool.length, createdThisVisit.length, expectedCount],
   );
 
+  // §D — Finalização SEM falso sucesso: a tela só fecha após confirmação real de
+  // que o status FINALIZADO foi persistido. Em erro, mantém o draft/tela aberto e
+  // mostra feedback (nada é perdido). Ao confirmar, atualiza a listagem no pai.
   const finish = async () => {
-    if (survey) {
-      try {
-        const verified = mode === 'COMPLETO' ? (summary?.resolved || 0) : createdThisVisit.length;
-        await finalizeSurvey(survey.id, verified);
-      } catch { /* não bloqueia o fecho local */ }
-    }
-    onChanged();
-    onClose();
+    if (!survey) { onClose(); return; } // sem survey iniciado: nada a finalizar
+    const verified = mode === 'COMPLETO' ? (summary?.resolved || 0) : createdThisVisit.length;
+    await runSurveyFinalize({
+      finalize: () => finalizeSurvey(survey.id, verified),
+      setBusy: setFinishing,
+      onError: (msg) => showToast(`Não foi possível finalizar o levantamento: ${msg}. Nada foi perdido — tente novamente.`),
+      onSuccess: () => {
+        showToast('Levantamento finalizado.');
+        onChanged();
+        onFinalized?.();
+        onClose();
+      },
+    });
   };
 
   if (restoring) return <div role="status" className="fixed inset-0 z-50 bg-surface p-6">Restaurando levantamento…</div>;
@@ -525,9 +538,9 @@ export const TechnicalSurveyFlow: React.FC<Props> = ({ area, clienteId, clientNa
           )}
           {phase === 'finish' && (
             <div className="flex flex-wrap gap-2">
-              <button onClick={() => setPhase('capture')} className="flex-1 rounded-lg border border-border px-3 py-3 text-sm font-semibold text-fg-secondary hover:bg-surface-2">Voltar</button>
-              <button onClick={() => setShowPdf(true)} className="flex-1 rounded-lg border border-primary px-3 py-3 text-sm font-bold text-primary hover:bg-navy hover:text-white">PDF do levantamento</button>
-              <button onClick={finish} className="flex-1 rounded-lg bg-primary px-3 py-3 text-sm font-bold text-white hover:bg-navy">Finalizar</button>
+              <button onClick={() => setPhase('capture')} disabled={finishing} className="flex-1 rounded-lg border border-border px-3 py-3 text-sm font-semibold text-fg-secondary hover:bg-surface-2 disabled:opacity-50">Voltar</button>
+              <button onClick={() => setShowPdf(true)} disabled={finishing} className="flex-1 rounded-lg border border-primary px-3 py-3 text-sm font-bold text-primary hover:bg-navy hover:text-white disabled:opacity-50">PDF do levantamento</button>
+              <button onClick={finish} disabled={finishing} className="flex-1 rounded-lg bg-primary px-3 py-3 text-sm font-bold text-white hover:bg-navy disabled:opacity-50">{finishing ? 'Finalizando…' : 'Finalizar'}</button>
             </div>
           )}
         </footer>

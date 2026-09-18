@@ -5,13 +5,19 @@ export const REALTIME_DOMAINS = {
   serviceOrders: ['ordens_servico'],
   agenda: ['ordens_servico', 'contract_routine_executions'],
   reports: ['reports', 'report_answers', 'report_media', 'report_signatures'],
+  // Levantamentos técnicos (motor 3D) — documento próprio identificado por
+  // technical_survey_id. Finalizar um survey invalida este domínio (Relatórios /
+  // Base Técnica do cliente reagem sem F5). device_verifications NÃO entra aqui:
+  // a finalização só muda technical_surveys.status; verificações já refletem via
+  // recarga de devices no fluxo de campo (evita invalidação desnecessária).
+  surveys: ['technical_surveys'],
   pending: ['pendencias'],
   fieldPhotos: ['field_photos', 'field_photo_sessions', 'field_photo_comparisons', 'service_attendance_evidence_items'],
   inventory: ['inventory_items', 'stock_movements', 'supply_orders', 'supply_purchases', 'supply_purchase_items', 'supply_receipts', 'supply_receipt_items'],
   contracts: ['contracts', 'contract_routines', 'contract_routine_executions', 'contract_hour_ledger'],
   fieldOps: ['field_operations', 'field_operation_assignments', 'service_attendances'],
   finance: ['transactions'],
-  dashboard: ['time_punches', 'punch_adjustments', 'profiles', 'pedidos', 'ordens_servico', 'reports', 'pendencias', 'contracts', 'transactions', 'field_operations', 'field_operation_assignments', 'service_attendances'],
+  dashboard: ['time_punches', 'punch_adjustments', 'profiles', 'pedidos', 'ordens_servico', 'reports', 'pendencias', 'contracts', 'transactions', 'field_operations', 'field_operation_assignments', 'service_attendances', 'technical_surveys'],
 } as const;
 
 export type RealtimeDomain = keyof typeof REALTIME_DOMAINS;

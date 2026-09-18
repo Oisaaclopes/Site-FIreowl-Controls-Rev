@@ -1,12 +1,17 @@
 'use client';
 import { useNavigation, useNavigationValue, useNavigationEntity } from '@/components/NavigationSession';
 import { fetchDevices } from '@/lib/devices';
-import React, { useEffect, useMemo, useState } from 'react';
-import { Client, Device, UserRole, ClientTechnicalCredential, TechnicalBackup, DeviceVerification, AssetConditionValue, DeviceOccurrence, OperationalStatus } from '@/lib/types';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Client, Device, UserRole, ClientTechnicalCredential, TechnicalBackup, DeviceVerification, AssetConditionValue, DeviceOccurrence, OperationalStatus, TechnicalSurvey } from '@/lib/types';
 import {
-  TechArea, AREAS, AREA_LABEL, CONDITIONS, CONDITION_LABEL, SOURCE_LABEL,
+  TechArea, AREAS, AREA_LABEL, CONDITIONS, CONDITION_LABEL, SOURCE_LABEL, SURVEY_MODE_LABEL,
   groupsForArea, assetDisplayIdentifier, legacyGroupLabel,
 } from '@/lib/technicalBase';
+import { fetchSurveys } from '@/lib/technicalSurveys';
+import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
+import dynamic from 'next/dynamic';
+
+const LevantamentoPdfInner = dynamic(() => import('@/components/documentos/LevantamentoPdfInner'), { ssr: false });
 import { upsertDevice } from '@/lib/devices';
 import { addVerification, fetchVerificationsForDevice } from '@/lib/deviceVerifications';
 import {
@@ -85,6 +90,25 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
   const [occurrences, setOccurrences] = useState<DeviceOccurrence[]>([]);
   const [operationalFilter, setOperationalFilter] = useState<OperationalStatus | 'ALL'>('ALL');
   const canManage = isGestao(userRole);
+
+  // Levantamentos deste cliente (motor 3D) — acesso claro no contexto do Cliente:
+  // EM_ANDAMENTO → Continuar (retoma o draft/identidade); FINALIZADO → Abrir
+  // (reutiliza o LevantamentoPdfInner). Identidade = technical_survey_id.
+  const [surveys, setSurveys] = useState<TechnicalSurvey[]>([]);
+  const [openSurvey, setOpenSurvey] = useState<TechnicalSurvey | null>(null);
+  const loadSurveys = useCallback(() => {
+    if (!isSupabaseConfigured()) return;
+    fetchSurveys(client.id).then(setSurveys).catch(() => {});
+  }, [client.id]);
+  useEffect(() => { loadSurveys(); }, [loadSurveys]);
+  // Reage à finalização/alteração de qualquer survey sem F5 (mesmo mecanismo de
+  // invalidação por domínio usado no resto do app).
+  useDomainRefresh('surveys', loadSurveys);
+  // Retoma um levantamento EM_ANDAMENTO pela sua identidade (technical_survey_id):
+  // o TechnicalSurveyFlow restaura o draft, ativos e verificações já persistidos,
+  // sem recriar nada.
+  const continueSurvey = (s: TechnicalSurvey) =>
+    navigate({ levantamento: s.id, etapa: 'capture', rascunho: null, sessaoFoto: null, equipamento: null }, true);
 
   // Ao trocar de área/aba, zera seleção e filtros específicos (evita ids órfãos).
   useEffect(() => { setSelected(new Set()); setGroupFilter(''); setShowDup(false); setSpecial(''); setCentralFilter(''); setLacoFilter(''); if (area !== 'SDAI') setViewMode('lista'); }, [area]);
@@ -383,6 +407,9 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
         </div>
       </div>
 
+      {/* Levantamentos deste cliente — acesso direto (Continuar / Abrir). */}
+      <SurveysPanel surveys={surveys} onContinue={continueSurvey} onOpen={setOpenSurvey} />
+
       {/* Filtro ativo (grupo/duplicados/revisão) */}
       {(groupFilter || showDup || anyFilter) && (
         <div className="flex flex-wrap items-center gap-2 text-[11px]">
@@ -475,6 +502,18 @@ export const ClientTechnicalBase: React.FC<Props> = ({ client, userRole, devices
           catalog={catalog}
           onClose={() => setShowSurvey(false)}
           onChanged={onDevicesChanged}
+          onFinalized={() => { onDevicesChanged(); loadSurveys(); }}
+        />
+      )}
+      {openSurvey && (
+        <LevantamentoPdfInner
+          client={client}
+          area={openSurvey.area}
+          mode={openSurvey.mode}
+          scopeText={(openSurvey.scope && typeof openSurvey.scope === 'object' ? (openSurvey.scope as { descricao?: string }).descricao : undefined) || openSurvey.notes || undefined}
+          deviceIds={(devices || []).filter((d) => d.sistema === openSurvey.area).map((d) => d.id)}
+          resumo={{ expected: openSurvey.expectedCount, verified: openSurvey.verifiedCount }}
+          onClose={() => setOpenSurvey(null)}
         />
       )}
       {detailDevice && (
@@ -525,6 +564,60 @@ function groupIcon(group: string): string {
   if (g.includes('infra') || g.includes('cabea')) return 'cable';
   return 'category';
 }
+
+/* ------------------------- Levantamentos do cliente ------------------------- */
+/* Documento identificado por technical_survey_id. EM_ANDAMENTO → Continuar (retoma
+   o draft/ativos/verificações já persistidos, sem recriar); FINALIZADO → Abrir
+   (reutiliza o LevantamentoPdfInner). Nenhuma linha em `reports`. */
+const SurveysPanel: React.FC<{
+  surveys: TechnicalSurvey[];
+  onContinue: (s: TechnicalSurvey) => void;
+  onOpen: (s: TechnicalSurvey) => void;
+}> = ({ surveys, onContinue, onOpen }) => {
+  if (surveys.length === 0) return null;
+  const emAndamento = surveys.filter((s) => s.status === 'EM_ANDAMENTO');
+  const finalizados = surveys.filter((s) => s.status === 'FINALIZADO');
+  if (emAndamento.length === 0 && finalizados.length === 0) return null;
+  const fmt = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '—');
+  const Row = ({ s }: { s: TechnicalSurvey }) => {
+    const emAndamento = s.status === 'EM_ANDAMENTO';
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-navy/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">{AREA_LABEL[s.area]}</span>
+            <Badge color={emAndamento ? 'amber' : 'emerald'}>{emAndamento ? 'Em andamento' : 'Finalizado'}</Badge>
+          </div>
+          <p className="mt-0.5 truncate text-[11px] text-fg-secondary">{SURVEY_MODE_LABEL[s.mode]} · {s.verifiedCount || 0} ativo(s) · {fmt(s.finishedAt || s.updatedAt || s.createdAt)}</p>
+        </div>
+        {emAndamento ? (
+          <button onClick={() => onContinue(s)} className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-navy">Continuar levantamento</button>
+        ) : (
+          <button onClick={() => onOpen(s)} className="shrink-0 rounded-lg border border-primary px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-navy hover:text-white">Abrir levantamento</button>
+        )}
+      </div>
+    );
+  };
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border border-border bg-surface-2 p-3">
+      <div className="flex items-center gap-2">
+        <span className="material-symbols-outlined text-[18px] text-primary">lan</span>
+        <h3 className="text-xs font-bold uppercase tracking-wider text-fg-secondary">Levantamentos deste cliente</h3>
+        <span className="text-[11px] text-fg-muted">· {surveys.length}</span>
+      </div>
+      {emAndamento.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          {emAndamento.map((s) => <Row key={s.id} s={s} />)}
+        </div>
+      )}
+      {finalizados.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          {finalizados.map((s) => <Row key={s.id} s={s} />)}
+        </div>
+      )}
+    </div>
+  );
+};
 
 /* ------------------------- Resumo visual (§2–§8) ------------------------- */
 const SummaryPanel: React.FC<{
