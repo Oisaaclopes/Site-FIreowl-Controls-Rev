@@ -171,7 +171,7 @@ const EmployeePage = ({ block, periodLabel, emitido, logoUrl }: { block: Timecar
         {records.length ? (
           records.map((r, i) => {
             const ext = occurrences?.[r.dateKey];
-            const warn = r.status === 'INCONSISTENTE' || r.status === 'INCOMPLETA';
+            const warn = r.status === 'INCONSISTENTE' || r.status === 'INCOMPLETA' || r.status === 'ABERTA_ANOMALA';
             const adjusted = r.punches.some((p) => p.effectiveSource === 'adjusted');
             const occText = [ext || dayStatusLabel(r.status), adjusted ? 'Ajuste aprovado' : ''].filter(Boolean).join(' · ');
             const tone: 'none' | 'warn' | 'info' = ext || adjusted ? 'info' : warn ? 'warn' : 'none';
@@ -181,7 +181,9 @@ const EmployeePage = ({ block, periodLabel, emitido, logoUrl }: { block: Timecar
                 <DataCell w={COLS.ent} mono>{hhmm(r.entrada)}</DataCell>
                 <DataCell w={COLS.alm} mono>{hhmm(r.pausa)}</DataCell>
                 <DataCell w={COLS.ret} mono>{hhmm(r.retorno)}</DataCell>
-                <DataCell w={COLS.sai} mono>{hhmm(r.saida)}</DataCell>
+                {/* Saída no dia seguinte (jornada noturna) é sinalizada com "(+1)"
+                    para evitar ambiguidade — o timestamp real é preservado. */}
+                <DataCell w={COLS.sai} mono>{r.saida != null && r.crossesMidnight ? `${hhmm(r.saida)} (+1)` : hhmm(r.saida)}</DataCell>
                 <DataCell w={COLS.horas} mono>{fmtDurationOrDash(r.workedMs)}</DataCell>
                 <OccCell text={occText} tone={tone} />
               </View>

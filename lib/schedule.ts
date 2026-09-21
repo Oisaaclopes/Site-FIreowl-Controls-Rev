@@ -56,6 +56,11 @@ export const dayExpectedMs = (schedule: WorkSchedule, dayOfWeek: number): number
   const s = normalizeSchedule(schedule);
   const cfg = s[dayOfWeek];
   if (!cfg || !cfg.works) return 0;
-  const mins = hmToMinutes(cfg.end) - hmToMinutes(cfg.start) - (cfg.lunchMinutes || 0);
+  // Jornada noturna: quando a saída é "menor" que a entrada (ex.: 22:00 → 05:00),
+  // ela atravessa a meia-noite — soma 24h ao fim. NÃO interpretar 05:00 como
+  // anterior a 22:00 (isso zerava a jornada prevista da escala noturna).
+  let span = hmToMinutes(cfg.end) - hmToMinutes(cfg.start);
+  if (span <= 0) span += 24 * 60;
+  const mins = span - (cfg.lunchMinutes || 0);
   return Math.max(0, mins) * 60000;
 };

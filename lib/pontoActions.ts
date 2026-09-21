@@ -4,12 +4,12 @@
 // sendo o onAddPunch (handleAddPunch no CrmApp → insertPunch).
 
 import { TimePunch } from './types';
+import { buildJourneys, dateKeyOf, OPEN_JOURNEY_LIMIT_MS } from './timecard';
 
 export type PunchType = TimePunch['type'];
 
 const pad2 = (n: number) => n.toString().padStart(2, '0');
 const fmtClock = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
-const sameDay = (a: number, b: number) => new Date(a).toDateString() === new Date(b).toDateString();
 
 export const PUNCH_LABEL: Record<PunchType, string> = {
   ENTRADA: 'Registrar Entrada',
@@ -25,11 +25,28 @@ export const PUNCH_DONE: Record<PunchType, string> = {
   SAIDA: 'Saída registrada',
 };
 
-/** Próxima batida da sequência ENTRADA→PAUSA→RETORNO→SAIDA para HOJE. */
-export function nextPunchType(punches: TimePunch[], employeeName: string, nowMs: number): PunchType | null {
-  const todays = punches.filter((p) => p.employeeName === employeeName && p.at && sameDay(p.at!, nowMs));
-  const has = (t: PunchType) => todays.some((p) => p.type === t);
-  return !has('ENTRADA') ? 'ENTRADA' : !has('PAUSA') ? 'PAUSA' : !has('RETORNO') ? 'RETORNO' : !has('SAIDA') ? 'SAIDA' : null;
+/**
+ * Próxima batida da sequência ENTRADA→PAUSA→RETORNO→SAIDA, seguindo a JORNADA
+ * ABERTA (não "batidas de hoje"). Se existe uma entrada aberta — mesmo que de
+ * ontem — a próxima ação respeita essa jornada; a meia-noite não reabre a
+ * sequência nem oferece uma nova Entrada.
+ */
+export function nextPunchType(
+  punches: TimePunch[], employeeName: string, nowMs: number, maxOpenMs: number = OPEN_JOURNEY_LIMIT_MS,
+): PunchType | null {
+  const mine = punches.filter((p) => p.employeeName === employeeName && p.at);
+  const journeys = buildJourneys(mine, { nowMs, maxOpenMs });
+  const open = [...journeys].reverse().find((j) => j.entrada != null && j.saida == null);
+  if (open) {
+    if (open.pausa == null) return 'PAUSA';
+    if (open.retorno == null) return 'RETORNO';
+    return 'SAIDA';
+  }
+  // Sem jornada aberta: se a última jornada fechou HOJE, está encerrada (null);
+  // caso contrário, a próxima ação é abrir uma nova Entrada.
+  const last = journeys[journeys.length - 1];
+  if (last && last.saida != null && dateKeyOf(last.saida) === dateKeyOf(nowMs)) return null;
+  return 'ENTRADA';
 }
 
 /** Rótulo curto do TIPO da próxima batida (para o texto "Próxima batida"). */
@@ -43,7 +60,8 @@ export const PUNCH_SHORT: Record<PunchType, string> = {
 export type PunchStatusKind = 'FORA' | 'TRABALHANDO' | 'ALMOCO' | 'ENCERRADA';
 
 export interface PunchDayState {
-  /** Batidas de HOJE do funcionário, ordenadas por horário (efetivas). */
+  /** Batidas da JORNADA corrente (a aberta, mesmo iniciada ontem, ou a encerrada
+   *  hoje), ordenadas por horário — batidas efetivas. */
   todays: TimePunch[];
   /** Marcas do dia (batidas efetivas — ajustes aprovados já vêm aplicados na fonte). */
   entrada?: TimePunch;
@@ -70,25 +88,36 @@ const STATUS_LABEL: Record<PunchStatusKind, string> = {
  * pelo Painel do Técnico. NÃO recalcula ponto nem regras de jornada: apenas
  * deriva o estado da sequência a partir das batidas efetivas recebidas.
  */
-export function derivePunchState(punches: TimePunch[], employeeName: string, nowMs: number): PunchDayState {
-  const todays = punches
-    .filter((p) => p.employeeName === employeeName && p.at && sameDay(p.at!, nowMs))
+export function derivePunchState(
+  punches: TimePunch[], employeeName: string, nowMs: number, maxOpenMs: number = OPEN_JOURNEY_LIMIT_MS,
+): PunchDayState {
+  const mine = punches
+    .filter((p) => p.employeeName === employeeName && p.at)
     .sort((a, b) => (a.at || 0) - (b.at || 0));
-  const byType = (t: PunchType) => todays.find((p) => p.type === t);
+  const journeys = buildJourneys(mine, { nowMs, maxOpenMs });
+  const open = [...journeys].reverse().find((j) => j.entrada != null && j.saida == null);
+  const last = journeys[journeys.length - 1];
+  // Jornada corrente: a aberta (mesmo iniciada ontem) ou, na ausência dela, a
+  // última encerrada HOJE (estado "encerrada"). Fora disso, fora do expediente.
+  const current = open
+    ? open
+    : (last && last.saida != null && dateKeyOf(last.saida) === dateKeyOf(nowMs)) ? last : undefined;
+  const cp = current?.punches ?? [];
+  const byType = (t: PunchType) => cp.find((p) => p.type === t);
   const entrada = byType('ENTRADA');
   const almoco = byType('PAUSA');
   const retorno = byType('RETORNO');
   const saida = byType('SAIDA');
-  const nextType = nextPunchType(punches, employeeName, nowMs);
+  const nextType = nextPunchType(punches, employeeName, nowMs, maxOpenMs);
   const statusKind: PunchStatusKind = !entrada
     ? 'FORA'
-    : almoco && !retorno
-    ? 'ALMOCO'
     : saida
     ? 'ENCERRADA'
+    : almoco && !retorno
+    ? 'ALMOCO'
     : 'TRABALHANDO';
   return {
-    todays,
+    todays: cp,
     entrada,
     almoco,
     retorno,

@@ -21,7 +21,6 @@ import type { TimecardBlock } from '@/components/documentos/TimecardDocument';
 import {
   buildDailyTimeRecords,
   computePeriodSummary,
-  consolidateDay,
   dayStatusLabel,
   fmtHoursShort,
 } from '@/lib/timecard';
@@ -653,12 +652,6 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
     })
     .sort((a, b) => (a.at || 0) - (b.at || 0));
 
-  // Horas trabalhadas de um conjunto de batidas de um mesmo dia — via a fonte
-  // de verdade única (lib/timecard). Retorna 0 quando não calculável, apenas
-  // para somatórios; a classificação (incompleta/inconsistente) vem de
-  // consolidateDay().status.
-  const dayWorkedMs = (dayPunches: TimePunch[]): number => consolidateDay(dayPunches, nowMs).workedMs ?? 0;
-
   // ---- Banco de horas real (a partir das batidas + escala + feriados) ----
   // Jornada prevista para uma data: 0 em feriado, folga da escala ou dia
   // justificado por atestado/folga.
@@ -725,8 +718,11 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
     }
     return emps.map((emp) => {
       const occ = occurrencesForMonth(emp, month);
-      const empPunches = punches.filter((p) => p.employeeName === emp && inMonth(p));
-      const records = buildDailyTimeRecords(empPunches, { extraDateKeys: Object.keys(occ), nowMs });
+      // TODAS as batidas do funcionário (não recorta por dia civil): uma jornada
+      // que atravessa a meia-noite/mês fica inteira no mês da ENTRADA (competência)
+      // e é contada uma única vez (§14/§15). O `monthKey` filtra por competência.
+      const empPunches = punches.filter((p) => p.employeeName === emp && p.at);
+      const records = buildDailyTimeRecords(empPunches, { extraDateKeys: Object.keys(occ), nowMs, monthKey: month });
       const summary = computePeriodSummary(records, (dk) => {
         const [y, m, d] = dk.split('-').map(Number);
         return expectedMsForDate(new Date(y, m - 1, d), emp);
@@ -761,15 +757,13 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
   };
 
   const hoursStats = useMemo(() => {
-    // Agrupa batidas do usuário logado por dia (YYYY-MM-DD)
-    const byDay = new Map<string, TimePunch[]>();
-    punches
-      .filter((p) => p.employeeName === currentUser && p.at)
-      .forEach((p) => {
-        const dk = fmtDateInput(new Date(p.at!));
-        if (!byDay.has(dk)) byDay.set(dk, []);
-        byDay.get(dk)!.push(p);
-      });
+    // Registros por JORNADA (competência), não por dia civil — uma jornada
+    // noturna conta uma vez, no dia da entrada. Fonte única (lib/timecard).
+    const recs = buildDailyTimeRecords(
+      punches.filter((p) => p.employeeName === currentUser && p.at),
+      { nowMs }
+    );
+    const recByDk = new Map(recs.map((r) => [r.dateKey, r]));
 
     // Banco acumulado: apenas sobre dias efetivamente trabalhados (com batida),
     // para não penalizar dias anteriores à adoção do sistema. Fonte única.
@@ -788,14 +782,14 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
       const dk = fmtDateInput(day);
       const exp = expectedMsForDate(day);
       prevMs += exp;
-      const list = byDay.get(dk);
-      if (list && list.length) {
-        const worked = dayWorkedMs(list);
-        realMs += worked;
-        if (worked > exp) extraMs += worked - exp;
-        const ent = list.find((p) => p.type === 'ENTRADA');
-        if (ent?.at && sched[day.getDay()].works && !holidays[dk]) {
-          const em = new Date(ent.at);
+      const rec = recByDk.get(dk);
+      if (rec) {
+        if (rec.workedMs != null && rec.workedMs > 0) {
+          realMs += rec.workedMs;
+          if (rec.workedMs > exp) extraMs += rec.workedMs - exp;
+        }
+        if (rec.entrada != null && sched[day.getDay()].works && !holidays[dk]) {
+          const em = new Date(rec.entrada);
           const entMin = em.getHours() * 60 + em.getMinutes();
           if (entMin > hmToMinutes(sched[day.getDay()].start) + 5) atrasos++;
         }
@@ -843,13 +837,9 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
       ['Funcionário', 'Data', 'Entrada', 'Almoço', 'Retorno', 'Saída', 'Horas trabalhadas', 'Ocorrência'],
     ];
 
-    // Agrupa batidas por funcionário + dia (chave YYYY-MM-DD)
-    const groups = new Map<string, TimePunch[]>();
+    // Detalhamento por batida (timestamps reais, sem agrupar).
     monthPunches.forEach((p) => {
       const d = new Date(p.at!);
-      const key = `${p.employeeName}||${fmtDateInput(d)}`;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(p);
       detail.push([
         p.employeeName,
         d.toLocaleDateString('pt-BR'),
@@ -880,41 +870,30 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
     let totalMs = 0;
     const rows: { emp: string; dk: string; line: string[] }[] = [];
 
+    // Resumo por JORNADA (competência), igual ao Espelho/PDF: uma jornada noturna
+    // aparece uma vez, no dia da entrada, com a saída marcada "(+1)" quando cai no
+    // dia seguinte. Usa TODAS as batidas do funcionário + recorte por competência.
+    const hm = (at?: number) => (at != null ? fmtHM(new Date(at)) : '--');
     empSet.forEach((emp) => {
-      const dayKeys = new Set<string>();
-      groups.forEach((_, key) => {
-        const [e, dk] = key.split('||');
-        if (e === emp) dayKeys.add(dk);
-      });
-      monthEntries.forEach((e) => {
-        if (e.employeeName === emp) dayKeys.add(e.refDate);
-      });
-      monthHolidayDates.forEach((dk) => dayKeys.add(dk));
-
-      dayKeys.forEach((dk) => {
-        const dayPunches = groups.get(`${emp}||${dk}`) || [];
-        const t = (type: PunchType) => {
-          const found =
-            type === 'SAIDA'
-              ? [...dayPunches].reverse().find((p) => p.type === type)
-              : dayPunches.find((p) => p.type === type);
-          return found?.at ? fmtHM(new Date(found.at)) : '--';
-        };
-        const cons = dayPunches.length ? consolidateDay(dayPunches, nowMs) : null;
-        const ms = cons?.workedMs ?? 0;
+      const occ = occurrencesForMonth(emp, expMonth);
+      const empAllPunches = punches.filter((p) => p.employeeName === emp && p.at);
+      const records = buildDailyTimeRecords(empAllPunches, { extraDateKeys: Object.keys(occ), nowMs, monthKey: expMonth });
+      records.forEach((r) => {
+        const ms = r.workedMs ?? 0;
         totalMs += ms;
+        const saidaCell = r.saida != null ? `${hm(r.saida)}${r.crossesMidnight ? ' (+1)' : ''}` : '--';
         rows.push({
           emp,
-          dk,
+          dk: r.dateKey,
           line: [
             emp,
-            dayKeyToBr(dk),
-            t('ENTRADA'),
-            t('PAUSA'),
-            t('RETORNO'),
-            t('SAIDA'),
-            cons && cons.workedMs == null ? '—' : fmtDuration(ms),
-            occurrenceFor(emp, dk) || (cons ? dayStatusLabel(cons.status) : '') || '—',
+            dayKeyToBr(r.dateKey),
+            hm(r.entrada),
+            hm(r.pausa),
+            hm(r.retorno),
+            saidaCell,
+            r.workedMs == null ? '—' : fmtDuration(ms),
+            occurrenceFor(emp, r.dateKey) || dayStatusLabel(r.status) || '—',
           ],
         });
       });
