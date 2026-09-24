@@ -1276,6 +1276,7 @@ function CrmAppContent({
               pedidos={pedidos}
               onNavigateToTab={setCurrentTab}
               currentUser={userName}
+              currentUserId={userId}
               onAddPunch={handleAddPunch}
               usesTimeClock={usesTimeClock}
             />
@@ -1461,6 +1462,7 @@ function CrmAppContent({
               onReloadPunches={reloadPunches}
               onEnsurePunchMonth={ensurePunchMonth}
               currentUser={userName}
+              currentUserId={userId}
               userRole={userRole}
               schedule={userSchedule}
               usesTimeClock={usesTimeClock}

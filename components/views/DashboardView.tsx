@@ -26,6 +26,8 @@ interface DashboardViewProps {
   onNavigateToTab: (tab: TabPath) => void;
   /** Ponto rápido no painel — depende de uses_time_clock, não do cargo. */
   currentUser?: string;
+  /** profiles.id — identidade canônica das batidas do usuário. */
+  currentUserId?: string;
   onAddPunch?: (p: TimePunch) => void;
   usesTimeClock?: boolean;
 }
@@ -39,6 +41,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   pedidos,
   onNavigateToTab,
   currentUser = '',
+  currentUserId,
   onAddPunch,
   usesTimeClock = false,
 }) => {
@@ -154,6 +157,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="w-full sm:max-w-sm">
           <QuickPunchCard
             currentUser={currentUser}
+            currentUserId={currentUserId}
             punches={punches}
             onAddPunch={onAddPunch}
             usesTimeClock={usesTimeClock}

@@ -1,5 +1,6 @@
 import { AttendanceResult, ServiceAttendance, TimePunch } from './types';
 import { hasOpenJourney } from './fieldOperations';
+import type { PunchOwner } from './pontoActions';
 
 /* ===================================================================
  * ETAPA 3B — Regras PURAS do fluxo operacional de atendimento. Sem I/O,
@@ -29,10 +30,13 @@ export const ATTENDANCE_RESULT_TONE: Record<AttendanceResult, string> = {
 export function shouldWarnNoJourney(
   usesTimeClock: boolean,
   punches: TimePunch[],
-  now = Date.now()
+  now = Date.now(),
+  /** Técnico que inicia o atendimento (user_id = identidade). Obrigatório
+   *  quando `punches` pode conter batidas de outras pessoas (gestor). */
+  owner?: PunchOwner,
 ): boolean {
   if (!usesTimeClock) return false;
-  return !hasOpenJourney(punches, now);
+  return !hasOpenJourney(punches, now, owner);
 }
 
 /** Só RESOLVIDO habilita concluir a OS; PARCIAL/NÃO mantêm a OS aberta (§16/§17). */

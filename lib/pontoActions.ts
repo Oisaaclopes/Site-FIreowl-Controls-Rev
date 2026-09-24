@@ -39,14 +39,27 @@ interface OperationalJourneys {
 }
 
 /**
+ * Dono das batidas. `userId` é a identidade canônica; o nome é só apresentação
+ * (snapshot textual gravado na batida) e serve apenas de fallback para batidas
+ * sem user_id (reserva local offline). Uma string é tratada como nome (legado).
+ */
+export type PunchOwner = string | { userId?: string; name: string };
+
+export function isPunchOf(p: TimePunch, who: PunchOwner): boolean {
+  if (typeof who === 'string') return p.employeeName === who;
+  if (who.userId) return p.userId ? p.userId === who.userId : p.employeeName === who.name;
+  return p.employeeName === who.name;
+}
+
+/**
  * Regra ÚNICA da máquina de estados operacional. Uma jornada aberta há mais
  * de 18h (ABERTA_ANOMALA) NÃO sequestra o estado: vira pendência e o
  * funcionário pode abrir uma nova Entrada. A data civil não altera a sequência.
  */
 function resolveOperationalJourneys(
-  punches: TimePunch[], employeeName: string, nowMs: number, maxOpenMs: number,
+  punches: TimePunch[], who: PunchOwner, nowMs: number, maxOpenMs: number,
 ): OperationalJourneys {
-  const mine = punches.filter((p) => p.employeeName === employeeName && p.at);
+  const mine = punches.filter((p) => isPunchOf(p, who) && p.at);
   const journeys = buildJourneys(mine, { nowMs, maxOpenMs });
   const last = journeys[journeys.length - 1];
   const open = last && last.entrada != null && last.saida == null && !isJourneyStale(last.entrada, nowMs, maxOpenMs)
@@ -66,9 +79,9 @@ function resolveOperationalJourneys(
  * a sequência. Entrada aberta há >18h é pendência e não bloqueia nova Entrada.
  */
 export function nextPunchType(
-  punches: TimePunch[], employeeName: string, nowMs: number, maxOpenMs: number = OPEN_JOURNEY_LIMIT_MS,
+  punches: TimePunch[], who: PunchOwner, nowMs: number, maxOpenMs: number = OPEN_JOURNEY_LIMIT_MS,
 ): PunchType | null {
-  const { open, current } = resolveOperationalJourneys(punches, employeeName, nowMs, maxOpenMs);
+  const { open, current } = resolveOperationalJourneys(punches, who, nowMs, maxOpenMs);
   if (open) {
     if (open.pausa == null && open.retorno == null) return 'PAUSA';
     if (open.retorno == null) return 'RETORNO';
@@ -122,19 +135,19 @@ const STATUS_LABEL: Record<PunchStatusKind, string> = {
  * deriva o estado da sequência a partir das batidas efetivas recebidas.
  */
 export function derivePunchState(
-  punches: TimePunch[], employeeName: string, nowMs: number, maxOpenMs: number = OPEN_JOURNEY_LIMIT_MS,
+  punches: TimePunch[], who: PunchOwner, nowMs: number, maxOpenMs: number = OPEN_JOURNEY_LIMIT_MS,
 ): PunchDayState {
   // Jornada corrente: a aberta (≤18h, mesmo iniciada ontem) ou, na ausência
   // dela, a encerrada com competência HOJE. Fora disso, fora do expediente —
   // uma entrada esquecida (>18h) aparece só como pendência.
-  const { current, pending } = resolveOperationalJourneys(punches, employeeName, nowMs, maxOpenMs);
+  const { current, pending } = resolveOperationalJourneys(punches, who, nowMs, maxOpenMs);
   const cp = [...(current?.punches ?? [])].sort((a, b) => (a.at || 0) - (b.at || 0));
   const byType = (t: PunchType) => cp.find((p) => p.type === t);
   const entrada = byType('ENTRADA');
   const almoco = byType('PAUSA');
   const retorno = byType('RETORNO');
   const saida = byType('SAIDA');
-  const nextType = nextPunchType(punches, employeeName, nowMs, maxOpenMs);
+  const nextType = nextPunchType(punches, who, nowMs, maxOpenMs);
   const statusKind: PunchStatusKind = !entrada
     ? 'FORA'
     : saida

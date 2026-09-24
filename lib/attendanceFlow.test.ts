@@ -108,3 +108,42 @@ describe('tempo derivado do atendimento (§22)', () => {
     expect(formatStartedAt(undefined)).toBe('');
   });
 });
+
+describe('shouldWarnNoJourney — dono da jornada por user_id', () => {
+  const of = (userId: string, name: string, type: TimePunch['type'], hour: number): TimePunch => ({
+    ...punch(type, hour), id: `${userId}-${type}-${hour}`, userId, employeeName: name,
+  });
+  const A = { userId: 'uA', name: 'Ana' };
+  const B = { userId: 'uB', name: 'Bruno' };
+
+  it('gestor vê batidas de A e B; A com jornada aberta NÃO conta para B', () => {
+    const visible = [of('uA', 'Ana', 'ENTRADA', 8)];
+    expect(shouldWarnNoJourney(true, visible, now, B)).toBe(true);
+    expect(shouldWarnNoJourney(true, visible, now, A)).toBe(false);
+  });
+
+  it('jornada aberta do próprio B continua detectada, mesmo com A batendo depois', () => {
+    const visible = [of('uB', 'Bruno', 'ENTRADA', 8), of('uA', 'Ana', 'ENTRADA', 9), of('uA', 'Ana', 'SAIDA', 13)];
+    expect(shouldWarnNoJourney(true, visible, now, B)).toBe(false);
+  });
+
+  it('SAÍDA de A (a batida mais recente da lista) não encerra a jornada de B', () => {
+    const visible = [of('uB', 'Bruno', 'ENTRADA', 8), of('uA', 'Ana', 'SAIDA', 13)];
+    expect(shouldWarnNoJourney(true, visible, now, B)).toBe(false);
+  });
+
+  it('batida de outro user_id com o MESMO nome não é jornada do dono', () => {
+    const spoof = [of('uX', 'Bruno', 'ENTRADA', 8)];
+    expect(shouldWarnNoJourney(true, spoof, now, B)).toBe(true);
+  });
+
+  it('técnico (lista só com as próprias batidas): comportamento igual, com ou sem dono', () => {
+    const own = [of('uB', 'Bruno', 'ENTRADA', 8)];
+    expect(shouldWarnNoJourney(true, own, now)).toBe(false);
+    expect(shouldWarnNoJourney(true, own, now, B)).toBe(false);
+    const closed = [...own, of('uB', 'Bruno', 'SAIDA', 12)];
+    expect(shouldWarnNoJourney(true, closed, now)).toBe(true);
+    expect(shouldWarnNoJourney(true, closed, now, B)).toBe(true);
+    expect(shouldWarnNoJourney(false, [], now, B)).toBe(false);
+  });
+});

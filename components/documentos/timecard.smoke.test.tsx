@@ -3,7 +3,7 @@ import path from 'node:path';
 import React from 'react';
 import { Font, renderToBuffer } from '@react-pdf/renderer';
 import { TimecardDocument, TimecardBlock } from './TimecardDocument';
-import { buildDailyTimeRecords, computePeriodSummary } from '../../lib/timecard';
+import { buildTimesheetRows, summarizeTimesheetRows, toDocumentLines } from '../../lib/timesheet';
 import { TimePunch } from '../../lib/types';
 
 // Reaponta as fontes (registradas em pdfKit como '/fonts/..') para arquivos
@@ -31,9 +31,12 @@ const p = (type: TimePunch['type'], y: number, mo: number, d: number, h: number,
 });
 
 function block(employee: string, punches: TimePunch[]): TimecardBlock {
-  const records = buildDailyTimeRecords(punches);
-  const summary = computePeriodSummary(records, () => 8 * 3600000);
-  return { employee, records, summary, scheduleLabel: '09:00 às 19:00', bank: '+2h00', occurrences: {} };
+  const rows = buildTimesheetRows(punches, {
+    monthKey: '2026-08', nowMs: new Date(2026, 8, 5).getTime(), expectedMsForDate: () => 8 * 3600000,
+    trackingStartKey: '2026-08-01',
+  });
+  const summary = summarizeTimesheetRows(rows);
+  return { employee, lines: toDocumentLines(rows), summary, scheduleLabel: '09:00 às 19:00', bank: '+2h00' };
 }
 
 describe('TimecardDocument render (Node smoke)', () => {

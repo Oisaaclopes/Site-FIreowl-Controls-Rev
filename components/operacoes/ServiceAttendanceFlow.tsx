@@ -209,7 +209,8 @@ export const StartAttendanceButton: React.FC<{
     setBusy(true);
     try {
       // Aviso de jornada (§6) — soft, nunca bloqueia.
-      if (shouldWarnNoJourney(usesTimeClock, punches)) {
+      // Jornada do PRÓPRIO técnico (user_id): o gestor recebe batidas de todos.
+      if (shouldWarnNoJourney(usesTimeClock, punches, Date.now(), { userId: technicianId, name: technicianName || '' })) {
         const go = await confirm({
           title: 'Sem entrada no Ponto',
           message: 'Você ainda não registrou entrada no Ponto hoje. Deseja iniciar o atendimento mesmo assim?',

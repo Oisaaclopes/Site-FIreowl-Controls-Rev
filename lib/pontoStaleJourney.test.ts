@@ -220,3 +220,27 @@ describe('F) nenhuma jornada absurda de vários dias vira OK', () => {
     }
   });
 });
+
+describe('G) identidade por user_id (nome é só apresentação)', () => {
+  const mk = (type: TimePunch['type'], at: number, userId: string, name: string): TimePunch => ({
+    id: `${type}_${at}_${userId}`, userId, employeeName: name, timestamp: '', type,
+    locationStr: '', lat: 0, lng: 0, status: 'APROVADO', at,
+  });
+
+  it('batida de OUTRO usuário gravada com o mesmo nome não altera o estado do dono', () => {
+    const mine = [mk('ENTRADA', ms(2026, 9, 24, 8, 0), 'u-joao', EMP)];
+    const spoof = mk('SAIDA', ms(2026, 9, 24, 9, 0), 'u-outro', EMP); // mesmo nome, outro user_id
+    const s = derivePunchState([...mine, spoof], { userId: 'u-joao', name: EMP }, ms(2026, 9, 24, 10, 0));
+    expect(s.statusKind).toBe('TRABALHANDO');
+    expect(s.nextType).toBe('PAUSA');
+  });
+
+  it('renomear o perfil não parte a jornada: batidas antigas com o nome anterior continuam do mesmo user_id', () => {
+    const ps = [mk('ENTRADA', ms(2026, 9, 24, 8, 0), 'u-joao', 'João S.'), mk('PAUSA', ms(2026, 9, 24, 12, 0), 'u-joao', 'João Silva')];
+    expect(nextPunchType(ps, { userId: 'u-joao', name: 'João Silva' }, ms(2026, 9, 24, 12, 30))).toBe('RETORNO');
+  });
+
+  it('legado: string continua sendo tratada como nome', () => {
+    expect(nextPunchType([punch('ENTRADA', ms(2026, 9, 24, 8, 0))], EMP, ms(2026, 9, 24, 9, 0))).toBe('PAUSA');
+  });
+});

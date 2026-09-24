@@ -214,7 +214,8 @@ describe('15) PDF representa entrada/saída e total (sinalizando o dia seguinte)
   it('o documento marca a saída do dia seguinte com "(+1)"', () => {
     const src = readFileSync(resolve(process.cwd(), 'components/documentos/TimecardDocument.tsx'), 'utf8');
     expect(src).toContain('(+1)');
-    expect(src).toContain('crossesMidnight');
+    // A marca vem da linha da Folha (saída em dia civil posterior à competência).
+    expect(src).toContain('saidaNextDay');
   });
 });
 

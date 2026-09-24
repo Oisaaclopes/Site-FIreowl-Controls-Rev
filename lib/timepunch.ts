@@ -145,3 +145,22 @@ export async function requestPunchAddress(punchId: string): Promise<void> {
   const { error } = await supabase.functions.invoke('reverse-geocode', { body: { punchId } });
   if (error) throw error;
 }
+
+/**
+ * Momento da PRIMEIRA batida original do funcionário no servidor — evidência
+ * real do início do uso do ponto (base do início da apuração enquanto não há
+ * um campo canônico no cadastro). Consulta indexada, 1 linha; RLS decide o
+ * acesso (o próprio funcionário, ou ADMINISTRATIVO/GESTOR). Sem batida → undefined.
+ */
+export async function fetchFirstPunchAt(userId: string): Promise<number | undefined> {
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select('punched_at')
+    .eq('user_id', userId)
+    .order('punched_at', { ascending: true })
+    .limit(1);
+  if (error) throw error;
+  const at = data?.[0]?.punched_at;
+  return at ? new Date(at).getTime() : undefined;
+}

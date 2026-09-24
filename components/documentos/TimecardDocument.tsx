@@ -2,14 +2,13 @@ import React from 'react';
 import { Document, Page, StyleSheet, Text, View } from '@react-pdf/renderer';
 import { C, PdfHeader, PdfFooter } from './pdfKit';
 import {
-  DailyTimeRecord,
   PeriodSummary,
   dateKeyToBr,
-  dayStatusLabel,
   fmtDurationOrDash,
   fmtHoursShort,
   hhmm,
 } from '@/lib/timecard';
+import type { TimesheetDocLine } from '@/lib/timesheet';
 
 // Tons de alerta discretos (âmbar), sem vermelho agressivo, para ocorrências
 // de jornada. Feriado/atestado usam um tom neutro (ardósia).
@@ -69,10 +68,11 @@ const DataCell = ({ w, children, mono, align = 'center' }: { w: string; children
 
 export interface TimecardBlock {
   employee: string;
-  records: DailyTimeRecord[];
+  /** Linhas da MESMA Folha Mensal da tela (lib/timesheet → toDocumentLines):
+   *  jornadas, dias "Sem registro" e ocorrências — nada recalculado aqui. */
+  lines: TimesheetDocLine[];
+  /** Totais da MESMA Folha (summarizeTimesheetRows). */
   summary: PeriodSummary;
-  /** Ocorrência externa por dia (feriado/atestado/folga), YYYY-MM-DD → texto. */
-  occurrences?: Record<string, string>;
   scheduleLabel: string;
   bank: string;
 }
@@ -132,7 +132,7 @@ const saldoHint = (ms: number) => (Math.round(ms / 60000) === 0 ? 'Em dia com o 
 const bankHintText = (ms: number) => (Math.round(ms / 60000) === 0 ? 'Zerado' : ms > 0 ? 'Saldo credor' : 'Saldo devedor');
 
 const EmployeePage = ({ block, periodLabel, emitido, logoUrl }: { block: TimecardBlock; periodLabel: string; emitido: string; logoUrl?: string }) => {
-  const { employee, records, summary, occurrences, scheduleLabel, bank } = block;
+  const { employee, lines, summary, scheduleLabel, bank } = block;
   const saldo = fmtHoursShort(summary.saldoMs, true);
   return (
     <Page size="A4" style={styles.page}>
@@ -168,24 +168,19 @@ const EmployeePage = ({ block, periodLabel, emitido, logoUrl }: { block: Timecar
       <SecHead n="03" titulo="Batidas por dia" />
       <View style={styles.table}>
         <TableHeader />
-        {records.length ? (
-          records.map((r, i) => {
-            const ext = occurrences?.[r.dateKey];
-            const warn = r.status === 'INCONSISTENTE' || r.status === 'INCOMPLETA' || r.status === 'ABERTA_ANOMALA';
-            const adjusted = r.punches.some((p) => p.effectiveSource === 'adjusted');
-            const occText = [ext || dayStatusLabel(r.status), adjusted ? 'Ajuste aprovado' : ''].filter(Boolean).join(' · ');
-            const tone: 'none' | 'warn' | 'info' = ext || adjusted ? 'info' : warn ? 'warn' : 'none';
+        {lines.length ? (
+          lines.map((r, i) => {
             return (
-              <View key={r.dateKey} style={[styles.tr, i % 2 ? styles.trAlt : {}]} wrap={false}>
+              <View key={`${r.dateKey}-${i}`} style={[styles.tr, i % 2 ? styles.trAlt : {}]} wrap={false}>
                 <DataCell w={COLS.data} mono>{dateKeyToBr(r.dateKey)}</DataCell>
                 <DataCell w={COLS.ent} mono>{hhmm(r.entrada)}</DataCell>
                 <DataCell w={COLS.alm} mono>{hhmm(r.pausa)}</DataCell>
                 <DataCell w={COLS.ret} mono>{hhmm(r.retorno)}</DataCell>
                 {/* Saída no dia seguinte (jornada noturna) é sinalizada com "(+1)"
                     para evitar ambiguidade — o timestamp real é preservado. */}
-                <DataCell w={COLS.sai} mono>{r.saida != null && r.crossesMidnight ? `${hhmm(r.saida)} (+1)` : hhmm(r.saida)}</DataCell>
+                <DataCell w={COLS.sai} mono>{r.saida != null && r.saidaNextDay ? `${hhmm(r.saida)} (+1)` : hhmm(r.saida)}</DataCell>
                 <DataCell w={COLS.horas} mono>{fmtDurationOrDash(r.workedMs)}</DataCell>
-                <OccCell text={occText} tone={tone} />
+                <OccCell text={r.label} tone={r.tone} />
               </View>
             );
           })

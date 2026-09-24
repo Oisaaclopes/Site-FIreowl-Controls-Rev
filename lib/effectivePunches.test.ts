@@ -133,3 +133,54 @@ describe('caso Rhuan — ajuste vinculado 08:01', () => {
     expect(r.effectiveSource).toBe('original');
   });
 });
+
+describe('ações administrativas (0113)', () => {
+  const base = (over: Partial<PunchAdjustment>): PunchAdjustment => adjustment('APROVADO', { origin: 'ADMINISTRATIVO', ...over });
+
+  it('DESCONSIDERAR retira a batida do cálculo sem tocar nas demais', () => {
+    const keep = punch('ENTRADA', at(8, 0), 'keep');
+    const wrong = punch('SAIDA', at(9, 0), 'wrong');
+    const result = resolveEffectivePunches([keep, wrong], [
+      base({ id: 'd1', type: 'SAIDA', action: 'DESCONSIDERAR', requestedTime: '', originalPunchId: 'wrong' }),
+    ]);
+    expect(result.map((p) => p.id)).toEqual(['keep']);
+  });
+
+  it('DESCONSIDERAR pendente, rejeitado ou substituído não tem efeito', () => {
+    for (const status of ['PENDENTE', 'REJEITADO', 'SUBSTITUIDO'] as const) {
+      const result = resolveEffectivePunches([punch('SAIDA', at(9, 0), 'x')], [
+        adjustment(status, { action: 'DESCONSIDERAR', type: 'SAIDA', requestedTime: '', originalPunchId: 'x' }),
+      ]);
+      expect(result).toHaveLength(1);
+    }
+  });
+
+  it('INCLUSAO é sempre efetiva, mesmo havendo batida do mesmo tipo no dia', () => {
+    const result = resolveEffectivePunches([punch('PAUSA', at(12, 0), 'p1')], [
+      base({ id: 'i1', type: 'PAUSA', requestedTime: '15:00', action: 'INCLUSAO' }),
+    ]);
+    expect(result).toHaveLength(2);
+    const inc = result.find((p) => p.id === 'adjustment:i1')!;
+    expect(inc.at).toBe(at(15, 0));
+    expect(inc.adjustmentAction).toBe('INCLUSAO');
+    expect(inc.adjustmentOrigin).toBe('ADMINISTRATIVO');
+    expect(result.find((p) => p.id === 'p1')!.effectiveSource).toBe('original');
+  });
+
+  it('correção substituída: só a vigente (APROVADO) vale; a SUBSTITUIDO é ignorada', () => {
+    const [result] = resolveEffectivePunches([punch('SAIDA', at(17, 40), 's')], [
+      base({ id: 'old', type: 'SAIDA', requestedTime: '17:10', originalPunchId: 's', status: 'SUBSTITUIDO' }),
+      base({ id: 'new', type: 'SAIDA', requestedTime: '17:00', originalPunchId: 's' }),
+    ]);
+    expect(result.at).toBe(at(17, 0));
+    expect(result.originalAt).toBe(at(17, 40));
+    expect(result.adjustmentId).toBe('new');
+  });
+
+  it('linhas anteriores à 0113 (sem action/origin) seguem o comportamento legado', () => {
+    const [result] = resolveEffectivePunches([punch('ENTRADA', at(12, 32))], [adjustment('APROVADO')]);
+    expect(result.at).toBe(at(8, 0));
+    expect(result.adjustmentAction).toBe('AJUSTE');
+    expect(result.adjustmentOrigin).toBe('SOLICITACAO');
+  });
+});

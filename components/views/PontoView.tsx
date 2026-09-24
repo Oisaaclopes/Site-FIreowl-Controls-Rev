@@ -1,7 +1,7 @@
 'use client';
 import { showToast, requestConfirm } from '@/components/ui/Feedback';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TimePunch, UserRole } from '@/lib/types';
 import { fetchCompanyProfile } from '@/lib/companyProfile';
 import { resolveLogoDataUrls } from '@/lib/institucional';
@@ -15,15 +15,32 @@ import { uploadCertificate, signedDocUrl } from '@/lib/storage';
 import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 import { fetchTimeClockParticipants } from '@/lib/users';
 import { TimecardPDFView } from '@/components/documentos/TimecardPDFView';
-import { derivePunchState, buildPunch, PUNCH_SHORT } from '@/lib/pontoActions';
+import { derivePunchState, buildPunch, isPunchOf, PUNCH_SHORT } from '@/lib/pontoActions';
 import { effectivePunchLabel } from '@/lib/effectivePunches';
 import type { TimecardBlock } from '@/components/documentos/TimecardDocument';
 import {
   buildDailyTimeRecords,
-  computePeriodSummary,
-  dayStatusLabel,
   fmtHoursShort,
 } from '@/lib/timecard';
+import {
+  buildTimesheetRows, resolveTrackingStartKey, summarizeEmployeeMonth, summarizeTimesheetRows, toDocumentLines,
+  TimesheetFilter, TimesheetRow,
+} from '@/lib/timesheet';
+import { fetchFirstPunchAt } from '@/lib/timepunch';
+import { TimesheetTable } from '@/components/ponto/TimesheetTable';
+import { PunchCorrectionModal } from '@/components/ponto/PunchCorrectionModal';
+import { TeamSummary } from '@/components/ponto/TeamSummary';
+
+// Funcionário na Folha/Equipe/documentos: user_id é a IDENTIDADE; o nome é só
+// apresentação. userId ausente apenas no modo reserva local (sem Supabase).
+interface PontoPerson { userId?: string; name: string }
+const samePerson = (a: PontoPerson, b: PontoPerson) => (a.userId && b.userId ? a.userId === b.userId : a.name === b.name);
+
+// Áreas do Ponto. "Equipe" só para quem administra o ponto (RBAC).
+type PontoSection = 'meu' | 'equipe' | 'folha' | 'ajustes' | 'registros';
+const SECTION_LABEL: Record<PontoSection, string> = {
+  meu: 'Meu Ponto', equipe: 'Equipe', folha: 'Folha Mensal', ajustes: 'Ajustes', registros: 'Registros',
+};
 
 interface PontoViewProps {
   punches: TimePunch[];
@@ -32,6 +49,8 @@ interface PontoViewProps {
   /** Garante as batidas de uma competência YYYY-MM fora da janela padrão. */
   onEnsurePunchMonth?: (month: string) => void | Promise<void>;
   currentUser?: string;
+  /** profiles.id — identidade canônica (o nome é só apresentação). */
+  currentUserId?: string;
   userRole?: UserRole;
   schedule?: WorkSchedule;
   usesTimeClock?: boolean;
@@ -203,6 +222,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
   onReloadPunches,
   onEnsurePunchMonth,
   currentUser = 'Operador Fireowl',
+  currentUserId,
   userRole = 'TECNICO',
   schedule,
 }) => {
@@ -222,32 +242,35 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
   const [recordPeriod, setRecordPeriod] = useState('');
   const [recordType, setRecordType] = useState<'TODOS' | PunchType>('TODOS');
   const [recordGps, setRecordGps] = useState<'TODOS' | 'COM_GPS' | 'SEM_GPS'>('TODOS');
-  const [participantNames, setParticipantNames] = useState<Set<string> | null>(null);
-  // Escala de CADA funcionário (por nome), vinda da RPC canônica (0090). É a
-  // fonte da jornada prevista da folha do funcionário selecionado — nunca a do
-  // usuário autenticado. ADMIN/GESTOR recebem todos; técnico, só a si (RPC).
-  const [scheduleByName, setScheduleByName] = useState<Map<string, WorkSchedule>>(new Map());
+  // Participantes do ponto (RPC canônica 0090/0092): id = IDENTIDADE, nome =
+  // apresentação, escala = jornada prevista. ADMIN/GESTOR recebem todos.
+  const [participants, setParticipants] = useState<{ id: string; name: string; usesTimeClock: boolean; schedule?: WorkSchedule }[] | null>(null);
+  const [section, setSection] = useState<PontoSection>('meu');
+  // Funcionário da Folha pelo user_id ('' = padrão: o próprio ou o primeiro).
+  const [sheetUserId, setSheetUserId] = useState('');
+  const [sheetFilter, setSheetFilter] = useState<TimesheetFilter>('TODOS');
+  const [corrRow, setCorrRow] = useState<TimesheetRow | null>(null);
+  // Início da apuração por user_id (1ª batida original no servidor).
+  const [firstPunchAt, setFirstPunchAt] = useState<Map<string, number | null>>(new Map());
   useEffect(() => {
     if (!isManager || !isSupabaseConfigured()) return;
-    fetchTimeClockParticipants().then((rows) => {
-      setParticipantNames(new Set(rows.filter((r) => r.usesTimeClock).map((r) => r.name)));
-      const map = new Map<string, WorkSchedule>();
-      rows.forEach((r) => { if (r.name && r.schedule) map.set(r.name, r.schedule); });
-      setScheduleByName(map);
-    }).catch(() => {});
+    fetchTimeClockParticipants().then(setParticipants).catch(() => {});
   }, [isManager]);
 
-  // Escala do FUNCIONÁRIO da folha (§2). O próprio usuário usa a escala do seu
-  // perfil (prop `schedule`); os demais vêm do mapa da RPC. Fallback à escala
-  // padrão do sistema quando o cadastro não tem escala — nunca zera por falha
-  // de carregamento (§4/§11).
-  const scheduleFor = useCallback((emp: string): WorkSchedule => {
-    if (emp === currentUser) return sched;
-    const s = scheduleByName.get(emp);
+  const self: PontoPerson = useMemo(() => ({ userId: currentUserId, name: currentUser }), [currentUserId, currentUser]);
+  const participantById = useMemo(() => new Map((participants || []).map((p) => [p.id, p])), [participants]);
+
+  // Escala do FUNCIONÁRIO da folha (§2), por user_id. O próprio usuário usa a
+  // escala do seu perfil (prop `schedule`); os demais vêm da RPC. Fallback à
+  // escala padrão do sistema quando o cadastro não tem escala — nunca zera por
+  // falha de carregamento (§4/§11).
+  const scheduleFor = useCallback((person: PontoPerson): WorkSchedule => {
+    if (person.userId ? person.userId === currentUserId : person.name === currentUser) return sched;
+    const s = person.userId ? participantById.get(person.userId)?.schedule : undefined;
     return s ? normalizeSchedule(s) : normalizeSchedule(DEFAULT_SCHEDULE);
-  }, [currentUser, sched, scheduleByName]);
-  const scheduleLabelFor = useCallback((emp: string): string => {
-    const s = scheduleFor(emp);
+  }, [currentUser, currentUserId, sched, participantById]);
+  const scheduleLabelFor = useCallback((person: PontoPerson): string => {
+    const s = scheduleFor(person);
     return `${s[1].start} às ${s[1].end} · intervalo ${s[1].lunchMinutes} min`;
   }, [scheduleFor]);
 
@@ -338,8 +361,8 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
   // completo sob demanda (a carga padrão cobre mês corrente + anterior).
   useEffect(() => {
     if (!onEnsurePunchMonth) return;
-    [myMonth, isManager ? expMonth : '', recordPeriod].filter(Boolean).forEach((m) => { void onEnsurePunchMonth(m); });
-  }, [onEnsurePunchMonth, myMonth, expMonth, recordPeriod, isManager]);
+    [myMonth, expMonth, recordPeriod].filter(Boolean).forEach((m) => { void onEnsurePunchMonth(m); });
+  }, [onEnsurePunchMonth, myMonth, expMonth, recordPeriod]);
 
   // Relógio em tempo real
   useEffect(() => {
@@ -362,7 +385,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
   // Batidas de HOJE do usuário logado (estado canônico compartilhado com o
   // Painel do Técnico — mesma regra de sequência e mesmas batidas efetivas).
   const nowMs = now.getTime();
-  const punchState = derivePunchState(punches, currentUser, nowMs);
+  const punchState = derivePunchState(punches, self, nowMs);
   const { todays, entrada, almoco, retorno, saida, nextType } = punchState;
 
   // Horas trabalhadas (manhã + tarde)
@@ -471,19 +494,19 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
   const punchDaySet = useMemo(() => {
     const s = new Set<string>();
     punches.forEach((p) => {
-      if (p.at && p.employeeName === currentUser) {
+      if (p.at && isPunchOf(p, self)) {
         s.add(`${new Date(p.at).getFullYear()}-${pad2(new Date(p.at).getMonth() + 1)}-${pad2(new Date(p.at).getDate())}`);
       }
     });
     return s;
-  }, [punches, currentUser]);
+  }, [punches, self]);
 
   // Horário original (evidência) da batida que o ajuste corrige, quando há
   // exatamente uma batida compatível. Usado no formulário e na aprovação.
-  const originalPunchTimeFor = (employeeName: string, refDate: string, type: TimePunch['type']): string | null => {
+  const originalPunchTimeFor = (owner: PontoPerson, refDate: string, type: TimePunch['type']): string | null => {
     const matching = punches.filter((p) => {
       const originalAt = p.originalAt ?? p.at;
-      return p.employeeName === employeeName && p.type === type && originalAt != null
+      return isPunchOf(p, owner) && p.type === type && originalAt != null
         && fmtDateInput(new Date(originalAt)) === refDate;
     });
     if (matching.length !== 1) return null;
@@ -508,7 +531,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
     try {
       const matching = punches.filter((p) => {
         const originalAt = p.originalAt ?? p.at;
-        return p.employeeName === currentUser && p.type === adjForm.type && originalAt != null
+        return isPunchOf(p, self) && p.type === adjForm.type && originalAt != null
           && fmtDateInput(new Date(originalAt)) === adjForm.refDate;
       });
       if (matching.length > 1) {
@@ -546,7 +569,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
       }
       const matching = punches.filter((p) => {
         const originalAt = p.originalAt ?? p.at;
-        return p.employeeName === a.employeeName && p.type === a.type && originalAt != null
+        return isPunchOf(p, { userId: a.userId, name: a.employeeName }) && p.type === a.type && originalAt != null
           && fmtDateInput(new Date(originalAt)) === a.refDate;
       });
       const originalPunchId = a.originalPunchId || (matching.length === 1 ? matching[0].id : undefined);
@@ -559,13 +582,15 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
       await onReloadPunches?.();
     } catch (err) {
       console.error('Falha ao revisar solicitação:', err);
-      showToast('Não foi possível atualizar a solicitação. Verifique se as migrações do ponto foram aplicadas.');
+      showToast((err as { code?: string })?.code === '23505'
+        ? 'Esta batida já tem uma correção vigente. Use "Corrigir" na Folha Mensal para registrar o novo horário.'
+        : 'Não foi possível atualizar a solicitação. Verifique se as migrações do ponto foram aplicadas.');
     } finally {
       setAdjBusy(null);
     }
   };
   const adjStatusColor = (s: PunchAdjustment['status']) =>
-    s === 'APROVADO' ? 'emerald' : s === 'REJEITADO' ? 'red' : 'amber';
+    s === 'APROVADO' ? 'emerald' : s === 'REJEITADO' ? 'red' : s === 'SUBSTITUIDO' ? 'slate' : 'amber';
 
   const todayHoliday = holidays[fmtDateInput(now)];
 
@@ -629,10 +654,28 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
     SAIDA: 'Saída',
   };
 
-  const employees = useMemo(
-    () => Array.from(new Set(punches.map((p) => p.employeeName).filter((name) => Boolean(name) && (!participantNames || participantNames.has(name))))).sort(),
-    [punches, participantNames]
-  );
+  // Funcionários (Folha/Equipe/documentos) — identidade = user_id; nome =
+  // apresentação. Gestão: participantes do ponto ∪ donos de batidas visíveis
+  // (filtrados pelos participantes quando carregados). Técnico: só ele mesmo.
+  const people = useMemo(() => {
+    if (!isManager) return [{ ...self, key: self.userId || `nome:${self.name}` }];
+    const byKey = new Map<string, PontoPerson>();
+    (participants || []).filter((p) => p.usesTimeClock).forEach((p) => byKey.set(p.id, { userId: p.id, name: p.name }));
+    punches.forEach((p) => {
+      if (p.userId) {
+        if (byKey.has(p.userId) || (participants && !participantById.get(p.userId)?.usesTimeClock)) return;
+        byKey.set(p.userId, { userId: p.userId, name: participantById.get(p.userId)?.name || p.employeeName });
+      } else if (p.employeeName && !participants) {
+        byKey.set(`nome:${p.employeeName}`, { name: p.employeeName }); // reserva local sem user_id
+      }
+    });
+    return Array.from(byKey.entries())
+      .map(([key, p]) => ({ ...p, key }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  }, [isManager, self, participants, participantById, punches]);
+  const personByKey = (key: string) => people.find((p) => p.key === key);
+  const punchesOf = (person: PontoPerson) => punches.filter((p) => p.at && isPunchOf(p, person));
+
   const filteredRecentPunches = useMemo(() => punches.filter((p) => {
     const period = p.at ? new Date(p.at).toISOString().slice(0, 7) : '';
     return (!recordPeriod || period === recordPeriod)
@@ -640,52 +683,55 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
       && (recordGps === 'TODOS' || (recordGps === 'COM_GPS' ? hasGps(p) : !hasGps(p)));
   }), [punches, recordGps, recordPeriod, recordType]);
 
+  const expPerson = expEmployee ? personByKey(expEmployee) : undefined;
   const monthPunches = punches
     .filter((p) => {
       if (!p.at) return false;
       const d = new Date(p.at);
       const key = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
-      return key === expMonth && (!expEmployee || p.employeeName === expEmployee);
+      return key === expMonth && (!expPerson || isPunchOf(p, expPerson));
     })
     .sort((a, b) => (a.at || 0) - (b.at || 0));
 
   // ---- Banco de horas real (a partir das batidas + escala + feriados) ----
   // Jornada prevista para uma data: 0 em feriado, folga da escala ou dia
-  // justificado por atestado/folga.
-  const expectedMsForDate = (d: Date, emp: string = currentUser): number => {
+  // justificado por atestado/folga. (Ocorrências do dia ainda são associadas
+  // pelo NOME — day_entries.user_id é o autor; migrar com a camada de Ocorrências.)
+  const expectedMsForDate = (d: Date, person: PontoPerson = self): number => {
     const dk = fmtDateInput(d);
     if (holidays[dk]) return 0;
     const justified = dayEntries.some(
-      (e) => e.employeeName === emp && e.refDate === dk && (e.kind === 'ATESTADO' || e.kind === 'FOLGA')
+      (e) => e.employeeName === person.name && e.refDate === dk && (e.kind === 'ATESTADO' || e.kind === 'FOLGA')
     );
     if (justified) return 0;
     // Jornada prevista pela escala do FUNCIONÁRIO da folha (§2), não do gerador.
-    return dayExpectedMs(scheduleFor(emp), d.getDay());
+    return dayExpectedMs(scheduleFor(person), d.getDay());
+  };
+  const expectedForKey = (person: PontoPerson) => (dk: string) => {
+    const [y, m, d] = dk.split('-').map(Number);
+    return expectedMsForDate(new Date(y, m - 1, d), person);
   };
 
   // Banco de horas acumulado (all-time, apenas dias efetivamente trabalhados)
   // de UM funcionário, via a consolidação única.
-  const bankMsFor = (emp: string): number => {
-    const recs = buildDailyTimeRecords(punches.filter((p) => p.employeeName === emp && p.at), { nowMs });
+  const bankMsFor = (person: PontoPerson): number => {
+    const recs = buildDailyTimeRecords(punchesOf(person), { nowMs });
     let bank = 0;
     for (const r of recs) {
-      if (r.workedMs != null && r.workedMs > 0) {
-        const [y, m, d] = r.dateKey.split('-').map(Number);
-        bank += r.workedMs - expectedMsForDate(new Date(y, m - 1, d), emp);
-      }
+      if (r.workedMs != null && r.workedMs > 0) bank += r.workedMs - expectedForKey(person)(r.dateKey);
     }
     return bank;
   };
 
   // Ocorrências (feriado/atestado/folga/obs) de um mês para um funcionário,
-  // como mapa YYYY-MM-DD → texto (usado no Espelho e para incluir dias sem batida).
-  const occurrencesForMonth = (emp: string, month: string): Record<string, string> => {
+  // como mapa YYYY-MM-DD → texto (usado na Folha e nos documentos).
+  const occurrencesForMonth = (person: PontoPerson, month: string): Record<string, string> => {
     const map: Record<string, string> = {};
     Object.keys(holidays)
       .filter((dk) => dk.startsWith(month))
       .forEach((dk) => (map[dk] = `Feriado: ${holidays[dk].name}`));
     dayEntries
-      .filter((e) => e.employeeName === emp && e.refDate.startsWith(month))
+      .filter((e) => e.employeeName === person.name && e.refDate.startsWith(month))
       .forEach((e) => {
         if (e.kind === 'FERIADO') return; // feriado tratado acima
         map[e.refDate] = `${dayKindLabel(e.kind)}${e.note ? `: ${e.note}` : ''}`;
@@ -699,45 +745,65 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
     return `01/${pad2(m)}/${y} a ${pad2(last)}/${pad2(m)}/${y}`;
   };
 
-  // Monta os blocos do Espelho de Ponto para o PDF canônico. Um bloco por
-  // funcionário (admin "todos" gera vários; cada um em nova página no PDF).
-  const buildTimecardBlocks = (month: string, employeeFilter?: string): TimecardBlock[] => {
+  // Início da apuração por user_id: 1ª batida original no servidor (sem campo
+  // canônico no cadastro ainda). Buscado uma vez por funcionário.
+  // Cada id é pedido UMA vez (falha = desconhecido → usa só as batidas
+  // conhecidas); recargas/realtime não disparam novas consultas.
+  const firstPunchRequested = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    const missing = people.map((p) => p.userId).filter((id): id is string => !!id && !firstPunchRequested.current.has(id));
+    if (!missing.length) return;
+    missing.forEach((id) => firstPunchRequested.current.add(id));
+    Promise.all(missing.map((id) => fetchFirstPunchAt(id).then((at) => [id, at ?? null] as const, () => [id, null] as const)))
+      .then((pairs) => {
+        setFirstPunchAt((prev) => {
+          const next = new Map(prev);
+          pairs.forEach(([id, at]) => next.set(id, at));
+          return next;
+        });
+      });
+  }, [people]);
+  const trackingStartFor = (person: PontoPerson) =>
+    resolveTrackingStartKey(person.userId ? firstPunchAt.get(person.userId) ?? undefined : undefined, punchesOf(person));
+
+  // ---- Folha consolidada — FONTE ÚNICA da tela, do PDF e do Excel ----
+  // Apresentação sobre o motor canônico (lib/timesheet → lib/timecard).
+  const nowMinuteMs = Math.floor(nowMs / 60000) * 60000;
+  const timesheetOptsFor = (person: PontoPerson, month: string = expMonth) => ({
+    monthKey: month,
+    nowMs: nowMinuteMs,
+    expectedMsForDate: expectedForKey(person),
+    occurrences: occurrencesForMonth(person, month),
+    adjustments: adjustments.filter((a) => (person.userId && a.userId ? a.userId === person.userId : a.employeeName === person.name)),
+    trackingStartKey: trackingStartFor(person),
+  });
+  const timesheetRowsFor = (person: PontoPerson, month: string = expMonth) =>
+    buildTimesheetRows(punchesOf(person), timesheetOptsFor(person, month));
+
+  // Documentos (PDF): um bloco por funcionário, com as MESMAS linhas e totais
+  // da Folha (admin "todos" gera vários; cada um em nova página no PDF).
+  const buildTimecardBlocks = (month: string, only?: PontoPerson): TimecardBlock[] => {
     const inMonth = (p: TimePunch) =>
       p.at != null && `${new Date(p.at).getFullYear()}-${pad2(new Date(p.at).getMonth() + 1)}` === month;
-    let emps: string[];
-    if (employeeFilter) {
-      emps = [employeeFilter];
-    } else {
-      const set = new Set<string>();
-      punches.filter(inMonth).forEach((p) => p.employeeName && (!participantNames || participantNames.has(p.employeeName)) && set.add(p.employeeName));
-      dayEntries.filter((e) => e.refDate.startsWith(month)).forEach((e) => e.employeeName && (!participantNames || participantNames.has(e.employeeName)) && set.add(e.employeeName));
-      emps = Array.from(set).sort();
-    }
-    return emps.map((emp) => {
-      const occ = occurrencesForMonth(emp, month);
-      // TODAS as batidas do funcionário (não recorta por dia civil): uma jornada
-      // que atravessa a meia-noite/mês fica inteira no mês da ENTRADA (competência)
-      // e é contada uma única vez (§14/§15). O `monthKey` filtra por competência.
-      const empPunches = punches.filter((p) => p.employeeName === emp && p.at);
-      const records = buildDailyTimeRecords(empPunches, { extraDateKeys: Object.keys(occ), nowMs, monthKey: month });
-      const summary = computePeriodSummary(records, (dk) => {
-        const [y, m, d] = dk.split('-').map(Number);
-        return expectedMsForDate(new Date(y, m - 1, d), emp);
-      });
+    const list = only ? [only] : people.filter((person) =>
+      punches.some((p) => inMonth(p) && isPunchOf(p, person))
+      || dayEntries.some((e) => e.refDate.startsWith(month) && e.employeeName === person.name));
+    return list.map((person) => {
+      const rows = timesheetRowsFor(person, month);
       return {
-        employee: emp,
-        records,
-        summary,
-        occurrences: occ,
-        scheduleLabel: scheduleLabelFor(emp),
-        bank: fmtHoursShort(bankMsFor(emp), true),
+        employee: person.name,
+        lines: toDocumentLines(rows),
+        summary: summarizeTimesheetRows(rows),
+        scheduleLabel: scheduleLabelFor(person),
+        bank: fmtHoursShort(bankMsFor(person), true),
       };
     });
   };
 
   const openMyTimecard = () => {
     setTimecardCfg({
-      blocks: buildTimecardBlocks(myMonth, currentUser),
+      blocks: buildTimecardBlocks(myMonth, self),
       periodLabel: monthPeriodLabel(myMonth),
       fileLabel: `${currentUser}_${myMonth}`,
       logoUrl,
@@ -746,9 +812,36 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
 
   const openAdminTimecard = () => {
     setTimecardCfg({
-      blocks: buildTimecardBlocks(expMonth, expEmployee || undefined),
+      blocks: buildTimecardBlocks(expMonth, expPerson),
       periodLabel: monthPeriodLabel(expMonth),
-      fileLabel: expEmployee || 'todos',
+      fileLabel: expPerson?.name || 'todos',
+      logoUrl,
+    });
+  };
+
+  // Técnico vê só a própria folha; gestão escolhe o funcionário (por user_id).
+  const sheetPerson: PontoPerson = isManager
+    ? (personByKey(sheetUserId) || people.find((p) => samePerson(p, self)) || people[0] || self)
+    : self;
+  const sheetKey = sheetPerson.userId || `nome:${sheetPerson.name}`;
+  const sheetRows = section === 'folha' ? timesheetRowsFor(sheetPerson) : [];
+  const sheetSummary = section === 'folha'
+    ? summarizeEmployeeMonth(sheetPerson.name, punchesOf(sheetPerson), timesheetOptsFor(sheetPerson))
+    : null;
+  const teamSummaries = section === 'equipe' && isManager
+    ? people.map((person) => ({ key: person.key, ...summarizeEmployeeMonth(person.name, punchesOf(person), timesheetOptsFor(person)) }))
+    : [];
+  const openSheetFor = (key: string) => {
+    setSheetUserId(key);
+    setExpEmployee(key);
+    setSheetFilter('TODOS');
+    setSection('folha');
+  };
+  const openSheetTimecard = () => {
+    setTimecardCfg({
+      blocks: buildTimecardBlocks(expMonth, sheetPerson),
+      periodLabel: monthPeriodLabel(expMonth),
+      fileLabel: `${sheetPerson.name}_${expMonth}`,
       logoUrl,
     });
   };
@@ -756,15 +849,12 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
   const hoursStats = useMemo(() => {
     // Registros por JORNADA (competência), não por dia civil — uma jornada
     // noturna conta uma vez, no dia da entrada. Fonte única (lib/timecard).
-    const recs = buildDailyTimeRecords(
-      punches.filter((p) => p.employeeName === currentUser && p.at),
-      { nowMs }
-    );
+    const recs = buildDailyTimeRecords(punchesOf(self), { nowMs });
     const recByDk = new Map(recs.map((r) => [r.dateKey, r]));
 
     // Banco acumulado: apenas sobre dias efetivamente trabalhados (com batida),
     // para não penalizar dias anteriores à adoção do sistema. Fonte única.
-    const bankMs = bankMsFor(currentUser);
+    const bankMs = bankMsFor(self);
 
     // Semana atual (segunda a domingo)
     const base = new Date(nowMs);
@@ -794,7 +884,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
     }
     return { bankMs, prevMs, realMs, extraMs, atrasos };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [punches, currentUser, sched, holidays, dayEntries, new Date(nowMs).toDateString()]);
+  }, [punches, self, sched, holidays, dayEntries, new Date(nowMs).toDateString()]);
 
   const fmtShort = (ms: number) => {
     const sign = ms < 0 ? '-' : '';
@@ -812,26 +902,13 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
   // dd/mm/aaaa a partir de uma chave YYYY-MM-DD
   const dayKeyToBr = (dk: string) => dk.split('-').reverse().join('/');
 
-  // Ocorrência do dia (feriado tem prioridade; depois atestado/folga/observação)
-  const occurrenceFor = (emp: string, dayKey: string): string => {
-    if (holidays[dayKey]) return `Feriado: ${holidays[dayKey].name}`;
-    const entries = dayEntries.filter((e) => e.employeeName === emp && e.refDate === dayKey);
-    if (entries.some((e) => e.kind === 'ATESTADO')) return 'Atestado';
-    if (entries.some((e) => e.kind === 'FOLGA')) return 'Folga';
-    const fe = entries.find((e) => e.kind === 'FERIADO');
-    if (fe) return `Feriado: ${fe.note || 'manual'}`;
-    const ob = entries.find((e) => e.kind === 'OBSERVACAO');
-    if (ob) return ob.note ? `Obs.: ${ob.note}` : 'Observação';
-    return '';
-  };
-
   // Agrupa por dia. Inclui feriados e ocorrências (atestado/folga) mesmo sem batidas.
   const buildData = () => {
     const detail: string[][] = [
       ['Funcionário', 'Data', 'Dia', 'Tipo', 'Hora', 'Latitude', 'Longitude', 'Precisão (m)'],
     ];
     const summary: string[][] = [
-      ['Funcionário', 'Data', 'Entrada', 'Almoço', 'Retorno', 'Saída', 'Horas trabalhadas', 'Ocorrência'],
+      ['Funcionário', 'Data', 'Entrada', 'Almoço', 'Retorno', 'Saída', 'Horas trabalhadas', 'Previsto', 'Saldo', 'Ocorrência'],
     ];
 
     // Detalhamento por batida (timestamps reais, sem agrupar).
@@ -852,56 +929,40 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
     // Feriados e ocorrências (atestado/folga/obs) do período selecionado
     const monthHolidayDates = Object.keys(holidays).filter((dt) => dt.startsWith(expMonth));
     const monthEntries = dayEntries.filter(
-      (e) => e.refDate.startsWith(expMonth) && (!expEmployee || e.employeeName === expEmployee)
+      (e) => e.refDate.startsWith(expMonth) && (!expPerson || e.employeeName === expPerson.name)
     );
 
-    // Funcionários no escopo (selecionado, ou todos com batida/ocorrência no mês)
-    const empSet = new Set<string>();
-    if (expEmployee) empSet.add(expEmployee);
-    else {
-      monthPunches.forEach((p) => p.employeeName && empSet.add(p.employeeName));
-      monthEntries.forEach((e) => e.employeeName && empSet.add(e.employeeName));
-      if (empSet.size === 0 && monthHolidayDates.length) empSet.add('(empresa)'); // só feriados, sem funcionário
-    }
-
-    let totalMs = 0;
-    const rows: { emp: string; dk: string; line: string[] }[] = [];
-
-    // Resumo por JORNADA (competência), igual ao Espelho/PDF: uma jornada noturna
-    // aparece uma vez, no dia da entrada, com a saída marcada "(+1)" quando cai no
-    // dia seguinte. Usa TODAS as batidas do funcionário + recorte por competência.
+    // Resumo = as MESMAS linhas e totais da Folha Mensal (lib/timesheet): uma
+    // jornada por linha (noturna no dia da entrada, saída "(+1)"), dias "Sem
+    // registro" e ocorrências. Nada recalculado aqui.
     const hm = (at?: number) => (at != null ? fmtHM(new Date(at)) : '--');
-    empSet.forEach((emp) => {
-      const occ = occurrencesForMonth(emp, expMonth);
-      const empAllPunches = punches.filter((p) => p.employeeName === emp && p.at);
-      const records = buildDailyTimeRecords(empAllPunches, { extraDateKeys: Object.keys(occ), nowMs, monthKey: expMonth });
-      records.forEach((r) => {
-        const ms = r.workedMs ?? 0;
-        totalMs += ms;
-        const saidaCell = r.saida != null ? `${hm(r.saida)}${r.crossesMidnight ? ' (+1)' : ''}` : '--';
-        rows.push({
-          emp,
-          dk: r.dateKey,
-          line: [
-            emp,
-            dayKeyToBr(r.dateKey),
-            hm(r.entrada),
-            hm(r.pausa),
-            hm(r.retorno),
-            saidaCell,
-            r.workedMs == null ? '—' : fmtDuration(ms),
-            occurrenceFor(emp, r.dateKey) || dayStatusLabel(r.status) || '—',
-          ],
-        });
+    const signedDur = (ms: number | null) => (ms == null ? '—' : fmtHoursShort(ms, true));
+    const blocks = buildTimecardBlocks(expMonth, expPerson);
+    let totalMs = 0;
+    blocks.forEach((b) => {
+      b.lines.forEach((l) => {
+        summary.push([
+          b.employee,
+          dayKeyToBr(l.dateKey),
+          hm(l.entrada),
+          hm(l.pausa),
+          hm(l.retorno),
+          l.saida != null ? `${hm(l.saida)}${l.saidaNextDay ? ' (+1)' : ''}` : '--',
+          l.workedMs == null ? '—' : fmtDuration(l.workedMs),
+          fmtDuration(l.expectedMs),
+          signedDur(l.balanceMs),
+          l.label || '—',
+        ]);
       });
+      totalMs += b.summary.trabalhadoMs;
+      summary.push([
+        b.employee, 'TOTAL', '', '', '', '',
+        fmtDuration(b.summary.trabalhadoMs), fmtDuration(b.summary.previstoMs), fmtHoursShort(b.summary.saldoMs, true), '',
+      ]);
     });
-
-    rows.sort((a, b) => a.dk.localeCompare(b.dk) || a.emp.localeCompare(b.emp));
-    rows.forEach((r) => summary.push(r.line));
 
     const feriados = monthHolidayDates.length;
     const atestados = monthEntries.filter((e) => e.kind === 'ATESTADO').length;
-    summary.push(['', '', '', '', '', '', 'TOTAL', fmtDuration(totalMs)]);
 
     return { detail, summary, totalMs, feriados, atestados };
   };
@@ -958,6 +1019,34 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
         </div>
       </div>
 
+      {/* Áreas do Ponto */}
+      <nav aria-label="Áreas do ponto" className="-mx-3 md:mx-0 overflow-x-auto">
+        <div className="flex gap-1 px-3 md:px-0 border-b border-border min-w-max">
+          {(isManager
+            ? (['meu', 'equipe', 'folha', 'ajustes', 'registros'] as PontoSection[])
+            : (['meu', 'folha', 'ajustes', 'registros'] as PontoSection[])
+          ).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setSection(s)}
+              aria-current={section === s ? 'page' : undefined}
+              className={`min-h-[44px] px-3 md:px-4 text-xs md:text-sm font-semibold border-b-2 -mb-px transition-colors ${
+                section === s ? 'border-primary text-primary' : 'border-transparent text-fg-secondary hover:text-primary'
+              }`}
+            >
+              {SECTION_LABEL[s]}
+              {s === 'ajustes' && isManager && adjustments.some((a) => a.status === 'PENDENTE') && (
+                <span className="ml-1.5 inline-flex min-w-[18px] justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+                  {adjustments.filter((a) => a.status === 'PENDENTE').length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      {section === 'meu' && (<>
       {/* Atalhos rápidos */}
       <div className="flex flex-wrap gap-2">
         {[
@@ -966,7 +1055,6 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
           { id: 'card-jornada', label: 'Registrar', icon: 'touch_app', mobileHidden: true },
           { id: 'card-timeline', label: 'Histórico', icon: 'timeline' },
           { id: 'card-banco', label: 'Banco de Horas', icon: 'savings' },
-          { id: 'card-registros', label: 'Registros', icon: 'fact_check' },
         ].map((s) => (
           <button
             key={s.id}
@@ -1235,6 +1323,90 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
         )}
       </div>
 
+      </>)}
+
+      {/* ===== Equipe (resumo da competência por funcionário) ===== */}
+      {section === 'equipe' && isManager && (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="font-display text-sm font-bold uppercase tracking-wide text-primary">Equipe</h2>
+              <p className="text-[11px] text-fg-muted">Resumo da competência por funcionário, em ordem alfabética. Selecione para abrir a folha.</p>
+            </div>
+            <div>
+              <label className="block text-fg-secondary mb-1 font-semibold uppercase text-[11px]" htmlFor="team-month">Competência</label>
+              <input id="team-month" type="month" value={expMonth} onChange={(e) => setExpMonth(e.target.value || expMonth)}
+                className="min-h-[40px] border border-border rounded-lg px-2 text-xs text-fg bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20" />
+            </div>
+          </div>
+          <TeamSummary summaries={teamSummaries} onOpen={openSheetFor} />
+        </div>
+      )}
+
+      {/* ===== Folha Mensal consolidada (uma linha por jornada) ===== */}
+      {section === 'folha' && (<>
+        <div className="space-y-3">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div className="min-w-0">
+              <h2 className="font-display text-sm font-bold uppercase tracking-wide text-primary">Folha Mensal</h2>
+              <p className="text-[11px] text-fg-muted">
+                Uma linha por jornada. Jornada que atravessa a meia-noite pertence ao dia da entrada.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 md:flex md:items-end">
+              {isManager && (
+                <div className="col-span-2 md:col-span-1">
+                  <label className="block text-fg-secondary mb-1 font-semibold uppercase text-[11px]" htmlFor="sheet-employee">Funcionário</label>
+                  <select id="sheet-employee" value={sheetKey}
+                    onChange={(e) => { setSheetUserId(e.target.value); setExpEmployee(e.target.value); }}
+                    className="w-full min-h-[40px] md:min-w-[14rem] border border-border rounded-lg px-2 text-xs text-fg bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20">
+                    {(people.some((p) => p.key === sheetKey) ? people : [{ ...sheetPerson, key: sheetKey }, ...people]).map((p) => <option key={p.key} value={p.key}>{p.name}</option>)}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-fg-secondary mb-1 font-semibold uppercase text-[11px]" htmlFor="sheet-month">Competência</label>
+                <input id="sheet-month" type="month" value={expMonth} onChange={(e) => setExpMonth(e.target.value || expMonth)}
+                  className="w-full min-h-[40px] border border-border rounded-lg px-2 text-xs text-fg bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20" />
+              </div>
+              <button type="button" onClick={openSheetTimecard}
+                className="min-h-[40px] inline-flex items-center justify-center gap-1.5 rounded-lg bg-danger px-3 text-xs font-semibold text-white hover:bg-danger-hover">
+                <span className="material-symbols-outlined text-base">picture_as_pdf</span> PDF
+              </button>
+            </div>
+          </div>
+
+          {sheetSummary && (
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+              {[
+                { label: 'Previsto', value: fmtHoursShort(sheetSummary.previstoMs) },
+                { label: 'Trabalhado', value: fmtHoursShort(sheetSummary.trabalhadoMs) },
+                { label: 'Saldo', value: fmtHoursShort(sheetSummary.saldoMs, true) },
+                { label: 'Pendências', value: String(sheetSummary.pendencies) },
+              ].map((k) => (
+                <div key={k.label} className="rounded-xl border border-border bg-surface px-3 py-2 shadow-sm">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-fg-secondary">{k.label}</p>
+                  <p className="font-data-mono text-base font-bold tabular-nums text-fg">{k.value}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <TimesheetTable
+            rows={sheetRows}
+            adjustments={timesheetOptsFor(sheetPerson).adjustments}
+            canCorrect={isManager}
+            onCorrect={isManager ? setCorrRow : undefined}
+            filter={sheetFilter}
+            onFilterChange={setSheetFilter}
+          />
+          {!isManager && (
+            <p className="text-[11px] text-fg-secondary">
+              Encontrou algo errado? Use <button type="button" onClick={() => setSection('ajustes')} className="font-semibold text-primary hover:underline">Ajustes</button> para solicitar a correção.
+            </p>
+          )}
+        </div>
+
       {/* ===== Exportar folha de ponto (admin/gestor) ===== */}
       {isManager && (
         <div className="bg-surface rounded-xl shadow-sm p-6">
@@ -1259,9 +1431,9 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
                 className="w-full border border-border rounded-lg p-2.5 text-xs text-fg bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20"
               >
                 <option value="">Todos os funcionários</option>
-                {employees.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
+                {people.map((p) => (
+                  <option key={p.key} value={p.key}>
+                    {p.name}
                   </option>
                 ))}
               </select>
@@ -1297,8 +1469,10 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
           </p>
         </div>
       )}
+      </>)}
 
       {/* ===== Ocorrências do dia (observação / atestado / feriado) ===== */}
+      {section === 'meu' && (
       <div className="bg-surface rounded-xl shadow-sm p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -1360,8 +1534,10 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
           </div>
         )}
       </div>
+      )}
 
       {/* ===== Solicitações de ajuste ===== */}
+      {section === 'ajustes' && (
       <div className="bg-surface rounded-xl shadow-sm p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -1398,16 +1574,24 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
                   <p className="font-semibold text-fg">
                     {isManager && <span className="text-fg-secondary">{a.employeeName} · </span>}
                     {a.type} em {a.refDate.split('-').reverse().join('/')}
+                    {a.action === 'INCLUSAO' && <span className="text-fg-secondary"> · batida incluída</span>}
+                    {a.action === 'DESCONSIDERAR' && <span className="text-fg-secondary"> · batida desconsiderada</span>}
                   </p>
                   {(() => {
-                    const orig = originalPunchTimeFor(a.employeeName, a.refDate, a.type);
+                    const orig = a.originalAt
+                      ? fmtClock(new Date(a.originalAt))
+                      : originalPunchTimeFor({ userId: a.userId, name: a.employeeName }, a.refDate, a.type);
+                    const admin = a.origin === 'ADMINISTRATIVO';
                     return (
                       <p className="text-[11px] text-fg-secondary mt-0.5">
                         {orig && <>Original: <span className="font-data-mono font-semibold">{orig}</span> · </>}
-                        Solicitado:{' '}
-                        {a.requestedTime
-                          ? <span className="font-data-mono font-semibold text-primary">{a.requestedTime}</span>
-                          : <span className="text-danger font-semibold">não informado</span>}
+                        {a.action === 'DESCONSIDERAR' ? null : <>
+                          {admin ? 'Corrigido para' : 'Solicitado'}:{' '}
+                          {a.requestedTime
+                            ? <span className="font-data-mono font-semibold text-primary">{a.requestedTime}</span>
+                            : <span className="text-danger font-semibold">não informado</span>}
+                        </>}
+                        {admin && <> · Correção administrativa por {a.createdByName || a.reviewerName || 'gestor'}{a.createdAt ? ` em ${new Date(a.createdAt).toLocaleString('pt-BR')}` : ''}</>}
                       </p>
                     );
                   })()}
@@ -1440,8 +1624,10 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
           </div>
         )}
       </div>
+      )}
 
-      {/* ===== Registros recentes ===== */}
+      {/* ===== Registros de batidas (visão secundária / auditável) ===== */}
+      {section === 'registros' && (
       <div id="card-registros">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 mb-3">
           <h3 className="text-xs font-bold text-fg-secondary uppercase tracking-wider">Registros recentes de frequência</h3>
@@ -1517,6 +1703,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
           </div>
         )}
       </div>
+      )}
 
       {selectedAdjustedPunch && (
         <div className="fixed inset-0 z-50 bg-navy/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setSelectedAdjustedPunch(null)}>
@@ -1676,7 +1863,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
               <div>
                 <label className={labelCls}>Novo horário *</label>
                 {(() => {
-                  const orig = originalPunchTimeFor(currentUser, adjForm.refDate, adjForm.type);
+                  const orig = originalPunchTimeFor(self, adjForm.refDate, adjForm.type);
                   return orig ? (
                     <p className="text-[11px] text-fg-secondary mb-1">
                       Horário original: <span className="font-data-mono font-semibold">{orig}</span>
@@ -1731,6 +1918,19 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
           <div className="min-w-0 flex-1 pl-2"><p className="text-[10px] text-fg-secondary">Próxima batida</p><p className="text-xs font-bold text-fg truncate">{NEXT_INFO[nextType].label}</p></div>
           <button onClick={handleBaterPonto} disabled={punching || locating} className={`shrink-0 px-4 py-3 rounded-lg text-white text-xs font-bold ${NEXT_INFO[nextType].classes}`}>{locating ? 'GPS…' : 'Registrar'}</button>
         </div>
+      )}
+      {corrRow && isManager && (
+        <PunchCorrectionModal
+          row={corrRow}
+          employeeName={sheetPerson.name}
+          employeeUserId={sheetPerson.userId}
+          onClose={() => setCorrRow(null)}
+          onSaved={async () => {
+            showToast('Correção registrada.', 'success');
+            loadAdjustments();
+            await onReloadPunches?.();
+          }}
+        />
       )}
       {timecardCfg && (
         <TimecardPDFView

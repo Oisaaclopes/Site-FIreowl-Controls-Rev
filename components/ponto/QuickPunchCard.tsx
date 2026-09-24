@@ -26,6 +26,8 @@ import { useToast } from '@/components/ui/Feedback';
  */
 export interface QuickPunchCardProps {
   currentUser: string;
+  /** profiles.id — identidade canônica das batidas (o nome é só apresentação). */
+  currentUserId?: string;
   punches: TimePunch[];
   onAddPunch: (p: TimePunch) => void;
   /** profiles.uses_time_clock — false esconde o card. */
@@ -59,6 +61,7 @@ const STATUS_DOT: Record<PunchStatusKind, string> = {
 
 export const QuickPunchCard: React.FC<QuickPunchCardProps> = ({
   currentUser,
+  currentUserId,
   punches,
   onAddPunch,
   usesTimeClock = true,
@@ -70,7 +73,7 @@ export const QuickPunchCard: React.FC<QuickPunchCardProps> = ({
 
   if (usesTimeClock === false) return null;
 
-  const state = derivePunchState(punches, currentUser, Date.now());
+  const state = derivePunchState(punches, { userId: currentUserId, name: currentUser }, Date.now());
   const nextT = state.nextType;
 
   const baterPonto = async () => {

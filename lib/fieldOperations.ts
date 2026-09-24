@@ -1,5 +1,6 @@
 import { Client, OrdemServico, TimePunch } from './types';
 import type { TimeClockParticipant } from './users';
+import { isPunchOf, PunchOwner } from './pontoActions';
 
 export type FieldOperationalStatus =
   | 'EM ATENDIMENTO' | 'EM OPERAÇÃO' | 'EM JORNADA' | 'FORA DE JORNADA';
@@ -59,9 +60,18 @@ const sameLocalDay = (left: number, right: number) => {
     && a.getDate() === b.getDate();
 };
 
-/** Jornada aberta exige evento efetivo de hoje e sem SAIDA posterior. */
-export function hasOpenJourney(punches: TimePunch[], now = Date.now()): boolean {
-  const latest = punches.filter((p) => p.at != null).sort((a, b) => (b.at || 0) - (a.at || 0))[0];
+/**
+ * Jornada aberta exige evento efetivo de hoje e sem SAIDA posterior.
+ *
+ * `owner` = DONO da jornada (user_id é a identidade; nome só como fallback
+ * para batidas sem user_id). Quem recebe batidas de várias pessoas (gestor)
+ * DEVE informá-lo — sem ele, todas as batidas recebidas são consideradas
+ * (uso legado com lista já filtrada por pessoa).
+ */
+export function hasOpenJourney(punches: TimePunch[], now = Date.now(), owner?: PunchOwner): boolean {
+  const latest = punches
+    .filter((p) => p.at != null && (!owner || isPunchOf(p, owner)))
+    .sort((a, b) => (b.at || 0) - (a.at || 0))[0];
   return Boolean(latest?.at && sameLocalDay(latest.at, now) && latest.type !== 'SAIDA');
 }
 
@@ -127,7 +137,7 @@ export function deriveFieldOperatorStates(
       .sort((a, b) => (b.at || 0) - (a.at || 0));
     const lastPunch = employeePunches[0];
     const lastLocatedPunch = employeePunches.find(hasCoordinates);
-    const journeyOpen = hasOpenJourney(employeePunches, now);
+    const journeyOpen = hasOpenJourney(employeePunches, now, { userId: technician.id, name: technician.name });
 
     // Sem jornada aberta, nada de campo se aplica (a SAÍDA prevalece).
     const realAttendance = journeyOpen ? attendanceByTechnician.get(technician.id) : undefined;

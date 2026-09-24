@@ -54,6 +54,7 @@ export const MobileQuickMenu: React.FC<Props> = ({ userName, cargo, userRole, us
       {onAddPunch && (
         <QuickPunchCard
           currentUser={userName}
+          currentUserId={userId}
           punches={punches}
           onAddPunch={onAddPunch}
           usesTimeClock={usesTimeClock}

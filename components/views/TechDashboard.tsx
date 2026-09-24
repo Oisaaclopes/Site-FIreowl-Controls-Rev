@@ -98,6 +98,7 @@ export const TechDashboard: React.FC<TechDashboardProps> = ({
           módulo Ponto). Só aparece para quem usa controle de ponto. */}
       <QuickPunchCard
         currentUser={currentUser}
+        currentUserId={currentUserId}
         punches={punches}
         onAddPunch={onAddPunch}
         usesTimeClock={usesTimeClock}

@@ -161,3 +161,22 @@ describe('ETAPA 3A — jornada, operação e atendimento (precedência §11/§33
     expect(states.map((s) => s.status)).toEqual(['EM ATENDIMENTO', 'EM OPERAÇÃO', 'EM JORNADA', 'FORA DE JORNADA']);
   });
 });
+
+describe('hasOpenJourney — dono explícito', () => {
+  it('lista mista (gestor): considera só as batidas do dono', () => {
+    const mixed = [punch('ENTRADA', 8), punch('ENTRADA', 9, { id: 'b', userId: 'u2', employeeName: 'Bia' }), punch('SAIDA', 12)];
+    expect(hasOpenJourney(mixed, now, { userId: 'u1', name: 'Ana' })).toBe(false); // Ana saiu
+    expect(hasOpenJourney(mixed, now, { userId: 'u2', name: 'Bia' })).toBe(true);  // Bia em jornada
+  });
+  it('batida local sem user_id cai no fallback por nome', () => {
+    const local = [punch('ENTRADA', 8, { userId: undefined })];
+    expect(hasOpenJourney(local, now, { userId: 'u1', name: 'Ana' })).toBe(true);
+    expect(hasOpenJourney(local, now, { userId: 'u9', name: 'Outro' })).toBe(false);
+  });
+  it('estado de campo por técnico não é afetado pela jornada de outro técnico', () => {
+    const bia = { ...technician, id: 'u2', name: 'Bia' } as typeof technician;
+    const states = deriveFieldOperatorStates([technician, bia], [punch('ENTRADA', 8, { userId: 'u2', employeeName: 'Bia' })], [], [], now);
+    expect(states.find((s) => s.userId === 'u1')!.status).toBe('FORA DE JORNADA');
+    expect(states.find((s) => s.userId === 'u2')!.status).toBe('EM JORNADA');
+  });
+});
