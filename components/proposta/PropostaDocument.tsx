@@ -1,4 +1,5 @@
 import { resolverTituloPedido } from '@/lib/pedidoTitulos';
+import { resolverNormasReferencia } from '@/lib/normasReferencia';
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet, Svg, Path, Line, Rect, Circle, Image, Font } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
@@ -1047,6 +1048,7 @@ export function PropostaDocument({
   // Título: snapshot persistido (tituloManual) tem prioridade; só recompõe de
   // Área×Tipo quando ausente (propostas antigas). Ver PARTE 19.
   const tituloDin = resolverTituloPedido(p);
+  const normas = resolverNormasReferencia(p);
   const siglas = faixaSiglas(p.areaPrincipal || []);
   // §22/§23 — Áreas de atuação contextuais (destaca as selecionadas).
   const areaSel = new Set(p.areaPrincipal || []);
@@ -1138,10 +1140,10 @@ export function PropostaDocument({
       <Sec k="visao">
         <Text style={styles.subTitle}>{`${num('visao')}.1. Introdução`}</Text>
         <Text style={styles.para}>{nv(p.objetivo) ? p.objetivo : `Apresentamos nossa proposta para o fornecimento e execução dos serviços referentes a ${escopoTitulo}, para ${clienteNome}.`}</Text>
-        {lnv(p.diretrizesNormativas) && (
+        {lnv(normas) && (
           <>
             <Text style={styles.subTitle}>Diretrizes normativas de referência</Text>
-            <Bullets itens={p.diretrizesNormativas} />
+            <Bullets itens={normas} />
           </>
         )}
       </Sec>

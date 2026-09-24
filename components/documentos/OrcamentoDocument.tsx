@@ -1,4 +1,5 @@
 import { resolverTituloPedido } from '@/lib/pedidoTitulos';
+import { resolverNormasReferencia } from '@/lib/normasReferencia';
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
@@ -195,6 +196,7 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
   const authenticityUrl = verificationUrl('orcamento', pedido.id);
   // P1 — título dinâmico (área × tipo) usado como subtítulo da capa.
   const tituloDin = resolverTituloPedido(p);
+  const normas = resolverNormasReferencia(p);
 
   return (
     <Document title={`Orçamento ${numero}`} author={razao}>
@@ -258,10 +260,10 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
                 <Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Escopo: </Text>{p.escopoServico}
               </Text>
             )}
-            {lnv(p.diretrizesNormativas) && (
+            {lnv(normas) && (
               <Text style={{ fontSize: 8, color: C.s500, marginTop: 4 }}>
                 <Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Normas de referência: </Text>
-                {p.diretrizesNormativas.filter(nv).join(' · ')}
+                {normas.filter(nv).join(' · ')}
               </Text>
             )}
           </View>

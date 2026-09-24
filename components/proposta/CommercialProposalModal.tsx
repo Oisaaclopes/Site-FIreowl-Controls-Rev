@@ -1,5 +1,6 @@
 'use client';
 import { gerarReferenciaPedido, gerarTituloPedido, tituloFoiPersonalizado, resolverTextoSugerido } from '@/lib/pedidoTitulos';
+import { getNormativeReferences, normasForamPersonalizadas } from '@/lib/normasReferencia';
 
 import { showToast, requestConfirm, requestText } from '@/components/ui/Feedback';
 
@@ -361,13 +362,12 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         : ''
   );
 
-  const [diretrizes, setDiretrizes] = useState<string[]>(
-    initialPedido?.proposal?.diretrizesNormativas || [
-      'ABNT NBR 17240:2010 — Sistemas de detecção e alarme de incêndio',
-      'NPT 019 — Sistema de Detecção e Alarme de Incêndio (Corpo de Bombeiros Militar do Paraná)',
-      'ABNT NBR 5410:2004 — Instalações elétricas de baixa tensão',
-    ]
-  );
+  // Normas de referência: sugeridas por Área + Serviço (fonte única em
+  // [[lib/normasReferencia]]); null = automático, lista = edição manual preservada.
+  const [diretrizesManual, setDiretrizesManual] = useState<string[] | null>(() => initialPedido && normasForamPersonalizadas(initialPedido.proposal) ? initialPedido.proposal.diretrizesNormativas || [] : null);
+  const diretrizes = diretrizesManual ?? getNormativeReferences(contextoTitulo);
+  const setDiretrizes: React.Dispatch<React.SetStateAction<string[]>> = (action) =>
+    setDiretrizesManual((prev) => (typeof action === 'function' ? action(prev ?? getNormativeReferences(contextoTitulo)) : action));
   const [escopoServico, setEscopoServico] = useState<string>(
     initialPedido?.proposal?.escopoServico ||
       'Inspeção física, ensaios funcionais e manutenção preventiva nos laços de detecção, verificação de centrais e comissionamento com emissão de laudo e ART.'
@@ -855,6 +855,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         impostosAdicionais: somenteMaterial ? impostosAdicionais : undefined,
         observacoesComerciais: somenteMaterial ? (observacoesComerciais.trim() || undefined) : (initialProposal?.observacoesComerciais),
         diretrizesNormativas: diretrizes,
+        diretrizesEditadasManualmente: diretrizesManual !== null,
         escopoServico,
         entregaveis,
         premissas,
@@ -1527,6 +1528,16 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           </Accordion>
 
           <Accordion title="Diretrizes Normativas" icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />} open={!!open.diretrizes} onToggle={() => toggle('diretrizes')}>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <p className="text-[11px] text-fg-muted">
+                {diretrizesManual === null ? 'Sugeridas automaticamente conforme Área(s) + Tipo de serviço.' : 'Editadas manualmente — mudanças de Área/Serviço não alteram esta lista.'}
+              </p>
+              {diretrizesManual !== null && (
+                <button type="button" onClick={() => setDiretrizesManual(null)} title="Substitui a lista pelas normas sugeridas para o contexto atual" className="text-[10px] font-bold uppercase text-primary hover:text-danger shrink-0">
+                  Reaplicar sugestão automática
+                </button>
+              )}
+            </div>
             <ListEditor items={diretrizes} numbered onAdd={() => addStr(setDiretrizes, 'ABNT NBR ')} onUpdate={(i, v) => updStr(setDiretrizes, i, v)} onRemove={(i) => rmStr(setDiretrizes, i)} addLabel="Adicionar norma" />
           </Accordion>
 

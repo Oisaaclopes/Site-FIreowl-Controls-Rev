@@ -3,6 +3,7 @@ import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import { C, nv, lnv, PdfHeader, PdfFooter, CamposExtras, CapaBanner } from './pdfKit';
 import { DocOptions } from '@/lib/documentos';
+import { resolverNormasReferencia } from '@/lib/normasReferencia';
 
 export type LaudoTecnicoPdfOptions = Partial<DocOptions>;
 
@@ -83,7 +84,16 @@ export function LaudoTecnicoDocument({ pedido, companyProfile, options }: { pedi
   const dataDoc = options?.dataHoje ? new Date().toISOString().split('T')[0] : dataEmissao;
 
   const itens = p.equipmentItems || [];
-  const normas = lnv(p.diretrizesNormativas) ? p.diretrizesNormativas : ['NBR 17240 — Sistemas de detecção e alarme de incêndio', 'NPT 019 (CBPMESP) — SDAI', 'Instrução Técnica do Corpo de Bombeiros aplicável'];
+  // Fonte única ([[lib/normasReferencia]]): salvas → preservadas; contexto
+  // conhecido → sugestão; desconhecido → vazio (nunca assume SDAI por ser laudo).
+  const normas = resolverNormasReferencia(p).filter(nv);
+  let proxSec = 1;
+  const sec = () => String(proxSec++).padStart(2, '0');
+  const nObjetivo = sec();
+  const nNormas = normas.length > 0 ? sec() : '';
+  const nItens = itens.length > 0 ? sec() : '';
+  const nParecer = sec();
+  const nResponsavel = sec();
   const objetivo = nv(p.escopoServico) ? p.escopoServico : (nv(p.objetivo) ? p.objetivo : 'Verificação das condições técnicas e de conformidade do sistema, conforme normas de referência.');
   const parecer = nv(p.conclusao) ? p.conclusao : 'Com base na inspeção realizada e nas normas de referência, o sistema encontra-se em conformidade nos pontos verificados, ressalvadas as observações registradas neste laudo. Recomenda-se a manutenção periódica para preservação do desempenho.';
 
@@ -108,22 +118,26 @@ export function LaudoTecnicoDocument({ pedido, companyProfile, options }: { pedi
           <InfoCell label="Responsável Técnico" value={responsavel} />
         </View>
 
-        <SecHead n="01" titulo="Objetivo da Inspeção" />
+        <SecHead n={nObjetivo} titulo="Objetivo da Inspeção" />
         <View style={styles.card}>
           <Text style={styles.para}>{objetivo}</Text>
         </View>
 
-        <SecHead n="02" titulo="Normas e Referências" />
-        {normas.filter(nv).map((it, i) => (
-          <View key={i} style={styles.bulletRow}>
-            <Text style={styles.bulletDot}>•</Text>
-            <Text style={styles.bulletText}>{it}</Text>
-          </View>
-        ))}
+        {normas.length > 0 && (
+          <>
+            <SecHead n={nNormas} titulo="Normas e Referências" />
+            {normas.map((it, i) => (
+              <View key={i} style={styles.bulletRow}>
+                <Text style={styles.bulletDot}>•</Text>
+                <Text style={styles.bulletText}>{it}</Text>
+              </View>
+            ))}
+          </>
+        )}
 
         {itens.length > 0 && (
           <View minPresenceAhead={70}>
-            <SecHead n="03" titulo="Itens Inspecionados" />
+            <SecHead n={nItens} titulo="Itens Inspecionados" />
             <View style={{ borderWidth: 1, borderColor: C.s200, borderRadius: 4, overflow: 'hidden', marginBottom: 10 }}>
               <View style={styles.th} fixed>
                 <Text style={[styles.thCell, { width: 22, textAlign: 'center' }]}>#</Text>
@@ -151,7 +165,7 @@ export function LaudoTecnicoDocument({ pedido, companyProfile, options }: { pedi
         )}
 
         <View minPresenceAhead={110} wrap={false}>
-          <SecHead n={itens.length > 0 ? '04' : '03'} titulo="Parecer Técnico" />
+          <SecHead n={nParecer} titulo="Parecer Técnico" />
           <View style={styles.card}>
             <Text style={styles.para}>{parecer}</Text>
           </View>
@@ -162,7 +176,7 @@ export function LaudoTecnicoDocument({ pedido, companyProfile, options }: { pedi
         {showCampos && <CamposExtras campos={p.camposPersonalizados} />}
 
         <View minPresenceAhead={130} wrap={false}>
-          <SecHead n={itens.length > 0 ? '05' : '04'} titulo="Responsável Técnico" />
+          <SecHead n={nResponsavel} titulo="Responsável Técnico" />
           <View style={styles.artRow}>
             <View style={styles.artField}>
               <Text style={styles.artLabel}>ART / CREA nº</Text>

@@ -210,6 +210,9 @@ export interface CommercialProposalData {
   tituloPersonalizado?: string;
   camposPersonalizados?: { rotulo: string; valor: string }[];
   diretrizesNormativas: string[];
+  /** true = normas editadas pelo usuário (não recalcular por Área/Serviço).
+   * Ausente = legado; ver [[lib/normasReferencia]]. */
+  diretrizesEditadasManualmente?: boolean;
   escopoServico: string;
   entregaveis: string[];
   premissas: string[];
