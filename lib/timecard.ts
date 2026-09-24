@@ -26,6 +26,13 @@ export type DayStatus = 'OK' | 'EM_ANDAMENTO' | 'ABERTA_ANOMALA' | 'INCOMPLETA' 
  *  automaticamente nem com saída inventada. */
 export const OPEN_JOURNEY_LIMIT_MS = 18 * 60 * 60 * 1000; // 18h
 
+/** true quando `atMs` está além da janela de segurança contada da ENTRADA —
+ *  nenhuma jornada legítima dura mais que isso. Regra ÚNICA usada para (a) a
+ *  jornada aberta deixar de ser a "atual" (vira pendência) e (b) uma batida
+ *  posterior NÃO ser anexada a ela. Exatamente 18h ainda pertence à jornada. */
+export const isJourneyStale = (entradaMs: number, atMs: number, maxOpenMs: number = OPEN_JOURNEY_LIMIT_MS): boolean =>
+  atMs - entradaMs > maxOpenMs;
+
 export interface DayConsolidation {
   entrada?: number; // epoch ms
   pausa?: number;
@@ -112,13 +119,14 @@ function finalizeConsolidation(
     return { ...base, workedMs: Math.max(0, ms), status: 'OK' };
   }
 
-  // Só entrada (sem saída): jornada em curso. Continua EM_ANDAMENTO enquanto
-  // estiver dentro da janela de segurança, MESMO que a entrada tenha sido ontem.
-  // Além da janela → possivelmente incompleta (revisão), nunca fechada nem com
-  // saída inventada.
-  if (entrada != null && saida == null && pausa == null && retorno == null) {
-    if (nowMs != null) return { ...base, status: (nowMs - entrada) > maxOpenMs ? 'ABERTA_ANOMALA' : 'EM_ANDAMENTO' };
-    return { ...base, status: 'INCOMPLETA' };
+  // Entrada sem saída (só entrada, no almoço ou já de volta): jornada em curso.
+  // Continua EM_ANDAMENTO enquanto estiver dentro da janela de segurança, MESMO
+  // que a entrada tenha sido ontem. Além da janela → possivelmente incompleta
+  // (pendência administrativa), nunca fechada nem com saída inventada.
+  // Retorno sem saída para almoço é par quebrado → cai em INCOMPLETA abaixo.
+  if (entrada != null && saida == null && !(retorno != null && pausa == null)) {
+    if (nowMs == null) return { ...base, status: 'INCOMPLETA' };
+    return { ...base, status: isJourneyStale(entrada, nowMs, maxOpenMs) ? 'ABERTA_ANOMALA' : 'EM_ANDAMENTO' };
   }
 
   // Qualquer outra combinação (falta entrada, par de almoço quebrado) é
@@ -156,13 +164,14 @@ export function buildJourneys(
   opts?: { nowMs?: number; maxOpenMs?: number },
 ): Journey[] {
   const sorted = punches.filter((p) => p.at != null).sort((a, b) => (a.at || 0) - (b.at || 0));
+  const maxOpenMs = opts?.maxOpenMs ?? OPEN_JOURNEY_LIMIT_MS;
   const journeys: Journey[] = [];
   let cur: { entrada?: number; pausa?: number; retorno?: number; saida?: number; punches: TimePunch[]; orphan?: boolean } | null = null;
 
   const flush = () => {
     if (!cur) return;
     const keyAt = cur.entrada ?? cur.punches[0]?.at ?? undefined;
-    let cons = finalizeConsolidation(cur.entrada, cur.pausa, cur.retorno, cur.saida, opts?.nowMs, opts?.maxOpenMs);
+    let cons = finalizeConsolidation(cur.entrada, cur.pausa, cur.retorno, cur.saida, opts?.nowMs, maxOpenMs);
     // Almoço/retorno sem entrada aberta é cronologicamente impossível (ex.: um
     // RETORNO registrado após a SAÍDA da jornada) → inconsistente, não 00h00.
     if (cur.orphan) cons = { ...cons, workedMs: null, status: 'INCONSISTENTE' };
@@ -171,6 +180,15 @@ export function buildJourneys(
   };
 
   for (const p of sorted) {
+    // Janela de segurança: PAUSA/RETORNO/SAÍDA que chega mais de 18h após a
+    // ENTRADA aberta NÃO pertence a ela (entrada esquecida de dias atrás). A
+    // jornada antiga é encerrada como está (entrada preservada, sem saída
+    // inventada → ABERTA_ANOMALA = pendência) e a batida segue sem entrada
+    // (órfã → INCONSISTENTE/INCOMPLETA), visível para regularização. Assim uma
+    // jornada de vários dias nunca vira "OK".
+    if (p.type !== 'ENTRADA' && cur && cur.entrada != null && isJourneyStale(cur.entrada, p.at!, maxOpenMs)) {
+      flush();
+    }
     if (p.type === 'ENTRADA') {
       if (cur) flush();               // entrada nova encerra a jornada anterior (aberta/órfã)
       cur = { entrada: p.at!, punches: [p] };

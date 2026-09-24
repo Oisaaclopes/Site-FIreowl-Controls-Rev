@@ -4,7 +4,7 @@
 // sendo o onAddPunch (handleAddPunch no CrmApp → insertPunch).
 
 import { TimePunch } from './types';
-import { buildJourneys, dateKeyOf, OPEN_JOURNEY_LIMIT_MS } from './timecard';
+import { buildJourneys, dateKeyOf, isJourneyStale, Journey, OPEN_JOURNEY_LIMIT_MS } from './timecard';
 
 export type PunchType = TimePunch['type'];
 
@@ -25,28 +25,58 @@ export const PUNCH_DONE: Record<PunchType, string> = {
   SAIDA: 'Saída registrada',
 };
 
+interface OperationalJourneys {
+  /** Jornada ABERTA operante: a última, com entrada, sem saída e DENTRO da
+   *  janela de segurança (18h) — mesmo iniciada ontem. */
+  open?: Journey;
+  /** Jornada exibida no card: a aberta ou, na ausência, a encerrada cuja
+   *  competência (dia da entrada) é hoje. */
+  current?: Journey;
+  /** Jornadas com entrada e sem saída que NÃO são a operante (esquecidas,
+   *  além de 18h, ou encerradas por uma nova entrada) — pendências para
+   *  regularização. Nunca fechadas nem com saída inventada. */
+  pending: Journey[];
+}
+
+/**
+ * Regra ÚNICA da máquina de estados operacional. Uma jornada aberta há mais
+ * de 18h (ABERTA_ANOMALA) NÃO sequestra o estado: vira pendência e o
+ * funcionário pode abrir uma nova Entrada. A data civil não altera a sequência.
+ */
+function resolveOperationalJourneys(
+  punches: TimePunch[], employeeName: string, nowMs: number, maxOpenMs: number,
+): OperationalJourneys {
+  const mine = punches.filter((p) => p.employeeName === employeeName && p.at);
+  const journeys = buildJourneys(mine, { nowMs, maxOpenMs });
+  const last = journeys[journeys.length - 1];
+  const open = last && last.entrada != null && last.saida == null && !isJourneyStale(last.entrada, nowMs, maxOpenMs)
+    ? last
+    : undefined;
+  const closedToday = last && last.entrada != null && last.saida != null && last.competenceKey === dateKeyOf(nowMs)
+    ? last
+    : undefined;
+  const pending = journeys.filter((j) => j !== open && j.entrada != null && j.saida == null);
+  return { open, current: open ?? closedToday, pending };
+}
+
 /**
  * Próxima batida da sequência ENTRADA→PAUSA→RETORNO→SAIDA, seguindo a JORNADA
- * ABERTA (não "batidas de hoje"). Se existe uma entrada aberta — mesmo que de
- * ontem — a próxima ação respeita essa jornada; a meia-noite não reabre a
- * sequência nem oferece uma nova Entrada.
+ * ABERTA (não "batidas de hoje"). Se existe uma entrada aberta há ≤18h — mesmo
+ * que de ontem — a próxima ação respeita essa jornada; a meia-noite não reabre
+ * a sequência. Entrada aberta há >18h é pendência e não bloqueia nova Entrada.
  */
 export function nextPunchType(
   punches: TimePunch[], employeeName: string, nowMs: number, maxOpenMs: number = OPEN_JOURNEY_LIMIT_MS,
 ): PunchType | null {
-  const mine = punches.filter((p) => p.employeeName === employeeName && p.at);
-  const journeys = buildJourneys(mine, { nowMs, maxOpenMs });
-  const open = [...journeys].reverse().find((j) => j.entrada != null && j.saida == null);
+  const { open, current } = resolveOperationalJourneys(punches, employeeName, nowMs, maxOpenMs);
   if (open) {
-    if (open.pausa == null) return 'PAUSA';
+    if (open.pausa == null && open.retorno == null) return 'PAUSA';
     if (open.retorno == null) return 'RETORNO';
     return 'SAIDA';
   }
-  // Sem jornada aberta: se a última jornada fechou HOJE, está encerrada (null);
-  // caso contrário, a próxima ação é abrir uma nova Entrada.
-  const last = journeys[journeys.length - 1];
-  if (last && last.saida != null && dateKeyOf(last.saida) === dateKeyOf(nowMs)) return null;
-  return 'ENTRADA';
+  // Sem jornada aberta: se a jornada de HOJE (competência) já fechou, está
+  // encerrada (null); caso contrário, a próxima ação é abrir uma nova Entrada.
+  return current ? null : 'ENTRADA';
 }
 
 /** Rótulo curto do TIPO da próxima batida (para o texto "Próxima batida"). */
@@ -74,6 +104,9 @@ export interface PunchDayState {
   statusLabel: string;
   /** Última marca relevante do dia (para exibição compacta). */
   lastRelevant?: TimePunch;
+  /** Jornadas com entrada sem saída que não são a operante (ex.: entrada
+   *  esquecida há >18h) — pendência administrativa, não bloqueiam a jornada atual. */
+  pendingOpen: Journey[];
 }
 
 const STATUS_LABEL: Record<PunchStatusKind, string> = {
@@ -91,18 +124,11 @@ const STATUS_LABEL: Record<PunchStatusKind, string> = {
 export function derivePunchState(
   punches: TimePunch[], employeeName: string, nowMs: number, maxOpenMs: number = OPEN_JOURNEY_LIMIT_MS,
 ): PunchDayState {
-  const mine = punches
-    .filter((p) => p.employeeName === employeeName && p.at)
-    .sort((a, b) => (a.at || 0) - (b.at || 0));
-  const journeys = buildJourneys(mine, { nowMs, maxOpenMs });
-  const open = [...journeys].reverse().find((j) => j.entrada != null && j.saida == null);
-  const last = journeys[journeys.length - 1];
-  // Jornada corrente: a aberta (mesmo iniciada ontem) ou, na ausência dela, a
-  // última encerrada HOJE (estado "encerrada"). Fora disso, fora do expediente.
-  const current = open
-    ? open
-    : (last && last.saida != null && dateKeyOf(last.saida) === dateKeyOf(nowMs)) ? last : undefined;
-  const cp = current?.punches ?? [];
+  // Jornada corrente: a aberta (≤18h, mesmo iniciada ontem) ou, na ausência
+  // dela, a encerrada com competência HOJE. Fora disso, fora do expediente —
+  // uma entrada esquecida (>18h) aparece só como pendência.
+  const { current, pending } = resolveOperationalJourneys(punches, employeeName, nowMs, maxOpenMs);
+  const cp = [...(current?.punches ?? [])].sort((a, b) => (a.at || 0) - (b.at || 0));
   const byType = (t: PunchType) => cp.find((p) => p.type === t);
   const entrada = byType('ENTRADA');
   const almoco = byType('PAUSA');
@@ -126,6 +152,7 @@ export function derivePunchState(
     statusKind,
     statusLabel: STATUS_LABEL[statusKind],
     lastRelevant: saida || retorno || almoco || entrada,
+    pendingOpen: pending,
   };
 }
 

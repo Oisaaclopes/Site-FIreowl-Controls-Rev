@@ -29,6 +29,8 @@ interface PontoViewProps {
   punches: TimePunch[];
   onAddPunch: (punch: TimePunch) => void;
   onReloadPunches?: () => void | Promise<void>;
+  /** Garante as batidas de uma competência YYYY-MM fora da janela padrão. */
+  onEnsurePunchMonth?: (month: string) => void | Promise<void>;
   currentUser?: string;
   userRole?: UserRole;
   schedule?: WorkSchedule;
@@ -56,6 +58,8 @@ const FEEDBACK_LABEL: Record<PunchType, string> = {
 const pad2 = (n: number) => n.toString().padStart(2, '0');
 const fmtClock = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
 const fmtHM = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+// A carga agora é por período (sem corte global); a lista só limita o que RENDERIZA.
+const RECENT_RENDER_LIMIT = 200;
 const fmtDuration = (ms: number) => {
   const totalMin = Math.max(0, Math.floor(ms / 60000));
   return `${pad2(Math.floor(totalMin / 60))}h${pad2(totalMin % 60)}min`;
@@ -197,6 +201,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
   punches,
   onAddPunch,
   onReloadPunches,
+  onEnsurePunchMonth,
   currentUser = 'Operador Fireowl',
   userRole = 'TECNICO',
   schedule,
@@ -329,6 +334,13 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
     return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
   });
 
+  // Competências escolhidas na folha/espelho/registros: carrega o período
+  // completo sob demanda (a carga padrão cobre mês corrente + anterior).
+  useEffect(() => {
+    if (!onEnsurePunchMonth) return;
+    [myMonth, isManager ? expMonth : '', recordPeriod].filter(Boolean).forEach((m) => { void onEnsurePunchMonth(m); });
+  }, [onEnsurePunchMonth, myMonth, expMonth, recordPeriod, isManager]);
+
   // Relógio em tempo real
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -385,27 +397,12 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
   // Alerta de saída: a partir de 5 min antes, com entrada já batida e sem saída
   const exitDue = todayCfg.works && !!entrada && !saida && nowMin >= exitMin - 5;
 
-  const dayKeyToday = new Date(nowMs).toDateString();
-  const missingDay = useMemo(() => {
-    const byDay = new Map<string, TimePunch[]>();
-    punches
-      .filter((p) => p.employeeName === currentUser && p.at)
-      .forEach((p) => {
-        const key = new Date(p.at!).toDateString();
-        if (!byDay.has(key)) byDay.set(key, []);
-        byDay.get(key)!.push(p);
-      });
-    let found: Date | null = null;
-    byDay.forEach((list, key) => {
-      if (key === dayKeyToday) return;
-      const d = new Date(key);
-      if (!sched[d.getDay()].works) return;
-      const hasEntrada = list.some((p) => p.type === 'ENTRADA');
-      const hasSaida = list.some((p) => p.type === 'SAIDA');
-      if (hasEntrada && !hasSaida && (!found || d > found)) found = d as Date;
-    });
-    return found as Date | null;
-  }, [punches, currentUser, sched, dayKeyToday]);
+  // Saída faltante = jornada com entrada e sem saída que NÃO é a jornada em
+  // curso (pendência canônica do estado: entrada esquecida >18h ou encerrada por
+  // nova entrada). Por JORNADA, não por dia civil — uma noturna em andamento
+  // não é "saída faltante". Mostra a mais recente, pela data da entrada.
+  const lastPending = punchState.pendingOpen[punchState.pendingOpen.length - 1];
+  const missingDay = lastPending?.entrada != null ? new Date(lastPending.entrada) : null;
 
   // A permissão de GPS é solicitada APENAS aqui, no clique de bater ponto
   // (nunca no carregamento do site).
@@ -1029,7 +1026,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
             <div className="flex items-center justify-between gap-2 bg-red-50 border border-danger/30 text-danger rounded-xl px-4 py-3 text-xs font-semibold">
               <span className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-base">error</span>
-                Você não registrou a saída de {missingDay.toLocaleDateString('pt-BR')}.
+                Jornada de {missingDay.toLocaleDateString('pt-BR')} ({fmtHM(missingDay)}) possivelmente incompleta: saída não registrada. Isso não impede o ponto de hoje.
               </span>
               <button
                 onClick={() => openAdj(missingDay || undefined)}
@@ -1461,7 +1458,12 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {filteredRecentPunches.map((p) => (
+            {filteredRecentPunches.length > RECENT_RENDER_LIMIT && (
+              <p className="text-[11px] text-fg-secondary">
+                Mostrando as {RECENT_RENDER_LIMIT} batidas mais recentes de {filteredRecentPunches.length}. Filtre por mês ou tipo para ver as demais.
+              </p>
+            )}
+            {filteredRecentPunches.slice(0, RECENT_RENDER_LIMIT).map((p) => (
               <DataListRow
                 key={p.id}
                 onClick={p.effectiveSource === 'adjusted' && p.originalAt != null ? () => setSelectedAdjustedPunch(p) : undefined}

@@ -235,19 +235,32 @@ describe('16) jornada aberta anormal (>18h) não recebe saída inventada', () =>
 });
 
 describe('18) cálculo usa datetime completo, não somente HH:mm', () => {
-  it('mesma hora de relógio em dias diferentes = 24h (não 0)', () => {
+  it('saída com relógio anterior à entrada, no dia seguinte = 17h (não negativo)', () => {
     const c = consolidateDay([
       punch('ENTRADA', ms(2026, 9, 20, 23, 0)),
-      punch('SAIDA', ms(2026, 9, 21, 23, 0)),
+      punch('SAIDA', ms(2026, 9, 21, 16, 0)),
     ]);
-    // 24h em aberto seria anômalo se em curso, mas aqui há saída explícita:
-    expect(c.workedMs).toBe(24 * H);
+    expect(c.status).toBe('OK');
+    expect(c.workedMs).toBe(17 * H);
   });
-  it('não usa a regra frágil "se saída < entrada soma 24h": 26h reais = 26h', () => {
+  it('exatamente no limite de 18h ainda fecha a jornada (datetime completo)', () => {
     const c = consolidateDay([
+      punch('ENTRADA', ms(2026, 9, 20, 22, 0)),
+      punch('SAIDA', ms(2026, 9, 21, 16, 0)),
+    ]);
+    expect(c.status).toBe('OK');
+    expect(c.workedMs).toBe(18 * H);
+  });
+  it('saída >18h após a entrada NÃO fecha a jornada: 26h nunca vira OK', () => {
+    const js = buildJourneys([
       punch('ENTRADA', ms(2026, 9, 20, 20, 0)),
       punch('SAIDA', ms(2026, 9, 21, 22, 0)),
-    ]);
-    expect(c.workedMs).toBe(26 * H);
+    ], { nowMs: ms(2026, 9, 22, 8, 0) });
+    expect(js).toHaveLength(2);
+    expect(js[0].status).toBe('ABERTA_ANOMALA'); // entrada preservada, sem saída inventada
+    expect(js[0].saida).toBeUndefined();
+    expect(js[1].entrada).toBeUndefined();       // saída órfã → pendência
+    expect(js[1].status).toBe('INCOMPLETA');
+    expect(js.every((j) => j.workedMs == null)).toBe(true);
   });
 });

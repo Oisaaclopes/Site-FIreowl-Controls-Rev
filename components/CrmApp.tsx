@@ -3,7 +3,7 @@ import { showToast } from '@/components/ui/Feedback';
 
 import { NavigationSession, clearNavigationSession } from '@/components/NavigationSession';
 import { AttendanceNavigationRestore } from '@/components/AttendanceNavigationRestore';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { BottomNav } from '@/components/BottomNav';
 import { Header } from '@/components/Header';
@@ -86,7 +86,9 @@ import { FotosDeCampoView } from '@/components/field-photos/FotosDeCampoView';
 import { PontoView } from '@/components/views/PontoView';
 import { ContaView } from '@/components/views/ContaView';
 import { allowedTabs, isTabAllowed } from '@/lib/rbac';
-import { fetchPunches, insertPunch } from '@/lib/timepunch';
+import {
+  fetchPunches, fetchPunchesRange, insertPunch, isMonthInDefaultWindow, mergePunchSets, monthFetchRange,
+} from '@/lib/timepunch';
 import { fetchPedidos, upsertPedido, updatePedidoStatus, deletePedido } from '@/lib/pedidos';
 import { fetchQuotes, insertQuote } from '@/lib/quotes';
 import { fetchSuppliers, upsertSupplier, deleteSupplier } from '@/lib/suppliers';
@@ -968,10 +970,13 @@ function CrmAppContent({
   // Ponto no Supabase (tabela enxuta, sem foto). Sem Supabase, cai no
   // localStorage como reserva.
   const PUNCHES_KEY = 'fireowl_punches';
+  // Competências antigas (fora da janela padrão mês corrente + anterior) já
+  // pedidas pela folha/espelho — mantidas nas recargas e no realtime.
+  const extraPunchMonthsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (isSupabaseConfigured()) {
-      fetchPunches()
+      fetchPunches(extraPunchMonthsRef.current)
         .then((rows) => setPunches(rows))
         .catch((err) => console.warn('Ponto: falha ao carregar do Supabase.', err));
       return;
@@ -1012,12 +1017,27 @@ function CrmAppContent({
   const reloadPunches = async () => {
     if (!isSupabaseConfigured()) return;
     try {
-      const rows = await fetchPunches();
+      const rows = await fetchPunches(extraPunchMonthsRef.current);
       setPunches(rows);
     } catch (err) {
       console.warn('Ponto: falha ao recarregar do Supabase.', err);
     }
   };
+
+  // Garante as batidas de uma competência antiga (folha/espelho de mês fora da
+  // janela padrão). Busca só aquele período e une ao estado — idempotente.
+  const ensurePunchMonth = useCallback(async (month: string) => {
+    if (!isSupabaseConfigured() || isMonthInDefaultWindow(month) || extraPunchMonthsRef.current.has(month)) return;
+    extraPunchMonthsRef.current.add(month);
+    try {
+      const { fromMs, toMs } = monthFetchRange(month);
+      const rows = await fetchPunchesRange(fromMs, toMs);
+      setPunches((prev) => mergePunchSets([prev, rows]));
+    } catch (err) {
+      extraPunchMonthsRef.current.delete(month);
+      console.warn('Ponto: falha ao carregar a competência do Supabase.', err);
+    }
+  }, []);
 
   // Realtime atua como invalidação: sempre refaz a consulta autorizada, sem
   // incorporar payloads do websocket ao estado e sem tocar em estado de modal.
@@ -1048,7 +1068,7 @@ function CrmAppContent({
   const refreshDashboard = useCallback(async () => {
     if (!isSupabaseConfigured()) return;
     const [nextPunches, nextPedidos, nextOs, nextContracts, nextTransactions] = await Promise.all([
-      fetchPunches(), fetchPedidos(), fetchOrdensServico(), fetchContracts(), fetchTransactions(),
+      fetchPunches(extraPunchMonthsRef.current), fetchPedidos(), fetchOrdensServico(), fetchContracts(), fetchTransactions(),
     ]);
     setPunches(nextPunches); setPedidos(nextPedidos); setOrdensServico(nextOs);
     setContracts(nextContracts); setTransactions(nextTransactions);
@@ -1439,6 +1459,7 @@ function CrmAppContent({
               punches={punches}
               onAddPunch={handleAddPunch}
               onReloadPunches={reloadPunches}
+              onEnsurePunchMonth={ensurePunchMonth}
               currentUser={userName}
               userRole={userRole}
               schedule={userSchedule}
