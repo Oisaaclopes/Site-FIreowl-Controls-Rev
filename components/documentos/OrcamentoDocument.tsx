@@ -1,8 +1,9 @@
+import { resolverTituloPedido } from '@/lib/pedidoTitulos';
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import { C, brl, nv, lnv, PdfHeader, PdfFooter, CamposExtras, itemTotal, DocCover, AreasAtuacaoPage, InclusoExcluso, ResumoExecutivoPage, SlaBloco, QrCode, contatoQrUrl, AuthenticityStamp } from './pdfKit';
-import { gerarTituloProposta, apresentacaoAreas } from '@/lib/propostaTitulo';
+import { apresentacaoAreas } from '@/lib/propostaTitulo';
 import { websiteDisplay } from '@/lib/companyProfile';
 import { normalizeCommercialProposalData } from '@/lib/commercialProposal';
 import { renderWarranty } from '@/lib/commercialWarranty';
@@ -193,7 +194,7 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
   const qrUrl = contatoQrUrl(companyProfile.telefone, companyProfile.email); // §32
   const authenticityUrl = verificationUrl('orcamento', pedido.id);
   // P1 — título dinâmico (área × tipo) usado como subtítulo da capa.
-  const tituloDin = (p.tituloManual && p.tituloManual.trim()) || gerarTituloProposta(p.areaPrincipal || [], p.tipoServico);
+  const tituloDin = resolverTituloPedido(p);
 
   return (
     <Document title={`Orçamento ${numero}`} author={razao}>

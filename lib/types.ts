@@ -248,6 +248,8 @@ export interface CommercialProposalData {
   /** Título resolvido no momento da emissão (snapshot). O PDF usa este valor;
    * só recompõe de Área×Tipo quando ausente (propostas antigas). */
   tituloManual?: string;
+  tituloEditadoManualmente?: boolean;
+  referenciaEditadaManualmente?: boolean;
   /** Contrato recorrente (mensal): quando true, o PDF destaca "R$ X / mês". */
   recorrente?: boolean;
   /** Valor mensal do contrato recorrente. */

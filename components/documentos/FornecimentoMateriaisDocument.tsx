@@ -1,3 +1,4 @@
+import { resolverTituloPedido } from '@/lib/pedidoTitulos';
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
@@ -177,7 +178,7 @@ export function FornecimentoMateriaisDocument({
           email={companyProfile.email}
           website={site}
           titulo="Orçamento Comercial"
-          subtitulo="Fornecimento de Materiais"
+          subtitulo={resolverTituloPedido(p) || 'Fornecimento de Materiais'}
           cliente={cliente}
           numero={numero}
           escopo={referencia}

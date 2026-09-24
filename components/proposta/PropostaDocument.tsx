@@ -1,10 +1,11 @@
+import { resolverTituloPedido } from '@/lib/pedidoTitulos';
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet, Svg, Path, Line, Rect, Circle, Image, Font } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import { InclusoExcluso, ResumoExecutivoPage, SlaBloco, QrCode, contatoQrUrl, ExperienciaParceriasPage, AuthenticityStamp } from '@/components/documentos/pdfKit';
 import { verificationUrl } from '@/lib/documentVerification';
 import { experienciaAtiva } from '@/lib/experienciaSelecao';
-import { gerarTituloProposta, faixaSiglas, tituloEscopo, conclusaoPorTipo, apresentacaoAreas } from '@/lib/propostaTitulo';
+import { faixaSiglas, tituloEscopo, conclusaoPorTipo, apresentacaoAreas } from '@/lib/propostaTitulo';
 import { websiteDisplay } from '@/lib/companyProfile';
 import { normalizeCommercialProposalData } from '@/lib/commercialProposal';
 import { renderWarranty } from '@/lib/commercialWarranty';
@@ -1045,7 +1046,7 @@ export function PropostaDocument({
   // P1 — título dinâmico (área × tipo) e faixa de siglas (§3/§7).
   // Título: snapshot persistido (tituloManual) tem prioridade; só recompõe de
   // Área×Tipo quando ausente (propostas antigas). Ver PARTE 19.
-  const tituloDin = (p.tituloManual && p.tituloManual.trim()) || gerarTituloProposta(p.areaPrincipal || [], p.tipoServico);
+  const tituloDin = resolverTituloPedido(p);
   const siglas = faixaSiglas(p.areaPrincipal || []);
   // §22/§23 — Áreas de atuação contextuais (destaca as selecionadas).
   const areaSel = new Set(p.areaPrincipal || []);

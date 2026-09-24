@@ -1,4 +1,6 @@
 'use client';
+import { gerarReferenciaPedido, gerarTituloPedido, tituloFoiPersonalizado, resolverTextoSugerido } from '@/lib/pedidoTitulos';
+
 import { showToast, requestConfirm, requestText } from '@/components/ui/Feedback';
 
 import { useNavigationScroll } from '@/lib/useNavigationScroll';
@@ -24,7 +26,7 @@ import {
 } from '@/lib/types';
 import { PEDIDO_TIPO_LABELS, PEDIDO_TIPO_ORDER } from '@/lib/documentos';
 import { MODALIDADE_LABELS, MODALIDADE_ORDER, FRETE_MODO_LABELS, IMPOSTO_MODO_LABELS, OBS_DISPONIBILIDADE } from '@/lib/fornecimentoComercial';
-import { AREAS_PROPOSTA, TIPOS_SERVICO, gerarTituloProposta, conclusaoPorTipo, presetPorTipo } from '@/lib/propostaTitulo';
+import { AREAS_PROPOSTA, TIPOS_SERVICO, conclusaoPorTipo, presetPorTipo } from '@/lib/propostaTitulo';
 import { montarEstruturaProposta, ordenarEstrutura, SECOES_FIXAS_INICIO, SECOES_FIXAS_FIM } from '@/lib/propostaEstrutura';
 import { CARTA_APRESENTACAO } from '@/lib/propostaTextos';
 import { SECOES_TEXTO, servicosOfertadosPadrao, restaurarSecaoLista, fonteDaSecaoLista, fonteServicos } from '@/lib/propostaMaterializacao';
@@ -309,7 +311,8 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const [numeroPedido, setNumeroPedido] = useState<string>(
     initialPedido?.numeroPedido || `PED-${new Date().getFullYear()}-${nextProposalNumber}`
   );
-  const [referencia, setReferencia] = useState<string>(initialPedido?.referencia || 'Manutenção Preventiva SDAI');
+  const [referenciaManual, setReferenciaManual] = useState<string | null>(() => initialPedido?.proposal?.referenciaEditadaManualmente === false ? null : initialPedido?.proposal?.referenciaEditadaManualmente === true ? initialPedido.referencia : initialPedido?.referencia || null);
+  const [tituloManual, setTituloManual] = useState<string | null>(() => initialPedido && tituloFoiPersonalizado(initialPedido.proposal) ? initialPedido.proposal.tituloManual ?? '' : null);
   // P1 — Área principal (multi) + Tipo de serviço → título dinâmico.
   const [areaPrincipal, setAreaPrincipal] = useState<string[]>(initialPedido?.proposal?.areaPrincipal || []);
   const [tipoServico, setTipoServico] = useState<string>(initialPedido?.proposal?.tipoServico || '');
@@ -323,7 +326,6 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const [experienciaMarcasIds, setExperienciaMarcasIds] = useState<string[]>(initialPedido?.proposal?.experienciaMarcasIds || []);
   const toggleSelId = (arr: string[], set: (v: string[]) => void, id: string) => set(arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]);
   const toggleArea = (id: string) => setAreaPrincipal((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  const tituloDinamico = gerarTituloProposta(areaPrincipal, tipoServico);
   const [pedidoTipo, setPedidoTipo] = useState<PedidoTipo | ''>(initialPedido?.proposal?.pedidoTipo || '');
   // Modalidade comercial (natureza). Ausente = fluxo histórico (Material + Serviço).
   const [modalidade, setModalidade] = useState<ModalidadeComercial>(initialPedido?.proposal?.modalidade || 'material_servico');
@@ -331,6 +333,9 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const [impostosAdicionais, setImpostosAdicionais] = useState<ImpostosAdicionaisInfo>(initialPedido?.proposal?.impostosAdicionais || { modo: 'inclusos' });
   const [observacoesComerciais, setObservacoesComerciais] = useState<string>(initialPedido?.proposal?.observacoesComerciais || '');
   const somenteMaterial = modalidade === 'somente_material';
+  const contextoTitulo = { areaPrincipal, tipoServico, pedidoTipo: pedidoTipo || undefined, modalidade };
+  const referencia = resolverTextoSugerido(gerarReferenciaPedido(contextoTitulo), referenciaManual);
+  const tituloDinamico = resolverTextoSugerido(gerarTituloPedido(contextoTitulo), tituloManual);
   const [clienteId, setClienteId] = useState<string>(initialPedido?.clienteId || clients[0]?.id || '');
   const [fornecedor, setFornecedor] = useState<string>(initialPedido?.fornecedor || 'Fireowl Controls Ltda.');
   const [dataEmissao, setDataEmissao] = useState<string>(
@@ -825,7 +830,9 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         schemaVersion: COMMERCIAL_SCHEMA_VERSION,
         areaPrincipal,
         tipoServico: tipoServico || undefined,
-        tituloManual: tituloDinamico || initialProposal?.tituloManual || undefined,
+        tituloManual: tituloDinamico,
+        tituloEditadoManualmente: tituloManual !== null,
+        referenciaEditadaManualmente: referenciaManual !== null,
         nivelProposta,
         ordemSecoes: ordemSecoes.length ? ordemSecoes : undefined,
         incluirExperiencia,
@@ -1160,7 +1167,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               </div>
               <div>
                 <label className={labelCls}>Referência / Nome do Projeto</label>
-                <input type="text" value={referencia} onChange={(e) => setReferencia(e.target.value)} placeholder="Ex.: Retrofit SDAI Bloco A" className={inputCls} />
+                <input type="text" value={referencia} onChange={(e) => setReferenciaManual(e.target.value)} placeholder="Ex.: Retrofit SDAI Bloco A" className={inputCls} />
               </div>
               <div className="sm:col-span-2">
                 <label className={labelCls}>Tipo de Pedido</label>
@@ -1209,7 +1216,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               </div>
 
               {/* P1 — Área de atuação (multi) + Tipo de serviço → título dinâmico */}
-              {!somenteMaterial && (<>
+              <>
               <div className="sm:col-span-2">
                 <label className={labelCls}>Área(s) de atuação</label>
                 <div className="flex flex-wrap gap-1.5">
@@ -1231,35 +1238,41 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               </div>
               <div className="sm:col-span-2">
                 <div className="flex items-center justify-between">
-                  <label className={labelCls}>Tipo de serviço</label>
-                  {presetPorTipo(tipoServico) && (
+                  <label className={labelCls}>{somenteMaterial ? 'Fornecimento de materiais' : 'Tipo de serviço'}</label>
+                  {(somenteMaterial || tipoServico) && (
                     <button
                       type="button"
                       onClick={() => {
-                        const preset = presetPorTipo(tipoServico)!;
-                        setNivelProposta(preset.nivel);
-                        setIncluirSeguranca(preset.seguranca);
+                        const preset = somenteMaterial ? undefined : presetPorTipo(tipoServico);
+                        setReferenciaManual(null);
+                        setTituloManual(null);
+                        if (preset) {
+                          setNivelProposta(preset.nivel);
+                          setIncluirSeguranca(preset.seguranca);
+                        }
                       }}
-                      title="Ajusta o nível da proposta e a seção Segurança do Trabalho conforme o tipo (você pode alterar depois)"
+                      title="Reaplica referência, título, nível e Segurança do Trabalho conforme o contexto"
                       className="text-[10px] font-bold uppercase text-primary hover:text-danger"
                     >
                       Aplicar sugestão do tipo
                     </button>
                   )}
                 </div>
-                <select value={tipoServico} onChange={(e) => setTipoServico(e.target.value)} className={inputCls}>
+                {!somenteMaterial && <select value={tipoServico} onChange={(e) => setTipoServico(e.target.value)} className={inputCls}>
                   <option value="">Não definido</option>
                   {TIPOS_SERVICO.map((t) => (
                     <option key={t.id} value={t.id}>{t.label}</option>
                   ))}
-                </select>
-                {tituloDinamico && (
+                </select>}
+                {(tituloDinamico || tituloManual !== null) && (
                   <div className="mt-2 rounded-lg bg-navy-3/5 border border-navy/15 px-3 py-2">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-primary/60">Título gerado</p>
-                    <p className="text-xs font-bold text-primary">{tituloDinamico}</p>
+                    <input aria-label="Título gerado" value={tituloDinamico} onChange={(e) => setTituloManual(e.target.value)} className={inputCls} />
                   </div>
                 )}
               </div>
+              </>
+              {!somenteMaterial && (<>
               <div className="sm:col-span-2">
                 <label className={labelCls}>Nível da proposta</label>
                 <div className="grid grid-cols-3 gap-2">
