@@ -41,9 +41,9 @@ describe('linhas da folha', () => {
     expect(row.slots.RETORNO?.at).toBe(ms(23, 13, 3));
   });
 
-  it('exatamente o previsto → Normal; acima → Hora extra (sem tolerância inventada)', () => {
+  it('exatamente o previsto → Normal; acima → Acima do previsto (saldo, não hora extra; sem tolerância inventada)', () => {
     expect(journeyRows(day(22, [8, 0], [12, 0], [13, 0], [17, 0]), opts())[0].situation).toBe('NORMAL');
-    expect(journeyRows(day(22, [8, 0], [12, 0], [13, 0], [17, 1]), opts())[0].situation).toBe('HORA_EXTRA');
+    expect(journeyRows(day(22, [8, 0], [12, 0], [13, 0], [17, 1]), opts())[0].situation).toBe('ACIMA_PREVISTO');
   });
 
   it('noturna 20:00→23:30 | 00:30→04:00 fica na competência da entrada, 7h00', () => {
@@ -185,7 +185,7 @@ describe('grade: dias previstos sem registro', () => {
     expect(rows.filter((r) => r.situation === 'SEM_REGISTRO').every((r) => r.competenceKey < '2026-09-24')).toBe(true);
   });
 
-  it('dia com jornada não gera "Sem registro"; trabalho em feriado = Hora extra', () => {
+  it('dia com jornada não gera "Sem registro"; trabalho em feriado = Acima do previsto', () => {
     const rows = grid([
       ...day(23, [8, 0], [12, 0], [13, 0], [18, 0]),
       punch('ENTRADA', ms(7, 8)), punch('SAIDA', ms(7, 12)),
@@ -193,7 +193,7 @@ describe('grade: dias previstos sem registro', () => {
     expect(byDay(rows, '2026-09-23').map((r) => r.situation)).toEqual(['NORMAL']);
     const holidayWork = byDay(rows, HOLIDAY);
     expect(holidayWork).toHaveLength(1);
-    expect(holidayWork[0].situation).toBe('HORA_EXTRA');
+    expect(holidayWork[0].situation).toBe('ACIMA_PREVISTO');
     expect(holidayWork[0].occurrence).toBe('Feriado: Independência');
   });
 
@@ -237,11 +237,11 @@ describe('totais da folha', () => {
 });
 
 describe('exemplo do enunciado', () => {
-  it('08:02–12:01 / 13:03–17:59 soma 8h55 (3h59 + 4h56) → Hora extra de +0h55', () => {
+  it('08:02–12:01 / 13:03–17:59 soma 8h55 (3h59 + 4h56) → saldo +0h55, Acima do previsto', () => {
     const [row] = journeyRows(day(23, [8, 2], [12, 1], [13, 3], [17, 59]), opts());
     expect(row.workedMs).toBe(8 * H + 55 * MIN);
     expect(row.balanceMs).toBe(55 * MIN);
-    expect(row.situation).toBe('HORA_EXTRA');
+    expect(row.situation).toBe('ACIMA_PREVISTO');
   });
 });
 
@@ -263,7 +263,9 @@ describe('início da apuração', () => {
   it('início desconhecido (sem nenhuma batida) → nenhum dia presumido "Sem registro"', () => {
     const rows = buildTimesheetRows([], opts({ ...base, trackingStartKey: undefined }));
     expect(rows.filter((r) => r.situation === 'SEM_REGISTRO')).toHaveLength(0);
-    expect(summarizeTimesheetRows(rows)).toEqual({ previstoMs: 0, trabalhadoMs: 0, saldoMs: 0 });
+    expect(summarizeTimesheetRows(rows)).toEqual({
+      previstoMs: 0, trabalhadoMs: 0, saldoMs: 0, overtimeMs: null, nightWorkedMs: 0, nightComputedMs: 0, pendencies: 0,
+    });
   });
 
   it('resolveTrackingStartKey: 1ª batida original do servidor ou a efetiva conhecida mais antiga', () => {

@@ -908,7 +908,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
       ['Funcionário', 'Data', 'Dia', 'Tipo', 'Hora', 'Latitude', 'Longitude', 'Precisão (m)'],
     ];
     const summary: string[][] = [
-      ['Funcionário', 'Data', 'Entrada', 'Almoço', 'Retorno', 'Saída', 'Horas trabalhadas', 'Previsto', 'Saldo', 'Ocorrência'],
+      ['Funcionário', 'Data', 'Entrada', 'Almoço', 'Retorno', 'Saída', 'Horas trabalhadas', 'Previsto', 'Saldo', 'Hora extra', 'Noturno real', 'Noturno computado', 'Ocorrência'],
     ];
 
     // Detalhamento por batida (timestamps reais, sem agrupar).
@@ -951,13 +951,19 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
           l.workedMs == null ? '—' : fmtDuration(l.workedMs),
           fmtDuration(l.expectedMs),
           signedDur(l.balanceMs),
+          l.overtimeMs == null ? 'Não apurável' : fmtDuration(l.overtimeMs),
+          l.nightWorkedMs == null ? '—' : fmtDuration(l.nightWorkedMs),
+          l.nightComputedMs == null ? '—' : fmtDuration(l.nightComputedMs),
           l.label || '—',
         ]);
       });
       totalMs += b.summary.trabalhadoMs;
       summary.push([
         b.employee, 'TOTAL', '', '', '', '',
-        fmtDuration(b.summary.trabalhadoMs), fmtDuration(b.summary.previstoMs), fmtHoursShort(b.summary.saldoMs, true), '',
+        fmtDuration(b.summary.trabalhadoMs), fmtDuration(b.summary.previstoMs), fmtHoursShort(b.summary.saldoMs, true),
+        b.summary.overtimeMs == null ? 'Não apurável' : fmtDuration(b.summary.overtimeMs),
+        fmtDuration(b.summary.nightWorkedMs), fmtDuration(b.summary.nightComputedMs),
+        `Pendências: ${b.summary.pendencies}`,
       ]);
     });
 
@@ -1258,7 +1264,8 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
               {[
                 { k: 'Horas previstas', v: week.previstas, c: 'text-fg' },
                 { k: 'Horas realizadas', v: week.realizadas, c: 'text-primary' },
-                { k: 'Horas extras', v: week.extras, c: 'text-emerald-600' },
+                // Excedente sobre o previsto — NÃO é hora extra sem política canônica.
+                { k: 'Acima do previsto', v: week.extras, c: 'text-emerald-600' },
                 { k: 'Atrasos', v: String(week.atrasos), c: 'text-fg' },
               ].map((r) => (
                 <div key={r.k} className="flex items-center justify-between">
@@ -1377,16 +1384,23 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
           </div>
 
           {sheetSummary && (
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
               {[
                 { label: 'Previsto', value: fmtHoursShort(sheetSummary.previstoMs) },
                 { label: 'Trabalhado', value: fmtHoursShort(sheetSummary.trabalhadoMs) },
                 { label: 'Saldo', value: fmtHoursShort(sheetSummary.saldoMs, true) },
+                // Saldo positivo NÃO é hora extra: sem política canônica, não apurável.
+                sheetSummary.overtimeMs == null
+                  ? { label: 'Hora extra', value: '—', hint: 'Sem política definida' }
+                  : { label: 'Hora extra', value: fmtHoursShort(sheetSummary.overtimeMs) },
+                // Tempo REAL sujeito ao adicional (a hora reduzida fica no "Ver mais").
+                { label: 'Adicional noturno', value: fmtHoursShort(sheetSummary.nightWorkedMs), hint: `${fmtHoursShort(sheetSummary.nightComputedMs)} computadas` },
                 { label: 'Pendências', value: String(sheetSummary.pendencies) },
               ].map((k) => (
                 <div key={k.label} className="rounded-xl border border-border bg-surface px-3 py-2 shadow-sm">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-fg-secondary">{k.label}</p>
                   <p className="font-data-mono text-base font-bold tabular-nums text-fg">{k.value}</p>
+                  {'hint' in k && k.hint && <p className="text-[10px] text-fg-muted">{k.hint}</p>}
                 </div>
               ))}
             </div>

@@ -5,9 +5,11 @@ import { TimePunch } from '@/lib/types';
 import type { PunchAdjustment } from '@/lib/adjustments';
 import { dateKeyOf, fmtHoursShort } from '@/lib/timecard';
 import {
-  FILTER_LABEL, PUNCH_TYPES, PunchType, SITUATION_LABEL, SITUATION_TONE, TimesheetFilter, TimesheetRow,
+  availableFilters, BADGE_LABEL, FILTER_LABEL, PUNCH_TYPES, PunchType, RowBadge, SITUATION_LABEL, SITUATION_TONE,
+  TimesheetFilter, TimesheetRow,
   filterTimesheetRows,
 } from '@/lib/timesheet';
+import { DEFAULT_WORK_TIME_RULES, WorkTimeRules } from '@/lib/workRules';
 
 /**
  * Folha consolidada — uma linha por JORNADA (motor canônico em lib/timesheet).
@@ -23,6 +25,8 @@ export interface TimesheetTableProps {
   onCorrect?: (row: TimesheetRow) => void;
   filter: TimesheetFilter;
   onFilterChange: (f: TimesheetFilter) => void;
+  /** Regras de apuração usadas nas linhas (noturno/hora extra). Padrão = central. */
+  rules?: WorkTimeRules;
 }
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
@@ -72,18 +76,54 @@ const SituationChip: React.FC<{ row: TimesheetRow }> = ({ row }) => (
     {row.situation !== 'OCORRENCIA' && row.occurrence && (
       <span className="text-[10px] text-fg-secondary" title={row.occurrence}>{row.occurrence}</span>
     )}
-    {row.adjusted && (
-      <span className="inline-flex items-center rounded-full border border-primary/30 bg-navy/5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
-        Ajustada
+    {/* Badges independentes (coexistem): noturno, hora extra, ajustada, aguardando. */}
+    {row.badges.map((b) => (
+      <span key={b} className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${BADGE_CLS[b]}`}>
+        {BADGE_LABEL[b]}
       </span>
-    )}
-    {row.awaitingCorrection && (
-      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">
-        Aguardando correção
-      </span>
-    )}
+    ))}
   </span>
 );
+
+const BADGE_CLS: Record<RowBadge, string> = {
+  ADICIONAL_NOTURNO: 'border-navy/30 bg-navy/10 text-fg',
+  HORA_EXTRA: 'border-amber-200 bg-amber-50 text-amber-700',
+  AJUSTADA: 'border-primary/30 bg-navy/5 text-primary',
+  AGUARDANDO_CORRECAO: 'border-amber-200 bg-amber-50 text-amber-700',
+};
+
+/** Decomposição da jornada: saldo × hora extra × trabalho noturno (regra usada). */
+const JourneyBreakdown: React.FC<{ row: TimesheetRow; rules: WorkTimeRules }> = ({ row, rules }) => {
+  if (!row.journey) return null;
+  const items: [string, string][] = [
+    ['Trabalhado', dur(row.workedMs)],
+    ['Previsto', dur(row.expectedMs)],
+    ['Saldo da jornada', signed(row.balanceMs)],
+    ['Hora extra', row.overtimeMs == null ? 'Não apurada — sem política de hora extra definida' : dur(row.overtimeMs)],
+  ];
+  if (row.nightWorkedMs != null) {
+    items.push(
+      ['Trabalho noturno real', dur(row.nightWorkedMs)],
+      ['Horas noturnas computadas', dur(row.nightComputedMs)],
+      [rules.night.source === 'PADRAO' ? 'Adicional padrão' : 'Adicional aplicado', `${rules.night.additionalPercent}%`],
+    );
+  }
+  return (
+    <div className="rounded-lg border border-border bg-surface px-3 py-2">
+      <dl className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2">
+        {items.map(([k, v]) => (
+          <div key={k} className="flex justify-between gap-2 text-[11px]">
+            <dt className="text-fg-secondary">{k}</dt>
+            <dd className="text-right font-data-mono font-semibold text-fg">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      {row.nightWorkedMs != null && (
+        <p className="mt-1 text-[10px] text-fg-muted">Regra de trabalho noturno: {rules.night.label}</p>
+      )}
+    </div>
+  );
+};
 
 const hasGps = (p: TimePunch) => !!(p.lat || p.lng);
 const mapsUrl = (p: TimePunch) => `https://www.google.com/maps?q=${p.lat},${p.lng}`;
@@ -91,7 +131,7 @@ const locationText = (p: TimePunch) =>
   p.locationAddress || (hasGps(p) ? p.locationStr || 'Localização registrada' : p.locationStr || 'Localização não informada');
 
 /** Detalhe da jornada: cada batida (original × efetiva) + trilha de ajustes. */
-const JourneyDetail: React.FC<{ row: TimesheetRow; adjustments: PunchAdjustment[] }> = ({ row, adjustments }) => {
+const JourneyDetail: React.FC<{ row: TimesheetRow; adjustments: PunchAdjustment[]; rules: WorkTimeRules }> = ({ row, adjustments, rules }) => {
   const punches = [
     ...PUNCH_TYPES.map((t) => row.slots[t]).filter((p): p is TimePunch => !!p),
     ...row.extras,
@@ -105,6 +145,7 @@ const JourneyDetail: React.FC<{ row: TimesheetRow; adjustments: PunchAdjustment[
 
   return (
     <div className="space-y-3 text-xs">
+      <JourneyBreakdown row={row} rules={rules} />
       {punches.length === 0 && <p className="text-fg-muted">Sem batidas nesta data.</p>}
       <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
         {punches.map((p) => {
@@ -165,7 +206,7 @@ const JourneyDetail: React.FC<{ row: TimesheetRow; adjustments: PunchAdjustment[
 };
 
 export const TimesheetTable: React.FC<TimesheetTableProps> = ({
-  rows, adjustments, canCorrect, onCorrect, filter, onFilterChange,
+  rows, adjustments, canCorrect, onCorrect, filter, onFilterChange, rules = DEFAULT_WORK_TIME_RULES,
 }) => {
   const [open, setOpen] = useState<string | null>(null);
   const visible = filterTimesheetRows(rows, filter);
@@ -175,7 +216,7 @@ export const TimesheetTable: React.FC<TimesheetTableProps> = ({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filtro da folha">
-        {(Object.keys(FILTER_LABEL) as TimesheetFilter[]).map((f) => {
+        {availableFilters(rules).map((f) => {
           const count = filterTimesheetRows(rows, f).length;
           return (
             <button key={f} type="button" role="tab" aria-selected={filter === f} onClick={() => onFilterChange(f)}
@@ -238,7 +279,7 @@ export const TimesheetTable: React.FC<TimesheetTableProps> = ({
                       </td>
                     </tr>
                     {open === r.key && (
-                      <tr><td colSpan={10} className="bg-surface-2 px-4 py-3"><JourneyDetail row={r} adjustments={adjustments} /></td></tr>
+                      <tr><td colSpan={10} className="bg-surface-2 px-4 py-3"><JourneyDetail row={r} adjustments={adjustments} rules={rules} /></td></tr>
                     )}
                   </React.Fragment>
                 ))}
@@ -284,7 +325,7 @@ export const TimesheetTable: React.FC<TimesheetTableProps> = ({
                     )}
                   </div>
                 )}
-                {open === r.key && <div className="mt-3"><JourneyDetail row={r} adjustments={adjustments} /></div>}
+                {open === r.key && <div className="mt-3"><JourneyDetail row={r} adjustments={adjustments} rules={rules} /></div>}
               </li>
             ))}
           </ul>

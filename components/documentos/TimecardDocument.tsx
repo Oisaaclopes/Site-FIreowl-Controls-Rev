@@ -2,13 +2,12 @@ import React from 'react';
 import { Document, Page, StyleSheet, Text, View } from '@react-pdf/renderer';
 import { C, PdfHeader, PdfFooter } from './pdfKit';
 import {
-  PeriodSummary,
   dateKeyToBr,
   fmtDurationOrDash,
   fmtHoursShort,
   hhmm,
 } from '@/lib/timecard';
-import type { TimesheetDocLine } from '@/lib/timesheet';
+import type { TimesheetDocLine, TimesheetSummary } from '@/lib/timesheet';
 
 // Tons de alerta discretos (âmbar), sem vermelho agressivo, para ocorrências
 // de jornada. Feriado/atestado usam um tom neutro (ardósia).
@@ -72,7 +71,7 @@ export interface TimecardBlock {
    *  jornadas, dias "Sem registro" e ocorrências — nada recalculado aqui. */
   lines: TimesheetDocLine[];
   /** Totais da MESMA Folha (summarizeTimesheetRows). */
-  summary: PeriodSummary;
+  summary: TimesheetSummary;
   scheduleLabel: string;
   bank: string;
 }
@@ -163,6 +162,23 @@ const EmployeePage = ({ block, periodLabel, emitido, logoUrl }: { block: Timecar
         <Stat label="Horas trabalhadas" value={fmtHoursShort(summary.trabalhadoMs)} accent={C.navy2} />
         <Stat label="Saldo do período" value={saldo} hint={saldoHint(summary.saldoMs)} accent={balanceAccent(summary.saldoMs)} />
         <Stat label="Banco de horas" value={bank} hint={bankHintText(summary.saldoMs)} accent={balanceAccent(summary.saldoMs)} />
+      </View>
+      {/* Mesmos totais da Folha: hora extra só quando apurável (há política);
+          trabalho noturno em tempo REAL, com as horas computadas como apoio. */}
+      <View style={[styles.statRow, { marginTop: -8 }]}>
+        <Stat
+          label="Hora extra"
+          value={summary.overtimeMs == null ? '—' : fmtHoursShort(summary.overtimeMs)}
+          hint={summary.overtimeMs == null ? 'Não apurada: sem política definida' : undefined}
+          accent={C.navy2}
+        />
+        <Stat
+          label="Trabalho noturno"
+          value={fmtHoursShort(summary.nightWorkedMs)}
+          hint={`${fmtHoursShort(summary.nightComputedMs)} computadas (hora reduzida)`}
+          accent={C.navy2}
+        />
+        <Stat label="Pendências" value={String(summary.pendencies)} accent={summary.pendencies ? AMBER : C.navy2} />
       </View>
 
       <SecHead n="03" titulo="Batidas por dia" />
