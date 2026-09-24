@@ -1,6 +1,7 @@
 'use client';
 import { gerarReferenciaPedido, gerarTituloPedido, tituloFoiPersonalizado, resolverTextoSugerido } from '@/lib/pedidoTitulos';
 import { getNormativeReferences, normasForamPersonalizadas } from '@/lib/normasReferencia';
+import { ClientSelector } from '@/components/clients/ClientSelector';
 
 import { showToast, requestConfirm, requestText } from '@/components/ui/Feedback';
 
@@ -1370,20 +1371,25 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                 <label className={labelCls}>
                   Cliente / Contratante <span className="text-danger">*</span>
                 </label>
-                <div className="flex gap-2">
-                  <select value={clienteId} onChange={(e) => setClienteId(e.target.value)} className={`${inputCls} font-bold`}>
-                    {clients.length === 0 && <option value="">Nenhum cliente</option>}
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} — CNPJ: {c.cnpj}
-                      </option>
-                    ))}
-                  </select>
+                <div className="flex gap-2 items-start">
+                  <div className="flex-1 min-w-0">
+                    {/* value = cliente efetivamente gravado (selectedClient tem fallback). */}
+                    <ClientSelector
+                      clients={clients}
+                      value={selectedClient?.id || ''}
+                      onChange={setClienteId}
+                      label=""
+                      placeholder="Buscar por nome fantasia, razão social ou CNPJ"
+                      showModeFilter
+                      onCreate={openNewClient}
+                      createLabel="+ Novo cliente"
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={openNewClient}
                     title="Cadastrar novo cliente"
-                    className="shrink-0 px-3 rounded-lg bg-navy-3 hover:bg-slate-800 text-white flex items-center gap-1.5 text-xs font-bold uppercase"
+                    className="shrink-0 min-h-12 px-3 rounded-lg bg-navy-3 hover:bg-slate-800 text-white flex items-center gap-1.5 text-xs font-bold uppercase"
                   >
                     <UserPlus className="w-4 h-4" /> Novo
                   </button>
