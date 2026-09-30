@@ -19,9 +19,14 @@ export interface TaxonomyNode {
   nodeType: string;
   name: string;
   sortOrder: number;
-  area: string;
+  /** Área comercial do nó; null nos nós TRANSVERSAL (domínio INFRA — 0116). */
+  area: string | null;
+  /** 0116 — 'AREA' | 'TRANSVERSAL'. Ausente no banco pré-0116 → 'AREA'. */
+  scope: TaxonomyScope;
   active: boolean;
 }
+
+export type TaxonomyScope = 'AREA' | 'TRANSVERSAL';
 
 export interface TaxonomyAlias {
   alias: string;
@@ -45,11 +50,12 @@ export async function fetchTaxonomyNodes(): Promise<TaxonomyNode[]> {
   const supabase = getSupabaseClient() as any;
   const { data, error } = await supabase
     .from('catalog_taxonomy_nodes')
-    .select('id,code,parent_id,node_type,name,sort_order,area,active');
+    .select('*'); // '*' tolera banco pré-0116 (sem a coluna scope)
   if (error) throw error;
   return (data || []).map((r: any) => ({
     id: String(r.id), code: r.code, parentId: r.parent_id ?? null, nodeType: r.node_type,
-    name: r.name, sortOrder: Number(r.sort_order ?? 0), area: r.area, active: r.active !== false,
+    name: r.name, sortOrder: Number(r.sort_order ?? 0), area: r.area ?? null, active: r.active !== false,
+    scope: r.scope === 'TRANSVERSAL' ? 'TRANSVERSAL' : 'AREA',
   }));
 }
 
@@ -110,7 +116,22 @@ export function nodePath(tree: CatalogTree, nodeId: string): TaxonomyNode[] {
 
 /** Famílias (raízes) de uma área, ordenadas. */
 export function areaFamilies(tree: CatalogTree, area: string): TaxonomyNode[] {
-  return nodeChildren(tree, null, area);
+  return nodeChildren(tree, null, area).filter((n) => n.scope !== 'TRANSVERSAL');
+}
+
+// ---- Domínio transversal (INFRA) — NÃO é área comercial -------------
+/** Código do domínio transversal do catálogo (Infraestrutura). */
+export const TRANSVERSAL_DOMAIN = 'INFRA';
+export const TRANSVERSAL_DOMAIN_LABEL = 'Infraestrutura';
+
+/** Famílias raiz do domínio transversal (scope TRANSVERSAL), ordenadas. */
+export function transversalFamilies(tree: CatalogTree): TaxonomyNode[] {
+  return (tree.children.get(ROOT_KEY) ?? []).filter((n) => n.scope === 'TRANSVERSAL');
+}
+
+/** Famílias de um domínio do Estoque: área comercial OU o domínio INFRA. */
+export function domainFamilies(tree: CatalogTree, domain: string): TaxonomyNode[] {
+  return domain === TRANSVERSAL_DOMAIN ? transversalFamilies(tree) : areaFamilies(tree, domain);
 }
 
 // ---- Produtos × nós -------------------------------------------------

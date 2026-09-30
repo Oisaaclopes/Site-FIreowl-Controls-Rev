@@ -19,6 +19,7 @@ import {
   updateInventoryItem,
   deleteInventoryItem,
   insertStockMovement,
+  saveItemApplicability,
   isSupabaseConfigured,
 } from '@/lib/inventory';
 
@@ -893,14 +894,28 @@ function CrmAppContent({
     }
   };
 
-  const handleAddInventoryItem = async (newItem: InventoryItem) => {
+  // Aplicabilidade (0118): gravada APÓS o produto (precisa do id). Falha aqui
+  // não desfaz o produto — mantém o valor anterior e avisa; transversal sem
+  // área fica sinalizado "sem aplicabilidade" no Estoque. Nunca cria área sozinho.
+  const persistApplicability = async (saved: InventoryItem, previous: string[] | undefined, applicability?: string[]): Promise<InventoryItem> => {
+    if (applicability === undefined) return saved;
+    try {
+      return { ...saved, applicableAreas: await saveItemApplicability(saved.id, applicability) };
+    } catch (err) {
+      console.error('Falha ao gravar aplicabilidade do produto:', err);
+      showToast('Produto salvo, mas a aplicabilidade (áreas em que é usado) não foi gravada. Verifique a migration 0118 e tente editar novamente.');
+      return { ...saved, applicableAreas: previous };
+    }
+  };
+
+  const handleAddInventoryItem = async (newItem: InventoryItem, opts?: { applicability?: string[] }) => {
     if (!isSupabaseConfigured()) {
       setInventory((prev) => [newItem, ...prev]);
       logAction('Entrada no Almoxarifado', 'Estoque', `Cadastrado item ${newItem.code} - ${newItem.name}`);
       return;
     }
     try {
-      const saved = await insertInventoryItem(newItem);
+      const saved = await persistApplicability(await insertInventoryItem(newItem), undefined, opts?.applicability);
       setInventory((prev) => [saved, ...prev]);
       logAction('Entrada no Almoxarifado', 'Estoque', `Cadastrado item ${saved.code} - ${saved.name}`);
     } catch (err) {
@@ -933,14 +948,15 @@ function CrmAppContent({
     return saved;
   };
 
-  const handleUpdateInventoryItem = async (item: InventoryItem) => {
+  const handleUpdateInventoryItem = async (item: InventoryItem, opts?: { applicability?: string[] }) => {
     if (!isSupabaseConfigured()) {
       setInventory((prev) => prev.map((i) => (i.id === item.id ? item : i)));
       logAction('Atualização de Item', 'Estoque', `Item ${item.code} - ${item.name} atualizado`);
       return;
     }
     try {
-      const saved = await updateInventoryItem(item);
+      const previous = inventory.find((i) => i.id === item.id)?.applicableAreas;
+      const saved = await persistApplicability(await updateInventoryItem(item), previous, opts?.applicability);
       setInventory((prev) => prev.map((i) => (i.id === saved.id ? saved : i)));
       logAction('Atualização de Item', 'Estoque', `Item ${saved.code} - ${saved.name} atualizado`);
     } catch (err) {

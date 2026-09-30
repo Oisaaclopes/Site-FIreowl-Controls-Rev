@@ -1,8 +1,10 @@
 import { getSupabaseClient } from './supabaseClient';
 import { InventoryItem, StockMovement } from './types';
+import { canonicalAreaList, diffApplicability } from './catalogApplicability';
 
 const TABLE = 'inventory_items';
 const MOVEMENTS_TABLE = 'stock_movements';
+const AREAS_TABLE = 'inventory_item_areas';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (v: string | undefined): boolean => !!v && UUID_RE.test(v);
@@ -118,15 +120,69 @@ function itemToRow(i: InventoryItem): Record<string, unknown> {
   };
 }
 
-// Carrega todos os itens do estoque (mais recentes primeiro)
+// Carrega todos os itens do estoque (mais recentes primeiro), com a
+// aplicabilidade explícita (0118) anexada em memória — uma consulta extra,
+// sem N+1. Banco pré-0118 (tabela ausente) → applicableAreas fica undefined.
 export async function fetchInventory(): Promise<InventoryItem[]> {
   const supabase = getSupabaseClient() as any;
-  const { data, error } = await supabase
-    .from(TABLE)
-    .select('*')
-    .order('created_at', { ascending: false });
+  const [{ data, error }, areas] = await Promise.all([
+    supabase.from(TABLE).select('*').order('created_at', { ascending: false }),
+    fetchApplicabilityMap(),
+  ]);
   if (error) throw error;
-  return (data || []).map(rowToItem);
+  return (data || []).map((r: any) => {
+    const item = rowToItem(r);
+    return areas ? { ...item, applicableAreas: areas.get(item.id) ?? [] } : item;
+  });
+}
+
+// ---- Aplicabilidade (inventory_item_areas — 0118) ----
+// Relação N×N produto × área. NÃO toca saldo nem classificação.
+
+// false = a última leitura falhou (banco pré-0118): gravar lista vazia vira no-op.
+let applicabilityAvailable: boolean | null = null;
+
+/** Mapa item_id → áreas explícitas. null se a tabela não existir/for inacessível. */
+export async function fetchApplicabilityMap(): Promise<Map<string, string[]> | null> {
+  try {
+    const supabase = getSupabaseClient() as any;
+    const { data, error } = await supabase.from(AREAS_TABLE).select('item_id,area');
+    applicabilityAvailable = !error;
+    if (error) return null;
+    const map = new Map<string, string[]>();
+    for (const r of data || []) {
+      const id = String(r.item_id);
+      (map.get(id) ?? map.set(id, []).get(id)!).push(String(r.area));
+    }
+    for (const [id, list] of map) map.set(id, canonicalAreaList(list));
+    return map;
+  } catch {
+    applicabilityAvailable = false;
+    return null;
+  }
+}
+
+/**
+ * Grava a aplicabilidade desejada de um produto (diff: só insere/remove o
+ * necessário, origin MANUAL). `areas` já deve vir sem a área implícita
+ * (normalizeApplicability). Devolve a lista persistida.
+ */
+export async function saveItemApplicability(itemId: string, areas: string[]): Promise<string[]> {
+  // Nada a gravar e tabela sabidamente ausente → não gera erro/aviso falso.
+  if (applicabilityAvailable === false && canonicalAreaList(areas).length === 0) return [];
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase.from(AREAS_TABLE).select('area').eq('item_id', itemId);
+  if (error) throw error;
+  const { toAdd, toRemove } = diffApplicability((data || []).map((r: any) => String(r.area)), areas);
+  if (toRemove.length) {
+    const { error: delErr } = await supabase.from(AREAS_TABLE).delete().eq('item_id', itemId).in('area', toRemove);
+    if (delErr) throw delErr;
+  }
+  if (toAdd.length) {
+    const { error: insErr } = await supabase.from(AREAS_TABLE).insert(toAdd.map((area) => ({ item_id: itemId, area, origin: 'MANUAL' })));
+    if (insErr) throw insErr;
+  }
+  return canonicalAreaList(areas);
 }
 
 // Insere um item e retorna a linha persistida (já com id do banco)
@@ -138,7 +194,8 @@ export async function insertInventoryItem(item: InventoryItem): Promise<Inventor
     .select()
     .single();
   if (error) throw error;
-  return rowToItem(data);
+  // aplicabilidade não é coluna de inventory_items: preserva o valor em memória
+  return { ...rowToItem(data), applicableAreas: item.applicableAreas };
 }
 
 // Atualiza um item existente (pelo id) e retorna a linha persistida
@@ -151,7 +208,7 @@ export async function updateInventoryItem(item: InventoryItem): Promise<Inventor
     .select()
     .single();
   if (error) throw error;
-  return rowToItem(data);
+  return { ...rowToItem(data), applicableAreas: item.applicableAreas };
 }
 
 // Remove um item pelo id

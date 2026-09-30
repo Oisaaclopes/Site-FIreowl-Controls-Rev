@@ -15,15 +15,21 @@ import { ProductEditor } from '@/components/catalog/ProductEditor';
 import {
   TaxonomyNode, TaxonomyAlias, CatalogTree,
   fetchTaxonomyNodes, fetchTaxonomyAliases, buildCatalogTree,
-  nodeChildren, nodePath, areaFamilies, countsByNode, countsByArea,
+  nodeChildren, nodePath, domainFamilies, transversalFamilies, countsByNode,
   productsUnderNode, searchCatalog, CANONICAL_AREAS, ClassificationStatus,
+  TRANSVERSAL_DOMAIN, TRANSVERSAL_DOMAIN_LABEL,
 } from '@/lib/catalogTree';
+import { countsByDomain, homeDomain, isCommercialArea, COMMERCIAL_AREA_LABEL } from '@/lib/catalogApplicability';
 
 type StatusFilter = 'all' | ClassificationStatus;
 type StockMode = 'all' | 'in_stock' | 'low' | 'out' | 'catalog_only';
 type SortMode = 'none' | 'margin_desc' | 'margin_asc' | 'markup_desc' | 'markup_asc' | 'price_desc' | 'price_asc' | 'has_cost' | 'no_cost' | 'has_price' | 'no_price';
 
-const AREA_ICON: Record<string, string> = { SDAI: 'local_fire_department', CFTV: 'videocam', ALARME: 'sensors', BMS: 'thermostat' };
+const AREA_ICON: Record<string, string> = { SDAI: 'local_fire_department', CFTV: 'videocam', ALARME: 'sensors', BMS: 'thermostat', CONTROLE_ACESSO: 'badge', [TRANSVERSAL_DOMAIN]: 'hub' };
+// Domínios com árvore canônica no Estoque: áreas SDAI/CFTV + o domínio
+// transversal INFRA (que NÃO é área comercial — só catálogo).
+const isTreeDomain = (d: string) => (CANONICAL_AREAS as readonly string[]).includes(d) || d === TRANSVERSAL_DOMAIN;
+const domainLabel = (d: string) => (d === TRANSVERSAL_DOMAIN ? TRANSVERSAL_DOMAIN_LABEL : isCommercialArea(d) ? COMMERCIAL_AREA_LABEL[d] : d);
 const STOCK_OPTIONS: { value: StockMode; label: string }[] = [
   { value: 'all', label: 'Estoque: todos' }, { value: 'in_stock', label: 'Em estoque' }, { value: 'low', label: 'Estoque baixo' },
   { value: 'out', label: 'Sem estoque' }, { value: 'catalog_only', label: 'Somente catálogo' },
@@ -51,8 +57,8 @@ export function CatalogoView({ inventory, inventoryLoading = false, userRole, su
   suppliers?: Supplier[];
   brands?: string[];
   onCreateBrand?: (name: string) => Promise<string>;
-  onAddInventoryItem?: (item: InventoryItem) => void | Promise<void>;
-  onUpdateInventoryItem?: (item: InventoryItem) => void | Promise<void>;
+  onAddInventoryItem?: (item: InventoryItem, opts?: { applicability?: string[] }) => void | Promise<void>;
+  onUpdateInventoryItem?: (item: InventoryItem, opts?: { applicability?: string[] }) => void | Promise<void>;
   onDeleteInventoryItem?: (id: string) => void | Promise<void>;
 }) {
   const canSeePrice = userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR';
@@ -105,7 +111,9 @@ export function CatalogoView({ inventory, inventoryLoading = false, userRole, su
 
   const tree: CatalogTree | null = useMemo(() => (nodes ? buildCatalogTree(nodes) : null), [nodes]);
   const counts = useMemo(() => (tree ? countsByNode(tree, scopedInventory) : new Map<string, number>()), [tree, scopedInventory]);
-  const areaCounts = useMemo(() => countsByArea(scopedInventory), [scopedInventory]);
+  // Cada produto conta UMA vez, no seu domínio casa (INFRA / área do nó /
+  // category legada) — transversal não é somado em cada área aplicável.
+  const areaCounts = useMemo(() => countsByDomain(scopedInventory, tree), [scopedInventory, tree]);
   const revisarCount = useMemo(() => scopedInventory.filter((p) => p.classificationStatus === 'REVISAR').length, [scopedInventory]);
   const naoClassCount = useMemo(() => scopedInventory.filter((p) => p.classificationStatus === 'NAO_CLASSIFICADO').length, [scopedInventory]);
   const indic = useMemo(() => stockIndicators(scopedInventory), [scopedInventory]);
@@ -149,7 +157,7 @@ export function CatalogoView({ inventory, inventoryLoading = false, userRole, su
 
   const crumbs: CrumbItem[] = useMemo(() => {
     const list: CrumbItem[] = [{ key: 'root', label: 'Estoque', onClick: () => resetTo(null, null) }];
-    if (area) list.push({ key: `area-${area}`, label: area, onClick: () => resetTo(area, null) });
+    if (area) list.push({ key: `area-${area}`, label: domainLabel(area), onClick: () => resetTo(area, null) });
     if (tree && nodeId) for (const n of nodePath(tree, nodeId)) list.push({ key: n.id, label: n.name, onClick: () => setNodeId(n.id) });
     return list;
   }, [area, nodeId, tree]);
@@ -165,8 +173,10 @@ export function CatalogoView({ inventory, inventoryLoading = false, userRole, su
     }
     setSelectedItem(updated);
   };
+  // Cadastro/edição: grava também a aplicabilidade (0118) escolhida no editor.
   const handleSaveProduct = async (item: InventoryItem) => {
-    if (item.id) await onUpdateInventoryItem?.(item); else await onAddInventoryItem?.(item);
+    const opts = { applicability: item.applicableAreas ?? [] };
+    if (item.id) await onUpdateInventoryItem?.(item, opts); else await onAddInventoryItem?.(item, opts);
   };
   const handleDeleteProduct = async (item: InventoryItem) => {
     if (typeof window !== 'undefined' && !await requestConfirm(`Excluir "${item.model || item.name}"? Esta ação não pode ser desfeita.`)) return;
@@ -188,7 +198,7 @@ export function CatalogoView({ inventory, inventoryLoading = false, userRole, su
       ? <EmptyState variant="generico" title="Nenhum resultado" description={`Nada encontrado para "${query}".`} />
       : <div className="flex flex-col gap-3"><p className="text-xs font-semibold text-fg-secondary">{l.length} resultado(s) para “{query}”.</p>{list(l)}</div>;
   } else if (hasFilter) {
-    const base = area ? scopedInventory.filter((p) => (p.category || '').toUpperCase() === area) : scopedInventory;
+    const base = area ? scopedInventory.filter((p) => homeDomain(p, tree) === area) : scopedInventory;
     const l = applyFilters(base);
     body = (
       <div className="flex flex-col gap-3">
@@ -202,31 +212,42 @@ export function CatalogoView({ inventory, inventoryLoading = false, userRole, su
       </div>
     );
   } else if (area === null) {
-    const areas = [...new Set([...CANONICAL_AREAS, ...[...areaCounts.keys()]])].filter((a) => (areaCounts.get(a) ?? 0) > 0);
+    // Áreas comerciais (com produto) + o domínio transversal Infraestrutura,
+    // separado visualmente: é catálogo, não área comercial.
+    const areas = [...new Set([...CANONICAL_AREAS, ...[...areaCounts.keys()]])]
+      .filter((a) => a !== TRANSVERSAL_DOMAIN && (areaCounts.get(a) ?? 0) > 0);
+    const showInfra = transversalFamilies(tree).length > 0 || (areaCounts.get(TRANSVERSAL_DOMAIN) ?? 0) > 0;
+    const card = (a: string, transversal: boolean) => (
+      <button key={a} type="button" onClick={() => { setArea(a); setNodeId(null); }} className={`group flex items-center gap-3 bg-surface border rounded-2xl px-5 py-4 text-left hover:border-primary hover:shadow-sm transition-all active:scale-[0.99] ${transversal ? 'border-dashed border-border-strong' : 'border-border'}`}>
+        <span className="w-11 h-11 rounded-xl bg-navy/5 flex items-center justify-center shrink-0"><span className="material-symbols-outlined text-primary">{AREA_ICON[a] || 'category'}</span></span>
+        <div className="min-w-0 flex-1">
+          <p className="text-base font-bold text-fg">{domainLabel(a)}</p>
+          <p className="text-[11px] font-semibold text-fg-muted">{areaCounts.get(a) ?? 0} produtos{transversal ? ' · transversal, aplicável a várias áreas' : ''}</p>
+        </div>
+        {!isTreeDomain(a) && <span className="text-[9px] font-bold uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">Em andamento</span>}
+        <span className="material-symbols-outlined text-fg-muted group-hover:text-danger">chevron_right</span>
+      </button>
+    );
     body = (
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {areas.map((a) => {
-          const canonical = (CANONICAL_AREAS as readonly string[]).includes(a);
-          return (
-            <button key={a} type="button" onClick={() => { setArea(a); setNodeId(null); }} className="group flex items-center gap-3 bg-surface border border-border rounded-2xl px-5 py-4 text-left hover:border-primary hover:shadow-sm transition-all active:scale-[0.99]">
-              <span className="w-11 h-11 rounded-xl bg-navy/5 flex items-center justify-center shrink-0"><span className="material-symbols-outlined text-primary">{AREA_ICON[a] || 'category'}</span></span>
-              <div className="min-w-0 flex-1"><p className="text-base font-bold text-fg">{a}</p><p className="text-[11px] font-semibold text-fg-muted">{areaCounts.get(a)} produtos</p></div>
-              {!canonical && <span className="text-[9px] font-bold uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">Em andamento</span>}
-              <span className="material-symbols-outlined text-fg-muted group-hover:text-danger">chevron_right</span>
-            </button>
-          );
-        })}
+      <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{areas.map((a) => card(a, false))}</div>
+        {showInfra && (
+          <div className="flex flex-col gap-2">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-fg-muted">Catálogo transversal</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{card(TRANSVERSAL_DOMAIN, true)}</div>
+          </div>
+        )}
       </div>
     );
-  } else if (!(CANONICAL_AREAS as readonly string[]).includes(area)) {
+  } else if (!isTreeDomain(area)) {
     body = (
       <div className="flex flex-col gap-3">
         <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5"><span className="material-symbols-outlined text-amber-600 text-[19px]">pending</span><p className="text-[12px] text-amber-800"><b>Classificação em andamento.</b> Esta área ainda não tem árvore canônica. Os produtos continuam acessíveis.</p></div>
-        {list(arrange(scopedInventory.filter((p) => (p.category || '').toUpperCase() === area)))}
+        {list(arrange(scopedInventory.filter((p) => homeDomain(p, tree) === area)))}
       </div>
     );
   } else {
-    const children = nodeId ? nodeChildren(tree, nodeId) : areaFamilies(tree, area);
+    const children = nodeId ? nodeChildren(tree, nodeId) : domainFamilies(tree, area);
     const nodeProducts = nodeId ? arrange(productsUnderNode(tree, scopedInventory, nodeId)) : [];
     body = (
       <div className="flex flex-col gap-4">

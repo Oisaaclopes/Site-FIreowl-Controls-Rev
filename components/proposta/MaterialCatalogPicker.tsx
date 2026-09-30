@@ -3,10 +3,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { InventoryItem } from '@/lib/types';
 import { PickerField } from '@/components/ui/PickerField';
 import {
-  areaMatches, groupsInArea, brandsInAreaGroup, productsInAreaGroup, searchCatalogItems,
-  canonicalFamilyGroups, productsInFamily, brandsInFamily,
+  groupsInArea, brandsInAreaGroup, productsInAreaGroup, searchCatalogItems,
+  canonicalFamilyGroups, productsInFamily, brandsInFamily, rootFamilyLabel,
   NO_BRAND, UNCLASSIFIED_GROUP,
 } from '@/lib/catalogSelection';
+import { appliesToArea } from '@/lib/catalogApplicability';
 import {
   CatalogTree, TaxonomyNode, buildCatalogTree, fetchTaxonomyNodes, CANONICAL_AREAS,
 } from '@/lib/catalogTree';
@@ -15,7 +16,9 @@ import {
  * Seletor inteligente de MATERIAIS da Proposta: Área (da proposta) → Grupo/
  * Família → Fabricante → Produto. Não renderiza lista gigante de início;
  * cada passo destrava o próximo. Reutiliza a taxonomia real do estoque
- * (subcategoria) e o casamento de área da Base Técnica (areaMatches), sem
+ * (subcategoria/árvore canônica). O escopo usa as ÁREAS EFETIVAS do produto
+ * (classificação + aplicabilidade 0118 + fallback legado por category): uma
+ * proposta CFTV vê produtos CFTV + Infraestrutura aplicável a CFTV. Sem
  * alterar o Levantamento. Retorna um inventory_item comercial real (id) —
  * o pai resolve descrição/unidade/preço. Nunca esconde item por saldo 0.
  * =================================================================== */
@@ -47,11 +50,25 @@ export const MaterialCatalogPicker: React.FC<Props> = ({ items, areaCodes, value
     return () => { alive = false; };
   }, []);
 
-  // Escopo por área(s) da proposta (união). Vazio → tudo (fallback controlado).
+  // Escopo por área(s) da proposta (união) pelas ÁREAS EFETIVAS. Vazio → tudo.
+  // Sem árvore carregada, appliesToArea cai no fallback legado (category).
   const scoped = useMemo(() => {
     if (showAllAreas || areaCodes.length === 0) return items;
-    return items.filter((i) => areaCodes.some((a) => areaMatches(i.category, a)));
-  }, [items, areaCodes, showAllAreas]);
+    return items.filter((i) => areaCodes.some((a) => appliesToArea(i, a, tree)));
+  }, [items, areaCodes, showAllAreas, tree]);
+
+  // Modo legado (agrupa por subcategoria): produto CLASSIFICADO sem subcategoria
+  // é agrupado pela família canônica (ex.: "Infraestrutura · Energia") em vez de
+  // cair em "Não classificados". Cópias só para agrupar/listar (mesmo id).
+  const groupable = useMemo(() => {
+    if (!tree) return scoped;
+    const ctx = (areaCodes[0] || '').toUpperCase();
+    return scoped.map((i) => {
+      if ((i.subcategory || '').trim()) return i;
+      const label = rootFamilyLabel(tree, i, ctx);
+      return label ? { ...i, subcategory: label } : i;
+    });
+  }, [scoped, tree, areaCodes]);
 
   // Usa a família CANÔNICA (árvore) quando há UMA área canônica e sem "todas as
   // áreas". Caso contrário, cai para agregação por subcategoria (comportamento
@@ -64,38 +81,37 @@ export const MaterialCatalogPicker: React.FC<Props> = ({ items, areaCodes, value
   const useTree = !!tree && !!treeArea;
 
   const groups = useMemo(
-    () => (useTree ? canonicalFamilyGroups(tree!, scoped, treeArea!) : groupsInArea(scoped, undefined)),
-    [useTree, tree, scoped, treeArea],
+    () => (useTree ? canonicalFamilyGroups(tree!, scoped, treeArea!) : groupsInArea(groupable, undefined)),
+    [useTree, tree, scoped, groupable, treeArea],
   );
   // Facetas COMBINÁVEIS (§10.1): fabricante pode ser escolhido antes ou depois
   // do grupo. Sem grupo, lista os fabricantes de toda a área; com grupo, os da
   // família. Produtos aparecem com grupo OU fabricante (não exigem cascata).
   const brands = useMemo(() => {
-    if (group) return useTree ? brandsInFamily(tree!, scoped, group) : brandsInAreaGroup(scoped, undefined, group);
+    if (group) return useTree ? brandsInFamily(tree!, scoped, group) : brandsInAreaGroup(groupable, undefined, group);
     // Fabricantes no nível da área (para começar pela marca).
     const named = Array.from(new Set(scoped.map((i) => (i.brand || '').trim()).filter(Boolean)))
       .sort((a, b) => a.localeCompare(b, 'pt-BR'));
     return scoped.some((i) => !(i.brand || '').trim()) ? [...named, NO_BRAND] : named;
-  }, [useTree, tree, scoped, group]);
+  }, [useTree, tree, scoped, groupable, group]);
   const products = useMemo(() => {
     if (!group && !brand) return [];
     const base = group
-      ? (useTree ? productsInFamily(tree!, scoped, group) : productsInAreaGroup(scoped, undefined, group))
+      ? (useTree ? productsInFamily(tree!, scoped, group) : productsInAreaGroup(groupable, undefined, group))
       : scoped;
     const b = (brand || '').trim().toLowerCase();
     const filtered = !brand ? base
       : brand === NO_BRAND ? base.filter((i) => !(i.brand || '').trim())
       : base.filter((i) => (i.brand || '').trim().toLowerCase() === b);
     return [...filtered].sort((a, b2) => (a.model || a.name).localeCompare(b2.model || b2.name, 'pt-BR'));
-  }, [useTree, tree, scoped, group, brand]);
+  }, [useTree, tree, scoped, groupable, group, brand]);
 
-  const searchResults = useMemo(() => (search.trim() ? searchCatalogItems(items, search, showAllAreas ? undefined : (areaCodes[0] && areaCodes.length === 1 ? areaCodes[0] : undefined)) : []), [items, search, showAllAreas, areaCodes]);
-  // Busca com múltiplas áreas: filtra pela união manualmente.
-  const searchScoped = useMemo(() => {
-    if (!search.trim()) return [] as InventoryItem[];
-    if (showAllAreas || areaCodes.length <= 1) return searchResults;
-    return searchResults.filter((i) => areaCodes.some((a) => areaMatches(i.category, a)));
-  }, [searchResults, search, showAllAreas, areaCodes]);
+  // Busca direta sobre o MESMO escopo por áreas efetivas (já é a união das
+  // áreas da proposta; "todas as áreas" → catálogo inteiro).
+  const searchScoped = useMemo(
+    () => (search.trim() ? searchCatalogItems(scoped, search, undefined) : ([] as InventoryItem[])),
+    [scoped, search],
+  );
 
   // Facetas combináveis: alterar uma NÃO zera a outra — só recalcula as opções
   // e o produto selecionado (§10.1). "Recomeçar" limpa tudo.

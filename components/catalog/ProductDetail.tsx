@@ -1,7 +1,8 @@
 'use client';
 import React, { useState } from 'react';
 import type { InventoryItem } from '@/lib/types';
-import { CatalogTree, productPathNames } from '@/lib/catalogTree';
+import { CatalogTree, productPathNames, TRANSVERSAL_DOMAIN_LABEL } from '@/lib/catalogTree';
+import { effectiveAreas, COMMERCIAL_AREA_LABEL } from '@/lib/catalogApplicability';
 import { productPricing, moneyOrDash, percentOrDash, ratioOrDash } from '@/lib/productPricing';
 import { stockStatus, STOCK_STATUS_META, textOrNull } from '@/lib/stockStatus';
 import { normalizeUnitCode } from '@/lib/commercialUnits';
@@ -42,6 +43,8 @@ export function ProductDetail({ item, tree, canManage, canSeePrice, onClose, onE
   onMovement: (item: InventoryItem, type: 'entrada' | 'saida', qty: number, note: string) => Promise<void>;
 }) {
   const path = productPathNames(tree, item);
+  // Aplicabilidade é dimensão própria — não altera classificação nem saldo.
+  const eff = effectiveAreas(item, tree);
   const st = stockStatus(item);
   const catalogOnly = st === 'SOMENTE_CATALOGO';
   const { cost, price, profit, markup, margin } = productPricing(item);
@@ -101,8 +104,11 @@ export function ProductDetail({ item, tree, canManage, canSeePrice, onClose, onE
           </Section>
 
           <Section title="Classificação" icon="account_tree">
-            <Row label="Área" value={textOrNull(item.category)} />
+            <Row label="Domínio" value={eff.basis === 'TRANSVERSAL' ? `${TRANSVERSAL_DOMAIN_LABEL} (transversal)` : eff.primaryArea ? COMMERCIAL_AREA_LABEL[eff.primaryArea] : textOrNull(item.category)} />
             <Row label="Caminho canônico" value={path ? path.join(' › ') : '—'} />
+            <Row label="Aplicável a" value={eff.missingApplicability
+              ? <span className="text-amber-700">Sem aplicabilidade — não aparece em propostas</span>
+              : eff.areas.length ? eff.areas.map((a) => COMMERCIAL_AREA_LABEL[a]).join(' · ') : '—'} />
             <Row label="Status" value={item.classificationStatus === 'CLASSIFICADO' ? 'Classificado' : item.classificationStatus === 'REVISAR' ? 'Revisar' : 'Não classificado'} />
           </Section>
 

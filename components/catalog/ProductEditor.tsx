@@ -1,7 +1,11 @@
 'use client';
 import React, { useMemo, useState } from 'react';
 import type { InventoryItem } from '@/lib/types';
-import { CatalogTree, nodePath } from '@/lib/catalogTree';
+import { CatalogTree, nodePath, TRANSVERSAL_DOMAIN, TRANSVERSAL_DOMAIN_LABEL } from '@/lib/catalogTree';
+import {
+  COMMERCIAL_AREAS, COMMERCIAL_AREA_LABEL, isCommercialArea, explicitApplicability,
+  normalizeApplicability, applicabilityError, homeDomain,
+} from '@/lib/catalogApplicability';
 import { moneyOrDash, percentOrDash, markupOrDash, computePricing, principalValue, isPricingMode, PRICING_MODES, PricingMode } from '@/lib/priceFormation';
 import { modelsInScope, allManufacturers, normalizeBrand, modelAttrs } from '@/lib/catalogSelection';
 import { normalizeUnitCode, quantityUnitError } from '@/lib/commercialUnits';
@@ -9,7 +13,6 @@ import { UnitSelector } from '@/components/ui/UnitSelector';
 import { PickerField } from '@/components/ui/PickerField';
 import { BrandPickerField } from '@/components/catalog/BrandPickerField';
 
-const AREAS = ['SDAI', 'CFTV', 'ALARME', 'BMS'];
 const NEW_MODEL = '__new_model__';
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -25,7 +28,9 @@ const input = 'w-full border border-border-strong rounded-md px-3 py-2 text-sm f
 
 /**
  * Formulário de cadastro/edição de produto.
- * IDENTIFICAÇÃO: Área → Classificação → Fabricante (picker `brands` + cadastro
+ * IDENTIFICAÇÃO: Área comercial OU Infraestrutura (domínio transversal, não é
+ * área comercial) → Classificação → Aplicabilidade (N áreas; obrigatória p/
+ * Infraestrutura, opcional/extra p/ área) → Fabricante (picker `brands` + cadastro
  * inline, dedup por caixa/acento) → Modelo (picker de modelos compatíveis da
  * marca/classificação, ou novo modelo em texto — sem criar estoque fake).
  * COMERCIAL: custo é a base; escolhe-se UMA variável (preço/margem/markup/lucro)
@@ -48,8 +53,19 @@ export function ProductEditor({ initial, tree, inventory, suppliers, brands, onC
   const [newModelMode, setNewModelMode] = useState(false);
   const [name, setName] = useState(initial?.name ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
-  const [area, setArea] = useState(initial?.category ?? '');
+  // Domínio inicial: o da classificação (nó AREA → sua área; TRANSVERSAL →
+  // INFRA); sem classificação, a category legada como está.
+  const [area, setArea] = useState(() => {
+    const node = initial?.canonicalTaxonomyId ? tree.byId.get(initial.canonicalTaxonomyId) : undefined;
+    return node ? homeDomain(initial!, tree) : (initial?.category ?? '');
+  });
   const [nodeId, setNodeId] = useState(initial?.canonicalTaxonomyId ?? '');
+  // Aplicabilidade explícita (0118). A área implícita não é linha persistida.
+  const [applicability, setApplicability] = useState<string[]>(() => explicitApplicability(initial));
+  const isInfra = area === TRANSVERSAL_DOMAIN;
+  // Só oferece Infraestrutura quando o banco já tem os nós transversais (0117).
+  const hasTransversal = useMemo(() => tree.nodes.some((n) => n.scope === 'TRANSVERSAL'), [tree]);
+  const implicitArea = isInfra ? null : area.trim().toUpperCase();
   const [unit, setUnit] = useState(normalizeUnitCode(initial?.unit ?? 'un'));
   const [supplier, setSupplier] = useState(initial?.supplier ?? '');
   const [stockManaged, setStockManaged] = useState(initial?.stockManaged !== false);
@@ -82,10 +98,10 @@ export function ProductEditor({ initial, tree, inventory, suppliers, brands, onC
   const nodeOptions = useMemo(() => {
     if (!area) return [] as { id: string; label: string }[];
     return tree.nodes
-      .filter((n) => n.area === area)
+      .filter((n) => (isInfra ? n.scope === 'TRANSVERSAL' : n.scope === 'AREA' && n.area === area))
       .map((n) => ({ id: n.id, label: nodePath(tree, n.id).map((x) => x.name).join(' › ') }))
       .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
-  }, [area, tree]);
+  }, [area, isInfra, tree]);
 
   // Nome do grupo/família (folha do nó canônico) — filtra modelos por tokens.
   const groupLabel = useMemo(() => (nodeId ? nodePath(tree, nodeId).slice(-1)[0]?.name ?? '' : ''), [nodeId, tree]);
@@ -95,8 +111,14 @@ export function ProductEditor({ initial, tree, inventory, suppliers, brands, onC
 
   // Modelos compatíveis da marca + área + classificação (o próprio item é excluído).
   const modelItems = useMemo(
-    () => (brand ? modelsInScope(inventory, { area, nodeId, group: groupLabel, brand }).filter((m) => m.id !== initial?.id) : []),
-    [inventory, area, nodeId, groupLabel, brand, initial?.id],
+    () => (brand
+      ? modelsInScope(inventory, {
+        area, nodeId, group: groupLabel, brand,
+        // Infraestrutura: escopo pelo domínio do produto (não pela category).
+        match: isInfra ? (i) => homeDomain(i, tree) === TRANSVERSAL_DOMAIN : undefined,
+      }).filter((m) => m.id !== initial?.id)
+      : []),
+    [inventory, area, isInfra, tree, nodeId, groupLabel, brand, initial?.id],
   );
 
   // Casa o modelo atual (texto) a um item do catálogo, se houver.
@@ -131,7 +153,10 @@ export function ProductEditor({ initial, tree, inventory, suppliers, brands, onC
     e.preventDefault();
     if (saving) return;
     if (!(name.trim() || model.trim())) { setErr('Informe ao menos o modelo ou o nome.'); return; }
-    if (!area) { setErr('Selecione a área.'); return; }
+    if (!area) { setErr('Selecione a área ou Infraestrutura.'); return; }
+    if (isInfra && !nodeId) { setErr('Produto de Infraestrutura precisa de classificação (ex.: Energia › Nobreak).'); return; }
+    const applicabilityErr = applicabilityError(area, applicability);
+    if (applicabilityErr) { setErr(applicabilityErr); return; }
     if (pricing.error) { setErr(pricing.error); return; }
     const quantityError = stockManaged && (quantityUnitError(quantity, unit) || quantityUnitError(minQuantity, unit));
     if (quantityError) { setErr(quantityError); return; }
@@ -163,6 +188,8 @@ export function ProductEditor({ initial, tree, inventory, suppliers, brands, onC
       pricingMode,
       canonicalTaxonomyId: nodeId || undefined,
       classificationStatus: nodeId ? 'CLASSIFICADO' : (initial?.classificationStatus ?? 'NAO_CLASSIFICADO'),
+      // Sem a área implícita (evita linha redundante — 0118).
+      applicableAreas: normalizeApplicability(applicability, implicitArea),
     };
     setSaving(true);
     try { await onSave(payload); onClose(); }
@@ -190,18 +217,54 @@ export function ProductEditor({ initial, tree, inventory, suppliers, brands, onC
         <div className="flex flex-col gap-3 p-4">
           {/* IDENTIFICAÇÃO */}
           <div className="grid grid-cols-2 gap-2">
-            <Field label="Área"><select className={input} value={area} onChange={(e) => changeArea(e.target.value)}>
+            <Field label="Área / Domínio"><select className={input} value={area} onChange={(e) => changeArea(e.target.value)}>
               <option value="">Selecione…</option>
-              {[...new Set([...AREAS, area].filter(Boolean))].map((a) => <option key={a} value={a}>{a}</option>)}
+              <optgroup label="Área comercial">
+                {[...new Set([...COMMERCIAL_AREAS, area].filter((a) => a && a !== TRANSVERSAL_DOMAIN))].map((a) => (
+                  <option key={a} value={a}>{isCommercialArea(a) ? COMMERCIAL_AREA_LABEL[a] : a}</option>
+                ))}
+              </optgroup>
+              {(hasTransversal || isInfra) && (
+                <optgroup label="Catálogo transversal">
+                  <option value={TRANSVERSAL_DOMAIN}>{TRANSVERSAL_DOMAIN_LABEL} (transversal)</option>
+                </optgroup>
+              )}
             </select></Field>
             <Field label="Unidade"><UnitSelector value={unit} onChange={(code) => { setUnit(code); setErr(quantityUnitError(quantity, code) || quantityUnitError(minQuantity, code) || ''); }} /></Field>
           </div>
           <Field label="Classificação (caminho canônico)">
             <select className={input} value={nodeId} onChange={(e) => changeNode(e.target.value)} disabled={!area}>
-              <option value="">{area ? 'Não classificado' : 'Escolha a área primeiro'}</option>
+              <option value="">{!area ? 'Escolha a área primeiro' : isInfra ? 'Selecione a classificação…' : 'Não classificado'}</option>
               {nodeOptions.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
             </select>
           </Field>
+
+          {area && (
+            <div>
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-fg-secondary">
+                {isInfra ? 'Aplicável a (obrigatório)' : 'Também aplicável a (opcional)'}
+              </span>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {COMMERCIAL_AREAS.map((a) => {
+                  const implicit = a === implicitArea;
+                  const on = implicit || applicability.includes(a);
+                  return (
+                    <button key={a} type="button" disabled={implicit} aria-pressed={on}
+                      onClick={() => setApplicability((cur) => (cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a]))}
+                      title={implicit ? 'Implícita pela área/classificação do produto' : undefined}
+                      className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${on ? 'bg-navy text-white border-primary' : 'bg-surface text-fg-secondary border-border hover:border-primary'} ${implicit ? 'opacity-70 cursor-default' : ''}`}>
+                      {COMMERCIAL_AREA_LABEL[a]}{implicit ? ' · principal' : ''}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-1 text-[10px] text-fg-muted">
+                {isInfra
+                  ? 'Infraestrutura não é área comercial: o produto aparece nas propostas das áreas marcadas. Um único cadastro e um único saldo.'
+                  : 'Marque outras áreas em que este mesmo produto é usado — sem duplicar cadastro nem saldo.'}
+              </p>
+            </div>
+          )}
 
           <Field label="Fabricante">
             <BrandPickerField brands={brandOptions} value={brand} onChange={pickBrand} onCreate={onCreateBrand} onError={setErr}

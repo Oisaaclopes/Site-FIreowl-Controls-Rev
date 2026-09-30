@@ -2,6 +2,7 @@
 import React from 'react';
 import type { InventoryItem } from '@/lib/types';
 import { CatalogTree, productPathNames, ClassificationStatus } from '@/lib/catalogTree';
+import { effectiveAreas, COMMERCIAL_AREA_LABEL } from '@/lib/catalogApplicability';
 import { productPricing, moneyOrDash, percentOrDash } from '@/lib/productPricing';
 import { stockStatus } from '@/lib/stockStatus';
 import { normalizeUnitCode } from '@/lib/commercialUnits';
@@ -18,6 +19,27 @@ function StatusBadge({ status }: { status?: string }) {
     <span className={`inline-flex items-center gap-1 border rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${s.cls}`}>
       <span className="material-symbols-outlined text-[13px]">{s.icon}</span>{s.label}
     </span>
+  );
+}
+
+/** Aplicabilidade (0118): transversal mostra as áreas (ou o alerta "sem
+ * aplicabilidade"); produto de área mostra só as áreas extras, se houver. */
+function ApplicabilityLine({ item, tree }: { item: InventoryItem; tree: CatalogTree }) {
+  const eff = effectiveAreas(item, tree);
+  if (eff.missingApplicability) {
+    return (
+      <p className="text-[11px] font-semibold text-amber-700 flex items-center gap-1">
+        <span className="material-symbols-outlined text-[13px]">warning</span>Sem aplicabilidade — não aparece em propostas
+      </p>
+    );
+  }
+  const shown = eff.basis === 'TRANSVERSAL' ? eff.areas : eff.areas.filter((a) => a !== eff.primaryArea);
+  if (shown.length === 0) return null;
+  return (
+    <p className="text-[11px] text-fg-muted flex items-center gap-1 truncate">
+      <span className="material-symbols-outlined text-[13px] text-fg-muted">hub</span>
+      <span className="truncate">{eff.basis === 'TRANSVERSAL' ? 'Aplicável a' : 'Também em'}: {shown.map((a) => COMMERCIAL_AREA_LABEL[a]).join(' · ')}</span>
+    </p>
   );
 }
 
@@ -48,6 +70,7 @@ function ProductCard({ item, tree, canSeePrice, dense, onOpen }: { item: Invento
       ) : (
         <p className="text-[11px] text-fg-muted italic">Sem classificação canônica{item.subcategory ? ` · legado: ${item.subcategory}` : ''}</p>
       )}
+      <ApplicabilityLine item={item} tree={tree} />
       <div className="flex items-center gap-3 pt-0.5 flex-wrap">
         {catalogOnly ? (
           <span className="text-[11px] font-semibold text-fg-secondary inline-flex items-center gap-1">

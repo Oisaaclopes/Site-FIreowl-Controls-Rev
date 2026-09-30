@@ -1,7 +1,7 @@
 import type { InventoryItem } from './types';
 import { areaMatches, groupMatchesSubcategory } from './technicalCatalog';
 import type { CatalogTree } from './catalogTree';
-import { areaFamilies, productsUnderNode, countsByNode } from './catalogTree';
+import { areaFamilies, productsUnderNode, countsByNode, nodePath, TRANSVERSAL_DOMAIN_LABEL } from './catalogTree';
 
 export { areaMatches } from './technicalCatalog';
 
@@ -45,11 +45,13 @@ export interface ScopeFilter {
   nodeId?: string;
   /** Grupo/família textual (fallback tolerante por tokens). */
   group?: string;
+  /** Substitui o casamento de área por category (ex.: domínio INFRA / áreas efetivas). */
+  match?: (item: InventoryItem) => boolean;
 }
 
 /** Itens no escopo (área + nó canônico OU grupo). Nunca filtra saldo. */
 export function itemsInScope(items: InventoryItem[], f: ScopeFilter): InventoryItem[] {
-  const areaScope = items.filter((i) => areaMatches(i.category, f.area));
+  const areaScope = items.filter(f.match ?? ((i) => areaMatches(i.category, f.area)));
   if (f.nodeId) {
     const byNode = areaScope.filter((i) => i.canonicalTaxonomyId === f.nodeId);
     if (byNode.length > 0) return byNode;
@@ -157,24 +159,48 @@ export function productsInAreaGroup(items: InventoryItem[], area: string | undef
 // agregação por subcategoria (groupsInArea) permanece p/ áreas sem árvore.
 // ---------------------------------------------------------------------
 
-/** Famílias canônicas de uma área (mesmo nível dos cards do Estoque), com
- * contagem sob todos os descendentes + bucket "Não classificados" para itens
- * sem canonicalTaxonomyId. `items` já deve vir escopado por área. */
+/** Rótulo da família raiz no contexto de uma área: a própria área mostra só
+ * o nome; o domínio transversal vira "Infraestrutura · Energia"; família de
+ * outra área (aplicabilidade extra) vira "SDAI · Baterias". */
+export function familyContextLabel(root: { name: string; scope?: string; area: string | null }, area: string): string {
+  if (root.scope === 'TRANSVERSAL') return `${TRANSVERSAL_DOMAIN_LABEL} · ${root.name}`;
+  if (root.area && root.area !== area) return `${root.area} · ${root.name}`;
+  return root.name;
+}
+
+/** Família raiz (rótulo de contexto) de um produto classificado, ou null. */
+export function rootFamilyLabel(tree: CatalogTree, item: InventoryItem, area: string): string | null {
+  if (!item.canonicalTaxonomyId || !tree.byId.has(item.canonicalTaxonomyId)) return null;
+  const root = nodePath(tree, item.canonicalTaxonomyId)[0];
+  return root ? familyContextLabel(root, area) : null;
+}
+
+const isUnclassifiedIn = (tree: CatalogTree, i: InventoryItem) => !i.canonicalTaxonomyId || !tree.byId.has(i.canonicalTaxonomyId);
+
+/** Famílias canônicas para a Proposta de uma área (mesmo nível dos cards do
+ * Estoque), com contagem sob todos os descendentes + bucket "Não classificados"
+ * para itens sem classificação. `items` já deve vir escopado pelas ÁREAS
+ * EFETIVAS: além das famílias da área, aparecem as famílias transversais
+ * (Infraestrutura) e de outras áreas com produto aplicável — nenhum produto do
+ * escopo some. Ordem: área → Infraestrutura → outras áreas → não classificados. */
 export function canonicalFamilyGroups(tree: CatalogTree, items: InventoryItem[], area: string): CatalogGroup[] {
   const counts = countsByNode(tree, items);
-  const families: CatalogGroup[] = areaFamilies(tree, area)
-    .map((n) => ({ key: n.id, label: n.name, count: counts.get(n.id) || 0 }))
-    .filter((g) => g.count > 0);
-  const semClasse = items.filter((i) => !i.canonicalTaxonomyId).length;
+  const own = new Set(areaFamilies(tree, area).map((n) => n.id));
+  const rank = (n: { id: string; scope?: string }) => (own.has(n.id) ? 0 : n.scope === 'TRANSVERSAL' ? 1 : 2);
+  const families: CatalogGroup[] = (tree.children.get('') ?? [])
+    .filter((n) => (counts.get(n.id) || 0) > 0)
+    .map((n) => ({ key: n.id, label: familyContextLabel(n, area), count: counts.get(n.id) || 0, rank: rank(n) }))
+    .sort((a, b) => a.rank - b.rank || a.label.localeCompare(b.label, 'pt-BR'))
+    .map(({ key, label, count }) => ({ key, label, count }));
+  const semClasse = items.filter((i) => isUnclassifiedIn(tree, i)).length;
   if (semClasse > 0) families.push({ key: UNCLASSIFIED_GROUP, label: 'Outros / Não classificados', count: semClasse });
-  return families.sort((a, b) =>
-    a.key === UNCLASSIFIED_GROUP ? 1 : b.key === UNCLASSIFIED_GROUP ? -1 : a.label.localeCompare(b.label, 'pt-BR'));
+  return families;
 }
 
 /** Produtos de uma família canônica (nó) ou do bucket "Não classificados". */
 export function productsInFamily(tree: CatalogTree, items: InventoryItem[], familyKey: string): InventoryItem[] {
   return familyKey === UNCLASSIFIED_GROUP
-    ? items.filter((i) => !i.canonicalTaxonomyId)
+    ? items.filter((i) => isUnclassifiedIn(tree, i))
     : productsUnderNode(tree, items, familyKey);
 }
 

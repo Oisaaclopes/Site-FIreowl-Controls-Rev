@@ -1,5 +1,7 @@
 import type { InventoryItem } from './types';
 import { normalizeBrand } from './catalogSelection';
+import { COMMERCIAL_AREAS } from './catalogApplicability';
+import { TRANSVERSAL_DOMAIN } from './catalogTree';
 
 // =====================================================================
 // AUDITORIA DE QUALIDADE DO CATÁLOGO (read-only, pura, testável).
@@ -15,7 +17,8 @@ import { normalizeBrand } from './catalogSelection';
 // Um item pode ter família mas não ter classificação canônica.
 // =====================================================================
 
-export const CANONICAL_AREAS = ['SDAI', 'CFTV', 'ALARME', 'BMS', 'CONTROLE_ACESSO'];
+// Somente áreas COMERCIAIS. INFRA é domínio transversal do catálogo (0116), não área.
+export const CANONICAL_AREAS: string[] = [...COMMERCIAL_AREAS];
 
 const has = (s?: string | null) => !!(s || '').trim();
 /** Colapsa um modelo a chave alfanumérica: "DFC 421"/"DFC-421"/"dfc421" → "dfc421". */
@@ -125,7 +128,7 @@ export function auditCatalog(items: InventoryItem[]): CatalogAudit {
     missingBrand: items.filter((i) => !has(i.brand)).map(ref),
     missingModel: items.filter((i) => !has(i.model)).map(ref),
     unclassifiedFamily: items.filter((i) => !has(i.subcategory)).map(ref),
-    areaOutsideCanonical: items.filter((i) => has(i.category) && !CANONICAL_AREAS.includes(i.category.trim().toUpperCase())).map(ref),
+    areaOutsideCanonical: items.filter((i) => has(i.category) && !CANONICAL_AREAS.includes(i.category.trim().toUpperCase()) && i.category.trim().toUpperCase() !== TRANSVERSAL_DOMAIN).map(ref),
     brandDuplicates,
     modelDuplicates,
   };

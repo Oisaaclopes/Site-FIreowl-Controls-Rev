@@ -3,18 +3,22 @@ import { normalizedCatalogKey } from './catalogSeed/types';
 
 // =====================================================================
 // Taxonomia técnica canônica Fireowl (camada TS).
-// Espelha a migration 0070_canonical_catalog_taxonomy.sql. É a fonte de
+// Espelha as migrations 0070–0072 e 0115–0117 (nós AREA + domínio
+// TRANSVERSAL INFRA). É a fonte de
 // verdade dos NÓS, ALIASES e das REGRAS de classificação determinística.
 // Nada aqui muda saldo/preço/custo — apenas lê metadados do produto.
 // =====================================================================
 
 export type CatalogClassificationStatus = 'CLASSIFICADO' | 'REVISAR' | 'NAO_CLASSIFICADO';
-export type CatalogArea = 'SDAI' | 'CFTV' | 'ALARME' | 'BMS';
+export type CatalogArea = 'SDAI' | 'CFTV' | 'ALARME' | 'BMS' | 'CONTROLE_ACESSO';
 export type CatalogNodeType = 'FAMILY' | 'GROUP' | 'TYPE' | 'FUNCTION' | 'TECHNOLOGY' | 'FORM_FACTOR';
+/** 0116 — AREA: nó de área comercial; TRANSVERSAL: domínio INFRA (area null). */
+export type CatalogScope = 'AREA' | 'TRANSVERSAL';
 
 export interface CatalogTaxonomyNode {
   code: string;
-  area: CatalogArea;
+  scope: CatalogScope;
+  area: CatalogArea | null;
   parentCode: string | null;
   nodeType: CatalogNodeType;
   name: string;
@@ -92,43 +96,52 @@ export const CATALOG_TAXONOMY_NODES: CatalogTaxonomyNode[] = [
   n('CFTV', null, 'FAMILY', 'CFTV.GRAVADORES', 'Gravadores', 20),
   n('CFTV', 'CFTV.GRAVADORES', 'TECHNOLOGY', 'CFTV.GRAVADORES.NVR', 'NVR', 10),
   n('CFTV', 'CFTV.GRAVADORES', 'TECHNOLOGY', 'CFTV.GRAVADORES.DVR_HIBRIDO', 'DVR / Híbrido', 20),
-  // 0115 — Periféricos e Componentes (HD, Nobreak, rede, cabos, acessórios…)
-  n('CFTV', null, 'FAMILY', 'CFTV.PERIFERICOS', 'Periféricos e Componentes', 30),
-  n('CFTV', 'CFTV.PERIFERICOS', 'GROUP', 'CFTV.PERIFERICOS.ARMAZENAMENTO', 'Armazenamento', 10),
-  n('CFTV', 'CFTV.PERIFERICOS', 'GROUP', 'CFTV.PERIFERICOS.ENERGIA', 'Energia', 20),
-  n('CFTV', 'CFTV.PERIFERICOS', 'GROUP', 'CFTV.PERIFERICOS.REDE', 'Rede', 30),
-  n('CFTV', 'CFTV.PERIFERICOS', 'GROUP', 'CFTV.PERIFERICOS.CABOS', 'Cabos', 40),
-  n('CFTV', 'CFTV.PERIFERICOS', 'GROUP', 'CFTV.PERIFERICOS.CONECTORES', 'Conectores e Balun', 50),
-  n('CFTV', 'CFTV.PERIFERICOS', 'GROUP', 'CFTV.PERIFERICOS.ACESSORIOS', 'Acessórios e Instalação', 60),
-  n('CFTV', 'CFTV.PERIFERICOS', 'GROUP', 'CFTV.PERIFERICOS.VISUALIZACAO', 'Monitores e Visualização', 70),
-  n('CFTV', 'CFTV.PERIFERICOS.ARMAZENAMENTO', 'TYPE', 'CFTV.PERIFERICOS.ARMAZENAMENTO.HD', 'Disco Rígido (HD)', 10),
-  n('CFTV', 'CFTV.PERIFERICOS.ARMAZENAMENTO', 'TYPE', 'CFTV.PERIFERICOS.ARMAZENAMENTO.SSD', 'SSD', 20),
-  n('CFTV', 'CFTV.PERIFERICOS.ARMAZENAMENTO', 'TYPE', 'CFTV.PERIFERICOS.ARMAZENAMENTO.CARTAO', 'Cartão de Memória', 30),
-  n('CFTV', 'CFTV.PERIFERICOS.ENERGIA', 'TYPE', 'CFTV.PERIFERICOS.ENERGIA.NOBREAK', 'Nobreak', 10),
-  n('CFTV', 'CFTV.PERIFERICOS.ENERGIA', 'TYPE', 'CFTV.PERIFERICOS.ENERGIA.FONTE', 'Fonte de Alimentação', 20),
-  n('CFTV', 'CFTV.PERIFERICOS.ENERGIA', 'TYPE', 'CFTV.PERIFERICOS.ENERGIA.BATERIA', 'Bateria', 30),
-  n('CFTV', 'CFTV.PERIFERICOS.ENERGIA', 'TYPE', 'CFTV.PERIFERICOS.ENERGIA.PROTECAO', 'Protetor de Surto / DPS', 40),
-  n('CFTV', 'CFTV.PERIFERICOS.REDE', 'TYPE', 'CFTV.PERIFERICOS.REDE.SWITCH_POE', 'Switch PoE', 10),
-  n('CFTV', 'CFTV.PERIFERICOS.REDE', 'TYPE', 'CFTV.PERIFERICOS.REDE.SWITCH', 'Switch', 20),
-  n('CFTV', 'CFTV.PERIFERICOS.REDE', 'TYPE', 'CFTV.PERIFERICOS.REDE.POE', 'Injetor / Extensor PoE', 30),
-  n('CFTV', 'CFTV.PERIFERICOS.REDE', 'TYPE', 'CFTV.PERIFERICOS.REDE.ROTEADOR', 'Roteador / Access Point', 40),
-  n('CFTV', 'CFTV.PERIFERICOS.REDE', 'TYPE', 'CFTV.PERIFERICOS.REDE.CONVERSOR', 'Conversor de Mídia', 50),
-  n('CFTV', 'CFTV.PERIFERICOS.CABOS', 'TYPE', 'CFTV.PERIFERICOS.CABOS.UTP', 'Cabo UTP / Rede', 10),
-  n('CFTV', 'CFTV.PERIFERICOS.CABOS', 'TYPE', 'CFTV.PERIFERICOS.CABOS.COAXIAL', 'Cabo Coaxial', 20),
-  n('CFTV', 'CFTV.PERIFERICOS.CABOS', 'TYPE', 'CFTV.PERIFERICOS.CABOS.FIBRA', 'Fibra Óptica', 30),
-  n('CFTV', 'CFTV.PERIFERICOS.CABOS', 'TYPE', 'CFTV.PERIFERICOS.CABOS.ENERGIA', 'Cabo de Energia / PP', 40),
-  n('CFTV', 'CFTV.PERIFERICOS.CABOS', 'TYPE', 'CFTV.PERIFERICOS.CABOS.VIDEO', 'Cabo HDMI / VGA', 50),
-  n('CFTV', 'CFTV.PERIFERICOS.CONECTORES', 'TYPE', 'CFTV.PERIFERICOS.CONECTORES.CONECTOR', 'Conectores (BNC / P4 / RJ45)', 10),
-  n('CFTV', 'CFTV.PERIFERICOS.CONECTORES', 'TYPE', 'CFTV.PERIFERICOS.CONECTORES.BALUN', 'Balun', 20),
-  n('CFTV', 'CFTV.PERIFERICOS.ACESSORIOS', 'TYPE', 'CFTV.PERIFERICOS.ACESSORIOS.SUPORTE', 'Suportes', 10),
-  n('CFTV', 'CFTV.PERIFERICOS.ACESSORIOS', 'TYPE', 'CFTV.PERIFERICOS.ACESSORIOS.CAIXA', 'Caixas de Passagem / Herméticas', 20),
-  n('CFTV', 'CFTV.PERIFERICOS.ACESSORIOS', 'TYPE', 'CFTV.PERIFERICOS.ACESSORIOS.RACK', 'Racks', 30),
-  n('CFTV', 'CFTV.PERIFERICOS.VISUALIZACAO', 'TYPE', 'CFTV.PERIFERICOS.VISUALIZACAO.MONITOR', 'Monitor', 10),
-  n('CFTV', 'CFTV.PERIFERICOS.VISUALIZACAO', 'TYPE', 'CFTV.PERIFERICOS.VISUALIZACAO.CONTROLADORA', 'Mesa Controladora / Joystick', 20),
+  // 0115 — famílias específicas de CFTV (mesmo nível de Câmeras/Gravadores)
+  n('CFTV', null, 'FAMILY', 'CFTV.ARMAZENAMENTO', 'Armazenamento', 30),
+  n('CFTV', 'CFTV.ARMAZENAMENTO', 'TYPE', 'CFTV.ARMAZENAMENTO.HD', 'Disco Rígido (HD)', 10),
+  n('CFTV', 'CFTV.ARMAZENAMENTO', 'TYPE', 'CFTV.ARMAZENAMENTO.SSD', 'SSD', 20),
+  n('CFTV', 'CFTV.ARMAZENAMENTO', 'TYPE', 'CFTV.ARMAZENAMENTO.CARTAO', 'Cartão de Memória', 30),
+  n('CFTV', null, 'FAMILY', 'CFTV.TRANSMISSAO', 'Transmissão de Vídeo', 40),
+  n('CFTV', 'CFTV.TRANSMISSAO', 'TYPE', 'CFTV.TRANSMISSAO.BALUN', 'Balun', 10),
+  n('CFTV', 'CFTV.TRANSMISSAO', 'TYPE', 'CFTV.TRANSMISSAO.EXTENSOR', 'Extensor / Conversor de Vídeo', 20),
+  n('CFTV', null, 'FAMILY', 'CFTV.ACESSORIOS', 'Acessórios de Instalação', 50),
+  n('CFTV', 'CFTV.ACESSORIOS', 'TYPE', 'CFTV.ACESSORIOS.SUPORTE', 'Suportes', 10),
+  n('CFTV', 'CFTV.ACESSORIOS', 'TYPE', 'CFTV.ACESSORIOS.CAIXA', 'Caixas de Passagem / Herméticas', 20),
+  n('CFTV', null, 'FAMILY', 'CFTV.VISUALIZACAO', 'Visualização e Operação', 60),
+  n('CFTV', 'CFTV.VISUALIZACAO', 'TYPE', 'CFTV.VISUALIZACAO.MONITOR', 'Monitor', 10),
+  n('CFTV', 'CFTV.VISUALIZACAO', 'TYPE', 'CFTV.VISUALIZACAO.CONTROLADORA', 'Mesa Controladora / Joystick', 20),
+  // 0117 — domínio TRANSVERSAL Infraestrutura (area null; não é área comercial)
+  t(null, 'FAMILY', 'INFRA.ENERGIA', 'Energia', 10),
+  t('INFRA.ENERGIA', 'TYPE', 'INFRA.ENERGIA.FONTE', 'Fonte', 10),
+  t('INFRA.ENERGIA', 'TYPE', 'INFRA.ENERGIA.NOBREAK', 'Nobreak', 20),
+  t('INFRA.ENERGIA', 'TYPE', 'INFRA.ENERGIA.BATERIA', 'Bateria', 30),
+  t('INFRA.ENERGIA', 'TYPE', 'INFRA.ENERGIA.DPS', 'Proteção Elétrica (DPS)', 40),
+  t(null, 'FAMILY', 'INFRA.REDE', 'Rede', 20),
+  t('INFRA.REDE', 'TYPE', 'INFRA.REDE.SWITCH', 'Switch', 10),
+  t('INFRA.REDE', 'TYPE', 'INFRA.REDE.SWITCH_POE', 'Switch PoE', 20),
+  t('INFRA.REDE', 'TYPE', 'INFRA.REDE.POE', 'Injetor / Extensor PoE', 30),
+  t('INFRA.REDE', 'TYPE', 'INFRA.REDE.ROTEADOR', 'Roteador / Access Point', 40),
+  t('INFRA.REDE', 'TYPE', 'INFRA.REDE.CONVERSOR', 'Conversor de Mídia', 50),
+  t(null, 'FAMILY', 'INFRA.CABEAMENTO', 'Cabeamento', 30),
+  t('INFRA.CABEAMENTO', 'TYPE', 'INFRA.CABEAMENTO.UTP', 'Cabo UTP', 10),
+  t('INFRA.CABEAMENTO', 'TYPE', 'INFRA.CABEAMENTO.COAXIAL', 'Cabo Coaxial', 20),
+  t('INFRA.CABEAMENTO', 'TYPE', 'INFRA.CABEAMENTO.FIBRA', 'Fibra Óptica', 30),
+  t('INFRA.CABEAMENTO', 'TYPE', 'INFRA.CABEAMENTO.ENERGIA', 'Cabo de Energia / PP', 40),
+  t('INFRA.CABEAMENTO', 'TYPE', 'INFRA.CABEAMENTO.VIDEO', 'Cabo HDMI / VGA', 50),
+  t('INFRA.CABEAMENTO', 'TYPE', 'INFRA.CABEAMENTO.CONECTORES', 'Conectores', 60),
+  t(null, 'FAMILY', 'INFRA.RACKS', 'Racks e Organização', 40),
+  t('INFRA.RACKS', 'TYPE', 'INFRA.RACKS.RACK', 'Rack', 10),
+  t('INFRA.RACKS', 'TYPE', 'INFRA.RACKS.PATCH_PANEL', 'Patch Panel', 20),
+  t('INFRA.RACKS', 'TYPE', 'INFRA.RACKS.ORGANIZADOR', 'Organizador de Cabos', 30),
+  t('INFRA.RACKS', 'TYPE', 'INFRA.RACKS.ACESSORIOS', 'Acessórios de Rack', 40),
 ];
 
 function n(area: CatalogArea, parentCode: string | null, nodeType: CatalogNodeType, code: string, name: string, sortOrder: number): CatalogTaxonomyNode {
-  return { area, parentCode, nodeType, code, name, sortOrder };
+  return { scope: 'AREA', area, parentCode, nodeType, code, name, sortOrder };
+}
+
+function t(parentCode: string | null, nodeType: CatalogNodeType, code: string, name: string, sortOrder: number): CatalogTaxonomyNode {
+  return { scope: 'TRANSVERSAL', area: null, parentCode, nodeType, code, name, sortOrder };
 }
 
 // ---- Aliases (mesmo conjunto da migration) --------------------------
@@ -168,32 +181,36 @@ export const CATALOG_TAXONOMY_ALIASES: CatalogTaxonomyAlias[] = [
   // 0072 — Módulo de Zona e Multicritério
   ...aliasList('SDAI.MODULOS.ZONA', ['Módulo de Zona', 'Módulo Endereçador de Zona', 'Endereçador de Zona', 'Zone Module', 'Módulo para Laço Convencional']),
   ...aliasList('SDAI.DETECTORES.MULTICRITERIO', ['Multicritério', 'Multisensor', 'Multi-criteria']),
-  // 0115 — Periféricos CFTV ("Monitor"/"Bateria"/"Fonte Nobreak" seguem SDAI)
-  ...aliasList('CFTV.PERIFERICOS', ['Periférico', 'Periféricos', 'Acessório CFTV', 'Componente CFTV']),
-  ...aliasList('CFTV.PERIFERICOS.ARMAZENAMENTO.HD', ['HD', 'HDD', 'Disco Rígido', 'HD Surveillance', 'HD para CFTV']),
-  ...aliasList('CFTV.PERIFERICOS.ARMAZENAMENTO.SSD', ['SSD']),
-  ...aliasList('CFTV.PERIFERICOS.ARMAZENAMENTO.CARTAO', ['Cartão de Memória', 'Cartão microSD', 'MicroSD', 'Cartão SD']),
-  ...aliasList('CFTV.PERIFERICOS.ENERGIA.NOBREAK', ['Nobreak', 'UPS']),
-  ...aliasList('CFTV.PERIFERICOS.ENERGIA.FONTE', ['Fonte', 'Fonte 12V', 'Fonte Colmeia', 'Fonte Chaveada', 'Fonte para CFTV']),
-  ...aliasList('CFTV.PERIFERICOS.ENERGIA.BATERIA', ['Bateria para Nobreak']),
-  ...aliasList('CFTV.PERIFERICOS.ENERGIA.PROTECAO', ['DPS', 'Protetor de Surto', 'Protetor de Vídeo']),
-  ...aliasList('CFTV.PERIFERICOS.REDE.SWITCH_POE', ['Switch PoE']),
-  ...aliasList('CFTV.PERIFERICOS.REDE.SWITCH', ['Switch', 'Switch de Rede']),
-  ...aliasList('CFTV.PERIFERICOS.REDE.POE', ['Injetor PoE', 'Extensor PoE', 'Splitter PoE']),
-  ...aliasList('CFTV.PERIFERICOS.REDE.ROTEADOR', ['Roteador', 'Router', 'Access Point']),
-  ...aliasList('CFTV.PERIFERICOS.REDE.CONVERSOR', ['Conversor de Mídia', 'Media Converter']),
-  ...aliasList('CFTV.PERIFERICOS.CABOS.UTP', ['Cabo UTP', 'Cabo de Rede', 'Cabo CAT5e', 'Cabo CAT6']),
-  ...aliasList('CFTV.PERIFERICOS.CABOS.COAXIAL', ['Cabo Coaxial', 'Coaxial', 'Cabo Coaxial Bipolar']),
-  ...aliasList('CFTV.PERIFERICOS.CABOS.FIBRA', ['Fibra Óptica', 'Cabo de Fibra', 'Cordão Óptico']),
-  ...aliasList('CFTV.PERIFERICOS.CABOS.ENERGIA', ['Cabo PP', 'Cabo de Energia']),
-  ...aliasList('CFTV.PERIFERICOS.CABOS.VIDEO', ['Cabo HDMI', 'Cabo VGA']),
-  ...aliasList('CFTV.PERIFERICOS.CONECTORES.CONECTOR', ['Conector', 'Conector BNC', 'Conector P4', 'Conector RJ45', 'BNC', 'RJ45']),
-  ...aliasList('CFTV.PERIFERICOS.CONECTORES.BALUN', ['Balun', 'Video Balun']),
-  ...aliasList('CFTV.PERIFERICOS.ACESSORIOS.SUPORTE', ['Suporte', 'Suporte para Câmera']),
-  ...aliasList('CFTV.PERIFERICOS.ACESSORIOS.CAIXA', ['Caixa de Passagem', 'Caixa Hermética']),
-  ...aliasList('CFTV.PERIFERICOS.ACESSORIOS.RACK', ['Rack', 'Rack de Parede']),
-  ...aliasList('CFTV.PERIFERICOS.VISUALIZACAO.MONITOR', ['Monitor de Vídeo', 'Monitor CFTV']),
-  ...aliasList('CFTV.PERIFERICOS.VISUALIZACAO.CONTROLADORA', ['Mesa Controladora', 'Joystick', 'Teclado Controlador']),
+  // 0115 — CFTV específico ("Monitor" segue = módulo monitor SDAI)
+  ...aliasList('CFTV.ARMAZENAMENTO.HD', ['HD', 'HDD', 'Disco Rígido', 'HD Surveillance', 'HD para CFTV']),
+  ...aliasList('CFTV.ARMAZENAMENTO.SSD', ['SSD']),
+  ...aliasList('CFTV.ARMAZENAMENTO.CARTAO', ['Cartão de Memória', 'Cartão microSD', 'MicroSD', 'Cartão SD']),
+  ...aliasList('CFTV.TRANSMISSAO.BALUN', ['Balun', 'Video Balun', 'Balun HDCVI']),
+  ...aliasList('CFTV.TRANSMISSAO.EXTENSOR', ['Extensor de Vídeo', 'Conversor de Vídeo', 'Conversor HDCVI', 'Extensor HDMI']),
+  ...aliasList('CFTV.ACESSORIOS.SUPORTE', ['Suporte', 'Suporte para Câmera']),
+  ...aliasList('CFTV.ACESSORIOS.CAIXA', ['Caixa de Passagem', 'Caixa Hermética']),
+  ...aliasList('CFTV.VISUALIZACAO.MONITOR', ['Monitor de Vídeo', 'Monitor CFTV']),
+  ...aliasList('CFTV.VISUALIZACAO.CONTROLADORA', ['Mesa Controladora', 'Joystick', 'Teclado Controlador']),
+  // 0117 — Infraestrutura ("Bateria"/"Fonte Auxiliar"/"Fonte Nobreak" seguem SDAI)
+  ...aliasList('INFRA.ENERGIA.FONTE', ['Fonte', 'Fonte 12V', 'Fonte Colmeia', 'Fonte Chaveada']),
+  ...aliasList('INFRA.ENERGIA.NOBREAK', ['Nobreak', 'UPS']),
+  ...aliasList('INFRA.ENERGIA.BATERIA', ['Bateria Estacionária', 'Bateria para Nobreak']),
+  ...aliasList('INFRA.ENERGIA.DPS', ['DPS', 'Protetor de Surto', 'Dispositivo de Proteção contra Surtos']),
+  ...aliasList('INFRA.REDE.SWITCH', ['Switch', 'Switch de Rede']),
+  ...aliasList('INFRA.REDE.SWITCH_POE', ['Switch PoE']),
+  ...aliasList('INFRA.REDE.POE', ['Injetor PoE', 'Extensor PoE', 'Splitter PoE']),
+  ...aliasList('INFRA.REDE.ROTEADOR', ['Roteador', 'Router', 'Access Point']),
+  ...aliasList('INFRA.REDE.CONVERSOR', ['Conversor de Mídia', 'Media Converter']),
+  ...aliasList('INFRA.CABEAMENTO.UTP', ['Cabo UTP', 'Cabo de Rede', 'Cabo CAT5e', 'Cabo CAT6']),
+  ...aliasList('INFRA.CABEAMENTO.COAXIAL', ['Cabo Coaxial', 'Coaxial', 'Cabo Coaxial Bipolar']),
+  ...aliasList('INFRA.CABEAMENTO.FIBRA', ['Fibra Óptica', 'Cabo de Fibra', 'Cordão Óptico']),
+  ...aliasList('INFRA.CABEAMENTO.ENERGIA', ['Cabo PP', 'Cabo de Energia']),
+  ...aliasList('INFRA.CABEAMENTO.VIDEO', ['Cabo HDMI', 'Cabo VGA']),
+  ...aliasList('INFRA.CABEAMENTO.CONECTORES', ['Conector', 'Conector RJ45', 'Conector BNC', 'Conector P4', 'RJ45', 'BNC']),
+  ...aliasList('INFRA.RACKS.RACK', ['Rack', 'Rack de Parede', 'Rack de Piso']),
+  ...aliasList('INFRA.RACKS.PATCH_PANEL', ['Patch Panel']),
+  ...aliasList('INFRA.RACKS.ORGANIZADOR', ['Organizador de Cabos', 'Guia de Cabos']),
+  ...aliasList('INFRA.RACKS.ACESSORIOS', ['Acessório de Rack', 'Bandeja de Rack', 'Régua de Tomadas']),
 ];
 
 function aliasList(code: string, aliases: string[]): CatalogTaxonomyAlias[] {
@@ -213,6 +230,13 @@ export function getTaxonomyNode(code: string): CatalogTaxonomyNode | undefined {
 export function getTaxonomyChildren(code: string | null, area?: CatalogArea): CatalogTaxonomyNode[] {
   return CATALOG_TAXONOMY_NODES
     .filter((node) => node.parentCode === code && (!area || node.area === area))
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+/** Famílias raiz do domínio transversal (INFRA). */
+export function getTransversalFamilies(): CatalogTaxonomyNode[] {
+  return CATALOG_TAXONOMY_NODES
+    .filter((node) => node.parentCode === null && node.scope === 'TRANSVERSAL')
     .sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
@@ -245,9 +269,13 @@ export function validateTaxonomyTree(): string[] {
   const codes = new Set(CATALOG_TAXONOMY_NODES.map((node) => node.code));
   for (const node of CATALOG_TAXONOMY_NODES) {
     if (node.parentCode && !codes.has(node.parentCode)) problems.push(`parent inexistente: ${node.code} -> ${node.parentCode}`);
+    // Espelha o CHECK scope/area e o trigger pai/filho da 0116.
+    if (node.scope === 'AREA' && !node.area) problems.push(`nó AREA sem área: ${node.code}`);
+    if (node.scope === 'TRANSVERSAL' && node.area !== null) problems.push(`nó TRANSVERSAL com área: ${node.code}`);
     if (node.parentCode) {
       const parent = NODE_BY_CODE.get(node.parentCode);
       if (parent && parent.area !== node.area) problems.push(`área divergente do pai: ${node.code}`);
+      if (parent && parent.scope !== node.scope) problems.push(`scope divergente do pai: ${node.code}`);
     }
     // Ciclo: caminho deve terminar numa raiz sem revisitar.
     const seen = new Set<string>();
@@ -400,9 +428,6 @@ export function classifyCatalogItem(item: ClassifiableItem): ClassificationResul
     if (sub === 'camerahdcvi') return CLASSIFICADO('CFTV.CAMERAS.HDCVI');
     if (sub === 'gravadornvr') return CLASSIFICADO('CFTV.GRAVADORES.NVR');
     if (sub === 'dvrgravadorhibrido') return CLASSIFICADO('CFTV.GRAVADORES.DVR_HIBRIDO');
-    // 0115 — periféricos: subcategoria legada igual a um alias de tipo/grupo.
-    const peripheral = ALIAS_INDEX.get(sub);
-    if (peripheral?.startsWith('CFTV.PERIFERICOS.')) return CLASSIFICADO(peripheral);
     return NAO_CLASSIFICADO;
   }
 

@@ -973,6 +973,9 @@ export interface InventoryItem {
   /** Taxonomia canônica (0070/0071). Só leitura na UI de catálogo; nunca editado aqui. */
   canonicalTaxonomyId?: string;
   classificationStatus?: 'CLASSIFICADO' | 'REVISAR' | 'NAO_CLASSIFICADO';
+  /** 0118 — aplicabilidades EXPLÍCITAS (inventory_item_areas). A área implícita da
+   *  classificação AREA não aparece aqui. undefined = não carregado (banco pré-0118). */
+  applicableAreas?: string[];
 }
 
 export interface StockMovement {
