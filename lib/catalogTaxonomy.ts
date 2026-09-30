@@ -92,6 +92,39 @@ export const CATALOG_TAXONOMY_NODES: CatalogTaxonomyNode[] = [
   n('CFTV', null, 'FAMILY', 'CFTV.GRAVADORES', 'Gravadores', 20),
   n('CFTV', 'CFTV.GRAVADORES', 'TECHNOLOGY', 'CFTV.GRAVADORES.NVR', 'NVR', 10),
   n('CFTV', 'CFTV.GRAVADORES', 'TECHNOLOGY', 'CFTV.GRAVADORES.DVR_HIBRIDO', 'DVR / Híbrido', 20),
+  // 0115 — Periféricos e Componentes (HD, Nobreak, rede, cabos, acessórios…)
+  n('CFTV', null, 'FAMILY', 'CFTV.PERIFERICOS', 'Periféricos e Componentes', 30),
+  n('CFTV', 'CFTV.PERIFERICOS', 'GROUP', 'CFTV.PERIFERICOS.ARMAZENAMENTO', 'Armazenamento', 10),
+  n('CFTV', 'CFTV.PERIFERICOS', 'GROUP', 'CFTV.PERIFERICOS.ENERGIA', 'Energia', 20),
+  n('CFTV', 'CFTV.PERIFERICOS', 'GROUP', 'CFTV.PERIFERICOS.REDE', 'Rede', 30),
+  n('CFTV', 'CFTV.PERIFERICOS', 'GROUP', 'CFTV.PERIFERICOS.CABOS', 'Cabos', 40),
+  n('CFTV', 'CFTV.PERIFERICOS', 'GROUP', 'CFTV.PERIFERICOS.CONECTORES', 'Conectores e Balun', 50),
+  n('CFTV', 'CFTV.PERIFERICOS', 'GROUP', 'CFTV.PERIFERICOS.ACESSORIOS', 'Acessórios e Instalação', 60),
+  n('CFTV', 'CFTV.PERIFERICOS', 'GROUP', 'CFTV.PERIFERICOS.VISUALIZACAO', 'Monitores e Visualização', 70),
+  n('CFTV', 'CFTV.PERIFERICOS.ARMAZENAMENTO', 'TYPE', 'CFTV.PERIFERICOS.ARMAZENAMENTO.HD', 'Disco Rígido (HD)', 10),
+  n('CFTV', 'CFTV.PERIFERICOS.ARMAZENAMENTO', 'TYPE', 'CFTV.PERIFERICOS.ARMAZENAMENTO.SSD', 'SSD', 20),
+  n('CFTV', 'CFTV.PERIFERICOS.ARMAZENAMENTO', 'TYPE', 'CFTV.PERIFERICOS.ARMAZENAMENTO.CARTAO', 'Cartão de Memória', 30),
+  n('CFTV', 'CFTV.PERIFERICOS.ENERGIA', 'TYPE', 'CFTV.PERIFERICOS.ENERGIA.NOBREAK', 'Nobreak', 10),
+  n('CFTV', 'CFTV.PERIFERICOS.ENERGIA', 'TYPE', 'CFTV.PERIFERICOS.ENERGIA.FONTE', 'Fonte de Alimentação', 20),
+  n('CFTV', 'CFTV.PERIFERICOS.ENERGIA', 'TYPE', 'CFTV.PERIFERICOS.ENERGIA.BATERIA', 'Bateria', 30),
+  n('CFTV', 'CFTV.PERIFERICOS.ENERGIA', 'TYPE', 'CFTV.PERIFERICOS.ENERGIA.PROTECAO', 'Protetor de Surto / DPS', 40),
+  n('CFTV', 'CFTV.PERIFERICOS.REDE', 'TYPE', 'CFTV.PERIFERICOS.REDE.SWITCH_POE', 'Switch PoE', 10),
+  n('CFTV', 'CFTV.PERIFERICOS.REDE', 'TYPE', 'CFTV.PERIFERICOS.REDE.SWITCH', 'Switch', 20),
+  n('CFTV', 'CFTV.PERIFERICOS.REDE', 'TYPE', 'CFTV.PERIFERICOS.REDE.POE', 'Injetor / Extensor PoE', 30),
+  n('CFTV', 'CFTV.PERIFERICOS.REDE', 'TYPE', 'CFTV.PERIFERICOS.REDE.ROTEADOR', 'Roteador / Access Point', 40),
+  n('CFTV', 'CFTV.PERIFERICOS.REDE', 'TYPE', 'CFTV.PERIFERICOS.REDE.CONVERSOR', 'Conversor de Mídia', 50),
+  n('CFTV', 'CFTV.PERIFERICOS.CABOS', 'TYPE', 'CFTV.PERIFERICOS.CABOS.UTP', 'Cabo UTP / Rede', 10),
+  n('CFTV', 'CFTV.PERIFERICOS.CABOS', 'TYPE', 'CFTV.PERIFERICOS.CABOS.COAXIAL', 'Cabo Coaxial', 20),
+  n('CFTV', 'CFTV.PERIFERICOS.CABOS', 'TYPE', 'CFTV.PERIFERICOS.CABOS.FIBRA', 'Fibra Óptica', 30),
+  n('CFTV', 'CFTV.PERIFERICOS.CABOS', 'TYPE', 'CFTV.PERIFERICOS.CABOS.ENERGIA', 'Cabo de Energia / PP', 40),
+  n('CFTV', 'CFTV.PERIFERICOS.CABOS', 'TYPE', 'CFTV.PERIFERICOS.CABOS.VIDEO', 'Cabo HDMI / VGA', 50),
+  n('CFTV', 'CFTV.PERIFERICOS.CONECTORES', 'TYPE', 'CFTV.PERIFERICOS.CONECTORES.CONECTOR', 'Conectores (BNC / P4 / RJ45)', 10),
+  n('CFTV', 'CFTV.PERIFERICOS.CONECTORES', 'TYPE', 'CFTV.PERIFERICOS.CONECTORES.BALUN', 'Balun', 20),
+  n('CFTV', 'CFTV.PERIFERICOS.ACESSORIOS', 'TYPE', 'CFTV.PERIFERICOS.ACESSORIOS.SUPORTE', 'Suportes', 10),
+  n('CFTV', 'CFTV.PERIFERICOS.ACESSORIOS', 'TYPE', 'CFTV.PERIFERICOS.ACESSORIOS.CAIXA', 'Caixas de Passagem / Herméticas', 20),
+  n('CFTV', 'CFTV.PERIFERICOS.ACESSORIOS', 'TYPE', 'CFTV.PERIFERICOS.ACESSORIOS.RACK', 'Racks', 30),
+  n('CFTV', 'CFTV.PERIFERICOS.VISUALIZACAO', 'TYPE', 'CFTV.PERIFERICOS.VISUALIZACAO.MONITOR', 'Monitor', 10),
+  n('CFTV', 'CFTV.PERIFERICOS.VISUALIZACAO', 'TYPE', 'CFTV.PERIFERICOS.VISUALIZACAO.CONTROLADORA', 'Mesa Controladora / Joystick', 20),
 ];
 
 function n(area: CatalogArea, parentCode: string | null, nodeType: CatalogNodeType, code: string, name: string, sortOrder: number): CatalogTaxonomyNode {
@@ -135,6 +168,32 @@ export const CATALOG_TAXONOMY_ALIASES: CatalogTaxonomyAlias[] = [
   // 0072 — Módulo de Zona e Multicritério
   ...aliasList('SDAI.MODULOS.ZONA', ['Módulo de Zona', 'Módulo Endereçador de Zona', 'Endereçador de Zona', 'Zone Module', 'Módulo para Laço Convencional']),
   ...aliasList('SDAI.DETECTORES.MULTICRITERIO', ['Multicritério', 'Multisensor', 'Multi-criteria']),
+  // 0115 — Periféricos CFTV ("Monitor"/"Bateria"/"Fonte Nobreak" seguem SDAI)
+  ...aliasList('CFTV.PERIFERICOS', ['Periférico', 'Periféricos', 'Acessório CFTV', 'Componente CFTV']),
+  ...aliasList('CFTV.PERIFERICOS.ARMAZENAMENTO.HD', ['HD', 'HDD', 'Disco Rígido', 'HD Surveillance', 'HD para CFTV']),
+  ...aliasList('CFTV.PERIFERICOS.ARMAZENAMENTO.SSD', ['SSD']),
+  ...aliasList('CFTV.PERIFERICOS.ARMAZENAMENTO.CARTAO', ['Cartão de Memória', 'Cartão microSD', 'MicroSD', 'Cartão SD']),
+  ...aliasList('CFTV.PERIFERICOS.ENERGIA.NOBREAK', ['Nobreak', 'UPS']),
+  ...aliasList('CFTV.PERIFERICOS.ENERGIA.FONTE', ['Fonte', 'Fonte 12V', 'Fonte Colmeia', 'Fonte Chaveada', 'Fonte para CFTV']),
+  ...aliasList('CFTV.PERIFERICOS.ENERGIA.BATERIA', ['Bateria para Nobreak']),
+  ...aliasList('CFTV.PERIFERICOS.ENERGIA.PROTECAO', ['DPS', 'Protetor de Surto', 'Protetor de Vídeo']),
+  ...aliasList('CFTV.PERIFERICOS.REDE.SWITCH_POE', ['Switch PoE']),
+  ...aliasList('CFTV.PERIFERICOS.REDE.SWITCH', ['Switch', 'Switch de Rede']),
+  ...aliasList('CFTV.PERIFERICOS.REDE.POE', ['Injetor PoE', 'Extensor PoE', 'Splitter PoE']),
+  ...aliasList('CFTV.PERIFERICOS.REDE.ROTEADOR', ['Roteador', 'Router', 'Access Point']),
+  ...aliasList('CFTV.PERIFERICOS.REDE.CONVERSOR', ['Conversor de Mídia', 'Media Converter']),
+  ...aliasList('CFTV.PERIFERICOS.CABOS.UTP', ['Cabo UTP', 'Cabo de Rede', 'Cabo CAT5e', 'Cabo CAT6']),
+  ...aliasList('CFTV.PERIFERICOS.CABOS.COAXIAL', ['Cabo Coaxial', 'Coaxial', 'Cabo Coaxial Bipolar']),
+  ...aliasList('CFTV.PERIFERICOS.CABOS.FIBRA', ['Fibra Óptica', 'Cabo de Fibra', 'Cordão Óptico']),
+  ...aliasList('CFTV.PERIFERICOS.CABOS.ENERGIA', ['Cabo PP', 'Cabo de Energia']),
+  ...aliasList('CFTV.PERIFERICOS.CABOS.VIDEO', ['Cabo HDMI', 'Cabo VGA']),
+  ...aliasList('CFTV.PERIFERICOS.CONECTORES.CONECTOR', ['Conector', 'Conector BNC', 'Conector P4', 'Conector RJ45', 'BNC', 'RJ45']),
+  ...aliasList('CFTV.PERIFERICOS.CONECTORES.BALUN', ['Balun', 'Video Balun']),
+  ...aliasList('CFTV.PERIFERICOS.ACESSORIOS.SUPORTE', ['Suporte', 'Suporte para Câmera']),
+  ...aliasList('CFTV.PERIFERICOS.ACESSORIOS.CAIXA', ['Caixa de Passagem', 'Caixa Hermética']),
+  ...aliasList('CFTV.PERIFERICOS.ACESSORIOS.RACK', ['Rack', 'Rack de Parede']),
+  ...aliasList('CFTV.PERIFERICOS.VISUALIZACAO.MONITOR', ['Monitor de Vídeo', 'Monitor CFTV']),
+  ...aliasList('CFTV.PERIFERICOS.VISUALIZACAO.CONTROLADORA', ['Mesa Controladora', 'Joystick', 'Teclado Controlador']),
 ];
 
 function aliasList(code: string, aliases: string[]): CatalogTaxonomyAlias[] {
@@ -341,6 +400,9 @@ export function classifyCatalogItem(item: ClassifiableItem): ClassificationResul
     if (sub === 'camerahdcvi') return CLASSIFICADO('CFTV.CAMERAS.HDCVI');
     if (sub === 'gravadornvr') return CLASSIFICADO('CFTV.GRAVADORES.NVR');
     if (sub === 'dvrgravadorhibrido') return CLASSIFICADO('CFTV.GRAVADORES.DVR_HIBRIDO');
+    // 0115 — periféricos: subcategoria legada igual a um alias de tipo/grupo.
+    const peripheral = ALIAS_INDEX.get(sub);
+    if (peripheral?.startsWith('CFTV.PERIFERICOS.')) return CLASSIFICADO(peripheral);
     return NAO_CLASSIFICADO;
   }
 
