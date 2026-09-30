@@ -8,6 +8,7 @@ import { DataListRow, RowMeta, Badge, RowAction } from '@/components/DataListRow
 import { fetchCnpjData } from '@/lib/cnpj';
 import { removeInstitucionalLogo, resolveLogoDataUrls, uploadInstitucionalLogo } from '@/lib/institucional';
 import { normalizeSearch } from '@/lib/stockStatus';
+import { commercialAreaOptions } from '@/lib/catalogApplicability';
 import { deactivateSupplierProduct, fetchSupplierProducts, upsertSupplierProduct } from '@/lib/supplierProducts';
 
 const supplierStatusColor = (status: Supplier['activeStatus']) =>
@@ -94,7 +95,10 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
     if (!editing?.id) { setSupplierProducts([]); return; }
     fetchSupplierProducts(editing.id).then(setSupplierProducts).catch(() => setSupplierProducts([]));
   }, [editing?.id]);
-  const availableAreas = Array.from(new Set(inventory.map((item) => item.category?.trim()).filter((value): value is string => Boolean(value)))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  // Só áreas COMERCIAIS canônicas + valores históricos já gravados neste
+  // fornecedor (preservados). Nunca deriva de category do estoque: INFRA,
+  // "A DEFINIR" etc. não são áreas de fornecimento.
+  const availableAreas = commercialAreaOptions([...(editing?.areas ?? []), ...areas]);
   const [brandHint, setBrandHint] = useState('');
 
   const normalizeBrand = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/gi, '').toLowerCase();
@@ -396,8 +400,8 @@ export const FornecedoresView: React.FC<FornecedoresViewProps> = ({
           </FormSection>
 
           <FormSection icon="category" title="Áreas de fornecimento">
-            <p className="text-[11px] text-fg-secondary mb-2">As opções são derivadas das categorias já existentes no catálogo técnico.</p>
-            <div className="flex flex-wrap gap-1.5">{availableAreas.length ? availableAreas.map((area) => <button key={area} type="button" onClick={() => setAreas((current) => current.includes(area) ? current.filter((value) => value !== area) : [...current, area])} className={`px-2.5 py-1 rounded-full border text-[11px] font-semibold ${areas.includes(area) ? 'bg-navy text-white border-primary' : 'bg-surface text-fg-secondary border-border'}`}>{areas.includes(area) ? '✓ ' : ''}{area}</button>) : <span className="text-[11px] text-fg-muted">Cadastre categorias no catálogo para disponibilizá-las aqui.</span>}</div>
+            <p className="text-[11px] text-fg-secondary mb-2">Áreas comerciais atendidas pelo fornecedor. Valores antigos fora do padrão aparecem como “histórico” e podem ser desmarcados.</p>
+            <div className="flex flex-wrap gap-1.5">{availableAreas.map((opt) => <button key={opt.value} type="button" title={opt.legacy ? 'Valor histórico (fora das áreas comerciais)' : undefined} onClick={() => setAreas((current) => current.includes(opt.value) ? current.filter((value) => value !== opt.value) : [...current, opt.value])} className={`px-2.5 py-1 rounded-full border text-[11px] font-semibold ${opt.legacy ? 'border-dashed' : ''} ${areas.includes(opt.value) ? 'bg-navy text-white border-primary' : 'bg-surface text-fg-secondary border-border'}`}>{areas.includes(opt.value) ? '✓ ' : ''}{opt.label}{opt.legacy ? ' · histórico' : ''}</button>)}</div>
           </FormSection>
 
           <FormSection icon="image" title="Logo">

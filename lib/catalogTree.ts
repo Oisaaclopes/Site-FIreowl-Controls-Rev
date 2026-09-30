@@ -231,6 +231,22 @@ export function searchCatalog(
 /** Áreas com árvore canônica nesta fase. Outras aparecem como "em andamento". */
 export const CANONICAL_AREAS = ['SDAI', 'CFTV'] as const;
 
+/**
+ * Status de classificação ao salvar o cadastro. Não existe ação explícita de
+ * "confirmar revisão": a única confirmação real é ESCOLHER/ALTERAR o nó
+ * canônico. Mesmo nó → preserva o status atual (REVISAR continua REVISAR ao
+ * editar só aplicabilidade/nome/modelo); nó novo → CLASSIFICADO; sem nó →
+ * NAO_CLASSIFICADO.
+ */
+export function resolveClassificationStatus(
+  prev: { canonicalTaxonomyId?: string | null; classificationStatus?: ClassificationStatus } | null | undefined,
+  nodeId: string | null | undefined,
+): ClassificationStatus {
+  if (!nodeId) return 'NAO_CLASSIFICADO';
+  if (prev && prev.canonicalTaxonomyId === nodeId && prev.classificationStatus === 'REVISAR') return 'REVISAR';
+  return 'CLASSIFICADO';
+}
+
 export function statusLabel(s: ClassificationStatus | undefined): string {
   if (s === 'CLASSIFICADO') return 'Classificado';
   if (s === 'REVISAR') return 'Revisar';

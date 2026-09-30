@@ -33,6 +33,27 @@ export function isCommercialArea(a: string | null | undefined): a is CommercialA
   return !!a && (COMMERCIAL_AREAS as readonly string[]).includes(a);
 }
 
+export interface AreaOption { value: string; label: string; /** valor histórico fora do canônico (só preservado) */ legacy: boolean }
+
+/**
+ * Opções de "área" para cadastros comerciais (ex.: áreas de fornecimento):
+ * SOMENTE as áreas comerciais canônicas + valores históricos JÁ GRAVADOS
+ * (preservados, nunca oferecidos como novos). Nunca deriva de category do
+ * estoque — INFRA, "A DEFINIR" etc. não viram área.
+ */
+export function commercialAreaOptions(saved: ReadonlyArray<string | null | undefined> = []): AreaOption[] {
+  const canonical: AreaOption[] = COMMERCIAL_AREAS.map((a) => ({ value: a, label: COMMERCIAL_AREA_LABEL[a], legacy: false }));
+  const seen = new Set<string>(COMMERCIAL_AREAS);
+  const legacy: AreaOption[] = [];
+  for (const raw of saved) {
+    const v = (raw || '').trim();
+    if (!v || seen.has(v)) continue;
+    seen.add(v);
+    legacy.push({ value: v, label: v, legacy: true });
+  }
+  return [...canonical, ...legacy.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))];
+}
+
 /** Ordena/deduplica/filtra para códigos comerciais canônicos (ordem de COMMERCIAL_AREAS). */
 export function canonicalAreaList(list: ReadonlyArray<string | null | undefined>): CommercialArea[] {
   const set = new Set(list.map((a) => (a || '').trim().toUpperCase()));

@@ -198,7 +198,37 @@ export async function insertInventoryItem(item: InventoryItem): Promise<Inventor
   return { ...rowToItem(data), applicableAreas: item.applicableAreas };
 }
 
-// Atualiza um item existente (pelo id) e retorna a linha persistida
+// Colunas de SALDO com fluxo próprio (movimentação de estoque / recebimento RPC
+// 0052/0101). A edição de cadastro NUNCA as envia: evita que um formulário
+// aberto com saldo antigo sobrescreva uma entrada/saída feita no meio tempo.
+export const STOCK_FLOW_COLUMNS = ['quantity', 'reserved_quantity'] as const;
+
+/** Linha de UPDATE da edição de cadastro/classificação (sem colunas de saldo). */
+export function catalogEditRow(item: InventoryItem): Record<string, unknown> {
+  const row = itemToRow(item);
+  for (const col of STOCK_FLOW_COLUMNS) delete row[col];
+  return row;
+}
+
+/**
+ * Atualiza SOMENTE o cadastro/classificação do produto (Estoque › Editar).
+ * Não toca saldo: o retorno traz o `quantity` ATUAL do banco.
+ */
+export async function updateInventoryCatalog(item: InventoryItem): Promise<InventoryItem> {
+  const supabase = getSupabaseClient() as any;
+  const { data, error } = await supabase
+    .from(TABLE)
+    .update(catalogEditRow(item))
+    .eq('id', item.id)
+    .select()
+    .single();
+  if (error) throw error;
+  return { ...rowToItem(data), applicableAreas: item.applicableAreas };
+}
+
+// Atualiza um item existente (pelo id) e retorna a linha persistida.
+// Grava a linha INTEIRA (inclui saldo) — uso restrito aos fluxos de
+// movimentação; edição de cadastro usa updateInventoryCatalog.
 export async function updateInventoryItem(item: InventoryItem): Promise<InventoryItem> {
   const supabase = getSupabaseClient() as any;
   const { data, error } = await supabase

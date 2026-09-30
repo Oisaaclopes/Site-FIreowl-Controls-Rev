@@ -106,9 +106,14 @@ export function ProductDetail({ item, tree, canManage, canSeePrice, onClose, onE
           <Section title="Classificação" icon="account_tree">
             <Row label="Domínio" value={eff.basis === 'TRANSVERSAL' ? `${TRANSVERSAL_DOMAIN_LABEL} (transversal)` : eff.primaryArea ? COMMERCIAL_AREA_LABEL[eff.primaryArea] : textOrNull(item.category)} />
             <Row label="Caminho canônico" value={path ? path.join(' › ') : '—'} />
-            <Row label="Aplicável a" value={eff.missingApplicability
-              ? <span className="text-amber-700">Sem aplicabilidade — não aparece em propostas</span>
-              : eff.areas.length ? eff.areas.map((a) => COMMERCIAL_AREA_LABEL[a]).join(' · ') : '—'} />
+            {eff.basis === 'TRANSVERSAL' || eff.missingApplicability ? (
+              <Row label="Aplicável a" value={eff.missingApplicability
+                ? <span className="text-amber-700">Sem aplicabilidade — não aparece em propostas</span>
+                : eff.areas.map((a) => COMMERCIAL_AREA_LABEL[a]).join(' · ')} />
+            ) : (
+              // Área principal já está em "Domínio"; aqui só as adicionais.
+              <Row label="Também aplicável a" value={eff.areas.filter((a) => a !== eff.primaryArea).map((a) => COMMERCIAL_AREA_LABEL[a]).join(' · ') || '—'} />
+            )}
             <Row label="Status" value={item.classificationStatus === 'CLASSIFICADO' ? 'Classificado' : item.classificationStatus === 'REVISAR' ? 'Revisar' : 'Não classificado'} />
           </Section>
 

@@ -1,7 +1,7 @@
 'use client';
 import React, { useMemo, useState } from 'react';
 import type { InventoryItem } from '@/lib/types';
-import { CatalogTree, nodePath, TRANSVERSAL_DOMAIN, TRANSVERSAL_DOMAIN_LABEL } from '@/lib/catalogTree';
+import { CatalogTree, nodePath, TRANSVERSAL_DOMAIN, TRANSVERSAL_DOMAIN_LABEL, resolveClassificationStatus } from '@/lib/catalogTree';
 import {
   COMMERCIAL_AREAS, COMMERCIAL_AREA_LABEL, isCommercialArea, explicitApplicability,
   normalizeApplicability, applicabilityError, homeDomain,
@@ -158,7 +158,9 @@ export function ProductEditor({ initial, tree, inventory, suppliers, brands, onC
     const applicabilityErr = applicabilityError(area, applicability);
     if (applicabilityErr) { setErr(applicabilityErr); return; }
     if (pricing.error) { setErr(pricing.error); return; }
-    const quantityError = stockManaged && (quantityUnitError(quantity, unit) || quantityUnitError(minQuantity, unit));
+    // Saldo só é informado no CADASTRO de produto novo; na edição ele é
+    // somente leitura (alterado apenas por movimentação de estoque).
+    const quantityError = stockManaged && ((!editing && quantityUnitError(quantity, unit)) || quantityUnitError(minQuantity, unit));
     if (quantityError) { setErr(quantityError); return; }
     setErr('');
     const finalName = name.trim() || model.trim();
@@ -178,7 +180,9 @@ export function ProductEditor({ initial, tree, inventory, suppliers, brands, onC
       unit: normalizeUnitCode(unit),
       supplier: supplier.trim(),
       stockManaged,
-      quantity: stockManaged ? Number(quantity) || 0 : 0,
+      // Edição: o saldo NÃO é gravado (updateInventoryCatalog descarta a coluna);
+      // mantém o valor carregado só para o objeto em memória.
+      quantity: editing ? (initial?.quantity ?? 0) : (stockManaged ? Number(quantity) || 0 : 0),
       minQuantity: stockManaged ? Number(minQuantity) || 0 : 0,
       costPrice: pricing.cost ?? undefined,
       salePrice: pricing.price ?? undefined,
@@ -187,7 +191,9 @@ export function ProductEditor({ initial, tree, inventory, suppliers, brands, onC
       markup: pricing.markup ?? undefined,
       pricingMode,
       canonicalTaxonomyId: nodeId || undefined,
-      classificationStatus: nodeId ? 'CLASSIFICADO' : (initial?.classificationStatus ?? 'NAO_CLASSIFICADO'),
+      // REVISAR só vira CLASSIFICADO quando o nó canônico é efetivamente
+      // escolhido/alterado; editar aplicabilidade/cadastro preserva o status.
+      classificationStatus: resolveClassificationStatus(initial, nodeId),
       // Sem a área implícita (evita linha redundante — 0118).
       applicableAreas: normalizeApplicability(applicability, implicitArea),
     };
@@ -314,7 +320,14 @@ export function ProductEditor({ initial, tree, inventory, suppliers, brands, onC
 
           {stockManaged && (
             <div className="grid grid-cols-2 gap-2">
-              <Field label="Saldo"><input type="number" min={0} className={input} value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} /></Field>
+              {editing ? (
+                <Field label="Saldo atual">
+                  <p className="px-3 py-2 text-sm font-semibold text-fg bg-surface-2 border border-border rounded-md">{initial?.quantity ?? 0} {normalizeUnitCode(unit)}</p>
+                  <p className="mt-1 text-[10px] text-fg-muted">Alterado só por movimentação de estoque.</p>
+                </Field>
+              ) : (
+                <Field label="Saldo inicial"><input type="number" min={0} className={input} value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} /></Field>
+              )}
               <Field label="Estoque mínimo"><input type="number" min={0} className={input} value={minQuantity} onChange={(e) => setMinQuantity(Number(e.target.value))} /></Field>
             </div>
           )}

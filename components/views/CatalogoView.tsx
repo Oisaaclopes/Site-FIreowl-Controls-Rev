@@ -50,7 +50,7 @@ function passesStock(item: InventoryItem, mode: StockMode): boolean {
   return true;
 }
 
-export function CatalogoView({ inventory, inventoryLoading = false, userRole, suppliers = [], brands = [], onCreateBrand, onAddInventoryItem, onUpdateInventoryItem, onDeleteInventoryItem }: {
+export function CatalogoView({ inventory, inventoryLoading = false, userRole, suppliers = [], brands = [], onCreateBrand, onAddInventoryItem, onUpdateInventoryItem, onEditInventoryCatalog, onDeleteInventoryItem }: {
   inventory: InventoryItem[];
   inventoryLoading?: boolean;
   userRole: UserRole;
@@ -58,7 +58,10 @@ export function CatalogoView({ inventory, inventoryLoading = false, userRole, su
   brands?: string[];
   onCreateBrand?: (name: string) => Promise<string>;
   onAddInventoryItem?: (item: InventoryItem, opts?: { applicability?: string[] }) => void | Promise<void>;
-  onUpdateInventoryItem?: (item: InventoryItem, opts?: { applicability?: string[] }) => void | Promise<void>;
+  /** Fluxo de MOVIMENTAÇÃO (grava a linha inteira, inclui saldo). */
+  onUpdateInventoryItem?: (item: InventoryItem) => void | Promise<void>;
+  /** Edição de CADASTRO (nunca grava saldo). */
+  onEditInventoryCatalog?: (item: InventoryItem, opts?: { applicability?: string[] }) => void | Promise<void>;
   onDeleteInventoryItem?: (id: string) => void | Promise<void>;
 }) {
   const canSeePrice = userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR';
@@ -176,7 +179,12 @@ export function CatalogoView({ inventory, inventoryLoading = false, userRole, su
   // Cadastro/edição: grava também a aplicabilidade (0118) escolhida no editor.
   const handleSaveProduct = async (item: InventoryItem) => {
     const opts = { applicability: item.applicableAreas ?? [] };
-    if (item.id) await onUpdateInventoryItem?.(item, opts); else await onAddInventoryItem?.(item, opts);
+    // Edição de produto existente: fluxo de CADASTRO (sem saldo). Nunca cai no
+    // fluxo de movimentação, que grava a linha inteira.
+    if (item.id) {
+      if (!onEditInventoryCatalog) throw new Error('Edição de cadastro indisponível.');
+      await onEditInventoryCatalog(item, opts);
+    } else await onAddInventoryItem?.(item, opts);
   };
   const handleDeleteProduct = async (item: InventoryItem) => {
     if (typeof window !== 'undefined' && !await requestConfirm(`Excluir "${item.model || item.name}"? Esta ação não pode ser desfeita.`)) return;

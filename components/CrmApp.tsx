@@ -17,6 +17,7 @@ import {
   fetchInventory,
   insertInventoryItem,
   updateInventoryItem,
+  updateInventoryCatalog,
   deleteInventoryItem,
   insertStockMovement,
   saveItemApplicability,
@@ -948,15 +949,38 @@ function CrmAppContent({
     return saved;
   };
 
-  const handleUpdateInventoryItem = async (item: InventoryItem, opts?: { applicability?: string[] }) => {
+  // Edição de CADASTRO (Estoque › Editar): classificação, identificação,
+  // comercial e aplicabilidade. NUNCA grava saldo (quantity/reserved_quantity):
+  // o banco devolve o saldo atual e o estado local mantém o saldo corrente.
+  const handleEditInventoryCatalog = async (item: InventoryItem, opts?: { applicability?: string[] }) => {
+    const keepStock = (current: InventoryItem): InventoryItem =>
+      ({ ...item, quantity: current.quantity, reservedQuantity: current.reservedQuantity });
+    if (!isSupabaseConfigured()) {
+      setInventory((prev) => prev.map((i) => (i.id === item.id ? keepStock(i) : i)));
+      logAction('Atualização de Item', 'Estoque', `Item ${item.code} - ${item.name} atualizado`);
+      return;
+    }
+    try {
+      const previous = inventory.find((i) => i.id === item.id)?.applicableAreas;
+      const saved = await persistApplicability(await updateInventoryCatalog(item), previous, opts?.applicability);
+      setInventory((prev) => prev.map((i) => (i.id === saved.id ? saved : i)));
+      logAction('Atualização de Item', 'Estoque', `Item ${saved.code} - ${saved.name} atualizado`);
+    } catch (err) {
+      console.error('Falha ao atualizar o cadastro do item no Supabase:', err);
+      showToast('Não foi possível salvar o cadastro do produto no banco de dados (Supabase). Nada foi alterado.');
+      throw err;
+    }
+  };
+
+  // Grava a linha inteira (inclui saldo) — usado pelos fluxos de movimentação.
+  const handleUpdateInventoryItem = async (item: InventoryItem) => {
     if (!isSupabaseConfigured()) {
       setInventory((prev) => prev.map((i) => (i.id === item.id ? item : i)));
       logAction('Atualização de Item', 'Estoque', `Item ${item.code} - ${item.name} atualizado`);
       return;
     }
     try {
-      const previous = inventory.find((i) => i.id === item.id)?.applicableAreas;
-      const saved = await persistApplicability(await updateInventoryItem(item), previous, opts?.applicability);
+      const saved = await updateInventoryItem(item);
       setInventory((prev) => prev.map((i) => (i.id === saved.id ? saved : i)));
       logAction('Atualização de Item', 'Estoque', `Item ${saved.code} - ${saved.name} atualizado`);
     } catch (err) {
@@ -1424,6 +1448,7 @@ function CrmAppContent({
               onCreateBrand={handleCreateBrandInline}
               onAddInventoryItem={handleAddInventoryItem}
               onUpdateInventoryItem={handleUpdateInventoryItem}
+              onEditInventoryCatalog={handleEditInventoryCatalog}
               onDeleteInventoryItem={handleDeleteInventoryItem}
             />
           )}

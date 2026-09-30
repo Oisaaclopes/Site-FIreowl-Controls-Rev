@@ -38,7 +38,7 @@ function ApplicabilityLine({ item, tree }: { item: InventoryItem; tree: CatalogT
   return (
     <p className="text-[11px] text-fg-muted flex items-center gap-1 truncate">
       <span className="material-symbols-outlined text-[13px] text-fg-muted">hub</span>
-      <span className="truncate">{eff.basis === 'TRANSVERSAL' ? 'Aplicável a' : 'Também em'}: {shown.map((a) => COMMERCIAL_AREA_LABEL[a]).join(' · ')}</span>
+      <span className="truncate">{eff.basis === 'TRANSVERSAL' ? 'Aplicável a' : 'Também aplicável a'}: {shown.map((a) => COMMERCIAL_AREA_LABEL[a]).join(' · ')}</span>
     </p>
   );
 }
