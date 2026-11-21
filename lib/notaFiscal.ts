@@ -80,6 +80,39 @@ export const aplicarNotaFiscal = (
   return { ...p, proposal: { ...p.proposal, notaFiscal } };
 };
 
+/**
+ * Pode registrar a NF manualmente na linha do pedido? A NF pode sair ANTES da
+ * conclusão (faturamento antecipado), então vale a partir de ACEITO.
+ * Recorrente fica de fora (fatura por competência, §11).
+ */
+export const podeInformarNotaFiscal = (p: Pedido): boolean =>
+  (p.status === 'aceito' || p.status === 'concluido') &&
+  pedidoValorNota(p) > 0 &&
+  p.proposal?.recorrente !== true;
+
+/** Registra (ou corrige) a NF como emitida — nº/data/observação opcionais. */
+export const registrarNotaFiscalEmitida = (
+  p: Pedido,
+  dados: { numero?: string; dataEmissao?: string; observacao?: string },
+  autor?: string,
+): Pedido => {
+  const limpo = (v?: string) => (v && v.trim() ? v.trim() : undefined);
+  const base = p.proposal?.notaFiscal?.criadaEm ? p : {
+    ...p,
+    proposal: { ...p.proposal, notaFiscal: { ...(p.proposal?.notaFiscal || { status: 'pendente' as const }), criadaEm: new Date().toISOString() } },
+  };
+  return aplicarNotaFiscal(
+    base,
+    {
+      status: 'emitida',
+      numero: limpo(dados.numero),
+      dataEmissao: limpo(dados.dataEmissao) || new Date().toISOString().slice(0, 10),
+      observacao: limpo(dados.observacao),
+    },
+    autor,
+  );
+};
+
 /** NF já marcada como EMITIDA (selo de certificação na lista de pedidos). */
 export const isNotaFiscalEmitida = (p: Pedido): boolean =>
   p.proposal?.notaFiscal?.status === 'emitida';

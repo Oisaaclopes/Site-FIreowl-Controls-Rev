@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { BadgeCheck, ChevronDown, ChevronUp, Hash, RotateCcw, Search } from 'lucide-react';
+import { NotaFiscalRegistroModal } from '@/components/views/NotaFiscalRegistroModal';
 import type { Pedido, UserRole } from '@/lib/types';
-import { requestConfirm, requestText, showToast } from '@/components/ui/Feedback';
+import { requestConfirm, showToast } from '@/components/ui/Feedback';
 import {
   aplicarNotaFiscal,
   canManageNotaFiscal,
@@ -41,6 +42,7 @@ export const NotasFiscaisEmitidas: React.FC<Props> = ({ pedidos, userRole, curre
   const [aberto, setAberto] = useState(false);
   const [busca, setBusca] = useState('');
   const [mes, setMes] = useState<string>('TODOS');
+  const [editando, setEditando] = useState<Pedido | null>(null);
 
   const emitidas = useMemo(() => notasFiscaisEmitidas(pedidos), [pedidos]);
   const resumo = useMemo(() => resumoNotasEmitidas(pedidos), [pedidos]);
@@ -63,17 +65,8 @@ export const NotasFiscaisEmitidas: React.FC<Props> = ({ pedidos, userRole, curre
 
   const autor = currentUserName || undefined;
 
-  const editarNumero = async (ped: Pedido) => {
-    const atual = ped.proposal?.notaFiscal?.numero || '';
-    const numero = await requestText({
-      title: `Número da NF — ${ped.numeroPedido}`,
-      label: 'Número da nota fiscal',
-      initialValue: atual,
-    });
-    if (numero === null || numero.trim() === atual) return;
-    onSavePedido(aplicarNotaFiscal(ped, { status: 'emitida', numero: numero.trim() }, autor));
-    showToast(`NF nº ${numero.trim()} registrada no pedido ${ped.numeroPedido}.`, 'success');
-  };
+  // Edita nº/data/observação no mesmo formulário da linha do pedido.
+  const editarNumero = (ped: Pedido) => setEditando(ped);
 
   const reabrir = async (ped: Pedido) => {
     const ok = await requestConfirm({
@@ -157,7 +150,7 @@ export const NotasFiscaisEmitidas: React.FC<Props> = ({ pedidos, userRole, curre
           {filtradas.length === 0 ? (
             <p className="px-4 pb-6 pt-2 text-center text-xs text-fg-muted">
               {emitidas.length === 0
-                ? 'Nenhuma nota fiscal marcada como emitida ainda. Marque em "Emitir nota fiscal" quando o pedido for concluído.'
+                ? 'Nenhuma nota fiscal marcada como emitida ainda. Use "Informar NF" na linha do pedido (a partir de Aceito) ou a pendência "Emitir nota fiscal".'
                 : 'Nenhuma nota encontrada para esse filtro.'}
             </p>
           ) : (
@@ -196,10 +189,10 @@ export const NotasFiscaisEmitidas: React.FC<Props> = ({ pedidos, userRole, curre
                             <button
                               type="button"
                               onClick={() => editarNumero(ped)}
-                              title={nf?.numero ? 'Editar número da NF' : 'Informar número da NF'}
+                              title="Editar número, data ou observação da NF"
                               className="inline-flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-1 text-[11px] font-semibold text-fg-secondary hover:bg-surface-3 transition-colors"
                             >
-                              <Hash className="w-3 h-3" /> {nf?.numero ? 'Editar nº' : 'Informar nº'}
+                              <Hash className="w-3 h-3" /> {nf?.numero ? 'Editar' : 'Informar nº'}
                             </button>
                             <button
                               type="button"
@@ -219,6 +212,14 @@ export const NotasFiscaisEmitidas: React.FC<Props> = ({ pedidos, userRole, curre
             </div>
           )}
         </div>
+      )}
+      {editando && (
+        <NotaFiscalRegistroModal
+          pedido={editando}
+          autor={autor}
+          onSave={onSavePedido}
+          onClose={() => setEditando(null)}
+        />
       )}
     </section>
   );

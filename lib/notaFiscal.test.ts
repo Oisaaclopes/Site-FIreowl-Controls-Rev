@@ -10,6 +10,8 @@ import {
   isNotaFiscalEmitida,
   notasFiscaisEmitidas,
   resumoNotasEmitidas,
+  podeInformarNotaFiscal,
+  registrarNotaFiscalEmitida,
 } from './notaFiscal';
 import type { CommercialProposalData, Pedido, PedidoStatus } from './types';
 
@@ -149,5 +151,30 @@ describe('notaFiscal — NFs emitidas (card + selo)', () => {
       '2026-11',
     );
     expect(r).toEqual({ total: 3, valorTotal: 2250, mes: 2, valorMes: 1750, semNumero: 1 });
+  });
+});
+
+describe('notaFiscal — registro antecipado (a partir de ACEITO)', () => {
+  it('pode informar em aceito/concluído, com valor e não recorrente', () => {
+    expect(podeInformarNotaFiscal(ped({ status: 'aceito' }))).toBe(true);
+    expect(podeInformarNotaFiscal(ped({ status: 'concluido' }))).toBe(true);
+    expect(podeInformarNotaFiscal(ped({ status: 'em_negociacao' }))).toBe(false);
+    expect(podeInformarNotaFiscal(ped({ status: 'aceito' }, { recorrente: true }))).toBe(false);
+    expect(podeInformarNotaFiscal(ped({ status: 'aceito' }, { valorTotal: 0 }))).toBe(false);
+  });
+
+  it('registra emitida com nº/data e não é reaberta ao concluir depois', () => {
+    const aceito = registrarNotaFiscalEmitida(ped({ status: 'aceito' }), { numero: ' 4521 ', dataEmissao: '2026-11-18' }, 'Ana');
+    expect(aceito.proposal.notaFiscal).toMatchObject({ status: 'emitida', numero: '4521', dataEmissao: '2026-11-18', atualizadaPor: 'Ana' });
+    expect(aceito.proposal.notaFiscal?.criadaEm).toBeTruthy();
+    const concluido = semearNotaFiscalAoConcluir({ ...aceito, status: 'concluido' });
+    expect(notaFiscalStatus(concluido)).toBe('emitida');
+    expect(isNotaFiscalPendente(concluido)).toBe(false);
+  });
+
+  it('data vazia usa hoje; campos vazios ficam indefinidos', () => {
+    const r = registrarNotaFiscalEmitida(ped({ status: 'aceito' }), { numero: '  ', observacao: '' });
+    expect(r.proposal.notaFiscal?.numero).toBeUndefined();
+    expect(r.proposal.notaFiscal?.dataEmissao).toBe(new Date().toISOString().slice(0, 10));
   });
 });

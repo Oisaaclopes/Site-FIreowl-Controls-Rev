@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { NotaFiscalRegistroModal } from '@/components/views/NotaFiscalRegistroModal';
 import { FileText, Check, Ban } from 'lucide-react';
 import type { Pedido, UserRole } from '@/lib/types';
 import { requestConfirm, showToast } from '@/components/ui/Feedback';
@@ -32,27 +33,14 @@ interface Props {
  * pendência (o histórico fica no próprio pedido). Ver [[lib/notaFiscal]].
  */
 export const NotaFiscalPendencias: React.FC<Props> = ({ pedidos, userRole, currentUserName, onSavePedido }) => {
+  const [registrando, setRegistrando] = useState<Pedido | null>(null);
   if (!canManageNotaFiscal(userRole)) return null;
 
   const abertas = notaFiscalPendencias(pedidos);
   if (abertas.length === 0) return null;
 
-  const marcarEmitida = async (ped: Pedido) => {
-    const ok = await requestConfirm({
-      title: `Nota fiscal — ${ped.numeroPedido}`,
-      message: `Marcar a NF de ${ped.clienteNome} (${brl(pedidoValorNota(ped))}) como emitida? A data de hoje fica registrada e a pendência sai da lista.`,
-      confirmLabel: 'Marcar emitida',
-    });
-    if (!ok) return;
-    onSavePedido(
-      aplicarNotaFiscal(
-        ped,
-        { status: 'emitida', dataEmissao: new Date().toISOString().slice(0, 10) },
-        currentUserName || undefined,
-      ),
-    );
-    showToast(`NF do pedido ${ped.numeroPedido} marcada como emitida.`, 'success');
-  };
+  // Abre o formulário (nº/data/obs.) — mesmo registro usado na linha do pedido.
+  const marcarEmitida = (ped: Pedido) => setRegistrando(ped);
 
   const marcarNaoAplicavel = async (ped: Pedido) => {
     const ok = await requestConfirm({
@@ -120,6 +108,14 @@ export const NotaFiscalPendencias: React.FC<Props> = ({ pedidos, userRole, curre
           </tbody>
         </table>
       </div>
+      {registrando && (
+        <NotaFiscalRegistroModal
+          pedido={registrando}
+          autor={currentUserName || undefined}
+          onSave={onSavePedido}
+          onClose={() => setRegistrando(null)}
+        />
+      )}
     </section>
   );
 };

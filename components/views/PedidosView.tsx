@@ -4,7 +4,8 @@ import { showToast, requestConfirm, requestText } from '@/components/ui/Feedback
 import { useNavigationEntity, useNavigationValue } from '@/components/NavigationSession';
 import { fetchOrdemServicoById } from '@/lib/ordensServico';
 import { fetchPedidos } from '@/lib/pedidos';
-import { canManageNotaFiscal, isNotaFiscalEmitida, semearNotaFiscalAoConcluir } from '@/lib/notaFiscal';
+import { canManageNotaFiscal, isNotaFiscalEmitida, podeInformarNotaFiscal, semearNotaFiscalAoConcluir } from '@/lib/notaFiscal';
+import { NotaFiscalRegistroModal } from '@/components/views/NotaFiscalRegistroModal';
 import { NotaFiscalPendencias } from '@/components/views/NotaFiscalPendencias';
 import { NotasFiscaisEmitidas } from '@/components/views/NotasFiscaisEmitidas';
 import React, { useMemo, useRef, useState, useEffect } from 'react';
@@ -201,6 +202,8 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   // Alvos dos modais de lifecycle (cancelar / hard delete).
   const [osCancelTarget, setOsCancelTarget] = useState<OrdemServico | null>(null);
   const [osDeleteTarget, setOsDeleteTarget] = useState<OrdemServico | null>(null);
+  // Pedido com o modal "Informar/editar NF emitida" aberto.
+  const [nfModalPedido, setNfModalPedido] = useState<Pedido | null>(null);
   const isTecnico = userRole === 'TECNICO';
 
   // Aba inicial: atalho "Nova OS" força OS; técnico começa em OS; demais em propostas
@@ -946,18 +949,31 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           {canManageNotaFiscal(userRole) && isNotaFiscalEmitida(ped) && (() => {
             const nf = ped.proposal.notaFiscal;
             const quando = nf?.dataEmissao ? new Date(`${nf.dataEmissao.slice(0, 10)}T12:00:00`).toLocaleDateString('pt-BR') : '';
-            const dica = ['Nota fiscal emitida', nf?.numero && `nº ${nf.numero}`, quando && `em ${quando}`, nf?.atualizadaPor && `por ${nf.atualizadaPor}`].filter(Boolean).join(' · ');
+            const dica = ['Nota fiscal emitida', nf?.numero && `nº ${nf.numero}`, quando && `em ${quando}`, nf?.atualizadaPor && `por ${nf.atualizadaPor}`, 'clique para editar'].filter(Boolean).join(' · ');
             return (
-              <span
+              <button
+                type="button"
+                onClick={() => setNfModalPedido(ped)}
                 title={dica}
                 aria-label={dica}
-                className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 pl-1 pr-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700"
+                className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 pl-1 pr-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 hover:bg-emerald-100 transition-colors"
               >
                 <span className="material-symbols-outlined text-[16px] leading-none" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
                 NF emitida{nf?.numero ? ` · ${nf.numero}` : ''}
-              </span>
+              </button>
             );
           })()}
+          {canManageNotaFiscal(userRole) && !isNotaFiscalEmitida(ped) && podeInformarNotaFiscal(ped) && (
+            <button
+              type="button"
+              onClick={() => setNfModalPedido(ped)}
+              title="Informar que a nota fiscal deste pedido foi emitida"
+              className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1 border border-emerald-400 text-emerald-700 bg-surface hover:bg-emerald-50 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[14px] leading-none">receipt_long</span>
+              Informar NF
+            </button>
+          )}
           <span className="font-data-mono font-bold text-emerald-600 text-base md:text-lg">
             {maskMoney(brl(ped.proposal.valorTotal || 0))}
           </span>
@@ -1368,6 +1384,15 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
             </div>
           ))}</div>}
         </section>
+      )}
+
+      {nfModalPedido && (
+        <NotaFiscalRegistroModal
+          pedido={nfModalPedido}
+          autor={currentUserName || undefined}
+          onSave={onSavePedido}
+          onClose={() => setNfModalPedido(null)}
+        />
       )}
 
       {receivingOrder && (
