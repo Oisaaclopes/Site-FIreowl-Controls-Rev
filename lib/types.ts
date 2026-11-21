@@ -169,6 +169,10 @@ export interface CommercialProposalData {
   tipoServico?: string;
   /** §37 — nível de apresentação: simples (enxuto), técnica (padrão), corporativa. */
   nivelProposta?: 'simples' | 'tecnica' | 'corporativa';
+  /** Seções que aparecem no documento (chaves de [[lib/documentoSecoes]]).
+   * AUSENTE = não personalizado → padrão histórico do Tipo de Pedido.
+   * Lista (mesmo vazia) = seleção explícita respeitada no PDF e no preview. */
+  secoesDocumento?: string[];
   /** §12 — ordem das seções do corpo (chaves). Vazio/ausente = ordem padrão. */
   ordemSecoes?: string[];
   /** Página "Experiência e Capacidade Técnica": true/false força; undefined = automático (por nível). */
@@ -408,7 +412,7 @@ export type DocumentType =
   | 'personalizado';
 
 /** Classificação do pedido, usada para decidir o documento padrão. */
-export type PedidoTipo = 'orcamento' | 'proposta' | 'servico' | 'fornecimento' | 'laudo';
+export type PedidoTipo = 'orcamento' | 'proposta' | 'servico' | 'fornecimento' | 'laudo' | 'personalizado';
 
 /**
  * Modalidade comercial do pedido (natureza da relação). Ausente/undefined =

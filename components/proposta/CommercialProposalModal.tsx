@@ -30,6 +30,8 @@ import { PEDIDO_TIPO_LABELS, PEDIDO_TIPO_ORDER } from '@/lib/documentos';
 import { MODALIDADE_LABELS, MODALIDADE_ORDER, FRETE_MODO_LABELS, IMPOSTO_MODO_LABELS, OBS_DISPONIBILIDADE } from '@/lib/fornecimentoComercial';
 import { AREAS_PROPOSTA, TIPOS_SERVICO, conclusaoPorTipo, presetPorTipo } from '@/lib/propostaTitulo';
 import { montarEstruturaProposta, ordenarEstrutura, SECOES_FIXAS_INICIO, SECOES_FIXAS_FIM } from '@/lib/propostaEstrutura';
+import { SecaoDocKey, SECAO_KEYS, alternarSecao, flagDaSecao, igualAoPadrao, normalizarSecoes, secoesPadraoDoTipo } from '@/lib/documentoSecoes';
+import { SecoesDocumentoEditor } from '@/components/proposta/SecoesDocumentoEditor';
 import { CARTA_APRESENTACAO } from '@/lib/propostaTextos';
 import { SECOES_TEXTO, servicosOfertadosPadrao, restaurarSecaoLista, fonteDaSecaoLista, fonteServicos } from '@/lib/propostaMaterializacao';
 import { normalizeUnitCode } from '@/lib/commercialUnits';
@@ -244,6 +246,35 @@ const TagSelect: React.FC<{ options: string[]; selected: string[]; onToggle: (v:
 );
 
 // Chave de ativação de um bloco jurídico (checkbox).
+/**
+ * Conteúdo pré-preenchido de um pedido NOVO. O tipo "Personalizado" começa do
+ * zero: ao escolhê-lo num pedido novo, os campos que ainda têm este texto são
+ * esvaziados (o que o usuário já digitou é preservado).
+ */
+const PADRAO_NOVO = {
+  objetivo: 'Prestação de serviços técnicos especializados de engenharia para fornecimento, manutenção e testes de sistemas de segurança e alarme de incêndio (SDAI).',
+  escopo: 'Inspeção física, ensaios funcionais e manutenção preventiva nos laços de detecção, verificação de centrais e comissionamento com emissão de laudo e ART.',
+  entregaveis: [
+    'Relatório Diário de Obra (RDO) e Checklist de Testes Normativos',
+    'Anotação de Responsabilidade Técnica (ART CREA-PR) registrada',
+    'Manual As-Built e cadastro de pontos atualizado',
+  ],
+  premissas: [
+    'Acesso livre e desembaraçado às áreas de intervenção técnica',
+    'Acompanhamento do responsável de segurança do cliente durante os testes sonoros',
+  ],
+  respContratada: ['Fornecer equipe qualificada, EPIs, ferramentas calibradas e emitir laudo ART'],
+  respContratante: [
+    'Liberar acessos e autorizações de trabalho no ambiente',
+    'Garantir ponto de energia elétrica 220V e sinal telefônico/dados',
+  ],
+  prazo: '10 dias úteis após autorização formal de início',
+  conclusao: 'Permanecemos à disposição para eventuais esclarecimentos adicionais e renovamos nossos votos de estima.',
+  impostos: 'Inclusos, Simples Nacional (Anexo III)',
+  formasPagamento: ['Pix'],
+  condicoesPagamento: ['30% no aceite / 70% na entrega e laudo'],
+};
+
 const ClauseRow: React.FC<{ label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }> = ({
   label,
   hint,
@@ -299,6 +330,10 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const initialProposal = initialPedido?.proposal;
   const ehNovaProposta = !initialProposal;
   const jaMaterializada = !!initialProposal?.textosMaterializados;
+  // Texto inicial de um campo: pedido Personalizado respeita o vazio gravado
+  // (não reinjeta o texto padrão); os demais mantêm o comportamento histórico.
+  const iniTexto = (stored: string | undefined, padrao: string) =>
+    initialProposal?.pedidoTipo === 'personalizado' ? stored ?? padrao : stored || padrao;
 
   // Sanfonas abertas (por padrão as principais abertas).
   const { state: navigation, update: navigate } = useNavigation();
@@ -350,8 +385,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const [motivoRecusa, setMotivoRecusa] = useState<string>(initialPedido?.proposal?.motivoRecusa || '');
 
   const [objetivo, setObjetivo] = useState<string>(
-    initialPedido?.proposal?.objetivo ||
-      'Prestação de serviços técnicos especializados de engenharia para fornecimento, manutenção e testes de sistemas de segurança e alarme de incêndio (SDAI).'
+    iniTexto(initialPedido?.proposal?.objetivo, PADRAO_NOVO.objetivo)
   );
   // Carta: proposta NOVA materializa o texto institucional padrão (fica visível
   // no editor); histórica/já-materializada usa o que estiver gravado.
@@ -370,25 +404,17 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const setDiretrizes: React.Dispatch<React.SetStateAction<string[]>> = (action) =>
     setDiretrizesManual((prev) => (typeof action === 'function' ? action(prev ?? getNormativeReferences(contextoTitulo)) : action));
   const [escopoServico, setEscopoServico] = useState<string>(
-    initialPedido?.proposal?.escopoServico ||
-      'Inspeção física, ensaios funcionais e manutenção preventiva nos laços de detecção, verificação de centrais e comissionamento com emissão de laudo e ART.'
+    iniTexto(initialPedido?.proposal?.escopoServico, PADRAO_NOVO.escopo)
   );
   const [entregaveis, setEntregaveis] = useState<string[]>(
-    initialPedido?.proposal?.entregaveis || [
-      'Relatório Diário de Obra (RDO) e Checklist de Testes Normativos',
-      'Anotação de Responsabilidade Técnica (ART CREA-PR) registrada',
-      'Manual As-Built e cadastro de pontos atualizado',
-    ]
+    initialPedido?.proposal?.entregaveis || PADRAO_NOVO.entregaveis
   );
   const [equipmentItems, setEquipmentItems] = useState<PedidoEquipmentItem[]>(
     initialPedido?.proposal?.equipmentItems || []
   );
   const [marcas] = useState<PedidoBrand[]>(initialPedido?.proposal?.marcas || []);
   const [premissas, setPremissas] = useState<string[]>(
-    initialPedido?.proposal?.premissas || [
-      'Acesso livre e desembaraçado às áreas de intervenção técnica',
-      'Acompanhamento do responsável de segurança do cliente durante os testes sonoros',
-    ]
+    initialPedido?.proposal?.premissas || PADRAO_NOVO.premissas
   );
   // §16 — Incluso / Não incluso (blocos opcionais; só aparecem no PDF se houver itens).
   const [incluso, setIncluso] = useState<string[]>(initialPedido?.proposal?.incluso || []);
@@ -403,18 +429,13 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const updSla = (i: number, k: 'situacao' | 'prazo', v: string) => setSlaTabela((prev) => prev.map((r, idx) => (idx === i ? { ...r, [k]: v } : r)));
   const rmSla = (i: number) => setSlaTabela((prev) => prev.filter((_, idx) => idx !== i));
   const [respContratada, setRespContratada] = useState<string[]>(
-    initialPedido?.proposal?.responsabilidadesContratada || [
-      'Fornecer equipe qualificada, EPIs, ferramentas calibradas e emitir laudo ART',
-    ]
+    initialPedido?.proposal?.responsabilidadesContratada || PADRAO_NOVO.respContratada
   );
   const [respContratante, setRespContratante] = useState<string[]>(
-    initialPedido?.proposal?.responsabilidadesContratante || [
-      'Liberar acessos e autorizações de trabalho no ambiente',
-      'Garantir ponto de energia elétrica 220V e sinal telefônico/dados',
-    ]
+    initialPedido?.proposal?.responsabilidadesContratante || PADRAO_NOVO.respContratante
   );
   const [prazoExecucao, setPrazoExecucao] = useState<string>(
-    initialPedido?.proposal?.prazoExecucao || '10 dias úteis após autorização formal de início'
+    iniTexto(initialPedido?.proposal?.prazoExecucao, PADRAO_NOVO.prazo)
   );
   // ETAPA COMERCIAL — Garantia estruturada (mão de obra × materiais). Fonte única
   // do default (90 dias / 12 meses) em [[lib/commercialWarranty]]. Propostas antigas
@@ -484,11 +505,10 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     initialPedido?.proposal?.validadePropostaComplemento || 'dias corridos a partir da emissão'
   );
   const [conclusao, setConclusao] = useState<string>(
-    initialPedido?.proposal?.conclusao ||
-      'Permanecemos à disposição para eventuais esclarecimentos adicionais e renovamos nossos votos de estima.'
+    iniTexto(initialPedido?.proposal?.conclusao, PADRAO_NOVO.conclusao)
   );
   const [faturamento, setFaturamento] = useState<string>(initialPedido?.proposal?.faturamento || '');
-  const [impostos, setImpostos] = useState<string>(initialPedido?.proposal?.impostos || 'Inclusos, Simples Nacional (Anexo III)');
+  const [impostos, setImpostos] = useState<string>(iniTexto(initialPedido?.proposal?.impostos, PADRAO_NOVO.impostos));
 
   // ETAPA 2 — seções antes injetadas só no PDF (embalagem, segurança, preços/
   // impostos obs, multas, limitação, confidencialidade, termo de aceite,
@@ -552,9 +572,9 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   };
 
   // Pagamento por tags pré-formatadas.
-  const [formasPagamento, setFormasPagamento] = useState<string[]>(initialPedido?.proposal?.formasPagamento || ['Pix']);
+  const [formasPagamento, setFormasPagamento] = useState<string[]>(initialPedido?.proposal?.formasPagamento || PADRAO_NOVO.formasPagamento);
   const [condicoesPagamento, setCondicoesPagamento] = useState<string[]>(
-    initialPedido?.proposal?.condicoesPagamento || ['30% no aceite / 70% na entrega e laudo']
+    initialPedido?.proposal?.condicoesPagamento || PADRAO_NOVO.condicoesPagamento
   );
   const toggleTag = (setter: React.Dispatch<React.SetStateAction<string[]>>, v: string) =>
     setter((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]));
@@ -589,6 +609,74 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const [recorrente, setRecorrente] = useState<boolean>(initialPedido?.proposal?.recorrente ?? false);
   const [valorMensal, setValorMensal] = useState<number>(initialPedido?.proposal?.valorMensal ?? 0);
   const [vigenciaMeses, setVigenciaMeses] = useState<number>(initialPedido?.proposal?.vigenciaMeses ?? 12);
+
+  // ----------------- seções do documento (todos os tipos) -----------------
+  // null = sem seleção própria → padrão do Tipo de Pedido (pedido antigo gera
+  // exatamente como antes). Ver [[lib/documentoSecoes]].
+  const [secoesDocumento, setSecoesDocumento] = useState<string[] | null>(initialProposal?.secoesDocumento ?? null);
+  const flagsSecoes = { incluirSeguranca, incluirMultas, incluirLimitacao, incluirConfidencialidade, incluirTermoAceite, incluirCondicoesGerais };
+  const secoesPadrao = secoesPadraoDoTipo(pedidoTipo, flagsSecoes);
+  const secoesAtivas = secoesDocumento ? normalizarSecoes(secoesDocumento) : secoesPadrao;
+  const secoesSaoPersonalizadas = !!secoesDocumento && !igualAoPadrao(secoesDocumento, pedidoTipo, flagsSecoes);
+  const FLAG_SETTERS: Record<string, (b: boolean) => void> = {
+    incluirSeguranca: setIncluirSeguranca,
+    incluirMultas: setIncluirMultas,
+    incluirLimitacao: setIncluirLimitacao,
+    incluirConfidencialidade: setIncluirConfidencialidade,
+    incluirTermoAceite: setIncluirTermoAceite,
+    incluirCondicoesGerais: setIncluirCondicoesGerais,
+  };
+  const setSecao = (key: SecaoDocKey, ligar: boolean) => {
+    const flag = flagDaSecao(key);
+    if (flag) FLAG_SETTERS[flag](ligar);
+    setSecoesDocumento(alternarSecao(secoesAtivas, key, ligar));
+  };
+  const definirTodasSecoes = (ligar: boolean) => {
+    for (const set of Object.values(FLAG_SETTERS)) set(ligar);
+    setSecoesDocumento(ligar ? [...SECAO_KEYS] : []);
+  };
+  // Cláusulas com chave própria (Cláusulas Jurídicas / Estrutura): mantém a
+  // seleção em sincronia quando o pedido já tem seções escolhidas.
+  const setClausula = (key: SecaoDocKey) => (ligar: boolean) => {
+    const flag = flagDaSecao(key);
+    if (flag) FLAG_SETTERS[flag](ligar);
+    if (secoesDocumento) setSecoesDocumento(alternarSecao(secoesDocumento, key, ligar));
+  };
+
+  // Personalizado começa do zero: esvazia o que ainda é texto pré-preenchido.
+  const limparPreenchimentoPadrao = () => {
+    const igual = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+    if (objetivo === PADRAO_NOVO.objetivo) setObjetivo('');
+    if (escopoServico === PADRAO_NOVO.escopo) setEscopoServico('');
+    if (igual(entregaveis, PADRAO_NOVO.entregaveis)) setEntregaveis([]);
+    if (igual(premissas, PADRAO_NOVO.premissas)) setPremissas([]);
+    if (igual(respContratada, PADRAO_NOVO.respContratada)) setRespContratada([]);
+    if (igual(respContratante, PADRAO_NOVO.respContratante)) setRespContratante([]);
+    if (prazoExecucao === PADRAO_NOVO.prazo) setPrazoExecucao('');
+    if (conclusao === PADRAO_NOVO.conclusao) setConclusao('');
+    if (impostos === PADRAO_NOVO.impostos) setImpostos('');
+    if (igual(formasPagamento, PADRAO_NOVO.formasPagamento)) setFormasPagamento([]);
+    if (igual(condicoesPagamento, PADRAO_NOVO.condicoesPagamento)) setCondicoesPagamento([]);
+    if (cartaApresentacao === CARTA_APRESENTACAO.join('\n')) setCartaApresentacao('');
+    if (diretrizesManual === null) setDiretrizesManual([]);
+    if (igual(warranty, defaultWarranty()) && isStructuredWarranty(warranty)) {
+      setWarranty({ ...warranty, maoDeObra: { ...warranty.maoDeObra, enabled: false }, materiais: { ...warranty.materiais, enabled: false } });
+    }
+    setSecoesTexto((m) => {
+      const o = { ...m };
+      for (const sec of SECOES_TEXTO) if (igual(o[sec.campo], sec.padrao())) o[sec.campo] = [];
+      return o;
+    });
+    if (igual(servicosOfertados, servicosOfertadosPadrao())) setServicosOfertados([]);
+    setTextosTouched(true);
+  };
+
+  // Troca de tipo: as seções voltam ao padrão do novo tipo (destacadas no editor).
+  const handleTipoChange = (t: PedidoTipo | '') => {
+    setPedidoTipo(t);
+    setSecoesDocumento(null);
+    if (t === 'personalizado' && ehNovaProposta) limparPreenchimentoPadrao();
+  };
 
   // Cadastro rápido de cliente (dialog sobreposto).
   const [newClientOpen, setNewClientOpen] = useState(false);
@@ -849,6 +937,10 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         capaImagemPath: initialPedido?.proposal?.capaImagemPath,
         surveyOrigin: initialPedido?.proposal?.surveyOrigin,
         pedidoTipo: pedidoTipo || undefined,
+        // Seleção explícita só quando difere do padrão do tipo (pedido "não
+        // personalizado" continua gerando pelo caminho histórico). Personalizado
+        // grava a lista sempre (começa vazia).
+        secoesDocumento: secoesSaoPersonalizadas || pedidoTipo === 'personalizado' ? [...secoesAtivas] : undefined,
         modalidade,
         // Frete/impostos só fazem sentido no fornecimento; nas demais modalidades
         // não gravamos (mantém pedidos de serviço idênticos ao histórico).
@@ -1175,7 +1267,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                 <label className={labelCls}>Tipo de Pedido</label>
                 <select
                   value={pedidoTipo}
-                  onChange={(e) => setPedidoTipo(e.target.value as PedidoTipo | '')}
+                  onChange={(e) => handleTipoChange(e.target.value as PedidoTipo | '')}
                   className={inputCls}
                 >
                   <option value="">Não definido</option>
@@ -1188,6 +1280,20 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                 <p className="text-[11px] text-fg-muted mt-1">
                   Define o documento gerado por padrão (configurável em Conta → PDF).
                 </p>
+              </div>
+
+              {/* Seções do documento — toggles para TODOS os tipos */}
+              <div className="sm:col-span-2">
+                <SecoesDocumentoEditor
+                  tipo={pedidoTipo}
+                  ativas={secoesAtivas}
+                  padrao={secoesPadrao}
+                  personalizado={secoesSaoPersonalizadas}
+                  somenteMaterial={somenteMaterial}
+                  onToggle={setSecao}
+                  onRestaurarPadrao={() => setSecoesDocumento(null)}
+                  onDefinirTodas={definirTodasSecoes}
+                />
               </div>
 
               {/* Modalidade comercial (natureza) — decide seções técnicas × fornecimento */}
@@ -1699,12 +1805,12 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           <Accordion title="Cláusulas Jurídicas" icon={<Scale className="w-4 h-4 text-danger" />} open={!!open.clausulas} onToggle={() => toggle('clausulas')}>
             <p className="text-[11px] text-fg-secondary mb-2">Marque os blocos que devem sair no PDF. Desmarcado = título e texto totalmente omitidos.</p>
             <div className="space-y-2">
-              <ClauseRow label="Multas por atraso de pagamento" hint="Juros de mora e multa por inadimplência" checked={incluirMultas} onChange={setIncluirMultas} />
-              <ClauseRow label="Limitação de responsabilidade" checked={incluirLimitacao} onChange={setIncluirLimitacao} />
-              <ClauseRow label="Confidencialidade e sigilo" checked={incluirConfidencialidade} onChange={setIncluirConfidencialidade} />
-              <ClauseRow label="Condições Gerais" checked={incluirCondicoesGerais} onChange={setIncluirCondicoesGerais} />
-              <ClauseRow label="Segurança do Trabalho" checked={incluirSeguranca} onChange={setIncluirSeguranca} />
-              <ClauseRow label="Termo de Aceite da Proposta" checked={incluirTermoAceite} onChange={setIncluirTermoAceite} />
+              <ClauseRow label="Multas por atraso de pagamento" hint="Juros de mora e multa por inadimplência" checked={incluirMultas} onChange={setClausula('multas')} />
+              <ClauseRow label="Limitação de responsabilidade" checked={incluirLimitacao} onChange={setClausula('limitacao')} />
+              <ClauseRow label="Confidencialidade e sigilo" checked={incluirConfidencialidade} onChange={setClausula('confidencialidade')} />
+              <ClauseRow label="Condições Gerais" checked={incluirCondicoesGerais} onChange={setClausula('condicoesGerais')} />
+              <ClauseRow label="Segurança do Trabalho" checked={incluirSeguranca} onChange={setClausula('seguranca')} />
+              <ClauseRow label="Termo de Aceite da Proposta" checked={incluirTermoAceite} onChange={setClausula('termoAceite')} />
             </div>
           </Accordion>
 
@@ -1718,18 +1824,20 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             </div>
             {(() => {
               const secToggle: Record<string, { v: boolean; set: (b: boolean) => void }> = {
-                seguranca: { v: incluirSeguranca, set: setIncluirSeguranca },
-                multas: { v: incluirMultas, set: setIncluirMultas },
-                limitacao: { v: incluirLimitacao, set: setIncluirLimitacao },
-                confidencialidade: { v: incluirConfidencialidade, set: setIncluirConfidencialidade },
-                termoAceite: { v: incluirTermoAceite, set: setIncluirTermoAceite },
-                condicoesGerais: { v: incluirCondicoesGerais, set: setIncluirCondicoesGerais },
+                seguranca: { v: incluirSeguranca, set: setClausula('seguranca') },
+                multas: { v: incluirMultas, set: setClausula('multas') },
+                limitacao: { v: incluirLimitacao, set: setClausula('limitacao') },
+                confidencialidade: { v: incluirConfidencialidade, set: setClausula('confidencialidade') },
+                termoAceite: { v: incluirTermoAceite, set: setClausula('termoAceite') },
+                condicoesGerais: { v: incluirCondicoesGerais, set: setClausula('condicoesGerais') },
               };
               const temMateriais = equipmentItems.some((it) => it.tipo !== 'servico');
               const estrutura = ordenarEstrutura(
                 montarEstruturaProposta(
                   { tipoServico, incluirSeguranca, incluirMultas, incluirLimitacao, incluirConfidencialidade, incluirTermoAceite, incluirCondicoesGerais },
-                  { cartaVisivel: nivelProposta !== 'simples', historicoVisivel: nivelProposta !== 'simples', temMateriais }
+                  secoesSaoPersonalizadas || pedidoTipo === 'personalizado'
+                    ? { cartaVisivel: true, historicoVisivel: true, temMateriais, selecao: new Set<string>(secoesAtivas) }
+                    : { cartaVisivel: nivelProposta !== 'simples', historicoVisivel: nivelProposta !== 'simples', temMateriais }
                 ),
                 ordemSecoes
               );

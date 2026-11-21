@@ -32,6 +32,7 @@ describe('resolveDocumentoPadrao — Tipo de Pedido é a fonte de verdade', () =
       servico: 'proposta_comercial',
       fornecimento: 'orcamento',
       laudo: 'laudo_tecnico',
+      personalizado: 'personalizado',
     });
   });
 

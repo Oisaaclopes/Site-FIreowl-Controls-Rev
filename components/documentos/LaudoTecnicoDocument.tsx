@@ -4,6 +4,8 @@ import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import { C, nv, lnv, PdfHeader, PdfFooter, CamposExtras, CapaBanner } from './pdfKit';
 import { DocOptions } from '@/lib/documentos';
 import { resolverNormasReferencia } from '@/lib/normasReferencia';
+import { SecaoDocKey, SECOES_NATIVAS_LAUDO, secoesExtras, secoesSelecionadas } from '@/lib/documentoSecoes';
+import { SecoesExtras, secoesRenderizaveis } from './SecoesDocumentoPdf';
 
 export type LaudoTecnicoPdfOptions = Partial<DocOptions>;
 
@@ -87,12 +89,20 @@ export function LaudoTecnicoDocument({ pedido, companyProfile, options }: { pedi
   // Fonte única ([[lib/normasReferencia]]): salvas → preservadas; contexto
   // conhecido → sugestão; desconhecido → vazio (nunca assume SDAI por ser laudo).
   const normas = resolverNormasReferencia(p).filter(nv);
+  // Seções escolhidas no editor ([[lib/documentoSecoes]]). null = pedido não
+  // personalizado → laudo histórico idêntico.
+  const sel = secoesSelecionadas(p);
+  const on = (k: SecaoDocKey) => !sel || sel.has(k);
+  const secCtx = { p, companyProfile, cliente, assinante: responsavel, showUnit: false, showTotal: false };
+  const extras = sel ? secoesRenderizaveis(secoesExtras(sel, SECOES_NATIVAS_LAUDO), secCtx) : [];
   let proxSec = 1;
   const sec = () => String(proxSec++).padStart(2, '0');
-  const nObjetivo = sec();
-  const nNormas = normas.length > 0 ? sec() : '';
-  const nItens = itens.length > 0 ? sec() : '';
-  const nParecer = sec();
+  const nObjetivo = on('visao') ? sec() : '';
+  const nNormas = on('visao') && normas.length > 0 ? sec() : '';
+  const nItens = on('itens') && itens.length > 0 ? sec() : '';
+  const nParecer = on('conclusao') ? sec() : '';
+  const nExtras: Partial<Record<SecaoDocKey, string>> = {};
+  for (const k of extras) nExtras[k] = sec();
   const nResponsavel = sec();
   const objetivo = nv(p.escopoServico) ? p.escopoServico : (nv(p.objetivo) ? p.objetivo : 'Verificação das condições técnicas e de conformidade do sistema, conforme normas de referência.');
   const parecer = nv(p.conclusao) ? p.conclusao : 'Com base na inspeção realizada e nas normas de referência, o sistema encontra-se em conformidade nos pontos verificados, ressalvadas as observações registradas neste laudo. Recomenda-se a manutenção periódica para preservação do desempenho.';
@@ -118,12 +128,12 @@ export function LaudoTecnicoDocument({ pedido, companyProfile, options }: { pedi
           <InfoCell label="Responsável Técnico" value={responsavel} />
         </View>
 
-        <SecHead n={nObjetivo} titulo="Objetivo da Inspeção" />
-        <View style={styles.card}>
+        {on('visao') && <SecHead n={nObjetivo} titulo="Objetivo da Inspeção" />}
+        {on('visao') && <View style={styles.card}>
           <Text style={styles.para}>{objetivo}</Text>
-        </View>
+        </View>}
 
-        {normas.length > 0 && (
+        {on('visao') && normas.length > 0 && (
           <>
             <SecHead n={nNormas} titulo="Normas e Referências" />
             {normas.map((it, i) => (
@@ -135,7 +145,7 @@ export function LaudoTecnicoDocument({ pedido, companyProfile, options }: { pedi
           </>
         )}
 
-        {itens.length > 0 && (
+        {on('itens') && itens.length > 0 && (
           <View minPresenceAhead={70}>
             <SecHead n={nItens} titulo="Itens Inspecionados" />
             <View style={{ borderWidth: 1, borderColor: C.s200, borderRadius: 4, overflow: 'hidden', marginBottom: 10 }}>
@@ -164,14 +174,16 @@ export function LaudoTecnicoDocument({ pedido, companyProfile, options }: { pedi
           </View>
         )}
 
-        <View minPresenceAhead={110} wrap={false}>
+        {on('conclusao') && <View minPresenceAhead={110} wrap={false}>
           <SecHead n={nParecer} titulo="Parecer Técnico" />
           <View style={styles.card}>
             <Text style={styles.para}>{parecer}</Text>
           </View>
           <Text style={styles.artLabel}>Observações e não conformidades</Text>
           <View style={styles.parecerBox} />
-        </View>
+        </View>}
+
+        {extras.length > 0 && <SecoesExtras keys={extras} ctx={secCtx} numero={(k) => nExtras[k] || ''} />}
 
         {showCampos && <CamposExtras campos={p.camposPersonalizados} />}
 

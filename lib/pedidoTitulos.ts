@@ -4,7 +4,7 @@ import { areaById, tipoById, gerarTituloProposta } from './propostaTitulo';
 type Contexto = Pick<CommercialProposalData, 'areaPrincipal' | 'tipoServico' | 'pedidoTipo' | 'modalidade'>;
 const prefixos: Record<PedidoTipo, string> = {
   orcamento: 'Orçamento', proposta: 'Proposta Técnico-Comercial',
-  servico: 'Proposta Técnico-Comercial', fornecimento: 'Orçamento', laudo: 'Laudo Técnico',
+  servico: 'Proposta Técnico-Comercial', fornecimento: 'Orçamento', laudo: 'Laudo Técnico', personalizado: 'Documento',
 };
 const juntar = (nomes: string[]) => nomes.length < 2 ? nomes[0] : `${nomes.slice(0, -1).join(', ')} e ${nomes.at(-1)}`;
 

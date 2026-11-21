@@ -13,6 +13,7 @@ import { renderWarranty } from '@/lib/commercialWarranty';
 import { normalizeUnitCode } from '@/lib/commercialUnits';
 import { lineTotal } from '@/lib/commercialTotals';
 import { montarEstruturaProposta, ordenarEstrutura } from '@/lib/propostaEstrutura';
+import { secoesSelecionadas } from '@/lib/documentoSecoes';
 import { FornecimentoMateriaisDocument } from '@/components/documentos/FornecimentoMateriaisDocument';
 import {
   CARTA_APRESENTACAO,
@@ -1087,8 +1088,16 @@ export function PropostaDocument({
     ? p.servicosOfertados
     : (p.textosMaterializados ? [] : SERVICOS_OFERTADOS);
 
+  // Seções escolhidas no editor ([[lib/documentoSecoes]]). null = pedido não
+  // personalizado → estrutura histórica idêntica (flags + nível).
+  const sel = secoesSelecionadas(p);
   const secoes = ordenarEstrutura(
-    montarEstruturaProposta(p, { cartaVisivel: showCarta, historicoVisivel: showHistorico, temMateriais, garantiaVisivel: warrantyView.hasAny }),
+    montarEstruturaProposta(
+      p,
+      sel
+        ? { cartaVisivel: options?.showCarta !== false, historicoVisivel: showHistorico, temMateriais, garantiaVisivel: warrantyView.hasAny, selecao: sel }
+        : { cartaVisivel: showCarta, historicoVisivel: showHistorico, temMateriais, garantiaVisivel: warrantyView.hasAny }
+    ),
     p.ordemSecoes
   );
   const vis = secoes.filter((s) => s.visible);
@@ -1186,7 +1195,18 @@ export function PropostaDocument({
     premissas: () => (
       <Sec k="premissas">
         {lnv(p.premissas) ? <Bullets itens={p.premissas} /> : <Text style={{ fontSize: 9, color: C.s500, fontStyle: 'italic' }}>Premissas conforme rotinas padrão de execução.</Text>}
-        <InclusoExcluso incluso={p.incluso} naoIncluso={p.naoIncluso} />
+        {!sel && <InclusoExcluso incluso={p.incluso} naoIncluso={p.naoIncluso} />}
+      </Sec>
+    ),
+    // Só existem como seções próprias quando o pedido tem seleção explícita.
+    incluso: () => (
+      <Sec k="incluso">
+        {lnv(p.incluso) || lnv(p.naoIncluso) ? <InclusoExcluso incluso={p.incluso} naoIncluso={p.naoIncluso} /> : <Text style={{ fontSize: 9, color: C.s500, fontStyle: 'italic' }}>Conforme escopo descrito neste documento.</Text>}
+      </Sec>
+    ),
+    entregaveis: () => (
+      <Sec k="entregaveis">
+        {lnv(p.entregaveis) ? <Checks itens={p.entregaveis} /> : <Text style={{ fontSize: 9, color: C.s500, fontStyle: 'italic' }}>Entregáveis conforme escopo acordado.</Text>}
       </Sec>
     ),
     servicos: () => (
@@ -1197,7 +1217,7 @@ export function PropostaDocument({
             <Bullets itens={s.itens} />
           </View>
         ))}
-        {lnv(p.entregaveis) && (
+        {!sel && lnv(p.entregaveis) && (
           <View minPresenceAhead={50}>
             <Text style={styles.subTitle}>Entregáveis do projeto</Text>
             <Checks itens={p.entregaveis} />
@@ -1516,7 +1536,7 @@ export function PropostaDocument({
         {bodyOrder.map((k) => (on(k) && bodyRenderers[k] ? <React.Fragment key={k}>{bodyRenderers[k]()}</React.Fragment> : null))}
 
         {/* Aceite: mantém junto para não quebrar no meio */}
-        <View style={styles.section} minPresenceAhead={160} wrap={false}>
+        {on('aceite') && <View style={styles.section} minPresenceAhead={160} wrap={false}>
           <SecHead n={num('aceite')} titulo="Aceite da Proposta" />
           <Text style={[styles.para, { marginBottom: 8 }]}>
             O Cliente aceita as condições desta proposta, emitindo o seu &ldquo;de acordo&rdquo; para o fornecimento em tela. O aceite é documento suficiente para que as Partes se obriguem nos termos e condições aqui previstos.
@@ -1538,7 +1558,7 @@ export function PropostaDocument({
               <Text style={{ fontSize: 7.5, color: C.s500, textTransform: 'uppercase' }}>De acordo &amp; Aceite da Proposta</Text>
             </View>
           </View>
-        </View>
+        </View>}
       </Page>
 
       {/* ===================== FECHAMENTO (marinho) ===================== */}

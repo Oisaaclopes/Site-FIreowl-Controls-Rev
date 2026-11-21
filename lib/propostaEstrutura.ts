@@ -38,6 +38,10 @@ export interface EstruturaCtx {
   /** Garantia visível (há alguma condição informada). undefined = visível
    * (compatibilidade com propostas antigas / chamadas sem o campo). */
   garantiaVisivel?: boolean;
+  /** Seleção explícita de seções do pedido ([[lib/documentoSecoes]]). Ausente =
+   * estrutura histórica (flags). Presente = visibilidade segue a seleção, e
+   * Entregáveis / Incluso-Não incluso viram seções próprias. */
+  selecao?: ReadonlySet<string>;
 }
 
 const inc = (v?: boolean) => v !== false;
@@ -67,6 +71,22 @@ export function ordenarEstrutura(secoes: SecaoEstrutura[], ordem?: string[]): Se
 }
 
 export function montarEstruturaProposta(p: EstruturaProposalLike, ctx: EstruturaCtx): SecaoEstrutura[] {
+  const base = estruturaHistorica(p, ctx);
+  const sel = ctx.selecao;
+  if (!sel) return base;
+  // Seleção explícita: entregáveis e incluso saem como seções independentes e a
+  // visibilidade obedece aos toggles (com as guardas de conteúdo/opção de geração).
+  const out: SecaoEstrutura[] = [];
+  for (const s of base) {
+    const guarda = s.key === 'carta' ? ctx.cartaVisivel : s.key === 'historico' ? ctx.historicoVisivel : s.key === 'garantia' ? ctx.garantiaVisivel !== false : true;
+    out.push({ ...s, visible: sel.has(s.key) && guarda, opcional: true });
+    if (s.key === 'premissas') out.push({ key: 'incluso', titulo: 'Incluso / Não incluso', visible: sel.has('incluso'), opcional: true });
+    if (s.key === 'servicos') out.push({ key: 'entregaveis', titulo: 'Entregáveis do Projeto', visible: sel.has('entregaveis'), opcional: true });
+  }
+  return out;
+}
+
+function estruturaHistorica(p: EstruturaProposalLike, ctx: EstruturaCtx): SecaoEstrutura[] {
   return [
     { key: 'carta', titulo: 'Carta de Apresentação', visible: ctx.cartaVisivel, opcional: true },
     { key: 'historico', titulo: 'Histórico de Propostas', visible: ctx.historicoVisivel, opcional: true },

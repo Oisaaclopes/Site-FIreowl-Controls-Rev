@@ -12,6 +12,8 @@ import { normalizeUnitCode } from '@/lib/commercialUnits';
 import { DocOptions } from '@/lib/documentos';
 import { verificationUrl } from '@/lib/documentVerification';
 import { FornecimentoMateriaisDocument } from './FornecimentoMateriaisDocument';
+import { SecaoDocKey, SECOES_NATIVAS_ORCAMENTO, secoesExtras, secoesSelecionadas } from '@/lib/documentoSecoes';
+import { SecoesExtras, SecoesCtx, secoesRenderizaveis } from './SecoesDocumentoPdf';
 
 export type OrcamentoPdfOptions = Partial<DocOptions> & {
   capaImagemUrl?: string;
@@ -198,6 +200,32 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
   const tituloDin = resolverTituloPedido(p);
   const normas = resolverNormasReferencia(p);
 
+  // Seções escolhidas no editor ([[lib/documentoSecoes]]). null = pedido não
+  // personalizado → caminho histórico idêntico (numeração fixa 01–08).
+  const sel = secoesSelecionadas(p);
+  const on = (k: SecaoDocKey) => !sel || sel.has(k);
+  const secCtx: SecoesCtx = { p, companyProfile, cliente, assinante, showUnit, showTotal };
+  const extras = sel ? secoesRenderizaveis(secoesExtras(sel, SECOES_NATIVAS_ORCAMENTO), secCtx) : [];
+  const objetivoOn = on('visao') && nv(p.objetivo);
+  const escopoOn = on('escopo') && nv(p.escopoServico);
+  const mostraObjetivo = sel ? objetivoOn || escopoOn || (on('visao') && lnv(normas)) : nv(p.objetivo) || nv(p.escopoServico);
+  const NUM_LEGADO: Partial<Record<SecaoDocKey, string>> = { visao: '01', itens: '02', precos: '03', impostos: '04', pagamento: '05', prazo: '06', garantia: '07', validade: '08' };
+  const numerados: SecaoDocKey[] = sel
+    ? ([
+        mostraObjetivo && 'visao',
+        on('itens') && 'itens',
+        on('precos') && 'precos',
+        on('impostos') && 'impostos',
+        on('pagamento') && 'pagamento',
+        on('prazo') && 'prazo',
+        on('garantia') && warrantyView.hasAny && 'garantia',
+        on('validade') && 'validade',
+        on('premissas') && lnv(p.premissas) && 'premissas',
+        ...extras,
+      ].filter(Boolean) as SecaoDocKey[])
+    : [];
+  const n = (k: SecaoDocKey) => (sel ? String(numerados.indexOf(k) + 1).padStart(2, '0') : NUM_LEGADO[k] || '');
+
   return (
     <Document title={`Orçamento ${numero}`} author={razao}>
       {/* Capa (com a foto opcional, igual à proposta) */}
@@ -251,7 +279,25 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
         </View>
         <AuthenticityStamp url={authenticityUrl} />
 
-        {(nv(p.objetivo) || nv(p.escopoServico)) && (
+        {sel && mostraObjetivo && (
+          <View minPresenceAhead={50}>
+            <SecHead n={n('visao')} titulo={objetivoOn || !escopoOn ? 'Objetivo' : 'Escopo'} />
+            {objetivoOn && <Text style={styles.para}>{p.objetivo}</Text>}
+            {escopoOn && (objetivoOn ? (
+              <Text style={[styles.para, { marginTop: 4 }]}>
+                <Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Escopo: </Text>{p.escopoServico}
+              </Text>
+            ) : <Text style={styles.para}>{p.escopoServico}</Text>)}
+            {on('visao') && lnv(normas) && (
+              <Text style={{ fontSize: 8, color: C.s500, marginTop: 4 }}>
+                <Text style={{ fontFamily: 'Roboto', fontWeight: 700, color: C.ink }}>Normas de referência: </Text>
+                {normas.filter(nv).join(' · ')}
+              </Text>
+            )}
+          </View>
+        )}
+
+        {!sel && (nv(p.objetivo) || nv(p.escopoServico)) && (
           <View minPresenceAhead={50}>
             <SecHead n="01" titulo="Objetivo" />
             <Text style={styles.para}>{nv(p.objetivo) ? p.objetivo : p.escopoServico}</Text>
@@ -270,17 +316,20 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
         )}
 
         {/* Seção 05 — Materiais e Serviços (o coração do orçamento) */}
-        <SecHead n="02" titulo="Materiais e Serviços" />
+        {on('itens') && (<>
+        <SecHead n={n('itens')} titulo="Materiais e Serviços" />
         {materiais.length > 0 && <ItensTable titulo="Materiais" itens={materiais} showUnit={showUnit} showTotal={showTotal} showMarca={showMarca} accent={C.navy} />}
         {servicos.length > 0 && <ItensTable titulo="Serviços" itens={servicos} showUnit={showUnit} showTotal={showTotal} showMarca={showMarca} accent={C.green} />}
         {materiais.length === 0 && servicos.length === 0 && (
           <Text style={{ fontSize: 9, color: C.s400, fontStyle: 'italic', marginBottom: 8 }}>Itens conforme especificação técnica acordada.</Text>
         )}
+        </>)}
 
-        <InclusoExcluso incluso={p.incluso} naoIncluso={p.naoIncluso} />
+        {on('incluso') && <InclusoExcluso incluso={p.incluso} naoIncluso={p.naoIncluso} />}
 
         {/* Seção 11 — Preços */}
-        <SecHead n="03" titulo="Preços" />
+        {on('precos') && (<>
+        <SecHead n={n('precos')} titulo="Preços" />
         <View style={styles.totalWrap} wrap={false}>
           {showTotal && (p.maoDeObra || 0) > 0 && (
             <View style={styles.totalRowLight}>
@@ -301,32 +350,33 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
             {vMeses > 0 && <MensalCell label="Valor estimado do contrato" value={brl(vMensal * vMeses)} />}
           </View>
         )}
+        </>)}
 
         {/* Seção 13 — Impostos e Taxas */}
-        <View minPresenceAhead={50} wrap={false}>
-          <SecHead n="04" titulo="Impostos e Taxas" />
+        {on('impostos') && <View minPresenceAhead={50} wrap={false}>
+          <SecHead n={n('impostos')} titulo="Impostos e Taxas" />
           <Text style={styles.para}>{nv(p.impostos) ? p.impostos : 'Impostos inclusos conforme o regime tributário vigente.'} Não inclui taxas de condomínio, aluguéis ou custos de estadia não previstos.</Text>
-        </View>
+        </View>}
 
         {/* Seção 14 — Condições de Pagamento */}
-        <View minPresenceAhead={50} wrap={false}>
-          <SecHead n="05" titulo="Condições de Pagamento" />
+        {on('pagamento') && <View minPresenceAhead={50} wrap={false}>
+          <SecHead n={n('pagamento')} titulo="Condições de Pagamento" />
           <Text style={styles.para}>{pagamento}{nv(p.faturamento) ? ` Faturamento: ${p.faturamento}.` : ''}</Text>
-        </View>
+        </View>}
 
         {/* Seção 17 — Prazo de Fornecimento */}
-        <View minPresenceAhead={50} wrap={false}>
-          <SecHead n="06" titulo="Prazo de Fornecimento" />
+        {on('prazo') && <View minPresenceAhead={50} wrap={false}>
+          <SecHead n={n('prazo')} titulo="Prazo de Fornecimento" />
           <Text style={styles.para}>{nv(p.prazoExecucao) ? p.prazoExecucao : 'A combinar após a confirmação do pedido.'}</Text>
-        </View>
+        </View>}
 
         {/* Seção 17 (SLA) — SLA em destaque, quando cadastrado */}
-        <SlaBloco tabela={p.slaTabela} slaCritico={p.slaCritico} />
+        {(on('prazo') || on('escopo')) && <SlaBloco tabela={p.slaTabela} slaCritico={p.slaCritico} />}
 
         {/* Seção 18 — Garantia (só aparece quando há condição informada) */}
-        {warrantyView.hasAny && (
+        {on('garantia') && warrantyView.hasAny && (
           <View minPresenceAhead={50} wrap={false}>
-            <SecHead n="07" titulo="Garantia" />
+            <SecHead n={n('garantia')} titulo="Garantia" />
             {warrantyView.legacyText !== undefined ? (
               <Text style={styles.para}>{warrantyView.legacyText}</Text>
             ) : (
@@ -344,14 +394,14 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
         )}
 
         {/* Seção 22 — Validade da Proposta */}
-        <View minPresenceAhead={50} wrap={false}>
-          <SecHead n="08" titulo="Validade da Proposta" />
+        {on('validade') && <View minPresenceAhead={50} wrap={false}>
+          <SecHead n={n('validade')} titulo="Validade da Proposta" />
           <Text style={styles.para}>Os preços permanecem fixos dentro do período de validade: {validade}. Após esse período, eventuais variações na base de preços dos fabricantes poderão ser repactuadas.</Text>
-        </View>
+        </View>}
 
-        {lnv(p.premissas) && (
+        {on('premissas') && lnv(p.premissas) && (
           <View wrap={false} minPresenceAhead={50}>
-            <Text style={styles.subTitle}>Premissas</Text>
+            {sel ? <SecHead n={n('premissas')} titulo="Premissas" /> : <Text style={styles.subTitle}>Premissas</Text>}
             {p.premissas.filter(nv).map((it, i) => (
               <View key={i} style={{ flexDirection: 'row', marginBottom: 3 }}>
                 <Text style={{ color: C.red, fontFamily: 'Roboto', fontWeight: 700, marginRight: 6 }}>•</Text>
@@ -360,6 +410,9 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
             ))}
           </View>
         )}
+
+        {/* Seções ligadas no editor que o Orçamento não desenha nativamente */}
+        {extras.length > 0 && <SecoesExtras keys={extras} ctx={secCtx} numero={n} />}
 
         {showCampos && <CamposExtras campos={p.camposPersonalizados} />}
 

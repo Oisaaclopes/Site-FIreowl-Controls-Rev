@@ -3,6 +3,8 @@ import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import { C, nv, PdfHeader, PdfFooter, CapaBanner } from './pdfKit';
 import { PersonalizadoData } from './PersonalizadoConfigModal';
+import { SECAO_KEYS, secoesSelecionadas } from '@/lib/documentoSecoes';
+import { SecoesExtras, secoesRenderizaveis } from './SecoesDocumentoPdf';
 
 interface Props {
   pedido: Pedido;
@@ -59,6 +61,14 @@ export function PersonalizadoDocument({ pedido, companyProfile, data, showLogo =
   const dataDoc = dataHoje ? new Date().toISOString().split('T')[0] : (pedido.dataEmissao || '');
   const titulo = data.titulo || 'Documento';
   const itens = pedido.proposal?.equipmentItems || [];
+  // Tipo de Pedido "Personalizado": as seções ligadas no editor entram no corpo
+  // ([[lib/documentoSecoes]]). Para os demais tipos (fluxo "Gerar outro
+  // documento") o Personalizado segue só com título/campos, como sempre.
+  const sel = pedido.proposal?.pedidoTipo === 'personalizado' ? secoesSelecionadas(pedido.proposal) : null;
+  const secCtx = { p: pedido.proposal, companyProfile, cliente, assinante: responsavel };
+  const secoes = sel ? secoesRenderizaveis(SECAO_KEYS.filter((k) => sel.has(k)), secCtx) : [];
+  const numSecao = (k: (typeof secoes)[number]) => String(secoes.indexOf(k) + 1).padStart(2, '0');
+  const itensDoConfig = data.incluirItens && itens.length > 0 && !secoes.includes('itens');
 
   return (
     <Document title={`${titulo} ${numero}`} author={razao}>
@@ -90,7 +100,9 @@ export function PersonalizadoDocument({ pedido, companyProfile, data, showLogo =
           </View>
         ))}
 
-        {data.incluirItens && itens.length > 0 && (
+        {secoes.length > 0 && <SecoesExtras keys={secoes} ctx={secCtx} numero={numSecao} />}
+
+        {itensDoConfig && (
           <View minPresenceAhead={60}>
             <View style={styles.secHead}>
               <Text style={styles.secTitle}>Itens do Pedido</Text>
@@ -119,7 +131,7 @@ export function PersonalizadoDocument({ pedido, companyProfile, data, showLogo =
           </View>
         )}
 
-        {data.campos.length === 0 && !(data.incluirItens && itens.length > 0) && (
+        {data.campos.length === 0 && !itensDoConfig && secoes.length === 0 && (
           <Text style={{ fontSize: 9, color: C.s400, fontStyle: 'italic' }}>Documento sem campos definidos.</Text>
         )}
 

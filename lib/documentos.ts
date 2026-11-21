@@ -58,9 +58,10 @@ export const PEDIDO_TIPO_LABELS: Record<PedidoTipo, string> = {
   servico: 'Serviço / Manutenção',
   fornecimento: 'Fornecimento de materiais',
   laudo: 'Laudo / Inspeção',
+  personalizado: 'Personalizado',
 };
 
-export const PEDIDO_TIPO_ORDER: PedidoTipo[] = ['orcamento', 'proposta', 'servico', 'fornecimento', 'laudo'];
+export const PEDIDO_TIPO_ORDER: PedidoTipo[] = ['orcamento', 'proposta', 'servico', 'fornecimento', 'laudo', 'personalizado'];
 
 /**
  * Mapa canônico TIPO DE PEDIDO → documento gerado. É a FONTE DE VERDADE quando
@@ -73,6 +74,8 @@ export const PEDIDO_TIPO_ORDER: PedidoTipo[] = ['orcamento', 'proposta', 'servic
  *   [[modalidade-somente-material]] / OrcamentoDocument).
  * - servico → proposta_comercial: reaproveita o gerador comercial completo.
  * - laudo → laudo_tecnico: gerador existente.
+ * - personalizado → personalizado: documento montado do zero (seções ligadas no
+ *   editor + título/campos livres do PersonalizadoConfigModal).
  */
 export const DEFAULT_DOC_BY_PEDIDO_TIPO: Record<PedidoTipo, DocumentType> = {
   orcamento: 'orcamento',
@@ -80,6 +83,7 @@ export const DEFAULT_DOC_BY_PEDIDO_TIPO: Record<PedidoTipo, DocumentType> = {
   servico: 'proposta_comercial',
   fornecimento: 'orcamento',
   laudo: 'laudo_tecnico',
+  personalizado: 'personalizado',
 };
 
 /**
