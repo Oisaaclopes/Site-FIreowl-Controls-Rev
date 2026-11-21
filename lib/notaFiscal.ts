@@ -80,6 +80,34 @@ export const aplicarNotaFiscal = (
   return { ...p, proposal: { ...p.proposal, notaFiscal } };
 };
 
+/** NF já marcada como EMITIDA (selo de certificação na lista de pedidos). */
+export const isNotaFiscalEmitida = (p: Pedido): boolean =>
+  p.proposal?.notaFiscal?.status === 'emitida';
+
+/** Data de referência da emissão (dataEmissao → atualizadaEm → updatedAt). */
+export const notaFiscalDataRef = (p: Pedido): string =>
+  p.proposal?.notaFiscal?.dataEmissao || p.proposal?.notaFiscal?.atualizadaEm || p.updatedAt || '';
+
+/** NFs emitidas, mais recentes primeiro (card de controle). */
+export const notasFiscaisEmitidas = (pedidos: Pedido[]): Pedido[] =>
+  pedidos
+    .filter(isNotaFiscalEmitida)
+    .sort((a, b) => notaFiscalDataRef(b).localeCompare(notaFiscalDataRef(a)));
+
+/** Resumo do card: quantidade/valor total e do mês corrente (YYYY-MM). */
+export const resumoNotasEmitidas = (pedidos: Pedido[], mesRef = new Date().toISOString().slice(0, 7)) => {
+  const emitidas = notasFiscaisEmitidas(pedidos);
+  const doMes = emitidas.filter((p) => notaFiscalDataRef(p).slice(0, 7) === mesRef);
+  const soma = (ps: Pedido[]) => ps.reduce((acc, p) => acc + pedidoValorNota(p), 0);
+  return {
+    total: emitidas.length,
+    valorTotal: soma(emitidas),
+    mes: doMes.length,
+    valorMes: soma(doMes),
+    semNumero: emitidas.filter((p) => !p.proposal?.notaFiscal?.numero).length,
+  };
+};
+
 /** Rótulo legível do estado (UI). */
 export const notaFiscalStatusLabel = (s: NotaFiscalStatus): string =>
   s === 'emitida' ? 'Emitida' : s === 'nao_aplicavel' ? 'Não aplicável' : 'Pendente';

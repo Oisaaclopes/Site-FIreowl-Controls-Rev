@@ -7,6 +7,9 @@ import {
   notaFiscalStatus,
   semearNotaFiscalAoConcluir,
   aplicarNotaFiscal,
+  isNotaFiscalEmitida,
+  notasFiscaisEmitidas,
+  resumoNotasEmitidas,
 } from './notaFiscal';
 import type { CommercialProposalData, Pedido, PedidoStatus } from './types';
 
@@ -116,5 +119,35 @@ describe('notaFiscal — resolução preserva histórico', () => {
     const p = aplicarNotaFiscal(ped({ status: 'concluido' }), { status: 'nao_aplicavel', observacao: 'Garantia' });
     expect(notaFiscalStatus(p)).toBe('nao_aplicavel');
     expect(isNotaFiscalPendente(p)).toBe(false);
+  });
+});
+
+describe('notaFiscal — NFs emitidas (card + selo)', () => {
+  const emitida = (id: string, data: string, valor = 1000, numero?: string) =>
+    aplicarNotaFiscal(ped({ id }, { valorTotal: valor }), { status: 'emitida', dataEmissao: data, ...(numero ? { numero } : {}) });
+
+  it('selo só aparece para NF emitida', () => {
+    expect(isNotaFiscalEmitida(emitida('a', '2026-11-02'))).toBe(true);
+    expect(isNotaFiscalEmitida(semearNotaFiscalAoConcluir(ped()))).toBe(false);
+    expect(isNotaFiscalEmitida(aplicarNotaFiscal(ped(), { status: 'nao_aplicavel' }))).toBe(false);
+    expect(isNotaFiscalEmitida(ped())).toBe(false);
+  });
+
+  it('lista emitidas da mais recente para a mais antiga, ignorando outras', () => {
+    const lista = notasFiscaisEmitidas([
+      emitida('a', '2026-10-05'),
+      ped({ id: 'x' }),
+      emitida('b', '2026-11-10'),
+      aplicarNotaFiscal(ped({ id: 'y' }), { status: 'nao_aplicavel' }),
+    ]);
+    expect(lista.map((p) => p.id)).toEqual(['b', 'a']);
+  });
+
+  it('resumo soma total, mês de referência e conta NFs sem número', () => {
+    const r = resumoNotasEmitidas(
+      [emitida('a', '2026-10-05', 500, '123'), emitida('b', '2026-11-10', 1500), emitida('c', '2026-11-20', 250, '9')],
+      '2026-11',
+    );
+    expect(r).toEqual({ total: 3, valorTotal: 2250, mes: 2, valorMes: 1750, semNumero: 1 });
   });
 });

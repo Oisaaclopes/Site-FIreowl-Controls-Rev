@@ -4,8 +4,9 @@ import { showToast, requestConfirm, requestText } from '@/components/ui/Feedback
 import { useNavigationEntity, useNavigationValue } from '@/components/NavigationSession';
 import { fetchOrdemServicoById } from '@/lib/ordensServico';
 import { fetchPedidos } from '@/lib/pedidos';
-import { semearNotaFiscalAoConcluir } from '@/lib/notaFiscal';
+import { canManageNotaFiscal, isNotaFiscalEmitida, semearNotaFiscalAoConcluir } from '@/lib/notaFiscal';
 import { NotaFiscalPendencias } from '@/components/views/NotaFiscalPendencias';
+import { NotasFiscaisEmitidas } from '@/components/views/NotasFiscaisEmitidas';
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { usePagination } from '@/lib/usePagination';
 import { PaginatedListControls } from '@/components/ui/PaginatedListControls';
@@ -942,6 +943,21 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
 
         {/* Bloco direito */}
         <div className="flex items-center gap-2 md:gap-3 shrink-0 flex-wrap justify-end">
+          {canManageNotaFiscal(userRole) && isNotaFiscalEmitida(ped) && (() => {
+            const nf = ped.proposal.notaFiscal;
+            const quando = nf?.dataEmissao ? new Date(`${nf.dataEmissao.slice(0, 10)}T12:00:00`).toLocaleDateString('pt-BR') : '';
+            const dica = ['Nota fiscal emitida', nf?.numero && `nº ${nf.numero}`, quando && `em ${quando}`, nf?.atualizadaPor && `por ${nf.atualizadaPor}`].filter(Boolean).join(' · ');
+            return (
+              <span
+                title={dica}
+                aria-label={dica}
+                className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 pl-1 pr-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700"
+              >
+                <span className="material-symbols-outlined text-[16px] leading-none" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
+                NF emitida{nf?.numero ? ` · ${nf.numero}` : ''}
+              </span>
+            );
+          })()}
           <span className="font-data-mono font-bold text-emerald-600 text-base md:text-lg">
             {maskMoney(brl(ped.proposal.valorTotal || 0))}
           </span>
@@ -1274,6 +1290,14 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
 
           {/* Pendência administrativa de NF — oculta p/ técnico (RBAC no componente) */}
           <NotaFiscalPendencias
+            pedidos={pedidos}
+            userRole={userRole}
+            currentUserName={currentUserName}
+            onSavePedido={onSavePedido}
+          />
+
+          {/* Controle de NFs já emitidas — mesmo RBAC da pendência */}
+          <NotasFiscaisEmitidas
             pedidos={pedidos}
             userRole={userRole}
             currentUserName={currentUserName}
