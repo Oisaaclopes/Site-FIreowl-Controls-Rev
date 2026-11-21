@@ -25,6 +25,8 @@ function rowToProfile(r: any): CompanyProfile {
     techIntro: r.tech_intro || undefined,
     expMaxEmpresas: r.exp_max_empresas ?? undefined,
     expMaxMarcas: r.exp_max_marcas ?? undefined,
+    // 0122 — ausente (migration não aplicada) = undefined → padrão do sistema.
+    secoesPadrao: r.secoes_padrao && typeof r.secoes_padrao === 'object' && !Array.isArray(r.secoes_padrao) ? r.secoes_padrao : undefined,
   };
 }
 
@@ -94,6 +96,21 @@ export async function fetchCompanyProfile(): Promise<CompanyProfile | null> {
   const { data, error } = await supabase.from(TABLE).select('*').eq('id', 1).maybeSingle();
   if (error) throw error;
   return data ? rowToProfile(data) : null;
+}
+
+/**
+ * Grava SÓ o padrão de seções por tipo (coluna secoes_padrao, migration 0122).
+ * Fica fora de profileToRow de propósito: o upsert geral do perfil continua
+ * funcionando mesmo sem a coluna e nunca sobrescreve este mapa.
+ * Lança erro legível quando a coluna ainda não existe no banco.
+ */
+export async function saveSecoesPadrao(mapa: Record<string, string[]>): Promise<void> {
+  const supabase = getSupabaseClient() as any;
+  const { error } = await supabase.from(TABLE).update({ secoes_padrao: mapa, updated_at: new Date().toISOString() }).eq('id', 1);
+  if (error) {
+    const semColuna = error.code === '42703' || error.code === 'PGRST204' || /secoes_padrao/.test(error.message || '');
+    throw new Error(semColuna ? 'O banco ainda não tem a coluna do padrão de seções (migration 0122 pendente).' : error.message || 'Falha ao salvar o padrão.');
+  }
 }
 
 /** Cria/atualiza o perfil da empresa (upsert na linha id = 1). */

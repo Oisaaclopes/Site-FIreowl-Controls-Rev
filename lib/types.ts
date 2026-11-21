@@ -474,7 +474,14 @@ export interface CompanyProfile {
   // ===== Limites de logos por proposta (config) =====
   expMaxEmpresas?: number;
   expMaxMarcas?: number;
+  /** Padrão de seções do documento por Tipo de Pedido, salvo pela empresa
+   * (coluna company_profile.secoes_padrao, migration 0122). Tipo ausente =
+   * padrão do sistema. Ver [[lib/documentoSecoes]]. */
+  secoesPadrao?: SecoesPadraoEmpresa;
 }
+
+/** Mapa Tipo de Pedido → chaves de seção (lib/documentoSecoes). */
+export type SecoesPadraoEmpresa = Partial<Record<PedidoTipo, string[]>>;
 
 export interface PedidoTemplate {
   id: string;

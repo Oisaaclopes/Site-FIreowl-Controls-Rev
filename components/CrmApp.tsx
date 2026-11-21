@@ -41,6 +41,7 @@ import {
   EmpresaAtendida,
   MarcaTecnologia,
   CompanyProfile,
+  SecoesPadraoEmpresa,
   PedidoTemplate,
   PedidoStatus,
   PdfPrefs,
@@ -96,7 +97,7 @@ import { fetchQuotes, insertQuote } from '@/lib/quotes';
 import { fetchSuppliers, upsertSupplier, deleteSupplier } from '@/lib/suppliers';
 import { fetchBrands, upsertBrand, deleteBrand, seedBrands } from '@/lib/brands';
 import { fetchClients, upsertClient, deleteClient } from '@/lib/clients';
-import { fetchCompanyProfile, upsertCompanyProfile } from '@/lib/companyProfile';
+import { fetchCompanyProfile, upsertCompanyProfile, saveSecoesPadrao } from '@/lib/companyProfile';
 import { fetchEmpresasAtendidas, upsertEmpresaAtendida, deleteEmpresaAtendida } from '@/lib/empresasAtendidas';
 import { fetchMarcasTecnologias, upsertMarcaTecnologia, deleteMarcaTecnologia } from '@/lib/marcasTecnologias';
 import { fetchTransactions, upsertTransaction, deleteTransaction } from '@/lib/transactions';
@@ -579,6 +580,14 @@ function CrmAppContent({
         showToast('Não foi possível salvar o perfil da empresa no banco. Salvo apenas nesta sessão.');
       });
     }
+  };
+
+  // Padrão de seções do documento por Tipo de Pedido (company_profile.secoes_padrao,
+  // migration 0122). Grava só essa coluna; erro sobe para o editor avisar.
+  const handleSalvarPadraoSecoes = async (mapa: SecoesPadraoEmpresa) => {
+    if (isSupabaseConfigured()) await saveSecoesPadrao(mapa as Record<string, string[]>);
+    setCompanyProfile((prev) => ({ ...prev, secoesPadrao: mapa }));
+    logAction('Atualização Cadastral', 'Conta', 'Padrão de seções do documento por tipo de pedido atualizado');
   };
 
   // ===== Módulo Experiência: Empresas Atendidas e Marcas/Tecnologias =====
@@ -1338,6 +1347,7 @@ function CrmAppContent({
               onDeleteTemplate={handleDeletePedidoTemplate}
               services={services}
               companyProfile={companyProfile}
+              onSalvarPadraoSecoes={handleSalvarPadraoSecoes}
               empresasAtendidas={empresasAtendidas}
               marcasTecnologias={marcasTecnologias}
               onSavePedido={handleSavePedido}

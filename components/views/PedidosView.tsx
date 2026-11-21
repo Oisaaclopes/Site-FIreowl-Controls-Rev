@@ -11,7 +11,7 @@ import { NotasFiscaisEmitidas } from '@/components/views/NotasFiscaisEmitidas';
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { usePagination } from '@/lib/usePagination';
 import { PaginatedListControls } from '@/components/ui/PaginatedListControls';
-import { SupplyOrder, Client, Pedido, Contract, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem, DocumentosPadrao, DocumentType, FinancialTransaction, RecebimentoProposta, EmpresaAtendida, MarcaTecnologia, OrdemServico, TimePunch } from '@/lib/types';
+import { SupplyOrder, Client, Pedido, Contract, InventoryItem, PartnerBrand, PedidoTemplate, PedidoStatus, PdfPrefs, UserRole, ServiceCatalogItem, DocumentosPadrao, DocumentType, FinancialTransaction, RecebimentoProposta, EmpresaAtendida, MarcaTecnologia, OrdemServico, TimePunch, SecoesPadraoEmpresa } from '@/lib/types';
 import { StartAttendanceButton, AttendanceHistoryList, OsMissionPanel } from '@/components/operacoes/ServiceAttendanceFlow';
 import { OsDocumentsView, OsDocKind } from '@/components/documentos/OsDocumentsView';
 import { OS_STATUS_ATIVOS, osHistoryForPedido, pedidoOsAction, isHardDeleteEligible, isCancelable } from '@/lib/ordensServico';
@@ -87,6 +87,8 @@ interface PedidosViewProps {
   onDeleteTemplate?: (templateId: string) => void;
   services?: ServiceCatalogItem[];
   companyProfile: any;
+  /** Persiste o padrão de seções por Tipo de Pedido da empresa (0122). */
+  onSalvarPadraoSecoes?: (mapa: SecoesPadraoEmpresa) => Promise<void>;
   empresasAtendidas?: EmpresaAtendida[];
   marcasTecnologias?: MarcaTecnologia[];
   onSavePedido: (pedido: Pedido) => void;
@@ -166,6 +168,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   onDeleteTemplate,
   services = [],
   companyProfile,
+  onSalvarPadraoSecoes,
   empresasAtendidas = [],
   marcasTecnologias = [],
   onSavePedido,
@@ -1610,6 +1613,9 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
         onPreviewPDF={(ped) => previewByTipo(ped)}
         onEmit={(ped) => handleGenerateDocument(ped)}
         nextProposalNumber={nextProposalNumber}
+        secoesPadraoEmpresa={companyProfile?.secoesPadrao}
+        podeSalvarPadraoSecoes={userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR'}
+        onSalvarPadraoSecoes={onSalvarPadraoSecoes}
       />
       {externalPedido && isProposalModalOpen && (
         <div className="fixed top-16 left-1/2 z-[100] -translate-x-1/2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 shadow-lg text-sm text-amber-950" role="status">

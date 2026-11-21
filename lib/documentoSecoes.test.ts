@@ -3,6 +3,10 @@ import {
   SECAO_KEYS,
   SECOES_NATIVAS_ORCAMENTO,
   alternarSecao,
+  atualizarPadraoEmpresa,
+  mesmasSecoes,
+  padraoEmpresaDoTipo,
+  padraoReferenciaDoTipo,
   ehSecaoPadrao,
   igualAoPadrao,
   normalizarSecoes,
@@ -124,5 +128,39 @@ describe('estrutura da proposta × seleção', () => {
   it('garantia selecionada sem conteúdo não aparece', () => {
     const e = montarEstruturaProposta({}, { ...ctx, garantiaVisivel: false, selecao: new Set(['garantia']) });
     expect(e.filter((s) => s.visible)).toEqual([]);
+  });
+});
+
+describe('padrão da empresa × padrão do sistema × seleção', () => {
+  it('sem padrão salvo, a referência é o padrão do sistema', () => {
+    expect(padraoEmpresaDoTipo('orcamento', {})).toBeNull();
+    expect(padraoReferenciaDoTipo('orcamento', undefined)).toEqual(secoesPadraoDoTipo('orcamento'));
+  });
+
+  it('padrão salvo da empresa vira a referência do tipo (normalizado)', () => {
+    const empresa = { orcamento: ['premissas', 'carta', 'xpto', 'carta'] };
+    expect(padraoEmpresaDoTipo('orcamento', empresa)).toEqual(['carta', 'premissas']);
+    expect(padraoReferenciaDoTipo('orcamento', empresa)).toEqual(['carta', 'premissas']);
+    // outros tipos seguem no padrão do sistema
+    expect(padraoReferenciaDoTipo('proposta', empresa)).toEqual(SECAO_KEYS);
+  });
+
+  it('padrão salvo vazio é válido (tipo começa todo em Não)', () => {
+    expect(padraoReferenciaDoTipo('orcamento', { orcamento: [] })).toEqual([]);
+  });
+
+  it('salvar grava a lista; restaurar remove a chave', () => {
+    const salvo = atualizarPadraoEmpresa({}, 'orcamento', ['premissas', 'itens']);
+    expect(salvo).toEqual({ orcamento: ['itens', 'premissas'] });
+    expect(atualizarPadraoEmpresa(salvo, 'orcamento', null)).toEqual({});
+  });
+
+  it('salvar igual ao padrão do sistema não guarda redundância', () => {
+    expect(atualizarPadraoEmpresa({ laudo: ['visao'] }, 'orcamento', secoesPadraoDoTipo('orcamento'))).toEqual({ laudo: ['visao'] });
+  });
+
+  it('mesmasSecoes ignora ordem e repetição', () => {
+    expect(mesmasSecoes(['garantia', 'itens', 'itens'], ['itens', 'garantia'])).toBe(true);
+    expect(mesmasSecoes(['itens'], ['itens', 'garantia'])).toBe(false);
   });
 });

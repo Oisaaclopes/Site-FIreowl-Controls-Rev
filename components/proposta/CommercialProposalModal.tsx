@@ -19,6 +19,7 @@ import {
   PedidoStatus,
   ServiceCatalogItem,
   PedidoTipo,
+  SecoesPadraoEmpresa,
   EmpresaAtendida,
   MarcaTecnologia,
   CommercialProposalData,
@@ -30,8 +31,7 @@ import { PEDIDO_TIPO_LABELS, PEDIDO_TIPO_ORDER } from '@/lib/documentos';
 import { MODALIDADE_LABELS, MODALIDADE_ORDER, FRETE_MODO_LABELS, IMPOSTO_MODO_LABELS, OBS_DISPONIBILIDADE } from '@/lib/fornecimentoComercial';
 import { AREAS_PROPOSTA, TIPOS_SERVICO, conclusaoPorTipo, presetPorTipo } from '@/lib/propostaTitulo';
 import { montarEstruturaProposta, ordenarEstrutura, SECOES_FIXAS_INICIO, SECOES_FIXAS_FIM } from '@/lib/propostaEstrutura';
-import { SecaoDocKey, SECAO_KEYS, alternarSecao, flagDaSecao, igualAoPadrao, normalizarSecoes, secoesPadraoDoTipo } from '@/lib/documentoSecoes';
-import { SecoesDocumentoEditor } from '@/components/proposta/SecoesDocumentoEditor';
+import { SecaoDocKey, SECAO_KEYS, alternarSecao, atualizarPadraoEmpresa, flagDaSecao, igualAoPadrao, mesmasSecoes, normalizarSecoes, padraoEmpresaDoTipo, padraoReferenciaDoTipo, secoesPadraoDoTipo } from '@/lib/documentoSecoes';
 import { CARTA_APRESENTACAO } from '@/lib/propostaTextos';
 import { SECOES_TEXTO, servicosOfertadosPadrao, restaurarSecaoLista, fonteDaSecaoLista, fonteServicos } from '@/lib/propostaMaterializacao';
 import { normalizeUnitCode } from '@/lib/commercialUnits';
@@ -80,6 +80,12 @@ interface CommercialProposalModalProps {
   onEmit?: (pedido: Pedido) => void | Promise<void>;
   /** Próximo número sequencial para novas propostas (default do campo). */
   nextProposalNumber?: number;
+  /** Padrão de seções por tipo salvo pela empresa (company_profile.secoes_padrao). */
+  secoesPadraoEmpresa?: SecoesPadraoEmpresa;
+  /** Perfil pode salvar/restaurar o padrão da empresa (ADMINISTRATIVO/GESTOR). */
+  podeSalvarPadraoSecoes?: boolean;
+  /** Persiste o novo mapa de padrões da empresa (lança erro se falhar). */
+  onSalvarPadraoSecoes?: (mapa: SecoesPadraoEmpresa) => Promise<void>;
 }
 
 const inputCls =
@@ -109,16 +115,19 @@ const Accordion: React.FC<{
   open: boolean;
   onToggle: () => void;
   badge?: React.ReactNode;
+  /** Seção em "Não" na Estrutura: card apagado (continua editável). */
+  inativo?: boolean;
   children: React.ReactNode;
-}> = ({ title, icon, open, onToggle, badge, children }) => (
-  <div className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
+}> = ({ title, icon, open, onToggle, badge, inativo, children }) => (
+  <div className={`rounded-xl border overflow-hidden transition-opacity ${inativo ? 'bg-surface-2 border-dashed border-border-strong opacity-60 hover:opacity-90 focus-within:opacity-100' : 'bg-surface border-border shadow-sm'}`}>
     <button
       type="button"
       onClick={onToggle}
       className="w-full flex items-center gap-2.5 px-4 py-3.5 text-left hover:bg-surface-2 transition-colors"
     >
       {icon}
-      <span className="flex-1 font-bold text-primary uppercase text-sm">{title}</span>
+      <span className={`flex-1 font-bold uppercase text-sm ${inativo ? 'text-fg-muted' : 'text-primary'}`}>{title}</span>
+      {inativo && <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full shrink-0 bg-surface-3 text-fg-muted border border-border">Não sai no documento</span>}
       {badge}
       <ChevronDown className={`w-4 h-4 text-fg-muted shrink-0 transition-transform ${open ? '' : '-rotate-90'}`} />
     </button>
@@ -321,6 +330,9 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   onPreviewPDF,
   onEmit,
   nextProposalNumber = 249,
+  secoesPadraoEmpresa,
+  podeSalvarPadraoSecoes = false,
+  onSalvarPadraoSecoes,
 }) => {
   // ETAPA 2 — materialização de textos. Uma proposta é NOVA quando não traz um
   // registro `proposal` anterior; nesse caso os textos-padrão são copiados para
@@ -337,7 +349,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
 
   // Sanfonas abertas (por padrão as principais abertas).
   const { state: navigation, update: navigate } = useNavigation();
-  const open: Record<string, boolean> = navigation.secoes ? Object.fromEntries(navigation.secoes.split(',').map((key) => [key, true])) : { materiais: true, servicos: true, garantia: true, basicas: true };
+  const open: Record<string, boolean> = navigation.secoes ? Object.fromEntries(navigation.secoes.split(',').map((key) => [key, true])) : { materiais: true, servicos: true, garantia: true, basicas: true, estrutura: true };
   const setOpen = (action: (previous: Record<string, boolean>) => Record<string, boolean>) => {
     const next = action(open);
     navigate({ secoes: Object.keys(next).filter((key) => next[key]).join(',') || 'nenhuma' });
@@ -553,7 +565,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     const items = secoesTexto[opts.campo] || [];
     const fonte = fonteDaSecaoLista(opts.campo as Parameters<typeof fonteDaSecaoLista>[0], items);
     return (
-      <Accordion title={opts.titulo} icon={opts.icon} open={!!open[opts.openKey]} onToggle={() => toggle(opts.openKey)} badge={<FonteBadge fonte={fonte} />}>
+      <Accordion title={opts.titulo} icon={opts.icon} inativo={inativa(opts.fonteKey as SecaoDocKey)} open={!!open[opts.openKey]} onToggle={() => toggle(opts.openKey)} badge={<FonteBadge fonte={fonte} />}>
         <div className="flex justify-end mb-2">
           <button type="button" onClick={() => restaurarPadraoSecao(opts.campo)} className="text-[10px] font-bold uppercase text-fg-muted hover:text-primary inline-flex items-center gap-1">
             <span className="material-symbols-outlined text-sm">restart_alt</span>Restaurar padrão
@@ -611,13 +623,24 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const [vigenciaMeses, setVigenciaMeses] = useState<number>(initialPedido?.proposal?.vigenciaMeses ?? 12);
 
   // ----------------- seções do documento (todos os tipos) -----------------
-  // null = sem seleção própria → padrão do Tipo de Pedido (pedido antigo gera
-  // exatamente como antes). Ver [[lib/documentoSecoes]].
+  // Fonte única: o Sim/Não de cada linha da "Estrutura da proposta".
+  // null = sem seleção própria → padrão do SISTEMA para o tipo (pedido antigo
+  // gera exatamente como antes). Ver [[lib/documentoSecoes]].
   const [secoesDocumento, setSecoesDocumento] = useState<string[] | null>(initialProposal?.secoesDocumento ?? null);
   const flagsSecoes = { incluirSeguranca, incluirMultas, incluirLimitacao, incluirConfidencialidade, incluirTermoAceite, incluirCondicoesGerais };
-  const secoesPadrao = secoesPadraoDoTipo(pedidoTipo, flagsSecoes);
-  const secoesAtivas = secoesDocumento ? normalizarSecoes(secoesDocumento) : secoesPadrao;
+  const secoesPadraoSistema = secoesPadraoDoTipo(pedidoTipo, flagsSecoes);
+  const secoesAtivas = secoesDocumento ? normalizarSecoes(secoesDocumento) : secoesPadraoSistema;
+  const secaoOn = (key: SecaoDocKey) => secoesAtivas.includes(key);
+  // Card de edição de uma seção em "Não": apagado (Somente Material tem estrutura própria).
+  const inativa = (key: SecaoDocKey) => !somenteMaterial && !secaoOn(key);
+  // Gravado no pedido só quando difere do padrão do sistema (Personalizado: sempre).
   const secoesSaoPersonalizadas = !!secoesDocumento && !igualAoPadrao(secoesDocumento, pedidoTipo, flagsSecoes);
+  // Padrão da EMPRESA por tipo (0122): referência para "Salvar como novo padrão".
+  const [padraoEmpresa, setPadraoEmpresa] = useState<SecoesPadraoEmpresa>(secoesPadraoEmpresa || {});
+  const padraoEmpresaTipo = padraoEmpresaDoTipo(pedidoTipo, padraoEmpresa);
+  const padraoReferencia = padraoReferenciaDoTipo(pedidoTipo, padraoEmpresa, flagsSecoes);
+  const difereDoPadrao = !mesmasSecoes(secoesAtivas, padraoReferencia);
+  const [salvandoPadrao, setSalvandoPadrao] = useState(false);
   const FLAG_SETTERS: Record<string, (b: boolean) => void> = {
     incluirSeguranca: setIncluirSeguranca,
     incluirMultas: setIncluirMultas,
@@ -631,16 +654,49 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     if (flag) FLAG_SETTERS[flag](ligar);
     setSecoesDocumento(alternarSecao(secoesAtivas, key, ligar));
   };
-  const definirTodasSecoes = (ligar: boolean) => {
-    for (const set of Object.values(FLAG_SETTERS)) set(ligar);
-    setSecoesDocumento(ligar ? [...SECAO_KEYS] : []);
+  // Aplica uma seleção inteira (padrão do tipo), mantendo as flags coerentes.
+  const aplicarSelecao = (lista: string[] | null) => {
+    if (lista) for (const k of SECAO_KEYS) { const flag = flagDaSecao(k); if (flag) FLAG_SETTERS[flag](lista.includes(k)); }
+    setSecoesDocumento(lista ? [...lista] : null);
   };
-  // Cláusulas com chave própria (Cláusulas Jurídicas / Estrutura): mantém a
-  // seleção em sincronia quando o pedido já tem seções escolhidas.
-  const setClausula = (key: SecaoDocKey) => (ligar: boolean) => {
-    const flag = flagDaSecao(key);
-    if (flag) FLAG_SETTERS[flag](ligar);
-    if (secoesDocumento) setSecoesDocumento(alternarSecao(secoesDocumento, key, ligar));
+  const persistirPadraoEmpresa = async (novo: SecoesPadraoEmpresa, msgOk: string): Promise<boolean> => {
+    if (!onSalvarPadraoSecoes) return false;
+    setSalvandoPadrao(true);
+    try {
+      await onSalvarPadraoSecoes(novo);
+      setPadraoEmpresa(novo);
+      showToast(msgOk);
+      return true;
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Não foi possível salvar o padrão.');
+      return false;
+    } finally {
+      setSalvandoPadrao(false);
+    }
+  };
+  const salvarComoPadrao = async () => {
+    if (!pedidoTipo) return;
+    const nome = PEDIDO_TIPO_LABELS[pedidoTipo];
+    if (!await requestConfirm(`Salvar esta seleção como novo padrão de "${nome}"? Todo pedido NOVO desse tipo já virá assim, para todos os usuários. Pedidos existentes não mudam.`)) return;
+    await persistirPadraoEmpresa(atualizarPadraoEmpresa(padraoEmpresa, pedidoTipo, secoesAtivas), `Novo padrão de "${nome}" salvo.`);
+  };
+  // Restaurar padrão: descarta o padrão salvo da empresa (quando há e o perfil
+  // pode) e volta as linhas à configuração original do sistema para o tipo.
+  const restaurarPadrao = async () => {
+    if (!pedidoTipo) return;
+    const nome = PEDIDO_TIPO_LABELS[pedidoTipo];
+    // Sem permissão para mexer no padrão da empresa: volta ao padrão salvo dela.
+    if (padraoEmpresaTipo && !podeSalvarPadraoSecoes) {
+      aplicarSelecao(padraoEmpresaTipo);
+      return;
+    }
+    if (padraoEmpresaTipo && podeSalvarPadraoSecoes) {
+      if (!await requestConfirm(`Descartar o padrão salvo de "${nome}" e voltar à configuração original do sistema? Vale para os próximos pedidos desse tipo.`)) return;
+      const ok = await persistirPadraoEmpresa(atualizarPadraoEmpresa(padraoEmpresa, pedidoTipo, null), `Padrão original de "${nome}" restaurado.`);
+      if (!ok) return;
+    }
+    aplicarSelecao(secoesPadraoDoTipo(pedidoTipo));
+    setSecoesDocumento(null);
   };
 
   // Personalizado começa do zero: esvazia o que ainda é texto pré-preenchido.
@@ -671,10 +727,11 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     setTextosTouched(true);
   };
 
-  // Troca de tipo: as seções voltam ao padrão do novo tipo (destacadas no editor).
+  // Troca de tipo: as linhas da Estrutura voltam ao padrão do novo tipo (o da
+  // empresa quando salvo, senão o do sistema).
   const handleTipoChange = (t: PedidoTipo | '') => {
     setPedidoTipo(t);
-    setSecoesDocumento(null);
+    aplicarSelecao(padraoEmpresaDoTipo(t, padraoEmpresa));
     if (t === 'personalizado' && ehNovaProposta) limparPreenchimentoPadrao();
   };
 
@@ -1282,20 +1339,6 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                 </p>
               </div>
 
-              {/* Seções do documento — toggles para TODOS os tipos */}
-              <div className="sm:col-span-2">
-                <SecoesDocumentoEditor
-                  tipo={pedidoTipo}
-                  ativas={secoesAtivas}
-                  padrao={secoesPadrao}
-                  personalizado={secoesSaoPersonalizadas}
-                  somenteMaterial={somenteMaterial}
-                  onToggle={setSecao}
-                  onRestaurarPadrao={() => setSecoesDocumento(null)}
-                  onDefinirTodas={definirTodasSecoes}
-                />
-              </div>
-
               {/* Modalidade comercial (natureza) — decide seções técnicas × fornecimento */}
               <div className="sm:col-span-2">
                 <label className={labelCls}>Modalidade comercial</label>
@@ -1545,6 +1588,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           {/* ---- Lista de Materiais (puxa do Estoque) ---- */}
           <Accordion
             title="Lista de Materiais"
+            inativo={inativa('itens')}
             icon={<Wrench className="w-4 h-4 text-danger" />}
             open={!!open.materiais}
             onToggle={() => toggle('materiais')}
@@ -1579,6 +1623,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           {!somenteMaterial && (
           <Accordion
             title="Lista de Serviços"
+            inativo={inativa('itens')}
             icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />}
             open={!!open.servicos}
             onToggle={() => toggle('servicos')}
@@ -1609,12 +1654,13 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
 
           {/* ---- Accordions de conteúdo (seções técnicas — ocultas em Somente Material) ---- */}
           {!somenteMaterial && (<>
-          <Accordion title="Objetivo da Proposta" icon={<FileText className="w-4 h-4 text-danger" />} open={!!open.objetivo} onToggle={() => toggle('objetivo')}>
+          <Accordion title="Objetivo da Proposta" inativo={inativa('visao')} icon={<FileText className="w-4 h-4 text-danger" />} open={!!open.objetivo} onToggle={() => toggle('objetivo')}>
             <textarea rows={3} value={objetivo} onChange={(e) => setObjetivo(e.target.value)} placeholder="Objetivo geral da proposta..." className={inputCls} />
           </Accordion>
 
           <Accordion
             title="Carta de Apresentação"
+            inativo={inativa('carta')}
             icon={<FileText className="w-4 h-4 text-primary" />}
             open={!!open.carta}
             onToggle={() => toggle('carta')}
@@ -1639,7 +1685,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             <p className="text-[10px] text-fg-muted mt-1">Aparece na 2ª página do PDF, assinada pelo responsável comercial.</p>
           </Accordion>
 
-          <Accordion title="Diretrizes Normativas" icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />} open={!!open.diretrizes} onToggle={() => toggle('diretrizes')}>
+          <Accordion title="Diretrizes Normativas" inativo={inativa('visao')} icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />} open={!!open.diretrizes} onToggle={() => toggle('diretrizes')}>
             <div className="flex items-center justify-between gap-2 mb-2">
               <p className="text-[11px] text-fg-muted">
                 {diretrizesManual === null ? 'Sugeridas automaticamente conforme Área(s) + Tipo de serviço.' : 'Editadas manualmente — mudanças de Área/Serviço não alteram esta lista.'}
@@ -1653,19 +1699,19 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             <ListEditor items={diretrizes} numbered onAdd={() => addStr(setDiretrizes, 'ABNT NBR ')} onUpdate={(i, v) => updStr(setDiretrizes, i, v)} onRemove={(i) => rmStr(setDiretrizes, i)} addLabel="Adicionar norma" />
           </Accordion>
 
-          <Accordion title="Escopo Técnico dos Serviços" icon={<Wrench className="w-4 h-4 text-danger" />} open={!!open.escopo} onToggle={() => toggle('escopo')}>
+          <Accordion title="Escopo Técnico dos Serviços" inativo={inativa('escopo')} icon={<Wrench className="w-4 h-4 text-danger" />} open={!!open.escopo} onToggle={() => toggle('escopo')}>
             <textarea rows={4} value={escopoServico} onChange={(e) => setEscopoServico(e.target.value)} className={inputCls} />
           </Accordion>
 
-          <Accordion title="Entregáveis do Projeto" icon={<CheckCircle className="w-4 h-4 text-emerald-600" />} open={!!open.entregaveis} onToggle={() => toggle('entregaveis')}>
+          <Accordion title="Entregáveis do Projeto" inativo={inativa('entregaveis')} icon={<CheckCircle className="w-4 h-4 text-emerald-600" />} open={!!open.entregaveis} onToggle={() => toggle('entregaveis')}>
             <ListEditor items={entregaveis} onAdd={() => addStr(setEntregaveis, 'Documento de entregável')} onUpdate={(i, v) => updStr(setEntregaveis, i, v)} onRemove={(i) => rmStr(setEntregaveis, i)} addLabel="Adicionar entregável" />
           </Accordion>
 
-          <Accordion title="Premissas Adotadas" icon={<ShieldCheck className="w-4 h-4 text-primary" />} open={!!open.premissas} onToggle={() => toggle('premissas')}>
+          <Accordion title="Premissas Adotadas" inativo={inativa('premissas')} icon={<ShieldCheck className="w-4 h-4 text-primary" />} open={!!open.premissas} onToggle={() => toggle('premissas')}>
             <ListEditor items={premissas} onAdd={() => addStr(setPremissas, 'Acesso livre e facilitado')} onUpdate={(i, v) => updStr(setPremissas, i, v)} onRemove={(i) => rmStr(setPremissas, i)} addLabel="Adicionar premissa" />
           </Accordion>
 
-          <Accordion title="Incluso / Não incluso" icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />} open={!!open.incluso} onToggle={() => toggle('incluso')}>
+          <Accordion title="Incluso / Não incluso" inativo={inativa('incluso')} icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />} open={!!open.incluso} onToggle={() => toggle('incluso')}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className={labelCls}>Incluso no escopo</label>
@@ -1707,11 +1753,11 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             </div>
           </Accordion>
 
-          <Accordion title="Responsabilidades da Contratada" icon={<CheckCircle className="w-4 h-4 text-emerald-600" />} open={!!open.respContratada} onToggle={() => toggle('respContratada')}>
+          <Accordion title="Responsabilidades da Contratada" inativo={inativa('servicos')} icon={<CheckCircle className="w-4 h-4 text-emerald-600" />} open={!!open.respContratada} onToggle={() => toggle('respContratada')}>
             <ListEditor items={respContratada} onAdd={() => addStr(setRespContratada, 'Fornecer equipe qualificada')} onUpdate={(i, v) => updStr(setRespContratada, i, v)} onRemove={(i) => rmStr(setRespContratada, i)} addLabel="Adicionar item" />
           </Accordion>
 
-          <Accordion title="Obrigações da Contratante" icon={<Building2 className="w-4 h-4 text-blue-600" />} open={!!open.respContratante} onToggle={() => toggle('respContratante')}>
+          <Accordion title="Obrigações da Contratante" inativo={inativa('obrigacoes')} icon={<Building2 className="w-4 h-4 text-blue-600" />} open={!!open.respContratante} onToggle={() => toggle('respContratante')}>
             <ListEditor items={respContratante} onAdd={() => addStr(setRespContratante, 'Liberar autorizações')} onUpdate={(i, v) => updStr(setRespContratante, i, v)} onRemove={(i) => rmStr(setRespContratante, i)} addLabel="Adicionar item" />
           </Accordion>
 
@@ -1719,6 +1765,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               Todos ficam VISÍVEIS aqui e são a fonte de verdade do documento. */}
           <Accordion
             title="Descrição dos Serviços Ofertados"
+            inativo={inativa('servicos')}
             icon={<Wrench className="w-4 h-4 text-danger" />}
             open={!!open.descServicos}
             onToggle={() => toggle('descServicos')}
@@ -1767,7 +1814,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           {secaoListaBlock({ openKey: 'secTermo', fonteKey: 'termoAceite', campo: 'termoAceiteTexto', titulo: 'Termo de Aceite da Proposta', icon: <CheckCircle className="w-4 h-4 text-emerald-600" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
           {secaoListaBlock({ openKey: 'secCondGerais', fonteKey: 'condicoesGerais', campo: 'condicoesGeraisTexto', titulo: 'Condições Gerais', icon: <FileText className="w-4 h-4 text-fg-secondary" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
 
-          <Accordion title="Conclusão" icon={<FileText className="w-4 h-4 text-primary" />} open={!!open.conclusao} onToggle={() => toggle('conclusao')}>
+          <Accordion title="Conclusão" inativo={inativa('conclusao')} icon={<FileText className="w-4 h-4 text-primary" />} open={!!open.conclusao} onToggle={() => toggle('conclusao')}>
             <div className="flex items-center justify-between mb-1">
               <span className="text-[11px] text-fg-muted">Texto de fechamento da proposta.</span>
               {tipoServico && (
@@ -1786,7 +1833,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           </>)}
 
           {/* ---- Condições de Pagamento (tags pré-formatadas) ---- */}
-          <Accordion title="Condições de Pagamento" icon={<CreditCard className="w-4 h-4 text-emerald-600" />} open={!!open.pagamento} onToggle={() => toggle('pagamento')}>
+          <Accordion title="Condições de Pagamento" inativo={inativa('pagamento')} icon={<CreditCard className="w-4 h-4 text-emerald-600" />} open={!!open.pagamento} onToggle={() => toggle('pagamento')}>
             <div className="space-y-4">
               <div>
                 <label className={labelCls}>Formas de Pagamento</label>
@@ -1805,39 +1852,56 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           <Accordion title="Cláusulas Jurídicas" icon={<Scale className="w-4 h-4 text-danger" />} open={!!open.clausulas} onToggle={() => toggle('clausulas')}>
             <p className="text-[11px] text-fg-secondary mb-2">Marque os blocos que devem sair no PDF. Desmarcado = título e texto totalmente omitidos.</p>
             <div className="space-y-2">
-              <ClauseRow label="Multas por atraso de pagamento" hint="Juros de mora e multa por inadimplência" checked={incluirMultas} onChange={setClausula('multas')} />
-              <ClauseRow label="Limitação de responsabilidade" checked={incluirLimitacao} onChange={setClausula('limitacao')} />
-              <ClauseRow label="Confidencialidade e sigilo" checked={incluirConfidencialidade} onChange={setClausula('confidencialidade')} />
-              <ClauseRow label="Condições Gerais" checked={incluirCondicoesGerais} onChange={setClausula('condicoesGerais')} />
-              <ClauseRow label="Segurança do Trabalho" checked={incluirSeguranca} onChange={setClausula('seguranca')} />
-              <ClauseRow label="Termo de Aceite da Proposta" checked={incluirTermoAceite} onChange={setClausula('termoAceite')} />
+              <ClauseRow label="Multas por atraso de pagamento" hint="Juros de mora e multa por inadimplência" checked={secaoOn('multas')} onChange={(on) => setSecao('multas', on)} />
+              <ClauseRow label="Limitação de responsabilidade" checked={secaoOn('limitacao')} onChange={(on) => setSecao('limitacao', on)} />
+              <ClauseRow label="Confidencialidade e sigilo" checked={secaoOn('confidencialidade')} onChange={(on) => setSecao('confidencialidade', on)} />
+              <ClauseRow label="Condições Gerais" checked={secaoOn('condicoesGerais')} onChange={(on) => setSecao('condicoesGerais', on)} />
+              <ClauseRow label="Segurança do Trabalho" checked={secaoOn('seguranca')} onChange={(on) => setSecao('seguranca', on)} />
+              <ClauseRow label="Termo de Aceite da Proposta" checked={secaoOn('termoAceite')} onChange={(on) => setSecao('termoAceite', on)} />
             </div>
           </Accordion>
 
-          {/* ---- Estrutura da proposta (§10/§11/§12: prévia + ativar/desativar + reordenar) ---- */}
+          {/* ---- Estrutura da proposta: Sim/Não por seção (fonte única de secoesDocumento) + reordenar ---- */}
           <Accordion title="Estrutura da proposta" icon={<FileText className="w-4 h-4 text-primary" />} open={!!open.estrutura} onToggle={() => toggle('estrutura')}>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[11px] text-fg-secondary">Prévia do índice. Ative/desative as opcionais e use ↑↓ para reordenar — a numeração é recalculada sozinha.</p>
+            <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
+              <p className="text-[11px] text-fg-secondary flex-1 min-w-[220px]">
+                Escolha <b>Sim</b> ou <b>Não</b> para cada seção do documento e use ▲▼ para reordenar — a numeração é recalculada sozinha.
+                {pedidoTipo
+                  ? <> Padrão de <b>{PEDIDO_TIPO_LABELS[pedidoTipo]}</b>{padraoEmpresaTipo ? ' (salvo pela empresa)' : ''}.</>
+                  : ' Sem tipo definido: documento completo.'}
+              </p>
               {ordemSecoes.length > 0 && (
                 <button type="button" onClick={() => setOrdemSecoes([])} className="shrink-0 text-[10px] font-bold uppercase text-primary hover:text-danger">Ordem padrão</button>
               )}
             </div>
+            {pedidoTipo && (difereDoPadrao || (padraoEmpresaTipo && podeSalvarPadraoSecoes)) && (
+              <div className="flex flex-wrap items-center gap-2 mb-2 rounded-lg border border-warning/40 bg-warning-soft px-3 py-2">
+                <span className="text-[11px] text-fg-secondary flex-1 min-w-[180px]">
+                  {difereDoPadrao ? `Esta seleção difere do padrão de ${PEDIDO_TIPO_LABELS[pedidoTipo]}.` : `${PEDIDO_TIPO_LABELS[pedidoTipo]} usa um padrão salvo pela empresa.`}
+                </span>
+                {difereDoPadrao && podeSalvarPadraoSecoes && onSalvarPadraoSecoes && (
+                  <button type="button" disabled={salvandoPadrao} onClick={salvarComoPadrao} className="text-[10px] font-bold uppercase px-2.5 py-1 rounded bg-primary text-primary-fg hover:bg-primary-hover disabled:opacity-50">
+                    Salvar como novo padrão do {PEDIDO_TIPO_LABELS[pedidoTipo]}?
+                  </button>
+                )}
+                <button type="button" disabled={salvandoPadrao} onClick={restaurarPadrao} className="text-[10px] font-bold uppercase px-2.5 py-1 rounded border border-border-strong text-fg-secondary hover:text-primary disabled:opacity-50">
+                  Restaurar padrão
+                </button>
+              </div>
+            )}
             {(() => {
-              const secToggle: Record<string, { v: boolean; set: (b: boolean) => void }> = {
-                seguranca: { v: incluirSeguranca, set: setClausula('seguranca') },
-                multas: { v: incluirMultas, set: setClausula('multas') },
-                limitacao: { v: incluirLimitacao, set: setClausula('limitacao') },
-                confidencialidade: { v: incluirConfidencialidade, set: setClausula('confidencialidade') },
-                termoAceite: { v: incluirTermoAceite, set: setClausula('termoAceite') },
-                condicoesGerais: { v: incluirCondicoesGerais, set: setClausula('condicoesGerais') },
-              };
               const temMateriais = equipmentItems.some((it) => it.tipo !== 'servico');
+              const explicito = secoesSaoPersonalizadas || pedidoTipo === 'personalizado';
               const estrutura = ordenarEstrutura(
                 montarEstruturaProposta(
                   { tipoServico, incluirSeguranca, incluirMultas, incluirLimitacao, incluirConfidencialidade, incluirTermoAceite, incluirCondicoesGerais },
-                  secoesSaoPersonalizadas || pedidoTipo === 'personalizado'
-                    ? { cartaVisivel: true, historicoVisivel: true, temMateriais, selecao: new Set<string>(secoesAtivas) }
-                    : { cartaVisivel: nivelProposta !== 'simples', historicoVisivel: nivelProposta !== 'simples', temMateriais }
+                  {
+                    cartaVisivel: explicito || nivelProposta !== 'simples',
+                    historicoVisivel: explicito || nivelProposta !== 'simples',
+                    temMateriais,
+                    garantiaVisivel: renderWarranty(warranty).hasAny,
+                    selecao: new Set<string>(secoesAtivas),
+                  }
                 ),
                 ordemSecoes
               );
@@ -1855,12 +1919,13 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               return (
                 <div className="space-y-1">
                   {estrutura.map((s) => {
-                    const tg = secToggle[s.key];
+                    const key = s.key as SecaoDocKey;
+                    const on = secaoOn(key);
                     const podeMover = !fixa(s.key);
                     const mi = meioKeys.indexOf(s.key);
                     if (s.visible) n += 1;
                     return (
-                      <div key={s.key} className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 ${s.visible ? 'bg-surface border-border' : 'bg-surface-2 border-dashed border-border'}`}>
+                      <div key={s.key} className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 transition-colors ${on ? 'bg-surface border-border' : 'bg-surface-2 border-dashed border-border-strong'}`}>
                         {podeMover ? (
                           <div className="flex flex-col shrink-0 -my-1">
                             <button type="button" onClick={() => mover(s.key, -1)} disabled={mi <= 0} className="text-fg-muted hover:text-primary disabled:opacity-25 leading-none text-[11px]" title="Subir">▲</button>
@@ -1869,13 +1934,15 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                         ) : (
                           <div className="w-3 shrink-0" />
                         )}
-                        <span className={`font-data-mono text-[11px] font-bold shrink-0 ${s.visible ? 'text-primary' : 'text-fg-muted'}`}>{s.visible ? String(n).padStart(2, '0') : '--'}</span>
-                        <span className={`text-xs truncate flex-1 ${s.visible ? 'text-fg-secondary' : 'text-fg-muted line-through'}`}>{s.titulo}{fixa(s.key) && <span className="text-[9px] text-fg-muted ml-1">(fixa)</span>}</span>
-                        {tg ? (
-                          <button type="button" onClick={() => tg.set(!tg.v)} className={`shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded ${tg.v ? 'text-emerald-700 bg-emerald-50' : 'text-fg-muted bg-surface-3'}`}>{tg.v ? 'Ativa' : 'Inativa'}</button>
-                        ) : s.opcional ? (
-                          <span className="text-[9px] text-fg-muted shrink-0">automática</span>
-                        ) : null}
+                        <span className={`font-data-mono text-[11px] font-bold shrink-0 w-5 ${s.visible ? 'text-primary' : 'text-fg-muted'}`}>{s.visible ? String(n).padStart(2, '0') : '--'}</span>
+                        <span className={`text-xs truncate flex-1 ${on ? 'text-primary font-semibold' : 'text-fg-muted'}`}>
+                          {s.titulo}
+                          {on && !s.visible && <span className="text-[9px] font-normal text-fg-muted ml-1">(sem conteúdo — não sai)</span>}
+                        </span>
+                        <div role="radiogroup" aria-label={`${s.titulo}: aparece no documento`} className="flex shrink-0 rounded-md border border-border overflow-hidden">
+                          <button type="button" role="radio" aria-checked={on} onClick={() => !on && setSecao(key, true)} className={`text-[10px] font-bold uppercase px-2 py-0.5 ${on ? 'bg-success-soft text-success' : 'bg-surface text-fg-muted hover:text-fg-secondary'}`}>Sim</button>
+                          <button type="button" role="radio" aria-checked={!on} onClick={() => on && setSecao(key, false)} className={`text-[10px] font-bold uppercase px-2 py-0.5 border-l border-border ${!on ? 'bg-surface-3 text-fg-secondary' : 'bg-surface text-fg-muted hover:text-fg-secondary'}`}>Não</button>
+                        </div>
                       </div>
                     );
                   })}
@@ -1886,7 +1953,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           </>)}
 
           {/* ---- Garantia (bloco próprio, visível) ---- */}
-          <Accordion title="Garantia" icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />} open={!!open.garantia} onToggle={() => toggle('garantia')}>
+          <Accordion title="Garantia" inativo={inativa('garantia')} icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />} open={!!open.garantia} onToggle={() => toggle('garantia')}>
             {isLegacyWarranty(warranty) ? (
               <div className="space-y-2">
                 <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">Garantia herdada em texto livre. A edição preserva o histórico; converta para o formato estruturado quando quiser separar mão de obra e materiais.</p>

@@ -201,3 +201,50 @@ export function igualAoPadrao(sel: readonly string[], tipo: PedidoTipo | '' | un
 export function secoesExtras(sel: Set<SecaoDocKey>, nativas: readonly SecaoDocKey[]): SecaoDocKey[] {
   return SECAO_KEYS.filter((k) => sel.has(k) && !nativas.includes(k));
 }
+
+// ===================== Padrão da EMPRESA por tipo (0122) =====================
+// "Salvar como novo padrão do Orçamento": a empresa pode trocar o padrão de um
+// tipo. Ele só vale para pedidos NOVOS (ou ao escolher o tipo): o editor grava
+// a seleção no próprio pedido, então o PDF nunca depende deste mapa e pedidos
+// existentes não mudam.
+
+export type MapaPadraoEmpresa = Partial<Record<PedidoTipo, string[]>>;
+
+/** Padrão salvo pela empresa para o tipo (normalizado), ou null se não houver. */
+export function padraoEmpresaDoTipo(tipo: PedidoTipo | '' | undefined, empresa: MapaPadraoEmpresa | undefined | null): SecaoDocKey[] | null {
+  if (!tipo || !empresa) return null;
+  const lista = empresa[tipo];
+  return Array.isArray(lista) ? normalizarSecoes(lista) : null;
+}
+
+/** Padrão de referência do tipo: o da empresa quando existe, senão o do sistema. */
+export function padraoReferenciaDoTipo(
+  tipo: PedidoTipo | '' | undefined,
+  empresa: MapaPadraoEmpresa | undefined | null,
+  flags: FlagsSecoes = {},
+): SecaoDocKey[] {
+  return padraoEmpresaDoTipo(tipo, empresa) ?? secoesPadraoDoTipo(tipo, flags);
+}
+
+/** Duas seleções são iguais (ignorando ordem/repetição/chaves inválidas)? */
+export function mesmasSecoes(a: readonly string[], b: readonly string[]): boolean {
+  const x = normalizarSecoes(a);
+  const y = normalizarSecoes(b);
+  return x.length === y.length && x.every((k, i) => k === y[i]);
+}
+
+/**
+ * Novo mapa da empresa após salvar (`lista`) ou restaurar (`null`) o padrão de
+ * um tipo. Salvar exatamente o padrão do sistema equivale a restaurar (remove
+ * a chave), para o mapa não guardar redundância.
+ */
+export function atualizarPadraoEmpresa(
+  empresa: MapaPadraoEmpresa | undefined | null,
+  tipo: PedidoTipo,
+  lista: readonly string[] | null,
+): MapaPadraoEmpresa {
+  const out: MapaPadraoEmpresa = { ...(empresa || {}) };
+  if (lista === null || mesmasSecoes(lista, secoesPadraoDoTipo(tipo))) delete out[tipo];
+  else out[tipo] = normalizarSecoes(lista);
+  return out;
+}
