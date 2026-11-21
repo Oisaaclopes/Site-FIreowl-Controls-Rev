@@ -63,6 +63,18 @@ export interface NotaFiscalLembrete {
   atualizadaEm?: string;
   /** Quem resolveu (nome/id) — auditoria leve. */
   atualizadaPor?: string;
+  /** Chave de acesso (NF-e 44 díg. / NFS-e Nacional 50 díg.), lida do XML. */
+  chaveAcesso?: string;
+  /** Arquivos da nota no bucket privado `notas-fiscais` (migration 0121). */
+  anexos?: { xml?: NotaFiscalAnexo; pdf?: NotaFiscalAnexo };
+}
+
+/** Arquivo da NF guardado no storage privado (nunca URL pública). */
+export interface NotaFiscalAnexo {
+  path: string;
+  nome: string;
+  tamanho?: number;
+  enviadoEm: string;
 }
 
 export interface PedidoEquipmentItem {

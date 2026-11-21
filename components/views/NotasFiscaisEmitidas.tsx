@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { BadgeCheck, ChevronDown, ChevronUp, Hash, RotateCcw, Search } from 'lucide-react';
-import { NotaFiscalRegistroModal } from '@/components/views/NotaFiscalRegistroModal';
+import { NotaFiscalRegistroModal, abrirAnexoNotaFiscal } from '@/components/views/NotaFiscalRegistroModal';
 import type { Pedido, UserRole } from '@/lib/types';
 import { requestConfirm, showToast } from '@/components/ui/Feedback';
 import {
@@ -55,7 +55,7 @@ export const NotasFiscaisEmitidas: React.FC<Props> = ({ pedidos, userRole, curre
     return emitidas.filter((p) => {
       if (mes !== 'TODOS' && notaFiscalDataRef(p).slice(0, 7) !== mes) return false;
       if (!q) return true;
-      return [p.clienteNome, p.numeroPedido, p.referencia, p.proposal?.notaFiscal?.numero]
+      return [p.clienteNome, p.numeroPedido, p.referencia, p.proposal?.notaFiscal?.numero, p.proposal?.notaFiscal?.chaveAcesso]
         .some((v) => (v || '').toLowerCase().includes(q));
     });
   }, [emitidas, busca, mes]);
@@ -84,10 +84,12 @@ export const NotasFiscaisEmitidas: React.FC<Props> = ({ pedidos, userRole, curre
     { label: 'Faturado no mês', value: brl(resumo.valorMes), detail: 'Valor dos pedidos com NF', tone: 'text-emerald-700' },
     { label: 'Total emitidas', value: String(resumo.total), detail: brl(resumo.valorTotal), tone: 'text-fg' },
     {
-      label: 'Sem nº de NF',
-      value: String(resumo.semNumero),
-      detail: resumo.semNumero ? 'Informe o número para controle' : 'Todas numeradas',
-      tone: resumo.semNumero ? 'text-amber-700' : 'text-fg-secondary',
+      label: 'Controle incompleto',
+      value: String(emitidas.filter((p) => !p.proposal?.notaFiscal?.numero || !p.proposal?.notaFiscal?.anexos?.xml).length),
+      detail: resumo.semNumero || resumo.semXml
+        ? `${resumo.semNumero} sem nº · ${resumo.semXml} sem XML`
+        : 'Todas com nº e XML',
+      tone: resumo.semNumero || resumo.semXml ? 'text-amber-700' : 'text-fg-secondary',
     },
   ];
 
@@ -163,6 +165,7 @@ export const NotasFiscaisEmitidas: React.FC<Props> = ({ pedidos, userRole, curre
                     <th className="px-4 py-2 font-semibold">Nº NF</th>
                     <th className="px-4 py-2 font-semibold">Emissão</th>
                     <th className="px-4 py-2 font-semibold text-right">Valor</th>
+                    <th className="px-4 py-2 font-semibold">Arquivos</th>
                     <th className="px-4 py-2 font-semibold">Registrado por</th>
                     <th className="px-4 py-2 font-semibold text-right">Ação</th>
                   </tr>
@@ -183,6 +186,17 @@ export const NotasFiscaisEmitidas: React.FC<Props> = ({ pedidos, userRole, curre
                         </td>
                         <td className="px-4 py-2.5 text-fg-secondary">{fmtData(nf?.dataEmissao || nf?.atualizadaEm)}</td>
                         <td className="px-4 py-2.5 text-right font-data-mono text-fg">{brl(pedidoValorNota(ped))}</td>
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center gap-1">
+                            {nf?.anexos?.xml && (
+                              <button type="button" onClick={() => abrirAnexoNotaFiscal(nf.anexos!.xml!)} title={`Abrir ${nf.anexos.xml.nome}`} className="rounded border border-border px-1.5 py-0.5 text-[10px] font-bold text-fg-secondary hover:text-primary hover:border-primary">XML</button>
+                            )}
+                            {nf?.anexos?.pdf && (
+                              <button type="button" onClick={() => abrirAnexoNotaFiscal(nf.anexos!.pdf!)} title={`Abrir ${nf.anexos.pdf.nome}`} className="rounded border border-border px-1.5 py-0.5 text-[10px] font-bold text-fg-secondary hover:text-red-600 hover:border-red-400">PDF</button>
+                            )}
+                            {!nf?.anexos?.xml && !nf?.anexos?.pdf && <span className="text-[10px] text-fg-muted">—</span>}
+                          </div>
+                        </td>
                         <td className="px-4 py-2.5 text-fg-secondary">{nf?.atualizadaPor || '—'}</td>
                         <td className="px-4 py-2.5">
                           <div className="flex items-center justify-end gap-1.5">

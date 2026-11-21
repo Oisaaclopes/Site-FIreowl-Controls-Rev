@@ -93,7 +93,14 @@ export const podeInformarNotaFiscal = (p: Pedido): boolean =>
 /** Registra (ou corrige) a NF como emitida — nº/data/observação opcionais. */
 export const registrarNotaFiscalEmitida = (
   p: Pedido,
-  dados: { numero?: string; dataEmissao?: string; observacao?: string },
+  dados: {
+    numero?: string;
+    dataEmissao?: string;
+    observacao?: string;
+    chaveAcesso?: string;
+    /** Só substitui quando informado (undefined preserva os anexos atuais). */
+    anexos?: NotaFiscalLembrete['anexos'];
+  },
   autor?: string,
 ): Pedido => {
   const limpo = (v?: string) => (v && v.trim() ? v.trim() : undefined);
@@ -108,6 +115,8 @@ export const registrarNotaFiscalEmitida = (
       numero: limpo(dados.numero),
       dataEmissao: limpo(dados.dataEmissao) || new Date().toISOString().slice(0, 10),
       observacao: limpo(dados.observacao),
+      chaveAcesso: limpo(dados.chaveAcesso),
+      ...(dados.anexos !== undefined ? { anexos: dados.anexos } : {}),
     },
     autor,
   );
@@ -138,6 +147,8 @@ export const resumoNotasEmitidas = (pedidos: Pedido[], mesRef = new Date().toISO
     mes: doMes.length,
     valorMes: soma(doMes),
     semNumero: emitidas.filter((p) => !p.proposal?.notaFiscal?.numero).length,
+    /** Emitidas sem o XML (documento fiscal) anexado. */
+    semXml: emitidas.filter((p) => !p.proposal?.notaFiscal?.anexos?.xml).length,
   };
 };
 

@@ -150,7 +150,7 @@ describe('notaFiscal — NFs emitidas (card + selo)', () => {
       [emitida('a', '2026-10-05', 500, '123'), emitida('b', '2026-11-10', 1500), emitida('c', '2026-11-20', 250, '9')],
       '2026-11',
     );
-    expect(r).toEqual({ total: 3, valorTotal: 2250, mes: 2, valorMes: 1750, semNumero: 1 });
+    expect(r).toEqual({ total: 3, valorTotal: 2250, mes: 2, valorMes: 1750, semNumero: 1, semXml: 3 });
   });
 });
 
@@ -176,5 +176,20 @@ describe('notaFiscal — registro antecipado (a partir de ACEITO)', () => {
     const r = registrarNotaFiscalEmitida(ped({ status: 'aceito' }), { numero: '  ', observacao: '' });
     expect(r.proposal.notaFiscal?.numero).toBeUndefined();
     expect(r.proposal.notaFiscal?.dataEmissao).toBe(new Date().toISOString().slice(0, 10));
+  });
+});
+
+describe('notaFiscal — anexos e chave de acesso', () => {
+  const anexo = (n: string) => ({ path: `ped-1/${n}`, nome: n, enviadoEm: '2026-11-20T00:00:00.000Z' });
+
+  it('grava chave e anexos; edição sem anexos preserva os existentes', () => {
+    const com = registrarNotaFiscalEmitida(ped({ status: 'aceito' }), {
+      numero: '1', chaveAcesso: ' 4126 ', anexos: { xml: anexo('n.xml'), pdf: anexo('n.pdf') },
+    });
+    expect(com.proposal.notaFiscal?.chaveAcesso).toBe('4126');
+    expect(com.proposal.notaFiscal?.anexos?.pdf?.nome).toBe('n.pdf');
+    const editado = registrarNotaFiscalEmitida(com, { numero: '2', chaveAcesso: '4126' });
+    expect(editado.proposal.notaFiscal?.anexos?.xml?.nome).toBe('n.xml');
+    expect(editado.proposal.notaFiscal?.numero).toBe('2');
   });
 });
