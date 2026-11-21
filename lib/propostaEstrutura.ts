@@ -79,8 +79,11 @@ export function montarEstruturaProposta(p: EstruturaProposalLike, ctx: Estrutura
   const out: SecaoEstrutura[] = [];
   for (const s of base) {
     const guarda = s.key === 'carta' ? ctx.cartaVisivel : s.key === 'historico' ? ctx.historicoVisivel : s.key === 'garantia' ? ctx.garantiaVisivel !== false : true;
-    out.push({ ...s, visible: sel.has(s.key) && guarda, opcional: true });
+    const marcada = s.key === 'itens' ? sel.has('itens') || sel.has('itensServicos') : sel.has(s.key);
+    out.push({ ...s, visible: marcada && guarda, opcional: true });
+    if (s.key === 'visao') out.push({ key: 'normas', titulo: 'Diretrizes Normativas', visible: sel.has('normas'), opcional: true });
     if (s.key === 'premissas') out.push({ key: 'incluso', titulo: 'Incluso / Não incluso', visible: sel.has('incluso'), opcional: true });
+    if (s.key === 'servicos') out.push({ key: 'responsabilidades', titulo: 'Responsabilidades da Contratada', visible: sel.has('responsabilidades'), opcional: true });
     if (s.key === 'servicos') out.push({ key: 'entregaveis', titulo: 'Entregáveis do Projeto', visible: sel.has('entregaveis'), opcional: true });
   }
   return out;

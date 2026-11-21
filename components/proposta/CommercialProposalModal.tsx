@@ -30,8 +30,7 @@ import {
 import { PEDIDO_TIPO_LABELS, PEDIDO_TIPO_ORDER } from '@/lib/documentos';
 import { MODALIDADE_LABELS, MODALIDADE_ORDER, FRETE_MODO_LABELS, IMPOSTO_MODO_LABELS, OBS_DISPONIBILIDADE } from '@/lib/fornecimentoComercial';
 import { AREAS_PROPOSTA, TIPOS_SERVICO, conclusaoPorTipo, presetPorTipo } from '@/lib/propostaTitulo';
-import { montarEstruturaProposta, ordenarEstrutura, SECOES_FIXAS_INICIO, SECOES_FIXAS_FIM } from '@/lib/propostaEstrutura';
-import { SecaoDocKey, SECAO_KEYS, alternarSecao, atualizarPadraoEmpresa, flagDaSecao, igualAoPadrao, mesmasSecoes, normalizarSecoes, padraoEmpresaDoTipo, padraoReferenciaDoTipo, secoesPadraoDoTipo } from '@/lib/documentoSecoes';
+import { SecaoDocKey, SECAO_KEYS, SECAO_TITULO, alternarSecao, atualizarPadraoEmpresa, flagDaSecao, igualAoPadrao, mesmasSecoes, moverSecao, normalizarSecoes, ordenarSecoes, padraoEmpresaDoTipo, padraoReferenciaDoTipo, secoesPadraoDoTipo } from '@/lib/documentoSecoes';
 import { CARTA_APRESENTACAO } from '@/lib/propostaTextos';
 import { SECOES_TEXTO, servicosOfertadosPadrao, restaurarSecaoLista, fonteDaSecaoLista, fonteServicos } from '@/lib/propostaMaterializacao';
 import { normalizeUnitCode } from '@/lib/commercialUnits';
@@ -117,7 +116,7 @@ const Accordion: React.FC<{
   badge?: React.ReactNode;
   /** Seção do documento: Sim/Não direto no título (fonte de secoesDocumento).
    * Em "Não" o card fica apagado, mas continua editável. */
-  doc?: { on: boolean; set: (on: boolean) => void };
+  doc?: { on: boolean; set: (on: boolean) => void; up?: () => void; down?: () => void };
   children: React.ReactNode;
 }> = ({ title, icon, open, onToggle, badge, doc, children }) => {
   const inativo = doc ? !doc.on : false;
@@ -133,6 +132,12 @@ const Accordion: React.FC<{
           <span className={`flex-1 min-w-0 truncate font-bold uppercase text-sm ${inativo ? 'text-fg-muted' : 'text-primary'}`}>{title}</span>
           {badge}
         </button>
+        {doc && (doc.up || doc.down) && (
+          <div className="flex shrink-0 mr-1.5 rounded-md border border-border overflow-hidden" aria-label={`Posição de ${title} no documento`}>
+            <button type="button" onClick={doc.up} disabled={!doc.up} title="Subir no documento" className="px-1.5 py-1 text-[10px] leading-none text-fg-muted hover:text-primary hover:bg-surface-2 disabled:opacity-25 disabled:hover:bg-transparent">▲</button>
+            <button type="button" onClick={doc.down} disabled={!doc.down} title="Descer no documento" className="px-1.5 py-1 text-[10px] leading-none text-fg-muted hover:text-primary hover:bg-surface-2 border-l border-border disabled:opacity-25 disabled:hover:bg-transparent">▼</button>
+          </div>
+        )}
         {doc && (
           <div role="radiogroup" aria-label={`${title}: aparece no documento`} title="Aparece no documento?" className="flex shrink-0 rounded-md border border-border overflow-hidden">
             <button type="button" role="radio" aria-checked={doc.on} onClick={() => !doc.on && doc.set(true)} className={`text-[10px] font-bold uppercase px-2.5 py-1 ${doc.on ? 'bg-success-soft text-success' : 'bg-surface text-fg-muted hover:text-fg-secondary'}`}>Sim</button>
@@ -267,7 +272,15 @@ const TagSelect: React.FC<{ options: string[]; selected: string[]; onToggle: (v:
   </div>
 );
 
-// Chave de ativação de um bloco jurídico (checkbox).
+/** Seções que têm card de edição no editor (as demais ficam em "Outras seções"). */
+const CARDS_SECAO: SecaoDocKey[] = [
+  'carta', 'visao', 'normas', 'escopo', 'premissas', 'incluso', 'servicos', 'responsabilidades', 'entregaveis',
+  'embalagem', 'seguranca', 'obrigacoes', 'precos', 'impostos', 'pagamento', 'multas', 'limitacao', 'garantia',
+  'confidencialidade', 'termoAceite', 'condicoesGerais', 'conclusao',
+];
+/** Seções sem card próprio: Sim/Não numa linha compacta acima dos cards. */
+const SECOES_SEM_CARD: SecaoDocKey[] = ['historico', 'infoCompra', 'prazo', 'validade', 'aceite'];
+
 /**
  * Conteúdo pré-preenchido de um pedido NOVO. O tipo "Personalizado" começa do
  * zero: ao escolhê-lo num pedido novo, os campos que ainda têm este texto são
@@ -297,6 +310,7 @@ const PADRAO_NOVO = {
   condicoesPagamento: ['30% no aceite / 70% na entrega e laudo'],
 };
 
+// Chave de ativação de um bloco jurídico (checkbox).
 const ClauseRow: React.FC<{ label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }> = ({
   label,
   hint,
@@ -636,7 +650,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const [vigenciaMeses, setVigenciaMeses] = useState<number>(initialPedido?.proposal?.vigenciaMeses ?? 12);
 
   // ----------------- seções do documento (todos os tipos) -----------------
-  // Fonte única: o Sim/Não de cada linha da "Estrutura da proposta".
+  // Fonte única: o Sim/Não no título de cada card (e "Também no documento").
   // null = sem seleção própria → padrão do SISTEMA para o tipo (pedido antigo
   // gera exatamente como antes). Ver [[lib/documentoSecoes]].
   const [secoesDocumento, setSecoesDocumento] = useState<string[] | null>(initialProposal?.secoesDocumento ?? null);
@@ -644,8 +658,22 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const secoesPadraoSistema = secoesPadraoDoTipo(pedidoTipo, flagsSecoes);
   const secoesAtivas = secoesDocumento ? normalizarSecoes(secoesDocumento) : secoesPadraoSistema;
   const secaoOn = (key: SecaoDocKey) => secoesAtivas.includes(key);
-  // Sim/Não no título de cada card (Somente Material tem estrutura própria, sem toggles).
-  const docSecao = (key: SecaoDocKey) => (somenteMaterial ? undefined : { on: secaoOn(key), set: (on: boolean) => setSecao(key, on) });
+  // Ordem dos cards de seção no editor = ordem do documento (setas ▲▼ no título).
+  // As listas de Materiais/Serviços ficam no topo (só Sim/Não, sem setas).
+  const ordemCards: SecaoDocKey[] = somenteMaterial ? ['pagamento', 'garantia'] : ordenarSecoes(CARDS_SECAO, ordemSecoes);
+  const cardsMoveis: SecaoDocKey[] = ordemCards.filter((k) => k !== 'carta');
+  const moverCard = (key: SecaoDocKey, dir: -1 | 1) => setOrdemSecoes(moverSecao(ordemSecoes, key, dir, cardsMoveis));
+  // Sim/Não (e ▲▼) no título de cada card. Somente Material tem estrutura própria.
+  const docSecao = (key: SecaoDocKey) => {
+    if (somenteMaterial) return undefined;
+    const i = cardsMoveis.indexOf(key);
+    return {
+      on: secaoOn(key),
+      set: (on: boolean) => setSecao(key, on),
+      up: i > 0 ? () => moverCard(key, -1) : undefined,
+      down: i >= 0 && i < cardsMoveis.length - 1 ? () => moverCard(key, 1) : undefined,
+    };
+  };
   // Gravado no pedido só quando difere do padrão do sistema (Personalizado: sempre).
   const secoesSaoPersonalizadas = !!secoesDocumento && !igualAoPadrao(secoesDocumento, pedidoTipo, flagsSecoes);
   // Padrão da EMPRESA por tipo (0122): referência para "Salvar como novo padrão".
@@ -1287,6 +1315,322 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     </div>
   ) : null;
 
+  // Seções sem card próprio (Histórico, Pedido de Compra, Prazo, Validade, Aceite):
+  // Sim/Não numa linha compacta, sem card.
+  const outrasSecoes = somenteMaterial ? null : (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-1 text-[11px]">
+      <span className="font-bold uppercase text-fg-muted">Também no documento:</span>
+      {SECOES_SEM_CARD.map((k) => {
+        const on = secaoOn(k);
+        return (
+          <span key={k} className="inline-flex items-center gap-1.5">
+            <span className={on ? 'text-primary font-semibold' : 'text-fg-muted'}>{SECAO_TITULO[k]}</span>
+            <span role="radiogroup" aria-label={`${SECAO_TITULO[k]}: aparece no documento`} className="inline-flex rounded border border-border overflow-hidden">
+              <button type="button" role="radio" aria-checked={on} onClick={() => !on && setSecao(k, true)} className={`text-[9px] font-bold uppercase px-1.5 py-0.5 ${on ? 'bg-success-soft text-success' : 'bg-surface text-fg-muted'}`}>Sim</button>
+              <button type="button" role="radio" aria-checked={!on} onClick={() => on && setSecao(k, false)} className={`text-[9px] font-bold uppercase px-1.5 py-0.5 border-l border-border ${!on ? 'bg-surface-3 text-fg-secondary' : 'bg-surface text-fg-muted'}`}>Não</button>
+            </span>
+          </span>
+        );
+      })}
+    </div>
+  );
+
+  // Cards de edição por seção, desenhados na MESMA ordem do documento (setas ▲▼
+  // no título reordenam). Somente Material: só Pagamento e Garantia.
+  const cardsSecao: Partial<Record<SecaoDocKey, React.ReactNode>> = {
+    visao: (
+    <>
+    <Accordion title="Objetivo da Proposta" doc={docSecao('visao')} icon={<FileText className="w-4 h-4 text-danger" />} open={!!open.objetivo} onToggle={() => toggle('objetivo')}>
+      <textarea rows={3} value={objetivo} onChange={(e) => setObjetivo(e.target.value)} placeholder="Objetivo geral da proposta..." className={inputCls} />
+    </Accordion>
+    </>
+    ),
+    carta: (
+    <>
+    <Accordion
+      title="Carta de Apresentação"
+      doc={docSecao('carta')}
+      icon={<FileText className="w-4 h-4 text-primary" />}
+      open={!!open.carta}
+      onToggle={() => toggle('carta')}
+      badge={<FonteBadge fonte={cartaApresentacao.split('\n').map((x) => x.trim()).filter(Boolean).join('\n') === CARTA_APRESENTACAO.join('\n') ? 'padrao' : 'personalizado'} />}
+    >
+      <div className="flex justify-end mb-2">
+        <button
+          type="button"
+          onClick={async () => { if (await requestConfirm('Restaurar o texto padrão da Carta de Apresentação?')) { setCartaApresentacao(CARTA_APRESENTACAO.join('\n')); setTextosTouched(true); } }}
+          className="text-[10px] font-bold uppercase text-fg-muted hover:text-primary inline-flex items-center gap-1"
+        >
+          <span className="material-symbols-outlined text-sm">restart_alt</span>Restaurar padrão
+        </button>
+      </div>
+      <textarea
+        rows={5}
+        value={cartaApresentacao}
+        onChange={(e) => { setCartaApresentacao(e.target.value); setTextosTouched(true); }}
+        placeholder="Cada linha vira um parágrafo no PDF. Se ficar em branco, uma proposta histórica ainda usa o texto institucional; numa proposta nova o texto padrão já vem preenchido aqui."
+        className={inputCls}
+      />
+      <p className="text-[10px] text-fg-muted mt-1">Aparece na 2ª página do PDF, assinada pelo responsável comercial.</p>
+    </Accordion>
+    </>
+    ),
+    normas: (
+    <>
+    <Accordion title="Diretrizes Normativas" doc={docSecao('normas')} icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />} open={!!open.diretrizes} onToggle={() => toggle('diretrizes')}>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <p className="text-[11px] text-fg-muted">
+          {diretrizesManual === null ? 'Sugeridas automaticamente conforme Área(s) + Tipo de serviço.' : 'Editadas manualmente — mudanças de Área/Serviço não alteram esta lista.'}
+        </p>
+        {diretrizesManual !== null && (
+          <button type="button" onClick={() => setDiretrizesManual(null)} title="Substitui a lista pelas normas sugeridas para o contexto atual" className="text-[10px] font-bold uppercase text-primary hover:text-danger shrink-0">
+            Reaplicar sugestão automática
+          </button>
+        )}
+      </div>
+      <ListEditor items={diretrizes} numbered onAdd={() => addStr(setDiretrizes, 'ABNT NBR ')} onUpdate={(i, v) => updStr(setDiretrizes, i, v)} onRemove={(i) => rmStr(setDiretrizes, i)} addLabel="Adicionar norma" />
+    </Accordion>
+    </>
+    ),
+    escopo: (
+    <>
+    <Accordion title="Escopo Técnico dos Serviços" doc={docSecao('escopo')} icon={<Wrench className="w-4 h-4 text-danger" />} open={!!open.escopo} onToggle={() => toggle('escopo')}>
+      <textarea rows={4} value={escopoServico} onChange={(e) => setEscopoServico(e.target.value)} className={inputCls} />
+    </Accordion>
+    
+    <Accordion title="Indicadores & SLA (resumo executivo)" icon={<ShieldCheck className="w-4 h-4 text-primary" />} open={!!open.indicadores} onToggle={() => toggle('indicadores')}>
+      <p className="text-[11px] text-fg-secondary mb-3">Opcional. Preenchido, gera a página de <b>Resumo Executivo</b> (cards) e o bloco de <b>SLA</b>. Em branco, nada aparece.</p>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+        <div>
+          <label className={labelCls}>Unidades atendidas</label>
+          <input type="number" min={0} value={unidadesAtendidas} onChange={(e) => setUnidadesAtendidas(e.target.value === '' ? 0 : Number(e.target.value))} className={inputCls} placeholder="Ex: 19" />
+        </div>
+        <div>
+          <label className={labelCls}>Frequência de manutenção</label>
+          <input type="text" value={frequenciaManutencao} onChange={(e) => setFrequenciaManutencao(e.target.value)} className={inputCls} placeholder="Ex: Trimestral" />
+        </div>
+        <div>
+          <label className={labelCls}>SLA falhas críticas</label>
+          <input type="text" value={slaCritico} onChange={(e) => setSlaCritico(e.target.value)} className={inputCls} placeholder="Ex: 48 horas" />
+        </div>
+      </div>
+      <label className={labelCls}>Tabela de SLA (situação → prazo)</label>
+      <div className="space-y-2">
+        {slaTabela.map((r, i) => (
+          <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+            <input type="text" value={r.situacao} onChange={(e) => updSla(i, 'situacao', e.target.value)} className={inputCls} placeholder="Situação (ex: Falha crítica)" />
+            <input type="text" value={r.prazo} onChange={(e) => updSla(i, 'prazo', e.target.value)} className={inputCls} placeholder="Prazo (ex: Até 48 horas)" />
+            <button type="button" onClick={() => rmSla(i)} className="text-fg-muted hover:text-danger p-1" title="Remover linha">✕</button>
+          </div>
+        ))}
+        <button type="button" onClick={addSla} className="text-[11px] font-semibold text-primary hover:text-danger uppercase">+ Adicionar linha de SLA</button>
+      </div>
+    </Accordion>
+    </>
+    ),
+    entregaveis: (
+    <>
+    <Accordion title="Entregáveis do Projeto" doc={docSecao('entregaveis')} icon={<CheckCircle className="w-4 h-4 text-emerald-600" />} open={!!open.entregaveis} onToggle={() => toggle('entregaveis')}>
+      <ListEditor items={entregaveis} onAdd={() => addStr(setEntregaveis, 'Documento de entregável')} onUpdate={(i, v) => updStr(setEntregaveis, i, v)} onRemove={(i) => rmStr(setEntregaveis, i)} addLabel="Adicionar entregável" />
+    </Accordion>
+    </>
+    ),
+    premissas: (
+    <>
+    <Accordion title="Premissas Adotadas" doc={docSecao('premissas')} icon={<ShieldCheck className="w-4 h-4 text-primary" />} open={!!open.premissas} onToggle={() => toggle('premissas')}>
+      <ListEditor items={premissas} onAdd={() => addStr(setPremissas, 'Acesso livre e facilitado')} onUpdate={(i, v) => updStr(setPremissas, i, v)} onRemove={(i) => rmStr(setPremissas, i)} addLabel="Adicionar premissa" />
+    </Accordion>
+    </>
+    ),
+    incluso: (
+    <>
+    <Accordion title="Incluso / Não incluso" doc={docSecao('incluso')} icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />} open={!!open.incluso} onToggle={() => toggle('incluso')}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className={labelCls}>Incluso no escopo</label>
+          <ListEditor items={incluso} onAdd={() => addStr(setIncluso, 'Item incluso no escopo')} onUpdate={(i, v) => updStr(setIncluso, i, v)} onRemove={(i) => rmStr(setIncluso, i)} addLabel="Adicionar incluso" />
+        </div>
+        <div>
+          <label className={labelCls}>Não incluso</label>
+          <ListEditor items={naoIncluso} onAdd={() => addStr(setNaoIncluso, 'Item fora do escopo')} onUpdate={(i, v) => updStr(setNaoIncluso, i, v)} onRemove={(i) => rmStr(setNaoIncluso, i)} addLabel="Adicionar exclusão" />
+        </div>
+      </div>
+    </Accordion>
+    </>
+    ),
+    responsabilidades: (
+    <>
+    <Accordion title="Responsabilidades da Contratada" doc={docSecao('responsabilidades')} icon={<CheckCircle className="w-4 h-4 text-emerald-600" />} open={!!open.respContratada} onToggle={() => toggle('respContratada')}>
+      <ListEditor items={respContratada} onAdd={() => addStr(setRespContratada, 'Fornecer equipe qualificada')} onUpdate={(i, v) => updStr(setRespContratada, i, v)} onRemove={(i) => rmStr(setRespContratada, i)} addLabel="Adicionar item" />
+    </Accordion>
+    </>
+    ),
+    obrigacoes: (
+    <>
+    <Accordion title="Obrigações da Contratante" doc={docSecao('obrigacoes')} icon={<Building2 className="w-4 h-4 text-blue-600" />} open={!!open.respContratante} onToggle={() => toggle('respContratante')}>
+      <ListEditor items={respContratante} onAdd={() => addStr(setRespContratante, 'Liberar autorizações')} onUpdate={(i, v) => updStr(setRespContratante, i, v)} onRemove={(i) => rmStr(setRespContratante, i)} addLabel="Adicionar item" />
+    </Accordion>
+    
+    {/* ETAPA 2 — Textos padrão materializados (antes injetados só no PDF).
+        Todos ficam VISÍVEIS aqui e são a fonte de verdade do documento. */}
+    </>
+    ),
+    servicos: (
+    <>
+    <Accordion
+      title="Descrição dos Serviços Ofertados"
+      doc={docSecao('servicos')}
+      icon={<Wrench className="w-4 h-4 text-danger" />}
+      open={!!open.descServicos}
+      onToggle={() => toggle('descServicos')}
+      badge={<FonteBadge fonte={fonteServicos(servicosOfertados)} />}
+    >
+      <div className="flex justify-end mb-2">
+        <button type="button" onClick={restaurarServicos} className="text-[10px] font-bold uppercase text-fg-muted hover:text-primary inline-flex items-center gap-1">
+          <span className="material-symbols-outlined text-sm">restart_alt</span>Restaurar padrão
+        </button>
+      </div>
+      <div className="space-y-3">
+        {servicosOfertados.map((grupo, gi) => (
+          <div key={gi} className="rounded-lg border border-border p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <input
+                type="text"
+                value={grupo.titulo}
+                onChange={(e) => { setServicosOfertados((prev) => prev.map((g, idx) => (idx === gi ? { ...g, titulo: e.target.value } : g))); marcarServicosPersonalizado(); }}
+                placeholder="Título do grupo (ex.: Instalação e Montagem)"
+                className={`flex-1 ${inputCls} font-semibold`}
+              />
+              <button type="button" onClick={() => { setServicosOfertados((prev) => prev.filter((_, idx) => idx !== gi)); marcarServicosPersonalizado(); }} className="p-1.5 text-fg-muted hover:text-danger hover:bg-red-50 rounded-lg shrink-0"><Trash2 className="w-3.5 h-3.5" /></button>
+            </div>
+            <ListEditor
+              items={grupo.itens}
+              onAdd={() => { setServicosOfertados((prev) => prev.map((g, idx) => (idx === gi ? { ...g, itens: [...g.itens, 'Novo item do serviço'] } : g))); marcarServicosPersonalizado(); }}
+              onUpdate={(i, v) => { setServicosOfertados((prev) => prev.map((g, idx) => (idx === gi ? { ...g, itens: g.itens.map((x, ii) => (ii === i ? v : x)) } : g))); marcarServicosPersonalizado(); }}
+              onRemove={(i) => { setServicosOfertados((prev) => prev.map((g, idx) => (idx === gi ? { ...g, itens: g.itens.filter((_, ii) => ii !== i) } : g))); marcarServicosPersonalizado(); }}
+              addLabel="Adicionar item"
+            />
+          </div>
+        ))}
+        <button type="button" onClick={() => { setServicosOfertados((prev) => [...prev, { titulo: 'Novo grupo de serviços', itens: [] }]); marcarServicosPersonalizado(); }} className="w-full py-2 rounded-lg border border-dashed border-navy/40 text-[11px] font-semibold text-primary hover:bg-navy-3/5 flex items-center justify-center gap-1 uppercase">
+          <Plus className="w-3.5 h-3.5" /> Adicionar grupo
+        </button>
+      </div>
+    </Accordion>
+    </>
+    ),
+    conclusao: (
+    <>
+    <Accordion title="Conclusão" doc={docSecao('conclusao')} icon={<FileText className="w-4 h-4 text-primary" />} open={!!open.conclusao} onToggle={() => toggle('conclusao')}>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[11px] text-fg-muted">Texto de fechamento da proposta.</span>
+        {tipoServico && (
+          <button
+            type="button"
+            onClick={() => setConclusao(conclusaoPorTipo(tipoServico))}
+            title="Preenche com uma conclusão adequada ao tipo de serviço (você pode editar)"
+            className="text-[10px] font-bold uppercase text-primary hover:text-danger"
+          >
+            Sugerir pelo tipo
+          </button>
+        )}
+      </div>
+      <textarea rows={3} value={conclusao} onChange={(e) => setConclusao(e.target.value)} className={inputCls} />
+    </Accordion>
+    </>
+    ),
+    pagamento: (
+    <>
+    {/* ---- Condições de Pagamento (tags pré-formatadas) ---- */}
+    <Accordion title="Condições de Pagamento" doc={docSecao('pagamento')} icon={<CreditCard className="w-4 h-4 text-emerald-600" />} open={!!open.pagamento} onToggle={() => toggle('pagamento')}>
+      <div className="space-y-4">
+        <div>
+          <label className={labelCls}>Formas de Pagamento</label>
+          <TagSelect options={FORMAS_PAGAMENTO} selected={formasPagamento} onToggle={(v) => toggleTag(setFormasPagamento, v)} />
+        </div>
+        <div>
+          <label className={labelCls}>Condições de Pagamento</label>
+          <TagSelect options={CONDICOES_PAGAMENTO} selected={condicoesPagamento} onToggle={(v) => toggleTag(setCondicoesPagamento, v)} />
+        </div>
+        <p className="text-[10px] text-fg-muted">Clique nas opções para marcar. O texto no PDF é montado automaticamente.</p>
+      </div>
+    </Accordion>
+    </>
+    ),
+    garantia: (
+    <>
+    {/* ---- Garantia (bloco próprio, visível) ---- */}
+    <Accordion title="Garantia" doc={docSecao('garantia')} icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />} open={!!open.garantia} onToggle={() => toggle('garantia')}>
+      {isLegacyWarranty(warranty) ? (
+        <div className="space-y-2">
+          <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">Garantia herdada em texto livre. A edição preserva o histórico; converta para o formato estruturado quando quiser separar mão de obra e materiais.</p>
+          <textarea rows={3} value={warranty.text} onChange={(e) => setWarranty({ mode: 'legacy_text', text: e.target.value })} placeholder="Condição de garantia…" className={`${inputCls} resize-y`} />
+          <button type="button" onClick={() => setWarranty(defaultWarranty())} className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 underline">Converter para garantia estruturada (90 dias / 12 meses)</button>
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          {warrantyLegBlock('Mão de obra', 'maoDeObra')}
+          {warrantyLegBlock('Materiais / equipamentos', 'materiais')}
+          <div>
+            <label className={labelCls}>Observações da garantia (opcional)</label>
+            <textarea rows={2} value={(isStructuredWarranty(warranty) && warranty.observacoes) || ''} onChange={(e) => setWarrantyObs(e.target.value)} placeholder="Ex.: garantia condicionada à manutenção preventiva…" className={`${inputCls} resize-y`} />
+          </div>
+          {!renderWarranty(warranty).hasAny && (
+            <p className="text-[11px] text-fg-secondary italic">Nenhuma garantia informada — a seção “Garantia” não aparecerá no documento.</p>
+          )}
+        </div>
+      )}
+    </Accordion>
+    </>
+    ),
+    embalagem: (
+    <>
+    {secaoListaBlock({ openKey: 'secEmbalagem', fonteKey: 'embalagem', campo: 'embalagemTransporteTexto', titulo: 'Embalagem, Transporte e Armazenamento', icon: <FileText className="w-4 h-4 text-primary" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
+    </>
+    ),
+    seguranca: (
+    <>
+    {secaoListaBlock({ openKey: 'secSeguranca', fonteKey: 'seguranca', campo: 'segurancaTrabalhoTexto', titulo: 'Segurança do Trabalho', icon: <ShieldCheck className="w-4 h-4 text-emerald-600" />, addLabel: 'Adicionar item', seed: 'Nova condição de segurança' })}
+    </>
+    ),
+    precos: (
+    <>
+    {secaoListaBlock({ openKey: 'secPrecos', fonteKey: 'precos', campo: 'precosObsTexto', titulo: 'Preços — Observações', icon: <DollarSign className="w-4 h-4 text-emerald-600" />, addLabel: 'Adicionar observação', seed: 'Nova observação de preço' })}
+    </>
+    ),
+    impostos: (
+    <>
+    {secaoListaBlock({ openKey: 'secImpostos', fonteKey: 'impostos', campo: 'impostosObsTexto', titulo: 'Impostos e Taxas — Observações', icon: <Scale className="w-4 h-4 text-blue-600" />, addLabel: 'Adicionar observação', seed: 'Nova observação de imposto' })}
+    </>
+    ),
+    multas: (
+    <>
+    {secaoListaBlock({ openKey: 'secMultas', fonteKey: 'multas', campo: 'multasAtrasoTexto', titulo: 'Multas por Atraso de Pagamento', icon: <Scale className="w-4 h-4 text-danger" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
+    </>
+    ),
+    limitacao: (
+    <>
+    {secaoListaBlock({ openKey: 'secLimitacao', fonteKey: 'limitacao', campo: 'limitacaoRespTexto', titulo: 'Limitação de Responsabilidade', icon: <Scale className="w-4 h-4 text-primary" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
+    </>
+    ),
+    confidencialidade: (
+    <>
+    {secaoListaBlock({ openKey: 'secConfid', fonteKey: 'confidencialidade', campo: 'confidencialidadeTexto', titulo: 'Confidencialidade', icon: <ShieldCheck className="w-4 h-4 text-primary" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
+    </>
+    ),
+    termoAceite: (
+    <>
+    {secaoListaBlock({ openKey: 'secTermo', fonteKey: 'termoAceite', campo: 'termoAceiteTexto', titulo: 'Termo de Aceite da Proposta', icon: <CheckCircle className="w-4 h-4 text-emerald-600" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
+    </>
+    ),
+    condicoesGerais: (
+    <>
+    {secaoListaBlock({ openKey: 'secCondGerais', fonteKey: 'condicoesGerais', campo: 'condicoesGeraisTexto', titulo: 'Condições Gerais', icon: <FileText className="w-4 h-4 text-fg-secondary" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
+    </>
+    ),
+  };
+
+
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       <div className="bg-surface-2 max-w-4xl w-full rounded-2xl border border-border shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
@@ -1653,7 +1997,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           {!somenteMaterial && (
           <Accordion
             title="Lista de Serviços"
-            doc={docSecao('itens')}
+            doc={docSecao('itensServicos')}
             icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />}
             open={!!open.servicos}
             onToggle={() => toggle('servicos')}
@@ -1682,203 +2026,12 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
 
           {valorCard}
 
-          {/* ---- Accordions de conteúdo (seções técnicas — ocultas em Somente Material) ---- */}
-          {!somenteMaterial && (<>
-          {difereDoPadrao && faixaPadrao}
-          <Accordion title="Objetivo da Proposta" doc={docSecao('visao')} icon={<FileText className="w-4 h-4 text-danger" />} open={!!open.objetivo} onToggle={() => toggle('objetivo')}>
-            <textarea rows={3} value={objetivo} onChange={(e) => setObjetivo(e.target.value)} placeholder="Objetivo geral da proposta..." className={inputCls} />
-          </Accordion>
+          {/* ---- Seções do documento: Sim/Não e ▲▼ no título de cada card, na ordem do documento ---- */}
+          {faixaPadrao}
+          {outrasSecoes}
+          {ordemCards.map((k) => <React.Fragment key={k}>{cardsSecao[k]}</React.Fragment>)}
 
-          <Accordion
-            title="Carta de Apresentação"
-            doc={docSecao('carta')}
-            icon={<FileText className="w-4 h-4 text-primary" />}
-            open={!!open.carta}
-            onToggle={() => toggle('carta')}
-            badge={<FonteBadge fonte={cartaApresentacao.split('\n').map((x) => x.trim()).filter(Boolean).join('\n') === CARTA_APRESENTACAO.join('\n') ? 'padrao' : 'personalizado'} />}
-          >
-            <div className="flex justify-end mb-2">
-              <button
-                type="button"
-                onClick={async () => { if (await requestConfirm('Restaurar o texto padrão da Carta de Apresentação?')) { setCartaApresentacao(CARTA_APRESENTACAO.join('\n')); setTextosTouched(true); } }}
-                className="text-[10px] font-bold uppercase text-fg-muted hover:text-primary inline-flex items-center gap-1"
-              >
-                <span className="material-symbols-outlined text-sm">restart_alt</span>Restaurar padrão
-              </button>
-            </div>
-            <textarea
-              rows={5}
-              value={cartaApresentacao}
-              onChange={(e) => { setCartaApresentacao(e.target.value); setTextosTouched(true); }}
-              placeholder="Cada linha vira um parágrafo no PDF. Se ficar em branco, uma proposta histórica ainda usa o texto institucional; numa proposta nova o texto padrão já vem preenchido aqui."
-              className={inputCls}
-            />
-            <p className="text-[10px] text-fg-muted mt-1">Aparece na 2ª página do PDF, assinada pelo responsável comercial.</p>
-          </Accordion>
-
-          <Accordion title="Diretrizes Normativas" doc={docSecao('visao')} icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />} open={!!open.diretrizes} onToggle={() => toggle('diretrizes')}>
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <p className="text-[11px] text-fg-muted">
-                {diretrizesManual === null ? 'Sugeridas automaticamente conforme Área(s) + Tipo de serviço.' : 'Editadas manualmente — mudanças de Área/Serviço não alteram esta lista.'}
-              </p>
-              {diretrizesManual !== null && (
-                <button type="button" onClick={() => setDiretrizesManual(null)} title="Substitui a lista pelas normas sugeridas para o contexto atual" className="text-[10px] font-bold uppercase text-primary hover:text-danger shrink-0">
-                  Reaplicar sugestão automática
-                </button>
-              )}
-            </div>
-            <ListEditor items={diretrizes} numbered onAdd={() => addStr(setDiretrizes, 'ABNT NBR ')} onUpdate={(i, v) => updStr(setDiretrizes, i, v)} onRemove={(i) => rmStr(setDiretrizes, i)} addLabel="Adicionar norma" />
-          </Accordion>
-
-          <Accordion title="Escopo Técnico dos Serviços" doc={docSecao('escopo')} icon={<Wrench className="w-4 h-4 text-danger" />} open={!!open.escopo} onToggle={() => toggle('escopo')}>
-            <textarea rows={4} value={escopoServico} onChange={(e) => setEscopoServico(e.target.value)} className={inputCls} />
-          </Accordion>
-
-          <Accordion title="Entregáveis do Projeto" doc={docSecao('entregaveis')} icon={<CheckCircle className="w-4 h-4 text-emerald-600" />} open={!!open.entregaveis} onToggle={() => toggle('entregaveis')}>
-            <ListEditor items={entregaveis} onAdd={() => addStr(setEntregaveis, 'Documento de entregável')} onUpdate={(i, v) => updStr(setEntregaveis, i, v)} onRemove={(i) => rmStr(setEntregaveis, i)} addLabel="Adicionar entregável" />
-          </Accordion>
-
-          <Accordion title="Premissas Adotadas" doc={docSecao('premissas')} icon={<ShieldCheck className="w-4 h-4 text-primary" />} open={!!open.premissas} onToggle={() => toggle('premissas')}>
-            <ListEditor items={premissas} onAdd={() => addStr(setPremissas, 'Acesso livre e facilitado')} onUpdate={(i, v) => updStr(setPremissas, i, v)} onRemove={(i) => rmStr(setPremissas, i)} addLabel="Adicionar premissa" />
-          </Accordion>
-
-          <Accordion title="Incluso / Não incluso" doc={docSecao('incluso')} icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />} open={!!open.incluso} onToggle={() => toggle('incluso')}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className={labelCls}>Incluso no escopo</label>
-                <ListEditor items={incluso} onAdd={() => addStr(setIncluso, 'Item incluso no escopo')} onUpdate={(i, v) => updStr(setIncluso, i, v)} onRemove={(i) => rmStr(setIncluso, i)} addLabel="Adicionar incluso" />
-              </div>
-              <div>
-                <label className={labelCls}>Não incluso</label>
-                <ListEditor items={naoIncluso} onAdd={() => addStr(setNaoIncluso, 'Item fora do escopo')} onUpdate={(i, v) => updStr(setNaoIncluso, i, v)} onRemove={(i) => rmStr(setNaoIncluso, i)} addLabel="Adicionar exclusão" />
-              </div>
-            </div>
-          </Accordion>
-
-          <Accordion title="Indicadores & SLA (resumo executivo)" icon={<ShieldCheck className="w-4 h-4 text-primary" />} open={!!open.indicadores} onToggle={() => toggle('indicadores')}>
-            <p className="text-[11px] text-fg-secondary mb-3">Opcional. Preenchido, gera a página de <b>Resumo Executivo</b> (cards) e o bloco de <b>SLA</b>. Em branco, nada aparece.</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-              <div>
-                <label className={labelCls}>Unidades atendidas</label>
-                <input type="number" min={0} value={unidadesAtendidas} onChange={(e) => setUnidadesAtendidas(e.target.value === '' ? 0 : Number(e.target.value))} className={inputCls} placeholder="Ex: 19" />
-              </div>
-              <div>
-                <label className={labelCls}>Frequência de manutenção</label>
-                <input type="text" value={frequenciaManutencao} onChange={(e) => setFrequenciaManutencao(e.target.value)} className={inputCls} placeholder="Ex: Trimestral" />
-              </div>
-              <div>
-                <label className={labelCls}>SLA falhas críticas</label>
-                <input type="text" value={slaCritico} onChange={(e) => setSlaCritico(e.target.value)} className={inputCls} placeholder="Ex: 48 horas" />
-              </div>
-            </div>
-            <label className={labelCls}>Tabela de SLA (situação → prazo)</label>
-            <div className="space-y-2">
-              {slaTabela.map((r, i) => (
-                <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
-                  <input type="text" value={r.situacao} onChange={(e) => updSla(i, 'situacao', e.target.value)} className={inputCls} placeholder="Situação (ex: Falha crítica)" />
-                  <input type="text" value={r.prazo} onChange={(e) => updSla(i, 'prazo', e.target.value)} className={inputCls} placeholder="Prazo (ex: Até 48 horas)" />
-                  <button type="button" onClick={() => rmSla(i)} className="text-fg-muted hover:text-danger p-1" title="Remover linha">✕</button>
-                </div>
-              ))}
-              <button type="button" onClick={addSla} className="text-[11px] font-semibold text-primary hover:text-danger uppercase">+ Adicionar linha de SLA</button>
-            </div>
-          </Accordion>
-
-          <Accordion title="Responsabilidades da Contratada" doc={docSecao('servicos')} icon={<CheckCircle className="w-4 h-4 text-emerald-600" />} open={!!open.respContratada} onToggle={() => toggle('respContratada')}>
-            <ListEditor items={respContratada} onAdd={() => addStr(setRespContratada, 'Fornecer equipe qualificada')} onUpdate={(i, v) => updStr(setRespContratada, i, v)} onRemove={(i) => rmStr(setRespContratada, i)} addLabel="Adicionar item" />
-          </Accordion>
-
-          <Accordion title="Obrigações da Contratante" doc={docSecao('obrigacoes')} icon={<Building2 className="w-4 h-4 text-blue-600" />} open={!!open.respContratante} onToggle={() => toggle('respContratante')}>
-            <ListEditor items={respContratante} onAdd={() => addStr(setRespContratante, 'Liberar autorizações')} onUpdate={(i, v) => updStr(setRespContratante, i, v)} onRemove={(i) => rmStr(setRespContratante, i)} addLabel="Adicionar item" />
-          </Accordion>
-
-          {/* ETAPA 2 — Textos padrão materializados (antes injetados só no PDF).
-              Todos ficam VISÍVEIS aqui e são a fonte de verdade do documento. */}
-          <Accordion
-            title="Descrição dos Serviços Ofertados"
-            doc={docSecao('servicos')}
-            icon={<Wrench className="w-4 h-4 text-danger" />}
-            open={!!open.descServicos}
-            onToggle={() => toggle('descServicos')}
-            badge={<FonteBadge fonte={fonteServicos(servicosOfertados)} />}
-          >
-            <div className="flex justify-end mb-2">
-              <button type="button" onClick={restaurarServicos} className="text-[10px] font-bold uppercase text-fg-muted hover:text-primary inline-flex items-center gap-1">
-                <span className="material-symbols-outlined text-sm">restart_alt</span>Restaurar padrão
-              </button>
-            </div>
-            <div className="space-y-3">
-              {servicosOfertados.map((grupo, gi) => (
-                <div key={gi} className="rounded-lg border border-border p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <input
-                      type="text"
-                      value={grupo.titulo}
-                      onChange={(e) => { setServicosOfertados((prev) => prev.map((g, idx) => (idx === gi ? { ...g, titulo: e.target.value } : g))); marcarServicosPersonalizado(); }}
-                      placeholder="Título do grupo (ex.: Instalação e Montagem)"
-                      className={`flex-1 ${inputCls} font-semibold`}
-                    />
-                    <button type="button" onClick={() => { setServicosOfertados((prev) => prev.filter((_, idx) => idx !== gi)); marcarServicosPersonalizado(); }} className="p-1.5 text-fg-muted hover:text-danger hover:bg-red-50 rounded-lg shrink-0"><Trash2 className="w-3.5 h-3.5" /></button>
-                  </div>
-                  <ListEditor
-                    items={grupo.itens}
-                    onAdd={() => { setServicosOfertados((prev) => prev.map((g, idx) => (idx === gi ? { ...g, itens: [...g.itens, 'Novo item do serviço'] } : g))); marcarServicosPersonalizado(); }}
-                    onUpdate={(i, v) => { setServicosOfertados((prev) => prev.map((g, idx) => (idx === gi ? { ...g, itens: g.itens.map((x, ii) => (ii === i ? v : x)) } : g))); marcarServicosPersonalizado(); }}
-                    onRemove={(i) => { setServicosOfertados((prev) => prev.map((g, idx) => (idx === gi ? { ...g, itens: g.itens.filter((_, ii) => ii !== i) } : g))); marcarServicosPersonalizado(); }}
-                    addLabel="Adicionar item"
-                  />
-                </div>
-              ))}
-              <button type="button" onClick={() => { setServicosOfertados((prev) => [...prev, { titulo: 'Novo grupo de serviços', itens: [] }]); marcarServicosPersonalizado(); }} className="w-full py-2 rounded-lg border border-dashed border-navy/40 text-[11px] font-semibold text-primary hover:bg-navy-3/5 flex items-center justify-center gap-1 uppercase">
-                <Plus className="w-3.5 h-3.5" /> Adicionar grupo
-              </button>
-            </div>
-          </Accordion>
-
-          {secaoListaBlock({ openKey: 'secEmbalagem', fonteKey: 'embalagem', campo: 'embalagemTransporteTexto', titulo: 'Embalagem, Transporte e Armazenamento', icon: <FileText className="w-4 h-4 text-primary" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
-          {secaoListaBlock({ openKey: 'secSeguranca', fonteKey: 'seguranca', campo: 'segurancaTrabalhoTexto', titulo: 'Segurança do Trabalho', icon: <ShieldCheck className="w-4 h-4 text-emerald-600" />, addLabel: 'Adicionar item', seed: 'Nova condição de segurança' })}
-          {secaoListaBlock({ openKey: 'secPrecos', fonteKey: 'precos', campo: 'precosObsTexto', titulo: 'Preços — Observações', icon: <DollarSign className="w-4 h-4 text-emerald-600" />, addLabel: 'Adicionar observação', seed: 'Nova observação de preço' })}
-          {secaoListaBlock({ openKey: 'secImpostos', fonteKey: 'impostos', campo: 'impostosObsTexto', titulo: 'Impostos e Taxas — Observações', icon: <Scale className="w-4 h-4 text-blue-600" />, addLabel: 'Adicionar observação', seed: 'Nova observação de imposto' })}
-          {secaoListaBlock({ openKey: 'secMultas', fonteKey: 'multas', campo: 'multasAtrasoTexto', titulo: 'Multas por Atraso de Pagamento', icon: <Scale className="w-4 h-4 text-danger" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
-          {secaoListaBlock({ openKey: 'secLimitacao', fonteKey: 'limitacao', campo: 'limitacaoRespTexto', titulo: 'Limitação de Responsabilidade', icon: <Scale className="w-4 h-4 text-primary" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
-          {secaoListaBlock({ openKey: 'secConfid', fonteKey: 'confidencialidade', campo: 'confidencialidadeTexto', titulo: 'Confidencialidade', icon: <ShieldCheck className="w-4 h-4 text-primary" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
-          {secaoListaBlock({ openKey: 'secTermo', fonteKey: 'termoAceite', campo: 'termoAceiteTexto', titulo: 'Termo de Aceite da Proposta', icon: <CheckCircle className="w-4 h-4 text-emerald-600" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
-          {secaoListaBlock({ openKey: 'secCondGerais', fonteKey: 'condicoesGerais', campo: 'condicoesGeraisTexto', titulo: 'Condições Gerais', icon: <FileText className="w-4 h-4 text-fg-secondary" />, addLabel: 'Adicionar parágrafo', seed: 'Novo parágrafo' })}
-
-          <Accordion title="Conclusão" doc={docSecao('conclusao')} icon={<FileText className="w-4 h-4 text-primary" />} open={!!open.conclusao} onToggle={() => toggle('conclusao')}>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[11px] text-fg-muted">Texto de fechamento da proposta.</span>
-              {tipoServico && (
-                <button
-                  type="button"
-                  onClick={() => setConclusao(conclusaoPorTipo(tipoServico))}
-                  title="Preenche com uma conclusão adequada ao tipo de serviço (você pode editar)"
-                  className="text-[10px] font-bold uppercase text-primary hover:text-danger"
-                >
-                  Sugerir pelo tipo
-                </button>
-              )}
-            </div>
-            <textarea rows={3} value={conclusao} onChange={(e) => setConclusao(e.target.value)} className={inputCls} />
-          </Accordion>
-          </>)}
-
-          {/* ---- Condições de Pagamento (tags pré-formatadas) ---- */}
-          <Accordion title="Condições de Pagamento" doc={docSecao('pagamento')} icon={<CreditCard className="w-4 h-4 text-emerald-600" />} open={!!open.pagamento} onToggle={() => toggle('pagamento')}>
-            <div className="space-y-4">
-              <div>
-                <label className={labelCls}>Formas de Pagamento</label>
-                <TagSelect options={FORMAS_PAGAMENTO} selected={formasPagamento} onToggle={(v) => toggleTag(setFormasPagamento, v)} />
-              </div>
-              <div>
-                <label className={labelCls}>Condições de Pagamento</label>
-                <TagSelect options={CONDICOES_PAGAMENTO} selected={condicoesPagamento} onToggle={(v) => toggleTag(setCondicoesPagamento, v)} />
-              </div>
-              <p className="text-[10px] text-fg-muted">Clique nas opções para marcar. O texto no PDF é montado automaticamente.</p>
-            </div>
-          </Accordion>
-
-          {/* ---- Cláusulas Jurídicas (chaves de ativação) ---- */}
+          {/* ---- Cláusulas Jurídicas (atalho: mesma seleção dos cards) ---- */}
           {!somenteMaterial && (<>
           <Accordion title="Cláusulas Jurídicas" icon={<Scale className="w-4 h-4 text-danger" />} open={!!open.clausulas} onToggle={() => toggle('clausulas')}>
             <p className="text-[11px] text-fg-secondary mb-2">Marque os blocos que devem sair no PDF. Desmarcado = título e texto totalmente omitidos.</p>
@@ -1892,105 +2045,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             </div>
           </Accordion>
 
-          {/* ---- Estrutura da proposta: Sim/Não por seção (fonte única de secoesDocumento) + reordenar ---- */}
-          <Accordion title="Estrutura da proposta" icon={<FileText className="w-4 h-4 text-primary" />} open={!!open.estrutura} onToggle={() => toggle('estrutura')}>
-            <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
-              <p className="text-[11px] text-fg-secondary flex-1 min-w-[220px]">
-                Escolha <b>Sim</b> ou <b>Não</b> para cada seção do documento e use ▲▼ para reordenar — a numeração é recalculada sozinha.
-                {pedidoTipo
-                  ? <> Padrão de <b>{PEDIDO_TIPO_LABELS[pedidoTipo]}</b>{padraoEmpresaTipo ? ' (salvo pela empresa)' : ''}.</>
-                  : ' Sem tipo definido: documento completo.'}
-              </p>
-              {ordemSecoes.length > 0 && (
-                <button type="button" onClick={() => setOrdemSecoes([])} className="shrink-0 text-[10px] font-bold uppercase text-primary hover:text-danger">Ordem padrão</button>
-              )}
-            </div>
-            {faixaPadrao}
-            {(() => {
-              const temMateriais = equipmentItems.some((it) => it.tipo !== 'servico');
-              const explicito = secoesSaoPersonalizadas || pedidoTipo === 'personalizado';
-              const estrutura = ordenarEstrutura(
-                montarEstruturaProposta(
-                  { tipoServico, incluirSeguranca, incluirMultas, incluirLimitacao, incluirConfidencialidade, incluirTermoAceite, incluirCondicoesGerais },
-                  {
-                    cartaVisivel: explicito || nivelProposta !== 'simples',
-                    historicoVisivel: explicito || nivelProposta !== 'simples',
-                    temMateriais,
-                    garantiaVisivel: renderWarranty(warranty).hasAny,
-                    selecao: new Set<string>(secoesAtivas),
-                  }
-                ),
-                ordemSecoes
-              );
-              const fixa = (k: string) => SECOES_FIXAS_INICIO.includes(k) || SECOES_FIXAS_FIM.includes(k);
-              const meioKeys = estrutura.filter((s) => !fixa(s.key)).map((s) => s.key);
-              const mover = (key: string, dir: -1 | 1) => {
-                const i = meioKeys.indexOf(key);
-                const j = i + dir;
-                if (i < 0 || j < 0 || j >= meioKeys.length) return;
-                const next = [...meioKeys];
-                [next[i], next[j]] = [next[j], next[i]];
-                setOrdemSecoes(next);
-              };
-              let n = 0;
-              return (
-                <div className="space-y-1">
-                  {estrutura.map((s) => {
-                    const key = s.key as SecaoDocKey;
-                    const on = secaoOn(key);
-                    const podeMover = !fixa(s.key);
-                    const mi = meioKeys.indexOf(s.key);
-                    if (s.visible) n += 1;
-                    return (
-                      <div key={s.key} className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 transition-colors ${on ? 'bg-surface border-border' : 'bg-surface-2 border-dashed border-border-strong'}`}>
-                        {podeMover ? (
-                          <div className="flex flex-col shrink-0 -my-1">
-                            <button type="button" onClick={() => mover(s.key, -1)} disabled={mi <= 0} className="text-fg-muted hover:text-primary disabled:opacity-25 leading-none text-[11px]" title="Subir">▲</button>
-                            <button type="button" onClick={() => mover(s.key, 1)} disabled={mi >= meioKeys.length - 1} className="text-fg-muted hover:text-primary disabled:opacity-25 leading-none text-[11px]" title="Descer">▼</button>
-                          </div>
-                        ) : (
-                          <div className="w-3 shrink-0" />
-                        )}
-                        <span className={`font-data-mono text-[11px] font-bold shrink-0 w-5 ${s.visible ? 'text-primary' : 'text-fg-muted'}`}>{s.visible ? String(n).padStart(2, '0') : '--'}</span>
-                        <span className={`text-xs truncate flex-1 ${on ? 'text-primary font-semibold' : 'text-fg-muted'}`}>
-                          {s.titulo}
-                          {on && !s.visible && <span className="text-[9px] font-normal text-fg-muted ml-1">(sem conteúdo — não sai)</span>}
-                        </span>
-                        <div role="radiogroup" aria-label={`${s.titulo}: aparece no documento`} className="flex shrink-0 rounded-md border border-border overflow-hidden">
-                          <button type="button" role="radio" aria-checked={on} onClick={() => !on && setSecao(key, true)} className={`text-[10px] font-bold uppercase px-2 py-0.5 ${on ? 'bg-success-soft text-success' : 'bg-surface text-fg-muted hover:text-fg-secondary'}`}>Sim</button>
-                          <button type="button" role="radio" aria-checked={!on} onClick={() => on && setSecao(key, false)} className={`text-[10px] font-bold uppercase px-2 py-0.5 border-l border-border ${!on ? 'bg-surface-3 text-fg-secondary' : 'bg-surface text-fg-muted hover:text-fg-secondary'}`}>Não</button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })()}
-          </Accordion>
           </>)}
-
-          {/* ---- Garantia (bloco próprio, visível) ---- */}
-          <Accordion title="Garantia" doc={docSecao('garantia')} icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />} open={!!open.garantia} onToggle={() => toggle('garantia')}>
-            {isLegacyWarranty(warranty) ? (
-              <div className="space-y-2">
-                <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">Garantia herdada em texto livre. A edição preserva o histórico; converta para o formato estruturado quando quiser separar mão de obra e materiais.</p>
-                <textarea rows={3} value={warranty.text} onChange={(e) => setWarranty({ mode: 'legacy_text', text: e.target.value })} placeholder="Condição de garantia…" className={`${inputCls} resize-y`} />
-                <button type="button" onClick={() => setWarranty(defaultWarranty())} className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 underline">Converter para garantia estruturada (90 dias / 12 meses)</button>
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {warrantyLegBlock('Mão de obra', 'maoDeObra')}
-                {warrantyLegBlock('Materiais / equipamentos', 'materiais')}
-                <div>
-                  <label className={labelCls}>Observações da garantia (opcional)</label>
-                  <textarea rows={2} value={(isStructuredWarranty(warranty) && warranty.observacoes) || ''} onChange={(e) => setWarrantyObs(e.target.value)} placeholder="Ex.: garantia condicionada à manutenção preventiva…" className={`${inputCls} resize-y`} />
-                </div>
-                {!renderWarranty(warranty).hasAny && (
-                  <p className="text-[11px] text-fg-secondary italic">Nenhuma garantia informada — a seção “Garantia” não aparecerá no documento.</p>
-                )}
-              </div>
-            )}
-          </Accordion>
 
           {/* ---- Informações Básicas (colapsável com +/lixeira) ---- */}
           <Accordion title={somenteMaterial ? 'Condições Comerciais' : 'Informações Básicas'} icon={<DollarSign className="w-4 h-4 text-emerald-600" />} open={!!open.basicas} onToggle={() => toggle('basicas')}>

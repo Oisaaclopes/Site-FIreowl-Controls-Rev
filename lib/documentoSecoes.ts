@@ -20,11 +20,14 @@ export type SecaoDocKey =
   | 'carta'
   | 'historico'
   | 'visao'
+  | 'normas'
   | 'escopo'
   | 'itens'
+  | 'itensServicos'
   | 'premissas'
   | 'incluso'
   | 'servicos'
+  | 'responsabilidades'
   | 'entregaveis'
   | 'embalagem'
   | 'seguranca'
@@ -54,12 +57,15 @@ export interface SecaoDocumento {
 export const SECOES_DOCUMENTO: SecaoDocumento[] = [
   { key: 'carta', titulo: 'Carta de Apresentação', descricao: 'Página de abertura assinada pelo responsável comercial.' },
   { key: 'historico', titulo: 'Histórico de Propostas', descricao: 'Tabela de revisões do pedido.' },
-  { key: 'visao', titulo: 'Objetivo / Visão Geral', descricao: 'Objetivo do pedido e normas de referência.' },
+  { key: 'visao', titulo: 'Objetivo', descricao: 'Objetivo do pedido.' },
+  { key: 'normas', titulo: 'Diretrizes Normativas', descricao: 'Normas de referência.' },
   { key: 'escopo', titulo: 'Escopo dos Serviços', descricao: 'Descrição do escopo proposto (e SLA, se houver).' },
-  { key: 'itens', titulo: 'Materiais e Serviços', descricao: 'Tabela de itens com quantidades e valores.' },
+  { key: 'itens', titulo: 'Materiais e Serviços', descricao: 'Tabela de MATERIAIS (quantidades e valores).' },
+  { key: 'itensServicos', titulo: 'Lista de Serviços', descricao: 'Tabela de SERVIÇOS; sai dentro da seção de itens.' },
   { key: 'premissas', titulo: 'Premissas Adotadas', descricao: 'Condições assumidas para a execução.' },
   { key: 'incluso', titulo: 'Incluso / Não incluso', descricao: 'O que está dentro e fora do escopo.' },
-  { key: 'servicos', titulo: 'Descrição dos Serviços Ofertados', descricao: 'Grupos de serviços e responsabilidades da contratada.' },
+  { key: 'servicos', titulo: 'Descrição dos Serviços Ofertados', descricao: 'Grupos de serviços ofertados.' },
+  { key: 'responsabilidades', titulo: 'Responsabilidades da Contratada', descricao: 'O que a contratada assume.' },
   { key: 'entregaveis', titulo: 'Entregáveis', descricao: 'Documentos e resultados entregues ao cliente.' },
   { key: 'embalagem', titulo: 'Embalagem, Transporte e Armazenamento', descricao: 'Condições de entrega dos materiais.' },
   { key: 'seguranca', titulo: 'Segurança do Trabalho', descricao: 'Requisitos de segurança da equipe.' },
@@ -93,11 +99,11 @@ export const SECAO_TITULO: Record<SecaoDocKey, string> = Object.fromEntries(
  * seções ele desenha nativamente (o resto vira bloco genérico).
  */
 export const SECOES_NATIVAS_ORCAMENTO: SecaoDocKey[] = [
-  'visao', 'escopo', 'itens', 'incluso', 'precos', 'impostos', 'pagamento', 'prazo', 'garantia', 'validade', 'premissas',
+  'visao', 'normas', 'escopo', 'itens', 'itensServicos', 'incluso', 'precos', 'impostos', 'pagamento', 'prazo', 'garantia', 'validade', 'premissas',
 ];
 
-/** Seções que o gerador de LAUDO imprime historicamente (objetivo, itens, parecer). */
-export const SECOES_NATIVAS_LAUDO: SecaoDocKey[] = ['visao', 'itens', 'conclusao'];
+/** Seções que o gerador de LAUDO imprime historicamente (objetivo, normas, itens, parecer). */
+export const SECOES_NATIVAS_LAUDO: SecaoDocKey[] = ['visao', 'normas', 'itens', 'itensServicos', 'conclusao'];
 
 /** Cláusulas da proposta que já tinham flag própria (`incluirX`). */
 const FLAG_POR_SECAO: Partial<Record<SecaoDocKey, keyof FlagsSecoes>> = {
@@ -247,4 +253,53 @@ export function atualizarPadraoEmpresa(
   if (lista === null || mesmasSecoes(lista, secoesPadraoDoTipo(tipo))) delete out[tipo];
   else out[tipo] = normalizarSecoes(lista);
   return out;
+}
+
+// ============================ Ordem das seções ============================
+/** Seções presas no início/fim do documento (não reordenáveis). */
+export const SECOES_FIXAS_INICIO_DOC: SecaoDocKey[] = ['carta'];
+export const SECOES_FIXAS_FIM_DOC: SecaoDocKey[] = ['aceite'];
+/** Sub-seção: não tem posição própria (sai dentro de 'itens'). */
+export const SUBSECOES: SecaoDocKey[] = ['itensServicos'];
+
+/**
+ * Ordem de desenho das seções: Carta no início, Aceite no fim e o miolo na
+ * ordem escolhida pelo usuário (proposal.ordemSecoes); chaves não citadas
+ * seguem na ordem canônica, ao final. Sub-seções são removidas.
+ */
+export function ordenarSecoes(keys: readonly SecaoDocKey[], ordem?: readonly string[]): SecaoDocKey[] {
+  // Só a Lista de Serviços ligada ainda precisa da seção de itens para aparecer.
+  const comItens = keys.includes('itensServicos') && !keys.includes('itens') ? [...keys, 'itens' as SecaoDocKey] : keys;
+  const set = new Set(comItens.filter((k) => !SUBSECOES.includes(k)));
+  const inicio = SECOES_FIXAS_INICIO_DOC.filter((k) => set.has(k));
+  const fim = SECOES_FIXAS_FIM_DOC.filter((k) => set.has(k));
+  const meio: SecaoDocKey[] = [];
+  for (const k of ordem || []) {
+    const key = k as SecaoDocKey;
+    if (set.has(key) && !inicio.includes(key) && !fim.includes(key) && !meio.includes(key)) meio.push(key);
+  }
+  for (const k of SECAO_KEYS) if (set.has(k) && !inicio.includes(k) && !fim.includes(k) && !meio.includes(k)) meio.push(k);
+  return [...inicio, ...meio, ...fim];
+}
+
+/**
+ * Move uma seção do miolo para antes (dir=-1) ou depois (dir=1) da vizinha
+ * mais próxima dentre `visiveis` (as que têm card no editor). Devolve a nova
+ * ordem completa do miolo (para gravar em proposal.ordemSecoes).
+ */
+export function moverSecao(
+  ordemAtual: readonly string[] | undefined,
+  key: SecaoDocKey,
+  dir: -1 | 1,
+  visiveis: readonly SecaoDocKey[],
+): SecaoDocKey[] {
+  const meio = ordenarSecoes(SECAO_KEYS, ordemAtual).filter((k) => !SECOES_FIXAS_INICIO_DOC.includes(k) && !SECOES_FIXAS_FIM_DOC.includes(k));
+  const vis = meio.filter((k) => visiveis.includes(k));
+  const i = vis.indexOf(key);
+  const alvo = vis[i + dir];
+  if (i < 0 || !alvo) return meio;
+  const sem = meio.filter((k) => k !== key);
+  const j = sem.indexOf(alvo);
+  sem.splice(dir < 0 ? j : j + 1, 0, key);
+  return sem;
 }

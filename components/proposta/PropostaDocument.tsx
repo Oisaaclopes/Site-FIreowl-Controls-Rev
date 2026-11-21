@@ -1101,6 +1101,9 @@ export function PropostaDocument({
     p.ordemSecoes
   );
   const vis = secoes.filter((s) => s.visible);
+  // Listas de Materiais e de Serviços são independentes (sub-seções de "itens").
+  const verMateriais = !sel || sel.has('itens');
+  const verServicos = !sel || sel.has('itensServicos');
   const num = (key: string) => {
     const i = vis.findIndex((s) => s.key === key);
     return i >= 0 ? String(i + 1).padStart(2, '0') : '';
@@ -1149,12 +1152,23 @@ export function PropostaDocument({
       <Sec k="visao">
         <Text style={styles.subTitle}>{`${num('visao')}.1. Introdução`}</Text>
         <Text style={styles.para}>{nv(p.objetivo) ? p.objetivo : `Apresentamos nossa proposta para o fornecimento e execução dos serviços referentes a ${escopoTitulo}, para ${clienteNome}.`}</Text>
-        {lnv(normas) && (
+        {!sel && lnv(normas) && (
           <>
             <Text style={styles.subTitle}>Diretrizes normativas de referência</Text>
             <Bullets itens={normas} />
           </>
         )}
+      </Sec>
+    ),
+    // Com seleção explícita, Diretrizes é seção independente do Objetivo.
+    normas: () => (
+      <Sec k="normas">
+        {lnv(normas) ? <Bullets itens={normas} /> : <Text style={{ fontSize: 9, color: C.s500, fontStyle: 'italic' }}>Normas técnicas aplicáveis conforme o escopo.</Text>}
+      </Sec>
+    ),
+    responsabilidades: () => (
+      <Sec k="responsabilidades">
+        {lnv(p.responsabilidadesContratada) ? <Bullets itens={p.responsabilidadesContratada} /> : <Text style={{ fontSize: 9, color: C.s500, fontStyle: 'italic' }}>Conforme escopo descrito neste documento.</Text>}
       </Sec>
     ),
     escopo: () => (
@@ -1170,9 +1184,9 @@ export function PropostaDocument({
       <View style={styles.section}>
         <SecHead n={num('itens')} titulo={secoes.find((s) => s.key === 'itens')!.titulo} />
         <View>
-          {materiais.length > 0 && <ItensTable titulo="Materiais" itens={materiais} detailed={detailed} showMarca />}
-          {servicos.length > 0 && <ItensTable titulo="Serviços" itens={servicos} detailed={detailed} showMarca={false} accent={C.green} />}
-          {materiais.length === 0 && servicos.length === 0 && (
+          {verMateriais && materiais.length > 0 && <ItensTable titulo="Materiais" itens={materiais} detailed={detailed} showMarca />}
+          {verServicos && servicos.length > 0 && <ItensTable titulo="Serviços" itens={servicos} detailed={detailed} showMarca={false} accent={C.green} />}
+          {(!verMateriais || materiais.length === 0) && (!verServicos || servicos.length === 0) && (
             <Text style={{ fontSize: 9, color: C.s400, fontStyle: 'italic' }}>Itens conforme especificação técnica acordada.</Text>
           )}
           {detailed && (
@@ -1223,7 +1237,7 @@ export function PropostaDocument({
             <Checks itens={p.entregaveis} />
           </View>
         )}
-        {lnv(p.responsabilidadesContratada) && (
+        {!sel && lnv(p.responsabilidadesContratada) && (
           <View minPresenceAhead={50}>
             <Text style={styles.subTitle}>Responsabilidades da Contratada</Text>
             <Bullets itens={p.responsabilidadesContratada} />

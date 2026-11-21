@@ -15,6 +15,8 @@ import {
   secoesPadraoDoTipo,
   secoesPersonalizadas,
   secoesSelecionadas,
+  moverSecao,
+  ordenarSecoes,
 } from './documentoSecoes';
 import { montarEstruturaProposta } from './propostaEstrutura';
 
@@ -41,8 +43,8 @@ describe('secoesPadraoDoTipo — padrão pré-definido por Tipo de Pedido', () =
     expect(s).toContain('limitacao');
   });
 
-  it('Laudo vem com objetivo, itens e parecer', () => {
-    expect(secoesPadraoDoTipo('laudo')).toEqual(['visao', 'itens', 'conclusao']);
+  it('Laudo vem com objetivo, normas, itens (materiais e serviços) e parecer', () => {
+    expect(secoesPadraoDoTipo('laudo')).toEqual(['visao', 'normas', 'itens', 'itensServicos', 'conclusao']);
   });
 
   it('Personalizado começa sem nenhuma seção', () => {
@@ -162,5 +164,56 @@ describe('padrão da empresa × padrão do sistema × seleção', () => {
   it('mesmasSecoes ignora ordem e repetição', () => {
     expect(mesmasSecoes(['garantia', 'itens', 'itens'], ['itens', 'garantia'])).toBe(true);
     expect(mesmasSecoes(['itens'], ['itens', 'garantia'])).toBe(false);
+  });
+});
+
+describe('seções independentes (bug: Objetivo levava Diretrizes junto)', () => {
+  it('desligar Objetivo não desliga Diretrizes Normativas', () => {
+    const sel = alternarSecao(secoesPadraoDoTipo('proposta'), 'visao', false);
+    expect(sel).not.toContain('visao');
+    expect(sel).toContain('normas');
+  });
+
+  it('Descrição dos Serviços e Responsabilidades da Contratada são independentes', () => {
+    const sel = alternarSecao(secoesPadraoDoTipo('proposta'), 'servicos', false);
+    expect(sel).toContain('responsabilidades');
+  });
+
+  it('listas de Materiais e de Serviços são independentes', () => {
+    const sel = alternarSecao(secoesPadraoDoTipo('orcamento'), 'itens', false);
+    expect(sel).toContain('itensServicos');
+    // só a Lista de Serviços ligada ainda gera a seção de itens no documento
+    expect(ordenarSecoes(['itensServicos'])).toEqual(['itens']);
+  });
+
+  it('na estrutura da proposta, Objetivo em Não e Diretrizes em Sim', () => {
+    const ctx = { cartaVisivel: true, historicoVisivel: true, temMateriais: true, garantiaVisivel: true, selecao: new Set(['normas', 'responsabilidades']) };
+    const vis = montarEstruturaProposta({}, ctx).filter((s) => s.visible).map((s) => s.key);
+    expect(vis).toEqual(['normas', 'responsabilidades']);
+  });
+});
+
+describe('ordem das seções (setas ▲▼ no título dos cards)', () => {
+  it('sem ordem salva = ordem canônica, Carta no início e Aceite no fim', () => {
+    expect(ordenarSecoes(['aceite', 'premissas', 'carta', 'visao'])).toEqual(['carta', 'visao', 'premissas', 'aceite']);
+  });
+
+  it('respeita a ordem salva no miolo; Carta e Aceite continuam fixos', () => {
+    expect(ordenarSecoes(['aceite', 'premissas', 'carta', 'visao'], ['aceite', 'premissas', 'carta', 'visao'])).toEqual(['carta', 'premissas', 'visao', 'aceite']);
+  });
+
+  it('subir troca com a vizinha visível (pula seções sem card)', () => {
+    const cards = ['visao', 'premissas', 'garantia'] as const;
+    const ordem = moverSecao(undefined, 'premissas', -1, [...cards]);
+    expect(ordem.indexOf('premissas')).toBeLessThan(ordem.indexOf('visao'));
+    const vis = ordenarSecoes([...cards], ordem);
+    expect(vis).toEqual(['premissas', 'visao', 'garantia']);
+  });
+
+  it('descer a última não muda nada; carta/aceite não entram no miolo', () => {
+    const ordem = moverSecao(undefined, 'garantia', 1, ['visao', 'garantia']);
+    expect(ordenarSecoes(['visao', 'garantia'], ordem)).toEqual(['visao', 'garantia']);
+    expect(ordem).not.toContain('carta');
+    expect(ordem).not.toContain('aceite');
   });
 });

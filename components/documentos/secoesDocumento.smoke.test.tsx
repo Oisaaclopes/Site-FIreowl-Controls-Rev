@@ -87,6 +87,16 @@ describe('Seções do documento — render (Node smoke)', () => {
     expect(isPdf(await orc(pedido({ pedidoTipo: 'orcamento', secoesDocumento: sel })))).toBe(true);
   }, 30000);
 
+  it('Orçamento: Objetivo em Não, Diretrizes em Sim, só Lista de Serviços e ordem trocada', async () => {
+    const b = await orc(pedido({ pedidoTipo: 'orcamento', secoesDocumento: ['normas', 'itensServicos', 'premissas', 'garantia'], ordemSecoes: ['garantia', 'premissas', 'normas'] }));
+    expect(isPdf(b)).toBe(true);
+  }, 30000);
+
+  it('Laudo com ordem própria e Diretrizes sem Objetivo renderiza', async () => {
+    const b = await renderToBuffer(<LaudoTecnicoDocument pedido={pedido({ pedidoTipo: 'laudo', secoesDocumento: ['normas', 'conclusao', 'itens'], ordemSecoes: ['conclusao', 'itens'] })} companyProfile={company} />);
+    expect(isPdf(b)).toBe(true);
+  }, 30000);
+
   it('Laudo com seções comerciais extras renderiza', async () => {
     const b = await renderToBuffer(<LaudoTecnicoDocument pedido={pedido({ pedidoTipo: 'laudo', secoesDocumento: ['visao', 'premissas', 'garantia'] })} companyProfile={company} />);
     expect(isPdf(b)).toBe(true);

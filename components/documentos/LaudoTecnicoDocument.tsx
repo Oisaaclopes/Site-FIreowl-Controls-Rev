@@ -4,8 +4,8 @@ import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import { C, nv, lnv, PdfHeader, PdfFooter, CamposExtras, CapaBanner } from './pdfKit';
 import { DocOptions } from '@/lib/documentos';
 import { resolverNormasReferencia } from '@/lib/normasReferencia';
-import { SecaoDocKey, SECOES_NATIVAS_LAUDO, secoesExtras, secoesSelecionadas } from '@/lib/documentoSecoes';
-import { SecoesExtras, secoesRenderizaveis } from './SecoesDocumentoPdf';
+import { SecaoDocKey, ordenarSecoes, secoesSelecionadas } from '@/lib/documentoSecoes';
+import { SecoesExtras, SecoesCtx, secaoTemConteudo } from './SecoesDocumentoPdf';
 
 export type LaudoTecnicoPdfOptions = Partial<DocOptions>;
 
@@ -90,22 +90,88 @@ export function LaudoTecnicoDocument({ pedido, companyProfile, options }: { pedi
   // conhecido → sugestão; desconhecido → vazio (nunca assume SDAI por ser laudo).
   const normas = resolverNormasReferencia(p).filter(nv);
   // Seções escolhidas no editor ([[lib/documentoSecoes]]). null = pedido não
-  // personalizado → laudo histórico idêntico.
+  // personalizado → laudo histórico idêntico (objetivo, normas, itens, parecer).
   const sel = secoesSelecionadas(p);
-  const on = (k: SecaoDocKey) => !sel || sel.has(k);
-  const secCtx = { p, companyProfile, cliente, assinante: responsavel, showUnit: false, showTotal: false };
-  const extras = sel ? secoesRenderizaveis(secoesExtras(sel, SECOES_NATIVAS_LAUDO), secCtx) : [];
-  let proxSec = 1;
-  const sec = () => String(proxSec++).padStart(2, '0');
-  const nObjetivo = on('visao') ? sec() : '';
-  const nNormas = on('visao') && normas.length > 0 ? sec() : '';
-  const nItens = on('itens') && itens.length > 0 ? sec() : '';
-  const nParecer = on('conclusao') ? sec() : '';
-  const nExtras: Partial<Record<SecaoDocKey, string>> = {};
-  for (const k of extras) nExtras[k] = sec();
-  const nResponsavel = sec();
+  const secCtx: SecoesCtx = {
+    p, companyProfile, cliente, assinante: responsavel, showUnit: false, showTotal: false,
+    verMateriais: !sel || sel.has('itens'),
+    verServicos: !sel || sel.has('itensServicos'),
+  };
+  // Itens inspecionados: com seleção, as listas de materiais/serviços são independentes.
+  const itensLaudo = itens.filter((e) => (e.tipo === 'servico' ? secCtx.verServicos : secCtx.verMateriais));
+  const nativoTemConteudo = (k: SecaoDocKey): boolean | undefined => {
+    if (k === 'visao' || k === 'conclusao') return true;
+    if (k === 'normas') return normas.length > 0;
+    if (k === 'itens') return itensLaudo.length > 0;
+    return undefined;
+  };
+  const ordem: SecaoDocKey[] = sel
+    ? ordenarSecoes([...sel], p.ordemSecoes).filter((k) => nativoTemConteudo(k) ?? secaoTemConteudo(k, secCtx))
+    : (['visao', 'normas', 'itens', 'conclusao'] as SecaoDocKey[]).filter((k) => nativoTemConteudo(k));
+  const num = (k: SecaoDocKey) => String(ordem.indexOf(k) + 1).padStart(2, '0');
+  const nResponsavel = String(ordem.length + 1).padStart(2, '0');
   const objetivo = nv(p.escopoServico) ? p.escopoServico : (nv(p.objetivo) ? p.objetivo : 'Verificação das condições técnicas e de conformidade do sistema, conforme normas de referência.');
   const parecer = nv(p.conclusao) ? p.conclusao : 'Com base na inspeção realizada e nas normas de referência, o sistema encontra-se em conformidade nos pontos verificados, ressalvadas as observações registradas neste laudo. Recomenda-se a manutenção periódica para preservação do desempenho.';
+
+  const corpo: Partial<Record<SecaoDocKey, () => React.ReactNode>> = {
+    visao: () => (
+      <>
+        <SecHead n={num('visao')} titulo="Objetivo da Inspeção" />
+        <View style={styles.card}>
+          <Text style={styles.para}>{objetivo}</Text>
+        </View>
+      </>
+    ),
+    normas: () => (
+      <>
+        <SecHead n={num('normas')} titulo="Normas e Referências" />
+        {normas.map((it, i) => (
+          <View key={i} style={styles.bulletRow}>
+            <Text style={styles.bulletDot}>•</Text>
+            <Text style={styles.bulletText}>{it}</Text>
+          </View>
+        ))}
+      </>
+    ),
+    itens: () => (
+      <View minPresenceAhead={70}>
+        <SecHead n={num('itens')} titulo="Itens Inspecionados" />
+        <View style={{ borderWidth: 1, borderColor: C.s200, borderRadius: 4, overflow: 'hidden', marginBottom: 10 }}>
+          <View style={styles.th} fixed>
+            <Text style={[styles.thCell, { width: 22, textAlign: 'center' }]}>#</Text>
+            <Text style={[styles.thCell, { flex: 1 }]}>Descrição / Dispositivo</Text>
+            {showMarca && <Text style={[styles.thCell, { width: 92 }]}>Marca / Modelo</Text>}
+            <Text style={[styles.thCell, { width: 30, textAlign: 'center' }]}>Qtd</Text>
+            <Text style={[styles.thCell, { width: 46, textAlign: 'center' }]}>Conf.</Text>
+            <Text style={[styles.thCell, { width: 46, textAlign: 'center' }]}>N/Conf.</Text>
+          </View>
+          {itensLaudo.map((eq: PedidoEquipmentItem, i) => (
+            <View key={i} style={[styles.tr, i % 2 === 1 ? styles.trAlt : {}]} wrap={false}>
+              <Text style={[styles.td, { width: 22, textAlign: 'center', color: C.red, fontFamily: 'Roboto', fontWeight: 700 }]}>{i + 1}</Text>
+              <View style={[styles.td, { flex: 1 }]}>
+                <Text style={{ color: C.ink, fontFamily: 'Roboto', fontWeight: 700, fontSize: 8 }}>{eq.descricao}</Text>
+                {showMarca && eq.descricaoDetalhada ? <Text style={{ color: C.s500, fontSize: 7, marginTop: 1, lineHeight: 1.3 }}>{eq.descricaoDetalhada}</Text> : null}
+              </View>
+              {showMarca && <Text style={[styles.td, { width: 92 }]}>{eq.marcaModelo}</Text>}
+              <Text style={[styles.td, { width: 30, textAlign: 'center', fontFamily: 'Roboto', fontWeight: 700 }]}>{eq.quantidade}</Text>
+              <View style={{ width: 46, alignItems: 'center' }}><View style={styles.tdBox} /></View>
+              <View style={{ width: 46, alignItems: 'center' }}><View style={styles.tdBox} /></View>
+            </View>
+          ))}
+        </View>
+      </View>
+    ),
+    conclusao: () => (
+      <View minPresenceAhead={110} wrap={false}>
+        <SecHead n={num('conclusao')} titulo="Parecer Técnico" />
+        <View style={styles.card}>
+          <Text style={styles.para}>{parecer}</Text>
+        </View>
+        <Text style={styles.artLabel}>Observações e não conformidades</Text>
+        <View style={styles.parecerBox} />
+      </View>
+    ),
+  };
 
   return (
     <Document title={`Laudo Técnico ${numero}`} author={razao}>
@@ -128,62 +194,7 @@ export function LaudoTecnicoDocument({ pedido, companyProfile, options }: { pedi
           <InfoCell label="Responsável Técnico" value={responsavel} />
         </View>
 
-        {on('visao') && <SecHead n={nObjetivo} titulo="Objetivo da Inspeção" />}
-        {on('visao') && <View style={styles.card}>
-          <Text style={styles.para}>{objetivo}</Text>
-        </View>}
-
-        {on('visao') && normas.length > 0 && (
-          <>
-            <SecHead n={nNormas} titulo="Normas e Referências" />
-            {normas.map((it, i) => (
-              <View key={i} style={styles.bulletRow}>
-                <Text style={styles.bulletDot}>•</Text>
-                <Text style={styles.bulletText}>{it}</Text>
-              </View>
-            ))}
-          </>
-        )}
-
-        {on('itens') && itens.length > 0 && (
-          <View minPresenceAhead={70}>
-            <SecHead n={nItens} titulo="Itens Inspecionados" />
-            <View style={{ borderWidth: 1, borderColor: C.s200, borderRadius: 4, overflow: 'hidden', marginBottom: 10 }}>
-              <View style={styles.th} fixed>
-                <Text style={[styles.thCell, { width: 22, textAlign: 'center' }]}>#</Text>
-                <Text style={[styles.thCell, { flex: 1 }]}>Descrição / Dispositivo</Text>
-                {showMarca && <Text style={[styles.thCell, { width: 92 }]}>Marca / Modelo</Text>}
-                <Text style={[styles.thCell, { width: 30, textAlign: 'center' }]}>Qtd</Text>
-                <Text style={[styles.thCell, { width: 46, textAlign: 'center' }]}>Conf.</Text>
-                <Text style={[styles.thCell, { width: 46, textAlign: 'center' }]}>N/Conf.</Text>
-              </View>
-              {itens.map((eq: PedidoEquipmentItem, i) => (
-                <View key={i} style={[styles.tr, i % 2 === 1 ? styles.trAlt : {}]} wrap={false}>
-                  <Text style={[styles.td, { width: 22, textAlign: 'center', color: C.red, fontFamily: 'Roboto', fontWeight: 700 }]}>{i + 1}</Text>
-                  <View style={[styles.td, { flex: 1 }]}>
-                    <Text style={{ color: C.ink, fontFamily: 'Roboto', fontWeight: 700, fontSize: 8 }}>{eq.descricao}</Text>
-                    {showMarca && eq.descricaoDetalhada ? <Text style={{ color: C.s500, fontSize: 7, marginTop: 1, lineHeight: 1.3 }}>{eq.descricaoDetalhada}</Text> : null}
-                  </View>
-                  {showMarca && <Text style={[styles.td, { width: 92 }]}>{eq.marcaModelo}</Text>}
-                  <Text style={[styles.td, { width: 30, textAlign: 'center', fontFamily: 'Roboto', fontWeight: 700 }]}>{eq.quantidade}</Text>
-                  <View style={{ width: 46, alignItems: 'center' }}><View style={styles.tdBox} /></View>
-                  <View style={{ width: 46, alignItems: 'center' }}><View style={styles.tdBox} /></View>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {on('conclusao') && <View minPresenceAhead={110} wrap={false}>
-          <SecHead n={nParecer} titulo="Parecer Técnico" />
-          <View style={styles.card}>
-            <Text style={styles.para}>{parecer}</Text>
-          </View>
-          <Text style={styles.artLabel}>Observações e não conformidades</Text>
-          <View style={styles.parecerBox} />
-        </View>}
-
-        {extras.length > 0 && <SecoesExtras keys={extras} ctx={secCtx} numero={(k) => nExtras[k] || ''} />}
+        {ordem.map((k) => <React.Fragment key={k}>{corpo[k] ? corpo[k]!() : <SecoesExtras keys={[k]} ctx={secCtx} numero={num} />}</React.Fragment>)}
 
         {showCampos && <CamposExtras campos={p.camposPersonalizados} />}
 

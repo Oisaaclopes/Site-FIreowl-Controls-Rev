@@ -88,6 +88,14 @@ export interface SecoesCtx {
   /** Mostrar valores unitários / totais por item (opções do documento). */
   showUnit?: boolean;
   showTotal?: boolean;
+  /** Sub-seções de "itens": lista de materiais / lista de serviços (padrão: ambas). */
+  verMateriais?: boolean;
+  verServicos?: boolean;
+}
+
+/** Itens que a seção "itens" mostra, conforme as listas ligadas. */
+function itensVisiveis(ctx: SecoesCtx): PedidoEquipmentItem[] {
+  return (ctx.p.equipmentItems || []).filter((e) => (e.tipo === 'servico' ? ctx.verServicos !== false : ctx.verMateriais !== false));
 }
 
 function servicosSec(p: CommercialProposalData) {
@@ -100,12 +108,15 @@ export function secaoTemConteudo(key: SecaoDocKey, ctx: SecoesCtx): boolean {
   switch (key) {
     case 'carta': return nv(p.cartaApresentacao) || p.cartaApresentacao === undefined;
     case 'historico': return true;
-    case 'visao': return nv(p.objetivo) || lnv(resolverNormasReferencia(p));
+    case 'visao': return nv(p.objetivo);
+    case 'normas': return lnv(resolverNormasReferencia(p));
     case 'escopo': return nv(p.escopoServico) || (p.slaTabela || []).length > 0 || nv(p.slaCritico);
-    case 'itens': return (p.equipmentItems || []).length > 0;
+    case 'itens': return itensVisiveis(ctx).length > 0;
+    case 'itensServicos': return false; // sai dentro de "itens"
     case 'premissas': return lnv(p.premissas);
     case 'incluso': return lnv(p.incluso) || lnv(p.naoIncluso);
-    case 'servicos': return servicosSec(p).some((g) => nv(g.titulo) || lnv(g.itens)) || lnv(p.responsabilidadesContratada);
+    case 'servicos': return servicosSec(p).some((g) => nv(g.titulo) || lnv(g.itens));
+    case 'responsabilidades': return lnv(p.responsabilidadesContratada);
     case 'entregaveis': return lnv(p.entregaveis);
     case 'embalagem': return lnv(txtSec(p, p.embalagemTransporteTexto, EMBALAGEM_TRANSPORTE));
     case 'seguranca': return lnv(txtSec(p, p.segurancaTrabalhoTexto, SEGURANCA_TRABALHO));
@@ -154,20 +165,12 @@ function corpo(key: SecaoDocKey, ctx: SecoesCtx): React.ReactNode {
           <Text style={s.para}>{(p.revisoes || []).length ? 'Versão vigente: este documento.' : 'Emissão inicial.'}</Text>
         </View>
       );
-    case 'visao': {
-      const normas = resolverNormasReferencia(p).filter(nv);
-      return (
-        <View>
-          {nv(p.objetivo) ? <Text style={s.para}>{p.objetivo}</Text> : null}
-          {normas.length > 0 ? (
-            <>
-              <Text style={s.sub}>Normas de referência</Text>
-              <Bullets itens={normas} />
-            </>
-          ) : null}
-        </View>
-      );
-    }
+    case 'visao':
+      return <Text style={s.para}>{p.objetivo}</Text>;
+    case 'normas':
+      return <Bullets itens={resolverNormasReferencia(p).filter(nv)} />;
+    case 'responsabilidades':
+      return <Bullets itens={p.responsabilidadesContratada || []} />;
     case 'escopo':
       return (
         <View>
@@ -176,7 +179,7 @@ function corpo(key: SecaoDocKey, ctx: SecoesCtx): React.ReactNode {
         </View>
       );
     case 'itens': {
-      const itens = p.equipmentItems || [];
+      const itens = itensVisiveis(ctx);
       const showUnit = ctx.showUnit !== false;
       const showTotal = ctx.showTotal !== false;
       return (
@@ -218,12 +221,6 @@ function corpo(key: SecaoDocKey, ctx: SecoesCtx): React.ReactNode {
               <Bullets itens={g.itens} />
             </View>
           ))}
-          {lnv(p.responsabilidadesContratada) ? (
-            <View minPresenceAhead={40}>
-              <Text style={s.sub}>Responsabilidades da Contratada</Text>
-              <Bullets itens={p.responsabilidadesContratada} />
-            </View>
-          ) : null}
         </View>
       );
     case 'entregaveis':

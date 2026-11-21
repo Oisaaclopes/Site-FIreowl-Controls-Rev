@@ -3,7 +3,7 @@ import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import { Pedido, CompanyProfile, PedidoEquipmentItem } from '@/lib/types';
 import { C, nv, PdfHeader, PdfFooter, CapaBanner } from './pdfKit';
 import { PersonalizadoData } from './PersonalizadoConfigModal';
-import { SECAO_KEYS, secoesSelecionadas } from '@/lib/documentoSecoes';
+import { ordenarSecoes, secoesSelecionadas } from '@/lib/documentoSecoes';
 import { SecoesExtras, secoesRenderizaveis } from './SecoesDocumentoPdf';
 
 interface Props {
@@ -65,8 +65,8 @@ export function PersonalizadoDocument({ pedido, companyProfile, data, showLogo =
   // ([[lib/documentoSecoes]]). Para os demais tipos (fluxo "Gerar outro
   // documento") o Personalizado segue só com título/campos, como sempre.
   const sel = pedido.proposal?.pedidoTipo === 'personalizado' ? secoesSelecionadas(pedido.proposal) : null;
-  const secCtx = { p: pedido.proposal, companyProfile, cliente, assinante: responsavel };
-  const secoes = sel ? secoesRenderizaveis(SECAO_KEYS.filter((k) => sel.has(k)), secCtx) : [];
+  const secCtx = { p: pedido.proposal, companyProfile, cliente, assinante: responsavel, verMateriais: !!sel?.has('itens'), verServicos: !!sel?.has('itensServicos') };
+  const secoes = sel ? secoesRenderizaveis(ordenarSecoes([...sel], pedido.proposal?.ordemSecoes), secCtx) : [];
   const numSecao = (k: (typeof secoes)[number]) => String(secoes.indexOf(k) + 1).padStart(2, '0');
   const itensDoConfig = data.incluirItens && itens.length > 0 && !secoes.includes('itens');
 
