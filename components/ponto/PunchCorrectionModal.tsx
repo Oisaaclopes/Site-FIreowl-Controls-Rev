@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { TimePunch } from '@/lib/types';
 import { adminCorrectPunch, AdjustmentAction, validateAdminCorrection } from '@/lib/adjustments';
-import { dateKeyOf, dateKeyToBr } from '@/lib/timecard';
+import { dateKeyOf, dateKeyToBr, fmtDurationOrDash } from '@/lib/timecard';
+import { previewCorrection } from '@/lib/punchCorrectionPreview';
 import { PUNCH_TYPES, PunchType, TimesheetRow } from '@/lib/timesheet';
 
 /**
@@ -17,6 +18,8 @@ export interface PunchCorrectionModalProps {
   employeeName: string;
   /** profiles.id do funcionário — dono das batidas. */
   employeeUserId?: string;
+  /** Batidas EFETIVAS do funcionário — base da prévia (onde a batida vai cair). */
+  punches?: TimePunch[];
   onClose: () => void;
   onSaved: () => void | Promise<void>;
 }
@@ -48,14 +51,24 @@ const targetOf = (p?: TimePunch) => {
 };
 
 export const PunchCorrectionModal: React.FC<PunchCorrectionModalProps> = ({
-  row, employeeName, employeeUserId, onClose, onSaved,
+  row, employeeName, employeeUserId, punches, onClose, onSaved,
 }) => {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Gestor confirma conscientemente uma correção que cai fora desta jornada.
+  const [forceOutside, setForceOutside] = useState(false);
+
+  // Simula a correção no MESMO motor da folha antes de gravar.
+  const preview = useMemo(
+    () => (draft && punches ? previewCorrection(punches, row.journey, row.competenceKey, draft, Date.now()) : null),
+    [draft, punches, row],
+  );
+  const blocked = !!preview?.warning && !forceOutside;
 
   const start = (action: AdjustmentAction, type: PunchType, punch?: TimePunch) => {
     setError(null);
+    setForceOutside(false);
     setDraft({
       action, type, punch,
       refDate: punch?.at != null ? dateKeyOf(punch.at) : row.competenceKey,
@@ -65,7 +78,7 @@ export const PunchCorrectionModal: React.FC<PunchCorrectionModalProps> = ({
   };
 
   const save = async () => {
-    if (!draft || saving) return;
+    if (!draft || saving || blocked) return;
     const input = {
       userId: employeeUserId || '',
       action: draft.action,
@@ -225,10 +238,35 @@ export const PunchCorrectionModal: React.FC<PunchCorrectionModalProps> = ({
               <textarea id="corr-reason" rows={3} value={draft.reason} onChange={(e) => setDraft({ ...draft, reason: e.target.value })}
                 placeholder="Ex.: funcionário esqueceu de registrar o retorno" className={inputCls} />
             </div>
+            {preview?.journey && !preview.warning && (
+              <div className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-fg-secondary">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-fg-muted mb-1">Como a jornada vai ficar</p>
+                <p className="font-data-mono text-fg">
+                  {(['entrada', 'pausa', 'retorno', 'saida'] as const).map((k, i) => (
+                    <span key={k}>{i > 0 && ' · '}{hm(preview.journey![k]) || '--:--'}</span>
+                  ))}
+                </p>
+                <p className="mt-1">
+                  {preview.journey.status === 'OK'
+                    ? <span className="text-emerald-700 font-semibold">Jornada completa · {fmtDurationOrDash(preview.journey.workedMs)}</span>
+                    : <span className="text-amber-700 font-semibold">Ainda {preview.journey.status === 'INCONSISTENTE' ? 'inconsistente (horários fora de ordem)' : 'incompleta'} — faltará outra correção.</span>}
+                </p>
+              </div>
+            )}
+            {preview?.warning && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-amber-800 space-y-2">
+                <p className="font-semibold">Esta correção não vai para esta linha.</p>
+                <p>{preview.warning}</p>
+                <label className="flex items-start gap-2 text-[11px]">
+                  <input type="checkbox" checked={forceOutside} onChange={(e) => setForceOutside(e.target.checked)} className="mt-0.5" />
+                  Entendo que a batida ficará em outra jornada/linha e quero gravar mesmo assim.
+                </label>
+              </div>
+            )}
             {error && <p className="rounded-lg border border-danger/30 bg-red-50 px-3 py-2 text-danger">{error}</p>}
             <div className="flex gap-2">
               <button type="button" onClick={() => setDraft(null)} className="min-h-[44px] flex-1 rounded-lg border border-border text-sm font-semibold text-fg-secondary">Cancelar</button>
-              <button type="button" onClick={save} disabled={saving}
+              <button type="button" onClick={save} disabled={saving || blocked}
                 className={`min-h-[44px] flex-1 rounded-lg text-sm font-semibold text-white disabled:opacity-60 ${draft.action === 'DESCONSIDERAR' ? 'bg-danger hover:bg-danger-hover' : 'bg-navy hover:bg-navy-3'}`}>
                 {saving ? 'Salvando…' : 'Salvar correção'}
               </button>

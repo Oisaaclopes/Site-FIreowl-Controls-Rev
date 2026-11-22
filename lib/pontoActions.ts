@@ -12,7 +12,24 @@ export type PunchType = TimePunch['type'];
  *  'saved'  = confirmada no servidor;
  *  'queued' = sem conexão — guardada no aparelho e reenviada automaticamente;
  *  'busy'   = já havia uma batida sendo registrada (toque duplo ignorado). */
-export type PunchSaveResult = 'saved' | 'queued' | 'busy';
+export type PunchSaveResult = 'saved' | 'queued' | 'busy' | 'stale';
+
+/** Intervalo mínimo esperado entre duas batidas da mesma jornada. */
+export const QUICK_REPUNCH_MS = 2 * 60 * 1000;
+
+/**
+ * Batida logo após a anterior (ex.: Almoço e Retorno com 15s de diferença)
+ * quase sempre é toque repetido ou botão errado. Retorna a mensagem de
+ * confirmação, ou null quando não há motivo para perguntar.
+ */
+export function quickRepunchWarning(state: Pick<PunchDayState, 'todays' | 'nextType'>, nowMs: number): string | null {
+  if (!state.nextType) return null;
+  const last = state.todays.reduce<TimePunch | undefined>((m, p) => (p.at != null && (!m || p.at > (m.at || 0)) ? p : m), undefined);
+  if (!last?.at || nowMs - last.at >= QUICK_REPUNCH_MS || nowMs < last.at) return null;
+  const secs = Math.max(1, Math.round((nowMs - last.at) / 1000));
+  const ago = secs < 60 ? `${secs}s` : `${Math.round(secs / 60)} min`;
+  return `Sua última batida (${PUNCH_SHORT[last.type]}) foi há ${ago}.\n\nRegistrar agora "${PUNCH_SHORT[state.nextType]}"?`;
+}
 export type AddPunchHandler = (p: TimePunch) => Promise<PunchSaveResult> | void;
 
 /** GPS da batida: alta precisão, aceita posição de até 30s (evita espera longa

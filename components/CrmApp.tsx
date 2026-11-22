@@ -93,7 +93,7 @@ import {
   fetchPunches, fetchPunchesRange, insertPunch, isMonthInDefaultWindow, mergePunchSets, monthFetchRange,
 } from '@/lib/timepunch';
 import { enqueuePunch, isPunchSynced, mergeWithQueued, readPunchQueue, removeQueuedPunch } from '@/lib/punchQueue';
-import type { PunchSaveResult } from '@/lib/pontoActions';
+import { nextPunchType, type PunchSaveResult } from '@/lib/pontoActions';
 import { fetchPedidos, upsertPedido, updatePedidoStatus, deletePedido } from '@/lib/pedidos';
 import { fetchQuotes, insertQuote } from '@/lib/quotes';
 import { fetchSuppliers, upsertSupplier, deleteSupplier } from '@/lib/suppliers';
@@ -1089,12 +1089,33 @@ function CrmAppContent({
   }, [applyServerPunches]);
 
   const PUNCH_SAVE_TIMEOUT_MS = 20000;
+  const PUNCH_CHECK_TIMEOUT_MS = 6000;
+  // Cobre a janela de jornada aberta (18h) e a jornada encerrada de hoje.
+  const PUNCH_CHECK_WINDOW_MS = 36 * 60 * 60 * 1000;
   const handleAddPunch = async (newPunch: TimePunch): Promise<PunchSaveResult> => {
     if (punchInFlightRef.current) return 'busy';
     punchInFlightRef.current = true;
     try {
       if (isSupabaseConfigured()) {
         const owned: TimePunch = { ...newPunch, userId: newPunch.userId ?? userId };
+        // Confere a sequência com o SERVIDOR antes de gravar: um aparelho com a
+        // tela aberta há horas (sem atualização) oferecia a batida errada — ex.:
+        // "Entrada" depois de um Retorno já registrado em outro aparelho.
+        // Sem rede, segue com o estado local (a batida vai para a fila).
+        try {
+          const fresh = await Promise.race([
+            fetchPunchesRange(Date.now() - PUNCH_CHECK_WINDOW_MS),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), PUNCH_CHECK_TIMEOUT_MS)),
+          ]);
+          const known = mergeWithQueued(fresh, readPunchQueue(userId));
+          const expected = nextPunchType(known, { userId: owned.userId, name: owned.employeeName }, Date.now());
+          if (expected !== owned.type) {
+            setPunches((prev) => mergePunchSets([prev, fresh]));
+            return 'stale';
+          }
+        } catch {
+          /* sem conexão para conferir — segue */
+        }
         try {
           // Rede móvel instável pode deixar a requisição pendurada: após o
           // limite, a batida vai para a fila (a conciliação evita duplicar).

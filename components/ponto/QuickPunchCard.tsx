@@ -11,8 +11,9 @@ import {
   PUNCH_SHORT,
   PunchStatusKind,
   AddPunchHandler,
+  quickRepunchWarning,
 } from '@/lib/pontoActions';
-import { useToast } from '@/components/ui/Feedback';
+import { requestConfirm, useToast } from '@/components/ui/Feedback';
 
 /**
  * QuickPunchCard — card compacto de ponto orientado à PRÓXIMA ação.
@@ -84,10 +85,16 @@ export const QuickPunchCard: React.FC<QuickPunchCardProps> = ({
     busyRef.current = true;
     setPunching(true);
     try {
+      const warn = quickRepunchWarning(state, Date.now());
+      if (warn && !(await requestConfirm(warn))) return;
       const pos = await capturePunchPosition();
       // Aguarda a gravação: o botão só libera quando a próxima batida já mudou.
       const result = await onAddPunch(buildPunch(nextT, currentUser, pos || undefined));
       if (result === 'busy') return;
+      if (result === 'stale') {
+        toast.info('Seu ponto foi atualizado com o servidor — confira a próxima batida e toque novamente.');
+        return;
+      }
       if (result === 'queued') toast.info(`${PUNCH_DONE[nextT]} no aparelho — sem conexão, será enviada automaticamente.`);
       else toast.success(`${PUNCH_DONE[nextT]}${pos ? '' : ' (sem GPS)'}`);
     } catch {

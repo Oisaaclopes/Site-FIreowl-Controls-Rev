@@ -15,7 +15,7 @@ import { uploadCertificate, signedDocUrl } from '@/lib/storage';
 import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 import { fetchTimeClockParticipants } from '@/lib/users';
 import { TimecardPDFView } from '@/components/documentos/TimecardPDFView';
-import { derivePunchState, buildPunch, isPunchOf, PUNCH_SHORT, PUNCH_GPS_OPTIONS } from '@/lib/pontoActions';
+import { derivePunchState, buildPunch, isPunchOf, PUNCH_SHORT, PUNCH_GPS_OPTIONS, quickRepunchWarning } from '@/lib/pontoActions';
 import type { AddPunchHandler } from '@/lib/pontoActions';
 import { effectivePunchLabel } from '@/lib/effectivePunches';
 import type { TimecardBlock } from '@/components/documentos/TimecardDocument';
@@ -454,9 +454,15 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
   // envio). Antes o botão liberava antes do servidor responder e um 2º toque
   // gravava a MESMA batida de novo (ex.: duas Entradas → "saída faltante").
   const punchBusyRef = useRef(false);
-  const handleBaterPonto = () => {
+  const handleBaterPonto = async () => {
     if (punchBusyRef.current || !nextType) return;
     punchBusyRef.current = true;
+    // Batida logo após a anterior: confirma (toque repetido/botão errado).
+    const warn = quickRepunchWarning(punchState, Date.now());
+    if (warn && !(await requestConfirm(warn))) {
+      punchBusyRef.current = false;
+      return;
+    }
     if (!('geolocation' in navigator)) {
       void registerPunch();
       return;
@@ -498,6 +504,10 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
       const newPunch = buildPunch(type, currentUser, hasGps ? { lat: lat!, lng: lng!, accuracy } : undefined);
       const result = await onAddPunch(newPunch);
       if (result === 'busy') return;
+      if (result === 'stale') {
+        showToast('Seu ponto foi atualizado com o servidor — confira a próxima batida e toque novamente.', 'info');
+        return;
+      }
       if (result === 'queued') {
         setFeedback({ label: `${FEEDBACK_LABEL[type]} no aparelho`, time: fmtClock(d), queued: true });
       } else {
@@ -1987,7 +1997,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
       )}
 
       {nextType && (
-        <div className="md:hidden fixed bottom-[4.5rem] left-3 right-3 z-30 rounded-xl bg-white/95 backdrop-blur border border-border shadow-xl p-2 flex items-center gap-2">
+        <div className="md:hidden fixed bottom-[4.5rem] left-3 right-3 z-30 rounded-xl bg-surface/95 backdrop-blur border border-border shadow-xl p-2 flex items-center gap-2">
           <div className="min-w-0 flex-1 pl-2"><p className="text-[10px] text-fg-secondary">Próxima batida</p><p className="text-xs font-bold text-fg truncate">{NEXT_INFO[nextType].label}</p></div>
           <button onClick={handleBaterPonto} disabled={punching || locating} className={`shrink-0 px-4 py-3 rounded-lg text-white text-xs font-bold ${NEXT_INFO[nextType].classes}`}>{locating ? 'GPS…' : 'Registrar'}</button>
         </div>
@@ -1997,6 +2007,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
           row={corrRow}
           employeeName={sheetPerson.name}
           employeeUserId={sheetPerson.userId}
+          punches={punchesOf(sheetPerson)}
           onClose={() => setCorrRow(null)}
           onSaved={async () => {
             showToast('Correção registrada.', 'success');
