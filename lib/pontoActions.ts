@@ -8,6 +8,17 @@ import { buildJourneys, dateKeyOf, isJourneyStale, Journey, OPEN_JOURNEY_LIMIT_M
 
 export type PunchType = TimePunch['type'];
 
+/** Resultado do registro de uma batida (handleAddPunch no CrmApp):
+ *  'saved'  = confirmada no servidor;
+ *  'queued' = sem conexão — guardada no aparelho e reenviada automaticamente;
+ *  'busy'   = já havia uma batida sendo registrada (toque duplo ignorado). */
+export type PunchSaveResult = 'saved' | 'queued' | 'busy';
+export type AddPunchHandler = (p: TimePunch) => Promise<PunchSaveResult> | void;
+
+/** GPS da batida: alta precisão, aceita posição de até 30s (evita espera longa
+ *  em ambiente fechado) e desiste em 10s — a batida segue sem localização. */
+export const PUNCH_GPS_OPTIONS: PositionOptions = { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 };
+
 const pad2 = (n: number) => n.toString().padStart(2, '0');
 const fmtClock = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
 
@@ -202,7 +213,7 @@ export function capturePunchPosition(): Promise<{ lat: number; lng: number; accu
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
       () => resolve(null),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      PUNCH_GPS_OPTIONS
     );
   });
 }

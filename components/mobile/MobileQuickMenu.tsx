@@ -1,5 +1,6 @@
 'use client';
 
+import type { AddPunchHandler } from '@/lib/pontoActions';
 import React, { useState } from 'react';
 import { Client, TabPath, TimePunch, UserRole } from '@/lib/types';
 import { greeting, MODULE_META, quickMenuTabs } from '@/lib/modules';
@@ -27,7 +28,7 @@ interface Props {
   onSelectTab: (t: TabPath) => void;
   /** Ponto rápido na Home — depende de uses_time_clock, não do cargo. */
   punches?: TimePunch[];
-  onAddPunch?: (p: TimePunch) => void;
+  onAddPunch?: AddPunchHandler;
   usesTimeClock?: boolean;
 }
 

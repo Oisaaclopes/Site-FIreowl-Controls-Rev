@@ -15,7 +15,8 @@ import { uploadCertificate, signedDocUrl } from '@/lib/storage';
 import { useDomainRefresh } from '@/lib/realtime/RealtimeProvider';
 import { fetchTimeClockParticipants } from '@/lib/users';
 import { TimecardPDFView } from '@/components/documentos/TimecardPDFView';
-import { derivePunchState, buildPunch, isPunchOf, PUNCH_SHORT } from '@/lib/pontoActions';
+import { derivePunchState, buildPunch, isPunchOf, PUNCH_SHORT, PUNCH_GPS_OPTIONS } from '@/lib/pontoActions';
+import type { AddPunchHandler } from '@/lib/pontoActions';
 import { effectivePunchLabel } from '@/lib/effectivePunches';
 import type { TimecardBlock } from '@/components/documentos/TimecardDocument';
 import {
@@ -44,7 +45,7 @@ const SECTION_LABEL: Record<PontoSection, string> = {
 
 interface PontoViewProps {
   punches: TimePunch[];
-  onAddPunch: (punch: TimePunch) => void;
+  onAddPunch: AddPunchHandler;
   onReloadPunches?: () => void | Promise<void>;
   /** Garante as batidas de uma competência YYYY-MM fora da janela padrão. */
   onEnsurePunchMonth?: (month: string) => void | Promise<void>;
@@ -86,6 +87,21 @@ const fmtDuration = (ms: number) => {
 const inputCls =
   'w-full border border-border rounded-lg p-2.5 text-fg bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40';
 const labelCls = 'block text-fg-secondary mb-1 font-semibold uppercase text-[11px]';
+
+/** Relógio de segundos ISOLADO: só este nó re-renderiza a cada 1s — a tela do
+ *  ponto (folha, equipe, registros) não é recalculada a cada tique. */
+const LiveClock: React.FC<{ className?: string }> = ({ className }) => {
+  const [t, setT] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setT(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return <p className={className}>{fmtClock(t)}</p>;
+};
+
+/** Intervalo do "agora" usado nos cálculos da tela (horas trabalhadas, alertas,
+ *  jornada em curso). A exibição é em minutos — não precisa de 1s. */
+const VIEW_TICK_MS = 15000;
 
 const friendlyDate = (d: Date) =>
   d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
@@ -232,7 +248,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
   const [now, setNow] = useState(() => new Date());
   const [punching, setPunching] = useState(false);
   const [locating, setLocating] = useState(false);
-  const [feedback, setFeedback] = useState<{ label: string; time: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ label: string; time: string; queued?: boolean } | null>(null);
   const [online, setOnline] = useState(true);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [timecardCfg, setTimecardCfg] = useState<{ blocks: TimecardBlock[]; periodLabel: string; fileLabel: string; logoUrl?: string } | null>(null);
@@ -364,11 +380,13 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
     [myMonth, expMonth, recordPeriod].filter(Boolean).forEach((m) => { void onEnsurePunchMonth(m); });
   }, [onEnsurePunchMonth, myMonth, expMonth, recordPeriod]);
 
-  // Relógio em tempo real
+  // "Agora" dos cálculos: a cada 15s (o relógio de segundos é o <LiveClock/>)
+  // e imediatamente quando chegam batidas novas (a jornada muda na hora).
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
+    const id = setInterval(() => setNow(new Date()), VIEW_TICK_MS);
     return () => clearInterval(id);
   }, []);
+  useEffect(() => { setNow(new Date()); }, [punches]);
 
   // Indicador de sincronização (online/offline)
   useEffect(() => {
@@ -408,6 +426,9 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
   } as const;
   const status = { label: punchState.statusLabel, ...STATUS_UI[punchState.statusKind] };
 
+  // Batidas do próprio usuário gravadas no aparelho e ainda não confirmadas.
+  const myPendingSync = punches.filter((p) => p.pendingSync && isPunchOf(p, self)).length;
+
   const punchTime = (p?: TimePunch) => (p?.at ? fmtHM(new Date(p.at)) : '--');
 
   // ---- Alertas de escala (5 min antes) e batida faltante ----
@@ -429,17 +450,22 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
 
   // A permissão de GPS é solicitada APENAS aqui, no clique de bater ponto
   // (nunca no carregamento do site).
+  // Trava síncrona do botão: cobre do 1º toque até a batida estar gravada (GPS +
+  // envio). Antes o botão liberava antes do servidor responder e um 2º toque
+  // gravava a MESMA batida de novo (ex.: duas Entradas → "saída faltante").
+  const punchBusyRef = useRef(false);
   const handleBaterPonto = () => {
-    if (punching || locating || !nextType) return;
+    if (punchBusyRef.current || !nextType) return;
+    punchBusyRef.current = true;
     if (!('geolocation' in navigator)) {
-      registerPunch();
+      void registerPunch();
       return;
     }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setLocating(false);
-        registerPunch(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+        void registerPunch(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
       },
       async (err) => {
         setLocating(false);
@@ -448,27 +474,44 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
           const ok = await requestConfirm(
             'Permissão de localização negada.\n\nPara registrar com GPS, permita a localização no navegador.\n\nDeseja registrar o ponto MESMO ASSIM (sem localização)?'
           );
-          if (!ok) return;
+          if (!ok) {
+            punchBusyRef.current = false;
+            return;
+          }
         }
-        registerPunch(); // registra sem GPS (não inventa localização)
+        void registerPunch(); // registra sem GPS (não inventa localização)
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      PUNCH_GPS_OPTIONS
     );
   };
 
-  const registerPunch = (lat?: number, lng?: number, accuracy?: number) => {
-    if (!nextType) {
-      setPunching(false);
+  const registerPunch = async (lat?: number, lng?: number, accuracy?: number) => {
+    const type = nextType;
+    if (!type) {
+      punchBusyRef.current = false;
       return;
     }
-    const hasGps = typeof lat === 'number' && typeof lng === 'number';
-    const d = new Date();
-    const newPunch = buildPunch(nextType, currentUser, hasGps ? { lat: lat!, lng: lng!, accuracy } : undefined);
-    onAddPunch(newPunch);
-    setLastSync(d);
-    setFeedback({ label: FEEDBACK_LABEL[nextType], time: fmtClock(d) });
-    setPunching(false);
-    setTimeout(() => setFeedback(null), 2000);
+    setPunching(true);
+    try {
+      const hasGps = typeof lat === 'number' && typeof lng === 'number';
+      const d = new Date();
+      const newPunch = buildPunch(type, currentUser, hasGps ? { lat: lat!, lng: lng!, accuracy } : undefined);
+      const result = await onAddPunch(newPunch);
+      if (result === 'busy') return;
+      if (result === 'queued') {
+        setFeedback({ label: `${FEEDBACK_LABEL[type]} no aparelho`, time: fmtClock(d), queued: true });
+      } else {
+        setLastSync(new Date());
+        setFeedback({ label: FEEDBACK_LABEL[type], time: fmtClock(d) });
+      }
+      setTimeout(() => setFeedback(null), result === 'queued' ? 4000 : 2000);
+    } catch (err) {
+      console.error('Falha ao registrar ponto:', err);
+      showToast('Não foi possível registrar o ponto. Tente novamente.');
+    } finally {
+      setPunching(false);
+      punchBusyRef.current = false;
+    }
   };
 
   const hasGps = (p: TimePunch) => !!(p.lat || p.lng);
@@ -677,7 +720,8 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
   const punchesOf = (person: PontoPerson) => punches.filter((p) => p.at && isPunchOf(p, person));
 
   const filteredRecentPunches = useMemo(() => punches.filter((p) => {
-    const period = p.at ? new Date(p.at).toISOString().slice(0, 7) : '';
+    // Mês LOCAL (toISOString é UTC: batida após 21h do último dia caía no mês seguinte).
+    const period = p.at ? `${new Date(p.at).getFullYear()}-${pad2(new Date(p.at).getMonth() + 1)}` : '';
     return (!recordPeriod || period === recordPeriod)
       && (recordType === 'TODOS' || p.type === recordType)
       && (recordGps === 'TODOS' || (recordGps === 'COM_GPS' ? hasGps(p) : !hasGps(p)));
@@ -1003,7 +1047,7 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
 
         {/* Relógio grande + sincronização */}
         <div className="text-right">
-          <p className="font-data-mono text-2xl md:text-3xl font-bold text-fg tabular-nums leading-none">{fmtClock(now)}</p>
+          <LiveClock className="font-data-mono text-2xl md:text-3xl font-bold text-fg tabular-nums leading-none" />
           <div className="flex items-center justify-end gap-3 mt-1.5">
             <span className="text-[10px] uppercase tracking-wider text-fg-muted">Horário oficial</span>
             <span
@@ -1138,13 +1182,17 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
         <div id="card-jornada" className="lg:col-span-2 bg-surface rounded-xl shadow-sm p-6 relative overflow-hidden">
           {/* Feedback pós-batida */}
           {feedback && (
-            <div className="absolute inset-0 z-20 bg-white/95 flex flex-col items-center justify-center gap-2 animate-[fadeIn_0.15s_ease-out]">
-              <span className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
-                <span className="material-symbols-outlined text-4xl">check</span>
+            <div className="absolute inset-0 z-20 bg-surface/95 flex flex-col items-center justify-center gap-2 px-4 text-center animate-[fadeIn_0.15s_ease-out]">
+              <span className={`w-16 h-16 rounded-full flex items-center justify-center ${feedback.queued ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                <span className="material-symbols-outlined text-4xl">{feedback.queued ? 'cloud_off' : 'check'}</span>
               </span>
               <p className="font-bold text-fg">{feedback.label}</p>
               <p className="font-data-mono text-lg text-fg-secondary">{feedback.time}</p>
-              <p className="text-xs text-emerald-600 font-semibold">Bom trabalho!</p>
+              {feedback.queued ? (
+                <p className="text-xs text-amber-600 font-semibold">Sem conexão — será enviada automaticamente com o horário acima.</p>
+              ) : (
+                <p className="text-xs text-emerald-600 font-semibold">Bom trabalho!</p>
+              )}
             </div>
           )}
 
@@ -1227,6 +1275,13 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
               ? NEXT_INFO[nextType].label
               : 'Jornada encerrada'}
           </button>
+
+          {myPendingSync > 0 && (
+            <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-700 flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-base">cloud_upload</span>
+              {myPendingSync === 1 ? '1 batida aguardando conexão' : `${myPendingSync} batidas aguardando conexão`} — envio automático ao reconectar, com o horário original.
+            </p>
+          )}
 
           <p className="text-[10px] text-fg-muted mt-3 text-center flex items-center justify-center gap-1">
             <span className="material-symbols-outlined text-sm">location_on</span>
@@ -1707,9 +1762,13 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
                     <Badge color={p.type === 'ENTRADA' ? 'emerald' : p.type === 'PAUSA' ? 'amber' : p.type === 'SAIDA' ? 'red' : 'blue'}>
                       {p.type}
                     </Badge>
-                    <Badge color={p.effectiveSource === 'adjusted' ? 'blue' : p.status === 'PENDENTE' ? 'amber' : 'emerald'} outline>
-                      {effectivePunchLabel(p)}
-                    </Badge>
+                    {p.pendingSync ? (
+                      <Badge color="amber" outline>Aguardando envio</Badge>
+                    ) : (
+                      <Badge color={p.effectiveSource === 'adjusted' ? 'blue' : p.status === 'PENDENTE' ? 'amber' : 'emerald'} outline>
+                        {effectivePunchLabel(p)}
+                      </Badge>
+                    )}
                   </>
                 }
               />

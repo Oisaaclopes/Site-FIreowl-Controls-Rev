@@ -851,6 +851,9 @@ export interface TimePunch {
   notes?: string;
   at?: number; // epoch ms do registro (para cálculos de jornada)
   accuracy?: number; // precisão do GPS em metros
+  /** true = batida registrada no aparelho e ainda NÃO confirmada no servidor
+   *  (fila local lib/punchQueue — reenviada automaticamente). */
+  pendingSync?: boolean;
   /** Metadados da resolução canônica: a evidência original nunca é sobrescrita. */
   originalAt?: number;
   effectiveSource?: 'original' | 'adjusted';

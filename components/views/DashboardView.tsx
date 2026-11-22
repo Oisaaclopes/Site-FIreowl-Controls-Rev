@@ -1,5 +1,6 @@
 'use client';
 
+import type { AddPunchHandler } from '@/lib/pontoActions';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { FinancialTransaction, OrdemServico, Contract, TabPath, TimePunch, Client, Pedido } from '@/lib/types';
 import { OS_STATUS_ATIVOS } from '@/lib/ordensServico';
@@ -28,7 +29,7 @@ interface DashboardViewProps {
   currentUser?: string;
   /** profiles.id — identidade canônica das batidas do usuário. */
   currentUserId?: string;
-  onAddPunch?: (p: TimePunch) => void;
+  onAddPunch?: AddPunchHandler;
   usesTimeClock?: boolean;
 }
 

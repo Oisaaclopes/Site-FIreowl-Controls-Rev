@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { TimePunch } from '@/lib/types';
 import {
   derivePunchState,
@@ -10,6 +10,7 @@ import {
   PUNCH_DONE,
   PUNCH_SHORT,
   PunchStatusKind,
+  AddPunchHandler,
 } from '@/lib/pontoActions';
 import { useToast } from '@/components/ui/Feedback';
 
@@ -29,7 +30,7 @@ export interface QuickPunchCardProps {
   /** profiles.id — identidade canônica das batidas (o nome é só apresentação). */
   currentUserId?: string;
   punches: TimePunch[];
-  onAddPunch: (p: TimePunch) => void;
+  onAddPunch: AddPunchHandler;
   /** profiles.uses_time_clock — false esconde o card. */
   usesTimeClock?: boolean;
   /** Abre o módulo Ponto completo ("Ver detalhes"). */
@@ -70,6 +71,8 @@ export const QuickPunchCard: React.FC<QuickPunchCardProps> = ({
 }) => {
   const toast = useToast();
   const [punching, setPunching] = useState(false);
+  // Trava síncrona: dois toques no mesmo frame não passam pelo estado React.
+  const busyRef = useRef(false);
 
   if (usesTimeClock === false) return null;
 
@@ -77,15 +80,20 @@ export const QuickPunchCard: React.FC<QuickPunchCardProps> = ({
   const nextT = state.nextType;
 
   const baterPonto = async () => {
-    if (!nextT || punching) return;
+    if (!nextT || busyRef.current) return;
+    busyRef.current = true;
     setPunching(true);
     try {
       const pos = await capturePunchPosition();
-      onAddPunch(buildPunch(nextT, currentUser, pos || undefined));
-      toast.success(`${PUNCH_DONE[nextT]}${pos ? '' : ' (sem GPS)'}`);
+      // Aguarda a gravação: o botão só libera quando a próxima batida já mudou.
+      const result = await onAddPunch(buildPunch(nextT, currentUser, pos || undefined));
+      if (result === 'busy') return;
+      if (result === 'queued') toast.info(`${PUNCH_DONE[nextT]} no aparelho — sem conexão, será enviada automaticamente.`);
+      else toast.success(`${PUNCH_DONE[nextT]}${pos ? '' : ' (sem GPS)'}`);
     } catch {
       toast.error('Não foi possível registrar o ponto.');
     } finally {
+      busyRef.current = false;
       setPunching(false);
     }
   };

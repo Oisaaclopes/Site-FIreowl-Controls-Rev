@@ -1,5 +1,6 @@
 'use client';
 
+import type { AddPunchHandler } from '@/lib/pontoActions';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { TabPath, TimePunch, Client, OrdemServico, FieldOperation } from '@/lib/types';
 import { getClientOperationalName } from '@/lib/utils';
@@ -16,7 +17,7 @@ interface TechDashboardProps {
   /** UUID autenticado — usado para "Minhas OS" (nunca por nome/email). */
   currentUserId?: string;
   punches: TimePunch[];
-  onAddPunch: (p: TimePunch) => void;
+  onAddPunch: AddPunchHandler;
   clients: Client[];
   onNavigateToTab: (tab: TabPath) => void;
   onNewOSClick: () => void;

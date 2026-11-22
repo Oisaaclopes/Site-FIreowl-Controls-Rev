@@ -92,6 +92,8 @@ import { allowedTabs, isTabAllowed } from '@/lib/rbac';
 import {
   fetchPunches, fetchPunchesRange, insertPunch, isMonthInDefaultWindow, mergePunchSets, monthFetchRange,
 } from '@/lib/timepunch';
+import { enqueuePunch, isPunchSynced, mergeWithQueued, readPunchQueue, removeQueuedPunch } from '@/lib/punchQueue';
+import type { PunchSaveResult } from '@/lib/pontoActions';
 import { fetchPedidos, upsertPedido, updatePedidoStatus, deletePedido } from '@/lib/pedidos';
 import { fetchQuotes, insertQuote } from '@/lib/quotes';
 import { fetchSuppliers, upsertSupplier, deleteSupplier } from '@/lib/suppliers';
@@ -1022,13 +1024,61 @@ function CrmAppContent({
   // Competências antigas (fora da janela padrão mês corrente + anterior) já
   // pedidas pela folha/espelho — mantidas nas recargas e no realtime.
   const extraPunchMonthsRef = useRef<Set<string>>(new Set());
+  // Dono da fila local de batidas pendentes (lib/punchQueue) — por usuário.
+  const punchOwnerRef = useRef(userId);
+  punchOwnerRef.current = userId;
+  // Trava de registro: um toque duplo (ou dois cards) não grava duas batidas
+  // enquanto a primeira ainda está a caminho do servidor.
+  const punchInFlightRef = useRef(false);
+  const punchSyncingRef = useRef(false);
+
+  // Aplica as batidas do servidor ao estado SEM perder as que ainda estão na
+  // fila local, e reenvia a fila (conciliando com o servidor para não duplicar).
+  const applyServerPunches = useCallback((rows: TimePunch[]) => {
+    const owner = punchOwnerRef.current;
+    setPunches(mergeWithQueued(rows, readPunchQueue(owner)));
+    void (async () => {
+      if (punchSyncingRef.current) return;
+      const queue = readPunchQueue(owner);
+      if (!queue.length) return;
+      punchSyncingRef.current = true;
+      try {
+        for (const q of queue) {
+          if (isPunchSynced(q, rows)) {
+            removeQueuedPunch(owner, q.id);
+            setPunches((prev) => prev.filter((p) => p.id !== q.id));
+            continue;
+          }
+          try {
+            const { pendingSync, ...clean } = q;
+            const saved = await insertPunch(clean);
+            removeQueuedPunch(owner, q.id);
+            setPunches((prev) => [saved, ...prev.filter((p) => p.id !== q.id)]);
+          } catch {
+            break; // ainda sem conexão — tenta na próxima recarga
+          }
+        }
+      } finally {
+        punchSyncingRef.current = false;
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     if (isSupabaseConfigured()) {
       fetchPunches(extraPunchMonthsRef.current)
-        .then((rows) => setPunches(rows))
-        .catch((err) => console.warn('Ponto: falha ao carregar do Supabase.', err));
-      return;
+        .then((rows) => applyServerPunches(rows))
+        .catch((err) => {
+          console.warn('Ponto: falha ao carregar do Supabase.', err);
+          // Mesmo sem servidor, mostra as batidas que ficaram no aparelho.
+          setPunches((prev) => mergeWithQueued(prev, readPunchQueue(punchOwnerRef.current)));
+        });
+      // Voltou a conexão → recarrega e reenvia as batidas pendentes.
+      const onOnline = () => {
+        fetchPunches(extraPunchMonthsRef.current).then(applyServerPunches).catch(() => {});
+      };
+      window.addEventListener('online', onOnline);
+      return () => window.removeEventListener('online', onOnline);
     }
     try {
       const saved = localStorage.getItem(PUNCHES_KEY);
@@ -1036,20 +1086,41 @@ function CrmAppContent({
     } catch {
       /* localStorage indisponível */
     }
-  }, []);
+  }, [applyServerPunches]);
 
-  const handleAddPunch = async (newPunch: TimePunch) => {
-    if (isSupabaseConfigured()) {
-      try {
-        const saved = await insertPunch(newPunch);
-        setPunches((prev) => [saved, ...prev]);
-        logAction('Batida de Ponto', 'Ponto Eletrônico', `Ponto registrado por ${saved.employeeName} (${saved.type})`);
-        return;
-      } catch (err) {
-        console.error('Falha ao registrar ponto no Supabase:', err);
-        // segue para o fallback local
+  const PUNCH_SAVE_TIMEOUT_MS = 20000;
+  const handleAddPunch = async (newPunch: TimePunch): Promise<PunchSaveResult> => {
+    if (punchInFlightRef.current) return 'busy';
+    punchInFlightRef.current = true;
+    try {
+      if (isSupabaseConfigured()) {
+        const owned: TimePunch = { ...newPunch, userId: newPunch.userId ?? userId };
+        try {
+          // Rede móvel instável pode deixar a requisição pendurada: após o
+          // limite, a batida vai para a fila (a conciliação evita duplicar).
+          const saved = await Promise.race([
+            insertPunch(owned),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), PUNCH_SAVE_TIMEOUT_MS)),
+          ]);
+          setPunches((prev) => [saved, ...prev]);
+          logAction('Batida de Ponto', 'Ponto Eletrônico', `Ponto registrado por ${saved.employeeName} (${saved.type})`);
+          return 'saved';
+        } catch (err) {
+          console.error('Falha ao registrar ponto no Supabase — batida guardada para reenvio:', err);
+          enqueuePunch(userId, owned);
+          setPunches((prev) => [{ ...owned, pendingSync: true }, ...prev]);
+          return 'queued';
+        }
       }
+      addLocalPunch(newPunch);
+      return 'saved';
+    } finally {
+      punchInFlightRef.current = false;
     }
+  };
+
+  // Modo sem Supabase (demonstração): persistência só no navegador.
+  const addLocalPunch = (newPunch: TimePunch) => {
     setPunches((prev) => {
       const next = [newPunch, ...prev].slice(0, 300);
       try {
@@ -1067,7 +1138,7 @@ function CrmAppContent({
     if (!isSupabaseConfigured()) return;
     try {
       const rows = await fetchPunches(extraPunchMonthsRef.current);
-      setPunches(rows);
+      applyServerPunches(rows);
     } catch (err) {
       console.warn('Ponto: falha ao recarregar do Supabase.', err);
     }
@@ -1119,9 +1190,9 @@ function CrmAppContent({
     const [nextPunches, nextPedidos, nextOs, nextContracts, nextTransactions] = await Promise.all([
       fetchPunches(extraPunchMonthsRef.current), fetchPedidos(), fetchOrdensServico(), fetchContracts(), fetchTransactions(),
     ]);
-    setPunches(nextPunches); setPedidos(nextPedidos); setOrdensServico(nextOs);
+    applyServerPunches(nextPunches); setPedidos(nextPedidos); setOrdensServico(nextOs);
     setContracts(nextContracts); setTransactions(nextTransactions);
-  }, []);
+  }, [applyServerPunches]);
 
   useDomainRefresh('orders', refreshOrders, currentTab === 'pedidos');
   useDomainRefresh('serviceOrders', refreshServiceOrders, currentTab === 'pedidos');
