@@ -29,6 +29,7 @@ function rowToPunch(r: any): TimePunch {
     status: r.status || 'APROVADO',
     at,
     accuracy: r.accuracy ?? undefined,
+    journeyReason: r.journey_reason || undefined,
   };
 }
 
@@ -131,6 +132,7 @@ export async function insertPunch(p: TimePunch): Promise<TimePunch> {
     lng: p.lng,
     accuracy: p.accuracy ?? null,
     status: p.status || 'APROVADO',
+    ...(p.type === 'ENTRADA' && p.journeyReason?.trim() ? { journey_reason: p.journeyReason.trim() } : {}),
   };
   const { data, error } = await supabase.from(TABLE).insert(row).select().single();
   if (error) throw error;

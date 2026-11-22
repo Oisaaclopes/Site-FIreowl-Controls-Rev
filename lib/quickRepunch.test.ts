@@ -19,3 +19,32 @@ describe('quickRepunchWarning', () => {
     expect(quickRepunchWarning(derivePunchState(punches, who, now), now)).toBeNull();
   });
 });
+
+import { needsNewJourneyReason, nextPunchType, buildPunch } from './pontoActions';
+
+describe('nova jornada no mesmo dia exige motivo', () => {
+  const D = (hm: string) => new Date(`2026-11-13T${hm}:00`).getTime();
+  it('dia encerrado: próxima é null e nova jornada exige motivo', () => {
+    const ps = [p('e', 'ENTRADA', D('08:00')), p('s', 'SAIDA', D('17:00'))];
+    expect(nextPunchType(ps, who, D('19:00'))).toBeNull();
+    expect(needsNewJourneyReason(ps, who, D('19:00'))).toBe(true);
+    expect(derivePunchState(ps, who, D('19:00')).todayJourneysLabel).toBe('08:00–17:00');
+  });
+  it('batida solta hoje (saída sem entrada) também exige motivo para a Entrada', () => {
+    const ps = [p('s', 'SAIDA', D('09:00'))];
+    expect(nextPunchType(ps, who, D('10:00'))).toBe('ENTRADA');
+    expect(needsNewJourneyReason(ps, who, D('10:00'))).toBe(true);
+  });
+  it('1ª entrada do dia (ontem encerrado) não exige motivo', () => {
+    const ps = [p('e', 'ENTRADA', D('08:00') - 864e5), p('s', 'SAIDA', D('17:00') - 864e5)];
+    expect(needsNewJourneyReason(ps, who, D('08:00'))).toBe(false);
+  });
+  it('jornada aberta não pede motivo (a próxima não é Entrada)', () => {
+    const ps = [p('e', 'ENTRADA', D('08:00'))];
+    expect(needsNewJourneyReason(ps, who, D('10:00'))).toBe(false);
+  });
+  it('o motivo só vai na Entrada', () => {
+    expect(buildPunch('ENTRADA', 'Func', undefined, '  Segundo turno ').journeyReason).toBe('Segundo turno');
+    expect(buildPunch('SAIDA', 'Func', undefined, 'x').journeyReason).toBeUndefined();
+  });
+});

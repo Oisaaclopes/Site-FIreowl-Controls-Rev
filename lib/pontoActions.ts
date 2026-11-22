@@ -64,6 +64,8 @@ interface OperationalJourneys {
    *  além de 18h, ou encerradas por uma nova entrada) — pendências para
    *  regularização. Nunca fechadas nem com saída inventada. */
   pending: Journey[];
+  /** Jornadas (ou batidas soltas) com competência HOJE. */
+  todays: Journey[];
 }
 
 /**
@@ -97,8 +99,31 @@ function resolveOperationalJourneys(
     ? last
     : undefined;
   const pending = journeys.filter((j) => j !== open && j.entrada != null && j.saida == null);
-  return { open, current: open ?? closedToday, pending };
+  const today = dateKeyOf(nowMs);
+  return { open, current: open ?? closedToday, pending, todays: journeys.filter((j) => j.competenceKey === today) };
 }
+
+/**
+ * Abrir uma NOVA jornada exige pergunta + motivo quando o funcionário já tem
+ * jornada (ou qualquer batida) com competência HOJE e nenhuma jornada aberta.
+ * Evita jornadas abertas sem querer (toque repetido, tela desatualizada —
+ * caso 13/11). Uma entrada esquecida de outro dia não exige motivo.
+ */
+export function needsNewJourneyReason(
+  punches: TimePunch[], who: PunchOwner, nowMs: number, maxOpenMs: number = OPEN_JOURNEY_LIMIT_MS,
+): boolean {
+  const { open, todays } = resolveOperationalJourneys(punches, who, nowMs, maxOpenMs);
+  return !open && todays.length > 0;
+}
+
+/** Resumo das jornadas de hoje para a pergunta ("08:18–17:02"). */
+function summarizeTodayJourneys(todays: Journey[]): string {
+  const hm = (at?: number) => (at != null ? fmtClock(new Date(at)).slice(0, 5) : '--:--');
+  return todays.map((j) => `${hm(j.entrada ?? j.punches[0]?.at)}–${j.saida != null ? hm(j.saida) : 'sem saída'}`).join(', ');
+}
+
+/** Mínimo de caracteres do motivo de nova jornada (o banco exige 3). */
+export const NEW_JOURNEY_REASON_MIN = 5;
 
 /**
  * Próxima batida da sequência ENTRADA→PAUSA→RETORNO→SAIDA, seguindo a JORNADA
@@ -148,6 +173,11 @@ export interface PunchDayState {
   /** Jornadas com entrada sem saída que não são a operante (ex.: entrada
    *  esquecida há >18h) — pendência administrativa, não bloqueiam a jornada atual. */
   pendingOpen: Journey[];
+  /** true = registrar uma Entrada agora abriria uma 2ª jornada hoje → exige
+   *  pergunta + motivo (needsNewJourneyReason). */
+  newJourneyNeedsReason: boolean;
+  /** Jornadas de hoje resumidas ("08:18–17:02") para a pergunta. */
+  todayJourneysLabel: string;
 }
 
 const STATUS_LABEL: Record<PunchStatusKind, string> = {
@@ -168,7 +198,7 @@ export function derivePunchState(
   // Jornada corrente: a aberta (≤18h, mesmo iniciada ontem) ou, na ausência
   // dela, a encerrada com competência HOJE. Fora disso, fora do expediente —
   // uma entrada esquecida (>18h) aparece só como pendência.
-  const { current, pending } = resolveOperationalJourneys(punches, who, nowMs, maxOpenMs);
+  const { open, current, pending, todays: todayJourneys } = resolveOperationalJourneys(punches, who, nowMs, maxOpenMs);
   const cp = [...(current?.punches ?? [])].sort((a, b) => (a.at || 0) - (b.at || 0));
   const byType = (t: PunchType) => cp.find((p) => p.type === t);
   const entrada = byType('ENTRADA');
@@ -194,6 +224,8 @@ export function derivePunchState(
     statusLabel: STATUS_LABEL[statusKind],
     lastRelevant: saida || retorno || almoco || entrada,
     pendingOpen: pending,
+    newJourneyNeedsReason: !open && todayJourneys.length > 0,
+    todayJourneysLabel: summarizeTodayJourneys(todayJourneys),
   };
 }
 
@@ -201,11 +233,13 @@ export function derivePunchState(
 export function buildPunch(
   type: PunchType,
   employeeName: string,
-  coords?: { lat: number; lng: number; accuracy?: number }
+  coords?: { lat: number; lng: number; accuracy?: number },
+  journeyReason?: string,
 ): TimePunch {
   const d = new Date();
   const hasGps = !!coords;
   return {
+    ...(type === 'ENTRADA' && journeyReason?.trim() ? { journeyReason: journeyReason.trim() } : {}),
     id: `p_${Date.now()}`,
     employeeName,
     timestamp: `${d.getDate()} ${d.toLocaleDateString('pt-BR', { month: 'short' }).toUpperCase()} ${d.getFullYear()} | ${fmtClock(d)}`,

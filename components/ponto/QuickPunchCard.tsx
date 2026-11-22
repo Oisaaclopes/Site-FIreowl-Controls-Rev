@@ -14,6 +14,7 @@ import {
   quickRepunchWarning,
 } from '@/lib/pontoActions';
 import { requestConfirm, useToast } from '@/components/ui/Feedback';
+import { NewJourneyDialog } from './NewJourneyDialog';
 
 /**
  * QuickPunchCard — card compacto de ponto orientado à PRÓXIMA ação.
@@ -74,29 +75,37 @@ export const QuickPunchCard: React.FC<QuickPunchCardProps> = ({
   const [punching, setPunching] = useState(false);
   // Trava síncrona: dois toques no mesmo frame não passam pelo estado React.
   const busyRef = useRef(false);
+  const [askNewJourney, setAskNewJourney] = useState(false);
 
   if (usesTimeClock === false) return null;
 
   const state = derivePunchState(punches, { userId: currentUserId, name: currentUser }, Date.now());
   const nextT = state.nextType;
 
-  const baterPonto = async () => {
+  const baterPonto = () => {
     if (!nextT || busyRef.current) return;
+    // Entrada que abriria uma 2ª jornada hoje: pergunta + motivo.
+    if (nextT === 'ENTRADA' && state.newJourneyNeedsReason) { setAskNewJourney(true); return; }
+    void register(nextT);
+  };
+
+  const register = async (type: NonNullable<typeof nextT>, journeyReason?: string) => {
+    if (busyRef.current) return;
     busyRef.current = true;
     setPunching(true);
     try {
-      const warn = quickRepunchWarning(state, Date.now());
+      const warn = journeyReason ? null : quickRepunchWarning(state, Date.now());
       if (warn && !(await requestConfirm(warn))) return;
       const pos = await capturePunchPosition();
       // Aguarda a gravação: o botão só libera quando a próxima batida já mudou.
-      const result = await onAddPunch(buildPunch(nextT, currentUser, pos || undefined));
+      const result = await onAddPunch(buildPunch(type, currentUser, pos || undefined, journeyReason));
       if (result === 'busy') return;
       if (result === 'stale') {
         toast.info('Seu ponto foi atualizado com o servidor — confira a próxima batida e toque novamente.');
         return;
       }
-      if (result === 'queued') toast.info(`${PUNCH_DONE[nextT]} no aparelho — sem conexão, será enviada automaticamente.`);
-      else toast.success(`${PUNCH_DONE[nextT]}${pos ? '' : ' (sem GPS)'}`);
+      if (result === 'queued') toast.info(`${PUNCH_DONE[type]} no aparelho — sem conexão, será enviada automaticamente.`);
+      else toast.success(`${PUNCH_DONE[type]}${pos ? '' : ' (sem GPS)'}`);
     } catch {
       toast.error('Não foi possível registrar o ponto.');
     } finally {
@@ -134,9 +143,22 @@ export const QuickPunchCard: React.FC<QuickPunchCardProps> = ({
           {punching ? 'progress_activity' : nextT ? 'fingerprint' : 'task_alt'}
         </span>
         <span className="text-sm font-bold uppercase tracking-wide">
-          {punching ? 'Registrando…' : nextT ? PUNCH_LABEL[nextT] : 'Jornada encerrada'}
+          {punching ? 'Registrando…' : nextT ? (nextT === 'ENTRADA' && state.newJourneyNeedsReason ? 'Abrir nova jornada' : PUNCH_LABEL[nextT]) : 'Jornada encerrada'}
         </span>
       </button>
+
+      {!nextT && !punching && (
+        <button type="button" onClick={() => setAskNewJourney(true)} className="mt-2 w-full min-h-[40px] text-[11px] font-semibold text-primary hover:underline">
+          Abrir nova jornada
+        </button>
+      )}
+      {askNewJourney && (
+        <NewJourneyDialog
+          todayLabel={state.todayJourneysLabel}
+          onConfirm={(reason) => { setAskNewJourney(false); void register('ENTRADA', reason); }}
+          onCancel={() => setAskNewJourney(false)}
+        />
+      )}
 
       {onOpenPonto && (
         <button onClick={onOpenPonto} className="mt-2 w-full text-[11px] font-semibold text-primary hover:underline uppercase">

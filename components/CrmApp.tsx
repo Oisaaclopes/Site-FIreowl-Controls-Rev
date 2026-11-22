@@ -93,7 +93,7 @@ import {
   fetchPunches, fetchPunchesRange, insertPunch, isMonthInDefaultWindow, mergePunchSets, monthFetchRange,
 } from '@/lib/timepunch';
 import { enqueuePunch, isPunchSynced, mergeWithQueued, readPunchQueue, removeQueuedPunch } from '@/lib/punchQueue';
-import { nextPunchType, type PunchSaveResult } from '@/lib/pontoActions';
+import { needsNewJourneyReason, nextPunchType, type PunchSaveResult } from '@/lib/pontoActions';
 import { fetchPedidos, upsertPedido, updatePedidoStatus, deletePedido } from '@/lib/pedidos';
 import { fetchQuotes, insertQuote } from '@/lib/quotes';
 import { fetchSuppliers, upsertSupplier, deleteSupplier } from '@/lib/suppliers';
@@ -1108,8 +1108,17 @@ function CrmAppContent({
             new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), PUNCH_CHECK_TIMEOUT_MS)),
           ]);
           const known = mergeWithQueued(fresh, readPunchQueue(userId));
-          const expected = nextPunchType(known, { userId: owned.userId, name: owned.employeeName }, Date.now());
-          if (expected !== owned.type) {
+          const who = { userId: owned.userId, name: owned.employeeName };
+          const nowMs = Date.now();
+          const expected = nextPunchType(known, who, nowMs);
+          // Nova jornada no mesmo dia: só com motivo informado (pergunta explícita).
+          // Com motivo, vale também depois de uma jornada já encerrada hoje.
+          const ok = owned.type === 'ENTRADA'
+            ? (owned.journeyReason?.trim()
+              ? expected === 'ENTRADA' || expected === null
+              : expected === 'ENTRADA' && !needsNewJourneyReason(known, who, nowMs))
+            : expected === owned.type;
+          if (!ok) {
             setPunches((prev) => mergePunchSets([prev, fresh]));
             return 'stale';
           }

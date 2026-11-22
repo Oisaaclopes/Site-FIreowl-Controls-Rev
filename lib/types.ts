@@ -854,6 +854,8 @@ export interface TimePunch {
   /** true = batida registrada no aparelho e ainda NÃO confirmada no servidor
    *  (fila local lib/punchQueue — reenviada automaticamente). */
   pendingSync?: boolean;
+  /** Motivo informado ao abrir uma NOVA jornada no mesmo dia (só ENTRADA; 0123). */
+  journeyReason?: string;
   /** Metadados da resolução canônica: a evidência original nunca é sobrescrita. */
   originalAt?: number;
   effectiveSource?: 'original' | 'adjusted';

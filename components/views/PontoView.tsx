@@ -30,6 +30,7 @@ import {
 import { fetchFirstPunchAt } from '@/lib/timepunch';
 import { TimesheetTable } from '@/components/ponto/TimesheetTable';
 import { PunchCorrectionModal } from '@/components/ponto/PunchCorrectionModal';
+import { NewJourneyDialog } from '@/components/ponto/NewJourneyDialog';
 import { TeamSummary } from '@/components/ponto/TeamSummary';
 
 // Funcionário na Folha/Equipe/documentos: user_id é a IDENTIDADE; o nome é só
@@ -454,15 +455,32 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
   // envio). Antes o botão liberava antes do servidor responder e um 2º toque
   // gravava a MESMA batida de novo (ex.: duas Entradas → "saída faltante").
   const punchBusyRef = useRef(false);
+  // Pergunta "abrir nova jornada?" (motivo obrigatório) quando já há jornada hoje.
+  const [newJourneyAsk, setNewJourneyAsk] = useState(false);
   const handleBaterPonto = async () => {
     if (punchBusyRef.current || !nextType) return;
+    if (nextType === 'ENTRADA' && punchState.newJourneyNeedsReason) {
+      setNewJourneyAsk(true);
+      return;
+    }
+    await startPunch(nextType);
+  };
+  // "Abrir nova jornada" (dia já encerrado) ou Entrada que abre 2ª jornada.
+  const confirmNewJourney = (reason: string) => {
+    setNewJourneyAsk(false);
+    void startPunch('ENTRADA', reason);
+  };
+
+  const startPunch = async (type: PunchType, journeyReason?: string) => {
+    if (punchBusyRef.current) return;
     punchBusyRef.current = true;
     // Batida logo após a anterior: confirma (toque repetido/botão errado).
-    const warn = quickRepunchWarning(punchState, Date.now());
+    const warn = journeyReason ? null : quickRepunchWarning(punchState, Date.now());
     if (warn && !(await requestConfirm(warn))) {
       punchBusyRef.current = false;
       return;
     }
+    const registerPunch = (lat?: number, lng?: number, accuracy?: number) => doRegister(type, journeyReason, lat, lng, accuracy);
     if (!('geolocation' in navigator)) {
       void registerPunch();
       return;
@@ -491,17 +509,12 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
     );
   };
 
-  const registerPunch = async (lat?: number, lng?: number, accuracy?: number) => {
-    const type = nextType;
-    if (!type) {
-      punchBusyRef.current = false;
-      return;
-    }
+  const doRegister = async (type: PunchType, journeyReason?: string, lat?: number, lng?: number, accuracy?: number) => {
     setPunching(true);
     try {
       const hasGps = typeof lat === 'number' && typeof lng === 'number';
       const d = new Date();
-      const newPunch = buildPunch(type, currentUser, hasGps ? { lat: lat!, lng: lng!, accuracy } : undefined);
+      const newPunch = buildPunch(type, currentUser, hasGps ? { lat: lat!, lng: lng!, accuracy } : undefined, journeyReason);
       const result = await onAddPunch(newPunch);
       if (result === 'busy') return;
       if (result === 'stale') {
@@ -1282,9 +1295,25 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
               : punching
               ? 'Registrando...'
               : nextType
-              ? NEXT_INFO[nextType].label
+              ? (nextType === 'ENTRADA' && punchState.newJourneyNeedsReason ? 'Abrir nova jornada' : NEXT_INFO[nextType].label)
               : 'Jornada encerrada'}
           </button>
+
+          {/* Dia já encerrado: nova jornada só de forma deliberada (pergunta + motivo). */}
+          {!nextType && !punching && !locating && (
+            <button type="button" onClick={() => setNewJourneyAsk(true)}
+              className="mt-2 w-full min-h-[44px] text-xs font-semibold text-primary hover:underline">
+              Precisa trabalhar de novo hoje? Abrir nova jornada
+            </button>
+          )}
+
+          {newJourneyAsk && (
+            <NewJourneyDialog
+              todayLabel={punchState.todayJourneysLabel}
+              onConfirm={confirmNewJourney}
+              onCancel={() => setNewJourneyAsk(false)}
+            />
+          )}
 
           {myPendingSync > 0 && (
             <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-700 flex items-center gap-1.5">
@@ -1749,6 +1778,12 @@ const PontoViewCore: React.FC<PontoViewProps> = ({
                         {locationLabel(p)}
                       </span>
                     </span>
+                    {p.journeyReason && (
+                      <span className="flex items-start gap-1 text-amber-700" title="Motivo informado ao abrir nova jornada no mesmo dia">
+                        <span className="material-symbols-outlined shrink-0 text-sm">info</span>
+                        <span className="min-w-0 break-words">Nova jornada: {p.journeyReason}</span>
+                      </span>
+                    )}
                     {hasGps(p) && (
                       <a
                         href={mapsUrl(p)}
