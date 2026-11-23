@@ -28,7 +28,8 @@ import {
   FreteInfo,
   ImpostosAdicionaisInfo,
 } from '@/lib/types';
-import { PEDIDO_TIPO_LABELS, PEDIDO_TIPO_ORDER } from '@/lib/documentos';
+import { PEDIDO_TIPO_LABELS, PEDIDO_TIPO_ORDER, DEFAULT_DOC_BY_PEDIDO_TIPO } from '@/lib/documentos';
+import { numeracaoSecoesProposta } from '@/lib/numeracaoSecoesEditor';
 import { MODALIDADE_LABELS, MODALIDADE_ORDER, FRETE_MODO_LABELS, IMPOSTO_MODO_LABELS, OBS_DISPONIBILIDADE } from '@/lib/fornecimentoComercial';
 import { AREAS_PROPOSTA, TIPOS_SERVICO, conclusaoPorTipo, presetPorTipo } from '@/lib/propostaTitulo';
 import { SecaoDocKey, SECAO_KEYS, SECAO_TITULO, alternarSecao, atualizarPadraoEmpresa, flagDaSecao, igualAoPadrao, mesmasSecoes, moverSecao, normalizarSecoes, ordenarSecoes, padraoEmpresaDoTipo, padraoReferenciaDoTipo, secoesPadraoDoTipo } from '@/lib/documentoSecoes';
@@ -87,6 +88,8 @@ interface CommercialProposalModalProps {
   podeSalvarPadraoSecoes?: boolean;
   /** Persiste o novo mapa de padrões da empresa (lança erro se falhar). */
   onSalvarPadraoSecoes?: (mapa: SecoesPadraoEmpresa) => Promise<void>;
+  /** Opções de geração do PDF (Conta → PDF) que afetam a numeração exibida nos cards. */
+  opcoesPdf?: { showCarta?: boolean; showHistorico?: boolean };
 }
 
 const inputCls =
@@ -119,7 +122,7 @@ const Accordion: React.FC<{
   badge?: React.ReactNode;
   /** Seção do documento: Sim/Não direto no título (fonte de secoesDocumento).
    * Em "Não" o card fica apagado, mas continua editável. */
-  doc?: { on: boolean; set: (on: boolean) => void; up?: () => void; down?: () => void };
+  doc?: { on: boolean; set: (on: boolean) => void; up?: () => void; down?: () => void; numero?: string };
   children: React.ReactNode;
 }> = ({ title, icon, open: openProp, onToggle: onToggleProp, badge, doc, children }) => {
   const inativo = doc ? !doc.on : false;
@@ -140,6 +143,9 @@ const Accordion: React.FC<{
           onClick={max ? undefined : onToggle}
           className={`flex-1 min-w-0 flex items-center gap-2.5 pl-3.5 pr-2 py-2.5 text-left ${max ? 'cursor-default' : ''} ${inativo ? 'opacity-50' : ''}`}
         >
+          {doc?.numero && (
+            <span title="Número desta seção no PDF" className="font-data-mono text-[11px] font-bold leading-none px-1.5 py-1 rounded bg-navy-3 text-white shrink-0">{doc.numero}</span>
+          )}
           {icon}
           <span id={titleId} className={`flex-1 min-w-0 truncate font-bold uppercase text-sm ${inativo ? 'text-fg-muted' : 'text-primary'}`}>{title}</span>
           {badge}
@@ -380,6 +386,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   secoesPadraoEmpresa,
   podeSalvarPadraoSecoes = false,
   onSalvarPadraoSecoes,
+  opcoesPdf,
 }) => {
   // ETAPA 2 — materialização de textos. Uma proposta é NOVA quando não traz um
   // registro `proposal` anterior; nesse caso os textos-padrão são copiados para
@@ -667,6 +674,8 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const [incluirTermoAceite, setIncluirTermoAceite] = useState<boolean>(initialPedido?.proposal?.incluirTermoAceite !== false);
 
   const [maoDeObra, setMaoDeObra] = useState<number>(initialPedido?.proposal?.maoDeObra ?? 0);
+  // Pedido antigo com mão de obra gravada: mantém o campo visível (recurso retirado da tela).
+  const maoDeObraLegado = (initialPedido?.proposal?.maoDeObra ?? 0) > 0;
   // Override do total comercial. Reidratado do snapshot: usa o flag explícito
   // (valorTotalManual) e, para propostas antigas sem flag, recupera o override
   // histórico quando o total gravado diverge do calculado. Ver [[lib/commercialProposal]].
@@ -705,6 +714,8 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     const i = cardsMoveis.indexOf(key);
     return {
       on: secaoOn(key),
+      // Nº da seção no PDF (Materiais e Serviços saem juntos na seção "itens").
+      numero: numeroPdf[key === 'itensServicos' ? 'itens' : key],
       set: (on: boolean) => setSecao(key, on),
       up: i > 0 ? () => moverCard(key, -1) : undefined,
       down: i >= 0 && i < cardsMoveis.length - 1 ? () => moverCard(key, 1) : undefined,
@@ -822,7 +833,6 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
 
   const selectedClient = clients.find((c) => c.id === clienteId) || clients[0];
 
-  const round2 = (n: number) => Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
   // Subtotal = soma dos itens (materiais e/ou serviços). Mão de obra é opcional
   // (0 por padrão); o botão "Sugerir 70/30" preenche pela regra material 30% /
   // mão de obra 70% quando a proposta for de fornecimento com instalação.
@@ -838,7 +848,6 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const subtotalItens = totals.itemsSubtotal;
   const valorBase = totals.calculatedTotal;
   const effectiveValorTotal = totals.finalTotal;
-  const sugerir7030 = () => setMaoDeObra(round2(subtotalItens > 0 ? subtotalItens * (0.7 / 0.3) : 0));
 
   // Separa os itens em Materiais (do estoque) e Serviços, mantendo o índice
   // original de cada um no array para os handlers de edição/remoção.
@@ -1192,6 +1201,36 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const infoCompleta = !!clienteId && !!pedidoTipo && (somenteMaterial || (areaPrincipal.length > 0 && !!tipoServico));
   const mostrarResumoInfo = infoCompleta && (infoResumo ?? !!initialPedido);
 
+  // Numeração das seções como sai no PDF da Proposta Comercial (tipos que geram esse
+  // documento). Outros documentos (Orçamento, Laudo…) numeram de outro jeito: sem número.
+  const geraProposta = !somenteMaterial && !!pedidoTipo && DEFAULT_DOC_BY_PEDIDO_TIPO[pedidoTipo] === 'proposta_comercial';
+  const numeroPdf: Record<string, string> = geraProposta
+    ? numeracaoSecoesProposta(
+        { ...flagsSecoes, tipoServico, nivelProposta, ordemSecoes: ordemSecoes.length ? ordemSecoes : undefined },
+        {
+          selecao: secoesSaoPersonalizadas || pedidoTipo === 'personalizado' ? new Set(secoesAtivas) : null,
+          temMateriais: materiaisRows.length > 0,
+          garantiaVisivel: renderWarranty(warranty).hasAny,
+          showCarta: opcoesPdf?.showCarta,
+          showHistorico: opcoesPdf?.showHistorico,
+        },
+      )
+    : {};
+
+  // Cards de seção exibidos na sequência numerada do PDF. Seção desligada (sem número)
+  // fica logo após a vizinha anterior, como no editor. Só muda a exibição.
+  const cardsNaOrdemDoPdf: SecaoDocKey[] = (() => {
+    let ultimo = 0;
+    return ordemCards
+      .map((k, i) => {
+        const n = Number(numeroPdf[k]) || 0;
+        if (n) ultimo = n;
+        return { k, rank: n || ultimo + 0.5, i };
+      })
+      .sort((a, b) => a.rank - b.rank || a.i - b.i)
+      .map((x) => x.k);
+  })();
+
   if (!isOpen) return null;
 
   // Card de valores (renderizado logo após os itens).
@@ -1201,25 +1240,19 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     <div className={`bg-navy-3 text-white p-4 rounded-xl shadow-sm space-y-3 ${max ? `${maxCardCls} overflow-y-auto` : ''}`}>
       <div className="flex items-center justify-between gap-2">
         <span id={titleId} className="text-[10px] font-bold text-[#F2A900] uppercase tracking-widest">{somenteMaterial ? 'Resumo Financeiro' : 'Valores da Proposta'}</span>
-        <span className="flex-1 text-[10px] text-fg-muted text-right">{somenteMaterial ? 'Subtotal + frete + impostos − desconto = total geral.' : 'Serviço puro: use só os itens. Fornecimento + instalação: clique em Sugerir 70/30.'}</span>
+        <span className="flex-1 text-[10px] text-fg-muted text-right">{somenteMaterial ? 'Subtotal + frete + impostos − desconto = total geral.' : ''}</span>
         {button}
       </div>
       <div className="flex items-center justify-between text-sm">
         <span className="text-fg-muted">{somenteMaterial ? 'Subtotal dos produtos' : 'Subtotal dos itens'}</span>
         <span className="font-data-mono font-bold">R$ {(somenteMaterial ? (totals.materialsSubtotal + totals.discountTotal) : subtotalItens).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
       </div>
-      {!somenteMaterial && (
+      {/* Mão de obra / Serviços adicionais: recurso retirado da tela. Só aparece em pedido
+          antigo que já tem valor gravado, para o total não incluir um valor invisível. */}
+      {!somenteMaterial && maoDeObraLegado && (
       <div className="flex items-center justify-between gap-2">
-        <span className="text-fg-muted text-sm flex items-center gap-1.5">
+        <span className="text-fg-muted text-sm" title="Valor de pedido antigo. Zere para remover.">
           Mão de obra / Serviços adicionais
-          <button
-            type="button"
-            onClick={sugerir7030}
-            title="Preencher pela regra 70/30 (sobre o subtotal dos itens)"
-            className="text-[9px] font-bold uppercase text-primary bg-[#F2A900] hover:bg-amber-400 rounded px-1.5 py-0.5"
-          >
-            Sugerir 70/30
-          </button>
         </span>
         <div className="flex items-center gap-1">
           <span className="text-fg-muted text-xs font-data-mono">R$</span>
@@ -1296,7 +1329,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             <button
               type="button"
               onClick={() => setManualValorTotal(null)}
-              title="Voltar ao total calculado (itens + mão de obra)"
+              title="Voltar ao total calculado"
               className="text-[9px] font-bold uppercase text-primary bg-[#F2A900] hover:bg-amber-400 rounded px-1.5 py-0.5"
             >
               Auto
@@ -1369,7 +1402,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
         const on = secaoOn(k);
         return (
           <span key={k} className="inline-flex items-center gap-1.5">
-            <span className={on ? 'text-primary font-semibold' : 'text-fg-muted'}>{SECAO_TITULO[k]}</span>
+            <span className={on ? 'text-primary font-semibold' : 'text-fg-muted'}>{numeroPdf[k] ? <b className="font-data-mono">{numeroPdf[k]} </b> : null}{SECAO_TITULO[k]}</span>
             <span role="radiogroup" aria-label={`${SECAO_TITULO[k]}: aparece no documento`} className="inline-flex rounded border border-border overflow-hidden">
               <button type="button" role="radio" aria-checked={on} onClick={() => !on && setSecao(k, true)} className={`text-[9px] font-bold uppercase px-1.5 py-0.5 ${on ? 'bg-success-soft text-success' : 'bg-surface text-fg-muted'}`}>Sim</button>
               <button type="button" role="radio" aria-checked={!on} onClick={() => on && setSecao(k, false)} className={`text-[9px] font-bold uppercase px-1.5 py-0.5 border-l border-border ${!on ? 'bg-surface-3 text-fg-secondary' : 'bg-surface text-fg-muted'}`}>Não</button>
@@ -1778,13 +1811,12 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               <div><strong>Pedido originado de levantamento técnico.</strong> {initialPedido.proposal.surveyOrigin.reportNumber || 'Relatório sem número'} · os itens abaixo preservam a origem para conferência comercial.</div>
             </div>
           )}
-          {/* Panorâmico (desktop): Informações do Pedido na largura toda; Materiais | Serviços
-              lado a lado; abaixo, coluna esquerda = dados comerciais, direita = conteúdo
-              do documento (na ordem do PDF). Abaixo de lg as colunas viram `contents` e a
-              ordem original de uma coluna é mantida pelas classes order-*. */}
+          {/* Panorâmico (desktop): grade de duas colunas na ordem do DOM. Informações do Pedido
+              e Valores na largura toda; Materiais | Serviços lado a lado; as seções do documento
+              seguem a sequência do PDF (esquerda → direita). No celular, uma coluna na mesma ordem. */}
           <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:items-start">
           {/* ---- Informações do Pedido (sempre visível) ---- */}
-          <div className="order-1 lg:order-none lg:col-span-2">
+          <div className="lg:col-span-2">
           <MaximizableCard title="Informações do Pedido">
           {({ max, button, titleId, ampliar }) => (
           <div className={`bg-surface rounded-xl border border-border shadow-sm ${max ? `${maxCardCls} overflow-hidden` : 'p-4'}`}>
@@ -2108,7 +2140,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           </div>
 
           {/* ---- Lista de Materiais (puxa do Estoque) ---- */}
-          <div className={`order-2 lg:order-none min-w-0 ${somenteMaterial ? 'lg:col-span-2' : ''}`}>
+          <div className={`min-w-0 ${somenteMaterial ? 'lg:col-span-2' : ''}`}>
           <Accordion
             title="Lista de Materiais"
             doc={docSecao('itens')}
@@ -2145,7 +2177,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
 
           {/* ---- Lista de Serviços (digitado ou do catálogo de Serviços) ---- */}
           {!somenteMaterial && (
-          <div className="order-3 lg:order-none min-w-0">
+          <div className="min-w-0">
           <Accordion
             title="Lista de Serviços"
             doc={docSecao('itensServicos')}
@@ -2177,11 +2209,30 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           )}
 
 
-          <div className="contents lg:flex lg:flex-col lg:gap-3 lg:min-w-0">
-          <div className="order-4">{valorCard}</div>
+          <div className="lg:col-span-2">{valorCard}</div>
+          {/* ---- Seções do documento: Sim/Não e ▲▼ no título de cada card, na ordem do documento ---- */}
+          {faixaPadrao && <div className="lg:col-span-2 -mb-2">{faixaPadrao}</div>}
+          {outrasSecoes && <div className="lg:col-span-2">{outrasSecoes}</div>}
+          {/* Seções do documento lado a lado, na sequência do PDF: 1ª à esquerda, 2ª à direita… */}
+          {cardsNaOrdemDoPdf.map((k) => <div key={k} className="min-w-0 flex flex-col gap-3">{cardsSecao[k]}</div>)}
+
+          {/* ---- Cláusulas Jurídicas (atalho: mesma seleção dos cards) ---- */}
+          {!somenteMaterial && (<div className="min-w-0">
+          <Accordion title="Cláusulas Jurídicas" icon={<Scale className="w-4 h-4 text-danger" />} open={open.clausulas} onToggle={(atual) => toggle('clausulas', atual)}>
+            <p className="text-[11px] text-fg-secondary mb-2">Marque os blocos que devem sair no PDF. Desmarcado = título e texto totalmente omitidos.</p>
+            <div className="space-y-2">
+              <ClauseRow label="Multas por atraso de pagamento" hint="Juros de mora e multa por inadimplência" checked={secaoOn('multas')} onChange={(on) => setSecao('multas', on)} />
+              <ClauseRow label="Limitação de responsabilidade" checked={secaoOn('limitacao')} onChange={(on) => setSecao('limitacao', on)} />
+              <ClauseRow label="Confidencialidade e sigilo" checked={secaoOn('confidencialidade')} onChange={(on) => setSecao('confidencialidade', on)} />
+              <ClauseRow label="Condições Gerais" checked={secaoOn('condicoesGerais')} onChange={(on) => setSecao('condicoesGerais', on)} />
+              <ClauseRow label="Segurança do Trabalho" checked={secaoOn('seguranca')} onChange={(on) => setSecao('seguranca', on)} />
+              <ClauseRow label="Termo de Aceite da Proposta" checked={secaoOn('termoAceite')} onChange={(on) => setSecao('termoAceite', on)} />
+            </div>
+          </Accordion>
+          </div>)}
 
           {/* ---- Informações Básicas (colapsável com +/lixeira) ---- */}
-          <div className="order-9">
+          <div className="min-w-0">
           <Accordion title={somenteMaterial ? 'Condições Comerciais' : 'Informações Básicas'} icon={<DollarSign className="w-4 h-4 text-emerald-600" />} open={open.basicas} onToggle={(atual) => toggle('basicas', atual)}>
             <div className="space-y-2.5">
               <BasicInfoRow label={somenteMaterial ? 'Prazo de entrega' : 'Prazo de Execução'} value={prazoExecucao} onChange={setPrazoExecucao} placeholder={somenteMaterial ? 'Ex.: Até 10 dias úteis após a confirmação do pedido' : 'Ex.: 10 dias úteis após liberação'} />
@@ -2205,7 +2256,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
 
           {/* ---- Observações comerciais (SOMENTE MATERIAL) ---- */}
           {somenteMaterial && (
-            <div className="order-10">
+            <div className="min-w-0">
             <Accordion title="Observações" icon={<FileText className="w-4 h-4 text-primary" />} open={open.observacoes} onToggle={(atual) => toggle('observacoes', atual)}>
               <textarea
                 rows={3}
@@ -2223,7 +2274,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
 
           {/* ---- Modelos reutilizáveis ---- */}
           {(templates.length > 0 || onSaveTemplate) && (
-            <div className="order-11">
+            <div className="min-w-0">
             <Accordion title="Modelos Reutilizáveis" icon={<Sparkles className="w-4 h-4 text-[#F2A900]" />} open={open.modelos} onToggle={(atual) => toggle('modelos', atual)}>
               {onSaveTemplate && (
                 <button type="button" onClick={handleSaveCurrentTemplate} className="mb-3 w-full sm:w-auto px-3 py-2 border border-primary/25 text-primary hover:bg-navy/5 rounded-lg text-xs font-bold uppercase flex items-center justify-center gap-1.5">
@@ -2253,31 +2304,6 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
             </Accordion>
             </div>
           )}
-          </div>
-
-          <div className="contents lg:flex lg:flex-col lg:gap-3 lg:min-w-0">
-          {/* ---- Seções do documento: Sim/Não e ▲▼ no título de cada card, na ordem do documento ---- */}
-          {faixaPadrao && <div className="order-5 -mb-2">{faixaPadrao}</div>}
-          {outrasSecoes && <div className="order-6">{outrasSecoes}</div>}
-          <div className="order-7 flex flex-col gap-3">
-            {ordemCards.map((k) => <React.Fragment key={k}>{cardsSecao[k]}</React.Fragment>)}
-          </div>
-
-          {/* ---- Cláusulas Jurídicas (atalho: mesma seleção dos cards) ---- */}
-          {!somenteMaterial && (<div className="order-8">
-          <Accordion title="Cláusulas Jurídicas" icon={<Scale className="w-4 h-4 text-danger" />} open={open.clausulas} onToggle={(atual) => toggle('clausulas', atual)}>
-            <p className="text-[11px] text-fg-secondary mb-2">Marque os blocos que devem sair no PDF. Desmarcado = título e texto totalmente omitidos.</p>
-            <div className="space-y-2">
-              <ClauseRow label="Multas por atraso de pagamento" hint="Juros de mora e multa por inadimplência" checked={secaoOn('multas')} onChange={(on) => setSecao('multas', on)} />
-              <ClauseRow label="Limitação de responsabilidade" checked={secaoOn('limitacao')} onChange={(on) => setSecao('limitacao', on)} />
-              <ClauseRow label="Confidencialidade e sigilo" checked={secaoOn('confidencialidade')} onChange={(on) => setSecao('confidencialidade', on)} />
-              <ClauseRow label="Condições Gerais" checked={secaoOn('condicoesGerais')} onChange={(on) => setSecao('condicoesGerais', on)} />
-              <ClauseRow label="Segurança do Trabalho" checked={secaoOn('seguranca')} onChange={(on) => setSecao('seguranca', on)} />
-              <ClauseRow label="Termo de Aceite da Proposta" checked={secaoOn('termoAceite')} onChange={(on) => setSecao('termoAceite', on)} />
-            </div>
-          </Accordion>
-          </div>)}
-          </div>
           </div>
         </div>
 
