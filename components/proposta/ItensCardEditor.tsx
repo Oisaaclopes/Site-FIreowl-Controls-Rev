@@ -59,6 +59,8 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
   const [openMenu, setOpenMenu] = useState<number | null>(null);
   const [catalogoFilter, setCatalogoFilter] = useState('');
   const [unitError, setUnitError] = useState('');
+  // Formulário de cadastro recolhido numa linha "(+) Cadastrar novo…"; abre ao clicar ou ao editar um item.
+  const [formAberto, setFormAberto] = useState(false);
 
   const filteredCatalogo = useMemo(() => {
     if (!catalogo) return [];
@@ -94,6 +96,7 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
   };
 
   const resetDraft = () => { setDraft(emptyDraft(tipo)); setEditingIdx(null); setUnitError(''); };
+  const fecharForm = () => { resetDraft(); setFormAberto(false); };
 
   const commit = () => {
     if (!draft.descricao.trim()) return;
@@ -111,13 +114,15 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
       ...(isServico ? { vinculoServicoId: draft.vinculoId || undefined } : { vinculoEstoqueId: draft.vinculoId || undefined }),
       tipo,
     };
-    if (editingIdx !== null) onUpdate(editingIdx, payload);
-    else onAdd(payload);
+    // Editar: salva e recolhe. Adicionar: mantém aberto para o próximo item.
+    if (editingIdx !== null) { onUpdate(editingIdx, payload); fecharForm(); return; }
+    onAdd(payload);
     resetDraft();
   };
 
   const startEdit = (idx: number, it: PedidoEquipmentItem) => {
     setOpenMenu(null);
+    setFormAberto(true);
     setEditingIdx(idx);
     setDraft({
       descricao: it.descricao || '',
@@ -209,18 +214,25 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
           </div>
         </div>
       ) : (
-        <p className="text-[11px] text-fg-muted italic px-1">Nenhum {isServico ? 'serviço' : 'material'} adicionado. Use o card abaixo.</p>
+        <p className="text-[11px] text-fg-muted italic px-1">Nenhum {isServico ? 'serviço' : 'material'} adicionado.</p>
       )}
 
-      {/* ---- Card grande para adicionar / editar ---- */}
+      {/* ---- Cadastro: linha "(+)" que abre o formulário completo ---- */}
+      {!formAberto ? (
+        <button
+          type="button"
+          onClick={() => setFormAberto(true)}
+          className={`w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed text-xs font-bold uppercase tracking-wide transition-colors ${accent === 'emerald' ? 'border-emerald-300 text-emerald-700 hover:bg-emerald-50' : 'border-danger/40 text-danger hover:bg-red-50'}`}
+        >
+          <Plus className="w-4 h-4" /> {isServico ? 'Cadastrar novo serviço' : 'Cadastrar novo dispositivo'}
+        </button>
+      ) : (
       <div className={`rounded-xl border-2 border-dashed p-3 ${accent === 'emerald' ? 'border-emerald-200 bg-emerald-50/40' : 'border-danger/25 bg-red-50/30'}`}>
         <div className="flex items-center justify-between mb-3">
           <span className={`text-xs font-bold uppercase tracking-wider ${accentText}`}>
             {editingIdx !== null ? `Editando ${isServico ? 'serviço' : 'material'}` : `Adicionar ${isServico ? 'serviço' : 'material'}`}
           </span>
-          {editingIdx !== null && (
-            <button type="button" onClick={resetDraft} className="text-[11px] text-fg-secondary hover:text-fg-secondary flex items-center gap-1"><X className="w-3.5 h-3.5" /> Cancelar edição</button>
-          )}
+          <button type="button" onClick={fecharForm} className="text-[11px] text-fg-secondary hover:text-fg flex items-center gap-1"><X className="w-3.5 h-3.5" /> {editingIdx !== null ? 'Cancelar edição' : 'Fechar'}</button>
         </div>
 
         {smartCatalog ? (
@@ -308,6 +320,7 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
           </button>
         </div>
       </div>
+      )}
     </div>
   );
 };

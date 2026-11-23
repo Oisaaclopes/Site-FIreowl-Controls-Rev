@@ -28,6 +28,8 @@ export interface MaximizeApi {
   button: React.ReactNode;
   /** id para o título do card (aria-labelledby do popup). */
   titleId: string;
+  /** Abre o popup (para botões extras, ex.: "Editar"). */
+  ampliar: () => void;
 }
 
 /** Classes do card quando ampliado: ~90% da largura, até 90% da altura, limite p/ monitores grandes. */
@@ -125,7 +127,7 @@ export const MaximizableCard: React.FC<{
         aria-modal={max ? true : undefined}
         aria-labelledby={max ? titleId : undefined}
       >
-        {children({ max, everMax, button, titleId })}
+        {children({ max, everMax, button, titleId, ampliar })}
       </div>
       {max && <div aria-hidden className="absolute inset-0 rounded-xl border-2 border-dashed border-border-strong bg-surface-3/40" />}
     </div>
