@@ -1621,7 +1621,6 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
         secoesPadraoEmpresa={companyProfile?.secoesPadrao}
         podeSalvarPadraoSecoes={userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR'}
         onSalvarPadraoSecoes={onSalvarPadraoSecoes}
-        opcoesPdf={{ showCarta: pdfOptions.showCarta, showHistorico: pdfOptions.showHistorico }}
       />
       {externalPedido && isProposalModalOpen && (
         <div className="fixed top-16 left-1/2 z-[100] -translate-x-1/2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 shadow-lg text-sm text-amber-950" role="status">

@@ -28,11 +28,11 @@ import {
   FreteInfo,
   ImpostosAdicionaisInfo,
 } from '@/lib/types';
-import { PEDIDO_TIPO_LABELS, PEDIDO_TIPO_ORDER, DEFAULT_DOC_BY_PEDIDO_TIPO } from '@/lib/documentos';
-import { numeracaoSecoesProposta, numeracaoSecoesOrcamento } from '@/lib/numeracaoSecoesEditor';
+import { PEDIDO_TIPO_LABELS, PEDIDO_TIPO_ORDER } from '@/lib/documentos';
+import { numeracaoPorPosicao } from '@/lib/numeracaoSecoesEditor';
 import { MODALIDADE_LABELS, MODALIDADE_ORDER, FRETE_MODO_LABELS, IMPOSTO_MODO_LABELS, OBS_DISPONIBILIDADE } from '@/lib/fornecimentoComercial';
 import { AREAS_PROPOSTA, TIPOS_SERVICO, conclusaoPorTipo, presetPorTipo } from '@/lib/propostaTitulo';
-import { SecaoDocKey, SECAO_KEYS, SECAO_TITULO, alternarSecao, atualizarPadraoEmpresa, flagDaSecao, igualAoPadrao, mesmasSecoes, moverSecao, normalizarSecoes, ordenarSecoes, padraoEmpresaDoTipo, padraoReferenciaDoTipo, secoesPadraoDoTipo, secoesSelecionadas } from '@/lib/documentoSecoes';
+import { SecaoDocKey, SECAO_KEYS, SECAO_TITULO, alternarSecao, atualizarPadraoEmpresa, flagDaSecao, igualAoPadrao, mesmasSecoes, moverSecao, normalizarSecoes, ordenarSecoes, padraoEmpresaDoTipo, padraoReferenciaDoTipo, secoesPadraoDoTipo } from '@/lib/documentoSecoes';
 import { CARTA_APRESENTACAO } from '@/lib/propostaTextos';
 import { SECOES_TEXTO, servicosOfertadosPadrao, restaurarSecaoLista, fonteDaSecaoLista, fonteServicos } from '@/lib/propostaMaterializacao';
 import { normalizeUnitCode } from '@/lib/commercialUnits';
@@ -88,8 +88,6 @@ interface CommercialProposalModalProps {
   podeSalvarPadraoSecoes?: boolean;
   /** Persiste o novo mapa de padrões da empresa (lança erro se falhar). */
   onSalvarPadraoSecoes?: (mapa: SecoesPadraoEmpresa) => Promise<void>;
-  /** Opções de geração do PDF (Conta → PDF) que afetam a numeração exibida nos cards. */
-  opcoesPdf?: { showCarta?: boolean; showHistorico?: boolean };
 }
 
 const inputCls =
@@ -123,8 +121,11 @@ const Accordion: React.FC<{
   /** Seção do documento: Sim/Não direto no título (fonte de secoesDocumento).
    * Em "Não" o card fica apagado, mas continua editável. */
   doc?: { on: boolean; set: (on: boolean) => void; up?: () => void; down?: () => void; numero?: string };
+  /** Número para card sem Sim/Não próprio (sub-bloco de outra seção, ex.: 03.1). */
+  numero?: string;
   children: React.ReactNode;
-}> = ({ title, icon, open: openProp, onToggle: onToggleProp, badge, doc, children }) => {
+}> = ({ title, icon, open: openProp, onToggle: onToggleProp, badge, doc, numero: numeroProp, children }) => {
+  const numero = doc?.numero ?? numeroProp;
   const inativo = doc ? !doc.on : false;
   // Visão ampla: seções ativas no documento abertas para leitura; desativadas recolhidas.
   const open = openProp ?? (doc ? doc.on : false);
@@ -143,8 +144,8 @@ const Accordion: React.FC<{
           onClick={max ? undefined : onToggle}
           className={`flex-1 min-w-0 flex items-center gap-2.5 pl-3.5 pr-2 py-2.5 text-left ${max ? 'cursor-default' : ''} ${inativo ? 'opacity-50' : ''}`}
         >
-          {doc?.numero && (
-            <span title="Número desta seção no PDF" className="font-data-mono text-[11px] font-bold leading-none px-1.5 py-1 rounded bg-navy-3 text-white shrink-0">{doc.numero}</span>
+          {numero && (
+            <span title="Posição desta seção no documento" className="font-data-mono text-[11px] font-bold leading-none px-1.5 py-1 rounded bg-navy-3 text-white shrink-0">{numero}</span>
           )}
           {icon}
           <span id={titleId} className={`flex-1 min-w-0 truncate font-bold uppercase text-sm ${inativo ? 'text-fg-muted' : 'text-primary'}`}>{title}</span>
@@ -386,7 +387,6 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   secoesPadraoEmpresa,
   podeSalvarPadraoSecoes = false,
   onSalvarPadraoSecoes,
-  opcoesPdf,
 }) => {
   // ETAPA 2 — materialização de textos. Uma proposta é NOVA quando não traz um
   // registro `proposal` anterior; nesse caso os textos-padrão são copiados para
@@ -1206,22 +1206,10 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const infoCompleta = !!clienteId && !!pedidoTipo && (somenteMaterial || (areaPrincipal.length > 0 && !!tipoServico));
   const mostrarResumoInfo = infoCompleta && (infoResumo ?? !!initialPedido);
 
-  // Numeração das seções exatamente como sai no PDF do documento que este Tipo de Pedido
-  // gera (Proposta Comercial ou Orçamento), calculada sobre o pedido como será gravado.
-  // Somente Material, Laudo e Personalizado usam outros documentos: sem número.
-  const docGerado = !somenteMaterial && pedidoTipo ? DEFAULT_DOC_BY_PEDIDO_TIPO[pedidoTipo] : null;
-  const numeroPdf: Record<string, string> = (() => {
-    if (docGerado !== 'proposta_comercial' && docGerado !== 'orcamento') return {};
-    const pAtual = buildCurrentPedido().proposal;
-    if (docGerado === 'orcamento') return numeracaoSecoesOrcamento(pAtual);
-    return numeracaoSecoesProposta(pAtual, {
-      selecao: secoesSelecionadas(pAtual),
-      temMateriais: (pAtual.equipmentItems || []).some((e) => e.tipo !== 'servico'),
-      garantiaVisivel: renderWarranty(pAtual.warranty).hasAny,
-      showCarta: opcoesPdf?.showCarta,
-      showHistorico: opcoesPdf?.showHistorico,
-    });
-  })();
+  // Número de cada card = posição da seção LIGADA na sequência do documento (01, 02…).
+  // Mover com ▲▼ muda o número; desligar tira o número e renumera as seguintes.
+  // Somente Material usa o documento enxuto de fornecimento: sem números.
+  const numeroPdf: Record<string, string> = somenteMaterial ? {} : numeracaoPorPosicao(secoesAtivas, ordemSecoes);
 
   const mostrarValorCard = somenteMaterial || valorCardLegado;
 
@@ -1491,7 +1479,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
       <textarea rows={4} value={escopoServico} onChange={(e) => setEscopoServico(e.target.value)} className={inputCls} />
     </Accordion>
     
-    <Accordion title="Indicadores & SLA (resumo executivo)" icon={<ShieldCheck className="w-4 h-4 text-primary" />} open={open.indicadores} onToggle={(atual) => toggle('indicadores', atual)}>
+    <Accordion title="Indicadores & SLA (resumo executivo)" numero={numeroPdf.escopo ? `${numeroPdf.escopo}.1` : undefined} icon={<ShieldCheck className="w-4 h-4 text-primary" />} open={open.indicadores} onToggle={(atual) => toggle('indicadores', atual)}>
       <p className="text-[11px] text-fg-secondary mb-3">Opcional. Preenchido, gera a página de <b>Resumo Executivo</b> (cards) e o bloco de <b>SLA</b>. Em branco, nada aparece.</p>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
         <div>
