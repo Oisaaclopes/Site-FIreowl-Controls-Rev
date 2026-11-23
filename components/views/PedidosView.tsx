@@ -4,7 +4,7 @@ import { showToast, requestConfirm, requestText } from '@/components/ui/Feedback
 import { useNavigationEntity, useNavigationValue } from '@/components/NavigationSession';
 import { fetchOrdemServicoById } from '@/lib/ordensServico';
 import { fetchPedidos } from '@/lib/pedidos';
-import { canManageNotaFiscal, isNotaFiscalEmitida, podeInformarNotaFiscal, semearNotaFiscalAoConcluir } from '@/lib/notaFiscal';
+import { NOTA_TIPO_LABEL, canManageNotaFiscal, isNotaFiscalEmitida, notasDoPedido, podeInformarNotaFiscal, resumoSeloNotas, semearNotaFiscalAoConcluir } from '@/lib/notaFiscal';
 import { NotaFiscalRegistroModal } from '@/components/views/NotaFiscalRegistroModal';
 import { NotaFiscalPendencias } from '@/components/views/NotaFiscalPendencias';
 import { NotasFiscaisEmitidas } from '@/components/views/NotasFiscaisEmitidas';
@@ -950,9 +950,14 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
         {/* Bloco direito */}
         <div className="flex items-center gap-2 md:gap-3 shrink-0 flex-wrap justify-end">
           {canManageNotaFiscal(userRole) && isNotaFiscalEmitida(ped) && (() => {
-            const nf = ped.proposal.notaFiscal;
-            const quando = nf?.dataEmissao ? new Date(`${nf.dataEmissao.slice(0, 10)}T12:00:00`).toLocaleDateString('pt-BR') : '';
-            const dica = ['Nota fiscal emitida', nf?.numero && `nº ${nf.numero}`, quando && `em ${quando}`, nf?.atualizadaPor && `por ${nf.atualizadaPor}`, 'clique para editar'].filter(Boolean).join(' · ');
+            const dataBr = (d?: string) => (d ? new Date(`${d.slice(0, 10)}T12:00:00`).toLocaleDateString('pt-BR') : '');
+            const notas = notasDoPedido(ped);
+            const dica = [
+              `Notas fiscais emitidas (${notas.length})`,
+              ...notas.map((n) => [NOTA_TIPO_LABEL[n.tipo], n.numero && `nº ${n.numero}`, dataBr(n.dataEmissao) && `em ${dataBr(n.dataEmissao)}`].filter(Boolean).join(' ')),
+              'Clique para editar ou adicionar notas',
+            ].join('\n');
+            const rotulo = resumoSeloNotas(ped);
             return (
               <button
                 type="button"
@@ -962,7 +967,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
                 className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 pl-1 pr-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 hover:bg-emerald-100 transition-colors"
               >
                 <span className="material-symbols-outlined text-[16px] leading-none" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
-                NF emitida{nf?.numero ? ` · ${nf.numero}` : ''}
+                NF emitida{rotulo && <span className="normal-case tracking-normal">· {rotulo}</span>}
               </button>
             );
           })()}

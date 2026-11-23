@@ -11,9 +11,14 @@ import {
   notasFiscaisEmitidas,
   resumoNotasEmitidas,
   podeInformarNotaFiscal,
-  registrarNotaFiscalEmitida,
+  salvarNotasDoPedido,
+  notasDoPedido,
+  valorDaNota,
+  linhasNotasEmitidas,
+  resumoSeloNotas,
+  tipoNotaPadrao,
 } from './notaFiscal';
-import type { CommercialProposalData, Pedido, PedidoStatus } from './types';
+import type { CommercialProposalData, NotaFiscalItem, Pedido, PedidoStatus } from './types';
 
 /**
  * Lembrete administrativo de NF — pendência derivada do pedido, idempotente.
@@ -144,15 +149,10 @@ describe('notaFiscal — NFs emitidas (card + selo)', () => {
     ]);
     expect(lista.map((p) => p.id)).toEqual(['b', 'a']);
   });
-
-  it('resumo soma total, mês de referência e conta NFs sem número', () => {
-    const r = resumoNotasEmitidas(
-      [emitida('a', '2026-10-05', 500, '123'), emitida('b', '2026-11-10', 1500), emitida('c', '2026-11-20', 250, '9')],
-      '2026-11',
-    );
-    expect(r).toEqual({ total: 3, valorTotal: 2250, mes: 2, valorMes: 1750, semNumero: 1, semXml: 3 });
-  });
 });
+
+const nota = (over: Partial<NotaFiscalItem> = {}): NotaFiscalItem =>
+  ({ id: over.id || 'n1', tipo: 'servico', ...over } as NotaFiscalItem);
 
 describe('notaFiscal — registro antecipado (a partir de ACEITO)', () => {
   it('pode informar em aceito/concluído com valor, inclusive recorrente', () => {
@@ -162,38 +162,82 @@ describe('notaFiscal — registro antecipado (a partir de ACEITO)', () => {
     // Recorrente: registro manual liberado (bug: botão sumia em pedidos aceitos recorrentes).
     expect(podeInformarNotaFiscal(ped({ status: 'aceito' }, { recorrente: true }))).toBe(true);
     // ...mas o lembrete automático segue excluindo recorrente.
-    expect(isNotaFiscalPendente(registrarNotaFiscalEmitida(ped({ status: 'concluido' }, { recorrente: true }), {}))).toBe(false);
+    expect(isNotaFiscalPendente(salvarNotasDoPedido(ped({ status: 'concluido' }, { recorrente: true }), [nota()]))).toBe(false);
     expect(isNotaFiscalElegivel(ped({ status: 'concluido' }, { recorrente: true }))).toBe(false);
     expect(podeInformarNotaFiscal(ped({ status: 'aceito' }, { valorTotal: 0 }))).toBe(false);
   });
 
-  it('registra emitida com nº/data e não é reaberta ao concluir depois', () => {
-    const aceito = registrarNotaFiscalEmitida(ped({ status: 'aceito' }), { numero: ' 4521 ', dataEmissao: '2026-11-18' }, 'Ana');
-    expect(aceito.proposal.notaFiscal).toMatchObject({ status: 'emitida', numero: '4521', dataEmissao: '2026-11-18', atualizadaPor: 'Ana' });
-    expect(aceito.proposal.notaFiscal?.criadaEm).toBeTruthy();
+  it('salvar notas no aceito marca emitida e concluir depois não reabre', () => {
+    const aceito = salvarNotasDoPedido(ped({ status: 'aceito' }), [nota({ numero: ' 4521 ', dataEmissao: '2026-11-18' })], 'Ana');
+    expect(aceito.proposal.notaFiscal).toMatchObject({ status: 'emitida', dataEmissao: '2026-11-18', atualizadaPor: 'Ana' });
+    expect(aceito.proposal.notaFiscal?.notas?.[0]).toMatchObject({ numero: '4521', registradaPor: 'Ana' });
     const concluido = semearNotaFiscalAoConcluir({ ...aceito, status: 'concluido' });
     expect(notaFiscalStatus(concluido)).toBe('emitida');
     expect(isNotaFiscalPendente(concluido)).toBe(false);
   });
 
   it('data vazia usa hoje; campos vazios ficam indefinidos', () => {
-    const r = registrarNotaFiscalEmitida(ped({ status: 'aceito' }), { numero: '  ', observacao: '' });
-    expect(r.proposal.notaFiscal?.numero).toBeUndefined();
-    expect(r.proposal.notaFiscal?.dataEmissao).toBe(new Date().toISOString().slice(0, 10));
+    const r = salvarNotasDoPedido(ped({ status: 'aceito' }), [nota({ numero: '  ', observacao: '' })]);
+    const n = r.proposal.notaFiscal!.notas![0];
+    expect(n.numero).toBeUndefined();
+    expect(n.observacao).toBeUndefined();
+    expect(n.dataEmissao).toBe(new Date().toISOString().slice(0, 10));
   });
 });
 
-describe('notaFiscal — anexos e chave de acesso', () => {
-  const anexo = (n: string) => ({ path: `ped-1/${n}`, nome: n, enviadoEm: '2026-11-20T00:00:00.000Z' });
+describe('notaFiscal — várias notas por pedido (serviço / material)', () => {
+  it('guarda notas de serviço e material; data de topo = mais recente', () => {
+    const p = salvarNotasDoPedido(ped({ status: 'aceito' }, { valorTotal: 3000 }), [
+      nota({ id: 's', tipo: 'servico', numero: '10', dataEmissao: '2026-11-10', valor: 1800 }),
+      nota({ id: 'm', tipo: 'material', numero: '77', dataEmissao: '2026-11-15', valor: 1200 }),
+    ]);
+    expect(notasDoPedido(p).map((n) => n.tipo)).toEqual(['servico', 'material']);
+    expect(p.proposal.notaFiscal?.dataEmissao).toBe('2026-11-15');
+    expect(resumoSeloNotas(p)).toBe('NFS-e 10 · NF-e 77');
+  });
 
-  it('grava chave e anexos; edição sem anexos preserva os existentes', () => {
-    const com = registrarNotaFiscalEmitida(ped({ status: 'aceito' }), {
-      numero: '1', chaveAcesso: ' 4126 ', anexos: { xml: anexo('n.xml'), pdf: anexo('n.pdf') },
+  it('remover todas as notas volta a pendente', () => {
+    const emit = salvarNotasDoPedido(ped(), [nota()]);
+    const vazio = salvarNotasDoPedido(emit, []);
+    expect(notaFiscalStatus(vazio)).toBe('pendente');
+    expect(isNotaFiscalPendente(vazio)).toBe(true);
+  });
+
+  it('valor: informado por nota; nota única sem valor herda o do pedido', () => {
+    const unica = salvarNotasDoPedido(ped({}, { valorTotal: 900 }), [nota()]);
+    expect(valorDaNota(notasDoPedido(unica)[0], unica)).toBe(900);
+    const duas = salvarNotasDoPedido(ped({}, { valorTotal: 900 }), [nota({ id: 'a' }), nota({ id: 'b', valor: 300 })]);
+    const [a, b] = notasDoPedido(duas);
+    expect(valorDaNota(a, duas)).toBe(0);
+    expect(valorDaNota(b, duas)).toBe(300);
+  });
+
+  it('registro legado (nota única no topo) é lido como uma nota', () => {
+    const legado = aplicarNotaFiscal(ped({}, { modalidade: 'somente_material' }), { status: 'emitida', numero: '55', dataEmissao: '2026-10-01' });
+    expect(notasDoPedido(legado)).toEqual([expect.objectContaining({ id: 'legado', tipo: 'material', numero: '55' })]);
+    const chave44 = aplicarNotaFiscal(ped(), { status: 'emitida', chaveAcesso: '4'.repeat(44) });
+    expect(notasDoPedido(chave44)[0].tipo).toBe('material');
+    expect(notasDoPedido(aplicarNotaFiscal(ped(), { status: 'emitida' }))[0].tipo).toBe('servico');
+    expect(notasDoPedido(semearNotaFiscalAoConcluir(ped()))).toEqual([]);
+  });
+
+  it('tipo padrão pela modalidade', () => {
+    expect(tipoNotaPadrao(ped({}, { modalidade: 'somente_material' }))).toBe('material');
+    expect(tipoNotaPadrao(ped({}, { modalidade: 'material_servico' }))).toBe('servico');
+  });
+
+  it('linhas e resumo contam por NOTA, com tipo e incompletas', () => {
+    const anexo = { path: 'x', nome: 'n.xml', enviadoEm: '2026-11-01T00:00:00Z' };
+    const p1 = salvarNotasDoPedido(ped({ id: 'p1' }, { valorTotal: 3000 }), [
+      nota({ id: 's', tipo: 'servico', numero: '1', dataEmissao: '2026-11-10', valor: 2000, anexos: { xml: anexo } }),
+      nota({ id: 'm', tipo: 'material', dataEmissao: '2026-11-12', valor: 1000 }),
+    ]);
+    const p2 = salvarNotasDoPedido(ped({ id: 'p2' }, { valorTotal: 500 }), [nota({ id: 'x', numero: '9', dataEmissao: '2026-10-03' })]);
+    const linhas = linhasNotasEmitidas([p2, p1, ped({ id: 'semnf' })]);
+    expect(linhas.map((l) => l.nota.id)).toEqual(['m', 's', 'x']);
+    expect(resumoNotasEmitidas([p1, p2], '2026-11')).toEqual({
+      total: 3, valorTotal: 3500, mes: 2, valorMes: 3000, servicoMes: 1, materialMes: 1,
+      servico: 2, material: 1, semNumero: 1, semXml: 2, incompletas: 2,
     });
-    expect(com.proposal.notaFiscal?.chaveAcesso).toBe('4126');
-    expect(com.proposal.notaFiscal?.anexos?.pdf?.nome).toBe('n.pdf');
-    const editado = registrarNotaFiscalEmitida(com, { numero: '2', chaveAcesso: '4126' });
-    expect(editado.proposal.notaFiscal?.anexos?.xml?.nome).toBe('n.xml');
-    expect(editado.proposal.notaFiscal?.numero).toBe('2');
   });
 });

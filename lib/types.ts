@@ -67,6 +67,31 @@ export interface NotaFiscalLembrete {
   chaveAcesso?: string;
   /** Arquivos da nota no bucket privado `notas-fiscais` (migration 0121). */
   anexos?: { xml?: NotaFiscalAnexo; pdf?: NotaFiscalAnexo };
+  /**
+   * Notas emitidas para o pedido (serviço e/ou material, uma ou várias).
+   * Presente = fonte de verdade; ausente = registro legado de nota única
+   * (campos numero/dataEmissao/chaveAcesso/anexos acima). Ver lib/notaFiscal.
+   */
+  notas?: NotaFiscalItem[];
+}
+
+/** Tipo da nota: NFS-e (serviço) ou NF-e (material/produto). */
+export type NotaFiscalTipo = 'servico' | 'material';
+
+/** Uma nota fiscal emitida para o pedido. */
+export interface NotaFiscalItem {
+  id: string;
+  tipo: NotaFiscalTipo;
+  numero?: string;
+  /** YYYY-MM-DD */
+  dataEmissao?: string;
+  /** Valor da nota (opcional; com nota única sem valor, vale o do pedido). */
+  valor?: number;
+  chaveAcesso?: string;
+  observacao?: string;
+  anexos?: { xml?: NotaFiscalAnexo; pdf?: NotaFiscalAnexo };
+  registradaEm?: string;
+  registradaPor?: string;
 }
 
 /** Arquivo da NF guardado no storage privado (nunca URL pública). */

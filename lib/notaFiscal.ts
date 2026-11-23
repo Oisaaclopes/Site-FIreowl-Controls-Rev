@@ -1,4 +1,4 @@
-import type { NotaFiscalLembrete, NotaFiscalStatus, Pedido, UserRole } from './types';
+import type { NotaFiscalItem, NotaFiscalLembrete, NotaFiscalStatus, NotaFiscalTipo, Pedido, UserRole } from './types';
 
 /**
  * Lembrete administrativo de Nota Fiscal.
@@ -93,36 +93,79 @@ export const podeInformarNotaFiscal = (p: Pedido): boolean =>
   (p.status === 'aceito' || p.status === 'concluido') &&
   pedidoValorNota(p) > 0;
 
-/** Registra (ou corrige) a NF como emitida — nº/data/observação opcionais. */
-export const registrarNotaFiscalEmitida = (
-  p: Pedido,
-  dados: {
-    numero?: string;
-    dataEmissao?: string;
-    observacao?: string;
-    chaveAcesso?: string;
-    /** Só substitui quando informado (undefined preserva os anexos atuais). */
-    anexos?: NotaFiscalLembrete['anexos'];
-  },
-  autor?: string,
-): Pedido => {
-  const limpo = (v?: string) => (v && v.trim() ? v.trim() : undefined);
-  const base = p.proposal?.notaFiscal?.criadaEm ? p : {
-    ...p,
-    proposal: { ...p.proposal, notaFiscal: { ...(p.proposal?.notaFiscal || { status: 'pendente' as const }), criadaEm: new Date().toISOString() } },
+// ─── Várias notas por pedido (serviço / material) ───────────────────────────
+
+export const NOTA_TIPO_LABEL: Record<NotaFiscalTipo, string> = { servico: 'Serviço', material: 'Material' };
+export const NOTA_TIPO_SIGLA: Record<NotaFiscalTipo, string> = { servico: 'NFS-e', material: 'NF-e' };
+
+/** Tipo sugerido para a primeira nota, pela modalidade comercial do pedido. */
+export const tipoNotaPadrao = (p: Pedido): NotaFiscalTipo =>
+  p.proposal?.modalidade === 'somente_material' ? 'material' : 'servico';
+
+/**
+ * Notas do pedido. `notaFiscal.notas` presente = fonte de verdade.
+ * Registro LEGADO (nota única nos campos de topo) vira uma nota sintética:
+ * chave de 44 dígitos = NF-e (material); senão, tipo pela modalidade.
+ */
+export const notasDoPedido = (p: Pedido): NotaFiscalItem[] => {
+  const nf = p.proposal?.notaFiscal;
+  if (!nf) return [];
+  if (Array.isArray(nf.notas)) return nf.notas;
+  if (nf.status !== 'emitida') return [];
+  const tipo: NotaFiscalTipo = /^\d{44}$/.test(nf.chaveAcesso || '') ? 'material' : tipoNotaPadrao(p);
+  return [{
+    id: 'legado',
+    tipo,
+    numero: nf.numero,
+    dataEmissao: nf.dataEmissao,
+    chaveAcesso: nf.chaveAcesso,
+    observacao: nf.observacao,
+    anexos: nf.anexos,
+    registradaEm: nf.atualizadaEm,
+    registradaPor: nf.atualizadaPor,
+  }];
+};
+
+/** Valor da nota: o informado; nota única sem valor = valor do pedido. */
+export const valorDaNota = (n: NotaFiscalItem, p: Pedido): number => {
+  if (typeof n.valor === 'number' && Number.isFinite(n.valor)) return n.valor;
+  return notasDoPedido(p).length === 1 ? pedidoValorNota(p) : 0;
+};
+
+const limpo = (v?: string) => (v && v.trim() ? v.trim() : undefined);
+
+/**
+ * Grava a lista completa de notas do pedido.
+ * ≥1 nota → status 'emitida'; nenhuma → volta a 'pendente' (se estava emitida).
+ * Os campos de topo legados são limpos (a lista passa a mandar); `dataEmissao`
+ * de topo espelha a nota mais recente, para ordenação.
+ */
+export const salvarNotasDoPedido = (p: Pedido, notas: NotaFiscalItem[], autor?: string): Pedido => {
+  const anterior: NotaFiscalLembrete = p.proposal?.notaFiscal || { status: 'pendente' };
+  const agora = new Date().toISOString();
+  const normalizadas: NotaFiscalItem[] = notas.map((n) => ({
+    ...n,
+    numero: limpo(n.numero),
+    dataEmissao: limpo(n.dataEmissao) || agora.slice(0, 10),
+    chaveAcesso: limpo(n.chaveAcesso),
+    observacao: limpo(n.observacao),
+    valor: typeof n.valor === 'number' && Number.isFinite(n.valor) ? n.valor : undefined,
+    registradaEm: n.registradaEm || agora,
+    registradaPor: n.registradaPor || autor,
+  }));
+  const maisRecente = normalizadas.map((n) => n.dataEmissao!).sort().pop();
+  const status: NotaFiscalStatus = normalizadas.length
+    ? 'emitida'
+    : anterior.status === 'emitida' ? 'pendente' : anterior.status;
+  const notaFiscal: NotaFiscalLembrete = {
+    status,
+    criadaEm: anterior.criadaEm || agora,
+    atualizadaEm: agora,
+    ...(autor ? { atualizadaPor: autor } : anterior.atualizadaPor ? { atualizadaPor: anterior.atualizadaPor } : {}),
+    ...(maisRecente ? { dataEmissao: maisRecente } : {}),
+    notas: normalizadas,
   };
-  return aplicarNotaFiscal(
-    base,
-    {
-      status: 'emitida',
-      numero: limpo(dados.numero),
-      dataEmissao: limpo(dados.dataEmissao) || new Date().toISOString().slice(0, 10),
-      observacao: limpo(dados.observacao),
-      chaveAcesso: limpo(dados.chaveAcesso),
-      ...(dados.anexos !== undefined ? { anexos: dados.anexos } : {}),
-    },
-    autor,
-  );
+  return { ...p, proposal: { ...p.proposal, notaFiscal } };
 };
 
 /** NF já marcada como EMITIDA (selo de certificação na lista de pedidos). */
@@ -133,26 +176,62 @@ export const isNotaFiscalEmitida = (p: Pedido): boolean =>
 export const notaFiscalDataRef = (p: Pedido): string =>
   p.proposal?.notaFiscal?.dataEmissao || p.proposal?.notaFiscal?.atualizadaEm || p.updatedAt || '';
 
-/** NFs emitidas, mais recentes primeiro (card de controle). */
+/** Pedidos com NF emitida, mais recentes primeiro. */
 export const notasFiscaisEmitidas = (pedidos: Pedido[]): Pedido[] =>
   pedidos
     .filter(isNotaFiscalEmitida)
     .sort((a, b) => notaFiscalDataRef(b).localeCompare(notaFiscalDataRef(a)));
 
-/** Resumo do card: quantidade/valor total e do mês corrente (YYYY-MM). */
+export interface LinhaNotaEmitida {
+  pedido: Pedido;
+  nota: NotaFiscalItem;
+  valor: number;
+  /** YYYY-MM-DD (ou ISO) usado para ordenar/filtrar por mês. */
+  data: string;
+}
+
+/** Uma linha por NOTA (não por pedido), mais recentes primeiro (card). */
+export const linhasNotasEmitidas = (pedidos: Pedido[]): LinhaNotaEmitida[] =>
+  pedidos
+    .filter(isNotaFiscalEmitida)
+    .flatMap((pedido) =>
+      notasDoPedido(pedido).map((nota) => ({
+        pedido,
+        nota,
+        valor: valorDaNota(nota, pedido),
+        data: nota.dataEmissao || nota.registradaEm || notaFiscalDataRef(pedido),
+      })),
+    )
+    .sort((a, b) => b.data.localeCompare(a.data));
+
+/** Resumo do card, contado por NOTA: total/mês, valores, por tipo, incompletas. */
 export const resumoNotasEmitidas = (pedidos: Pedido[], mesRef = new Date().toISOString().slice(0, 7)) => {
-  const emitidas = notasFiscaisEmitidas(pedidos);
-  const doMes = emitidas.filter((p) => notaFiscalDataRef(p).slice(0, 7) === mesRef);
-  const soma = (ps: Pedido[]) => ps.reduce((acc, p) => acc + pedidoValorNota(p), 0);
+  const linhas = linhasNotasEmitidas(pedidos);
+  const doMes = linhas.filter((l) => l.data.slice(0, 7) === mesRef);
+  const soma = (ls: LinhaNotaEmitida[]) => ls.reduce((acc, l) => acc + l.valor, 0);
+  const conta = (ls: LinhaNotaEmitida[], t: NotaFiscalTipo) => ls.filter((l) => l.nota.tipo === t).length;
   return {
-    total: emitidas.length,
-    valorTotal: soma(emitidas),
+    total: linhas.length,
+    valorTotal: soma(linhas),
     mes: doMes.length,
     valorMes: soma(doMes),
-    semNumero: emitidas.filter((p) => !p.proposal?.notaFiscal?.numero).length,
-    /** Emitidas sem o XML (documento fiscal) anexado. */
-    semXml: emitidas.filter((p) => !p.proposal?.notaFiscal?.anexos?.xml).length,
+    servicoMes: conta(doMes, 'servico'),
+    materialMes: conta(doMes, 'material'),
+    servico: conta(linhas, 'servico'),
+    material: conta(linhas, 'material'),
+    semNumero: linhas.filter((l) => !l.nota.numero).length,
+    /** Notas sem o XML (documento fiscal) anexado. */
+    semXml: linhas.filter((l) => !l.nota.anexos?.xml).length,
+    incompletas: linhas.filter((l) => !l.nota.numero || !l.nota.anexos?.xml).length,
   };
+};
+
+/** Texto curto do selo: "NFS-e 123 · NF-e 456" ou "3 notas". */
+export const resumoSeloNotas = (p: Pedido): string => {
+  const notas = notasDoPedido(p);
+  if (notas.length === 0) return '';
+  if (notas.length > 2) return `${notas.length} notas`;
+  return notas.map((n) => `${NOTA_TIPO_SIGLA[n.tipo]}${n.numero ? ` ${n.numero}` : ''}`).join(' · ');
 };
 
 /** Rótulo legível do estado (UI). */
