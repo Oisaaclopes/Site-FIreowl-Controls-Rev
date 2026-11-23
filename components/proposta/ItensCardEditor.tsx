@@ -142,11 +142,12 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
     <div className="space-y-3">
       {/* ---- Lista de itens (cards compactos) ---- */}
       {itens.length > 0 ? (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {itens.map(({ it, idx }, pos) => (
-            <div key={idx} className={`relative rounded-xl border bg-surface p-3 ${editingIdx === idx ? (accent === 'emerald' ? 'border-emerald-400 ring-1 ring-emerald-200' : 'border-danger/50 ring-1 ring-danger/15') : 'border-border'}`}>
-              <div className="flex items-start gap-2">
-                <span className={`mt-0.5 font-data-mono font-bold text-xs ${accentText}`}>{pos + 1}</span>
+            <div key={idx} className={`relative rounded-xl border bg-surface p-2.5 md:py-2 flex flex-wrap md:flex-nowrap items-start md:items-center gap-2 ${editingIdx === idx ? (accent === 'emerald' ? 'border-emerald-400 ring-1 ring-emerald-200' : 'border-danger/50 ring-1 ring-danger/15') : 'border-border'}`}>
+              {/* contents: número, descrição e menu viram itens da linha (no desktop, linha única). */}
+              <div className="contents">
+                <span className={`mt-0.5 md:mt-0 font-data-mono font-bold text-xs ${accentText}`}>{pos + 1}</span>
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold text-fg text-sm leading-snug break-words">{it.descricao || <span className="text-fg-muted italic">Sem descrição</span>}</p>
                   {it.descricaoDetalhada && <p className="text-[11px] text-fg-secondary leading-snug mt-0.5 break-words">{it.descricaoDetalhada}</p>}
@@ -165,7 +166,7 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
                   ) : null}
                 </div>
                 {/* Menu de opções */}
-                <div className="relative shrink-0">
+                <div className="relative shrink-0 md:order-last">
                   <button type="button" onClick={() => setOpenMenu(openMenu === idx ? null : idx)} className="p-1 text-fg-muted hover:text-fg-secondary rounded" title="Opções">
                     <span className="material-symbols-outlined text-lg leading-none">more_vert</span>
                   </button>
@@ -179,7 +180,7 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
                   )}
                 </div>
               </div>
-              <div className="flex items-center justify-between mt-2 pt-2 border-t border-border">
+              <div className="w-full md:w-auto order-last md:order-none flex items-center justify-between md:justify-end gap-4 pt-2 md:pt-0 border-t md:border-t-0 border-border shrink-0">
                 {/* Stepper de quantidade */}
                 <div className="flex items-center gap-2">
                   <button type="button" onClick={() => stepQtd(idx, it, -1)} className="w-7 h-7 rounded-full border border-border-strong text-fg-secondary hover:bg-surface-2 flex items-center justify-center"><Minus className="w-3.5 h-3.5" /></button>
@@ -190,13 +191,13 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
                   />
                   <button type="button" onClick={() => stepQtd(idx, it, 1)} className={`w-7 h-7 rounded-full border flex items-center justify-center ${accent === 'emerald' ? 'border-emerald-300 text-emerald-600 hover:bg-emerald-50' : 'border-danger/40 text-danger hover:bg-red-50'}`}><Plus className="w-3.5 h-3.5" /></button>
                 </div>
-                <span className={`font-data-mono font-bold text-sm ${accentText}`}>{brl(lineTotal(it))}</span>
+                <span className={`font-data-mono font-bold text-sm md:min-w-28 md:text-right ${accentText}`}>{brl(lineTotal(it))}</span>
               </div>
             </div>
           ))}
 
           {/* Total */}
-          <div className="flex items-center justify-between bg-surface-3 rounded-xl px-4 py-3">
+          <div className="flex items-center justify-between bg-surface-3 rounded-xl px-4 py-2">
             <div>
               <span className="block text-[10px] font-bold uppercase tracking-wider text-fg-muted">Quantidade</span>
               <span className="text-sm font-bold text-fg-secondary">{fmtQtd(itens.reduce((a, x) => a + (x.it.quantidade || 0), 0))}</span>
@@ -212,7 +213,7 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
       )}
 
       {/* ---- Card grande para adicionar / editar ---- */}
-      <div className={`rounded-xl border-2 border-dashed p-4 ${accent === 'emerald' ? 'border-emerald-200 bg-emerald-50/40' : 'border-danger/25 bg-red-50/30'}`}>
+      <div className={`rounded-xl border-2 border-dashed p-3 ${accent === 'emerald' ? 'border-emerald-200 bg-emerald-50/40' : 'border-danger/25 bg-red-50/30'}`}>
         <div className="flex items-center justify-between mb-3">
           <span className={`text-xs font-bold uppercase tracking-wider ${accentText}`}>
             {editingIdx !== null ? `Editando ${isServico ? 'serviço' : 'material'}` : `Adicionar ${isServico ? 'serviço' : 'material'}`}
@@ -256,24 +257,26 @@ export const ItensCardEditor: React.FC<Props> = ({ tipo, accent, itens, catalogo
           </div>
         )}
 
-        <div className="mb-3">
+        <div className={`grid gap-x-3 ${isServico ? '' : 'md:grid-cols-2'}`}>
+        <div className="mb-2.5">
           <label className={miniLabel}>Descrição</label>
           <input type="text" value={draft.descricao} onChange={(e) => set('descricao', e.target.value)} placeholder={isServico ? 'Serviço a ser realizado…' : 'Material…'} className={inputCls} />
         </div>
 
-        <div className="mb-3">
-          <label className={miniLabel}>Descrição detalhada (opcional)</label>
-          <textarea rows={2} value={draft.descricaoDetalhada} onChange={(e) => set('descricaoDetalhada', e.target.value)} placeholder="Detalhes que aparecem abaixo do item no documento…" className={`${inputCls} resize-y`} />
-        </div>
-
         {!isServico && (
-          <div className="mb-3">
+          <div className="mb-2.5">
             <label className={miniLabel}>Marca / Modelo (opcional)</label>
             <input type="text" value={draft.marcaModelo} onChange={(e) => set('marcaModelo', e.target.value)} placeholder="Ex.: Notifier FSP-951" className={inputCls} />
           </div>
         )}
+        </div>
 
-        <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="mb-2.5">
+          <label className={miniLabel}>Descrição detalhada (opcional)</label>
+          <textarea rows={2} value={draft.descricaoDetalhada} onChange={(e) => set('descricaoDetalhada', e.target.value)} placeholder="Detalhes que aparecem abaixo do item no documento…" className={`${inputCls} resize-y`} />
+        </div>
+
+        <div className="grid grid-cols-2 2xl:grid-cols-4 gap-3 mb-2.5">
           <div>
             <label className={miniLabel}>Preço (R$)</label>
             <input type="number" min={0} step="0.01" value={draft.precoUnitario} onChange={(e) => set('precoUnitario', Number(e.target.value))} className={`${inputCls} font-data-mono`} />

@@ -38,6 +38,7 @@ import { calculateCommercialProposalTotals } from '@/lib/commercialTotals';
 import { CommercialWarranty, StructuredWarranty, WarrantyLeg, WarrantyMode, defaultWarranty, defaultWarrantyMaterial, GARANTIA_MATERIAL_PADRAO, normalizeCommercialWarranty, isLegacyWarranty, isStructuredWarranty, renderWarranty, legText } from '@/lib/commercialWarranty';
 import { COMMERCIAL_SCHEMA_VERSION } from '@/lib/commercialProposal';
 import { ItensCardEditor } from '@/components/proposta/ItensCardEditor';
+import { MaximizableCard, maxCardCls } from '@/components/proposta/MaximizableCard';
 import {
   X,
   Plus,
@@ -88,7 +89,7 @@ interface CommercialProposalModalProps {
 }
 
 const inputCls =
-  'w-full border border-border-strong rounded-lg p-2.5 text-fg text-xs focus:outline-none focus:ring-2 focus:ring-[#0B1E38]/20 focus:border-navy/40';
+  'w-full border border-border-strong rounded-lg px-2.5 py-2 text-fg text-xs focus:outline-none focus:ring-2 focus:ring-[#0B1E38]/20 focus:border-navy/40';
 const labelCls = 'block text-fg-secondary font-bold uppercase text-[11px] mb-1';
 
 /* ------------------------- componentes de módulo ------------------------- */
@@ -121,15 +122,21 @@ const Accordion: React.FC<{
 }> = ({ title, icon, open, onToggle, badge, doc, children }) => {
   const inativo = doc ? !doc.on : false;
   return (
-    <div className={`rounded-xl border overflow-hidden ${inativo ? 'bg-surface-2 border-dashed border-border-strong' : 'bg-surface border-border shadow-sm'}`}>
-      <div className="flex items-center hover:bg-surface-2 transition-colors">
+    <MaximizableCard title={title}>
+      {({ max, everMax, button, titleId }) => {
+        // Ampliado: conteúdo sempre visível (sem alterar o estado aberto/recolhido).
+        // Depois de ampliado uma vez, o corpo fica montado (oculto) para não perder estado.
+        const visivel = open || max;
+        return (
+    <div className={`rounded-xl border overflow-hidden ${inativo ? 'bg-surface-2 border-dashed border-border-strong' : 'bg-surface border-border shadow-sm'} ${max ? maxCardCls : ''}`}>
+      <div className={`flex items-center transition-colors shrink-0 ${max ? 'border-b border-border' : 'hover:bg-surface-2'}`}>
         <button
           type="button"
-          onClick={onToggle}
-          className={`flex-1 min-w-0 flex items-center gap-2.5 pl-4 pr-2 py-3.5 text-left ${inativo ? 'opacity-50' : ''}`}
+          onClick={max ? undefined : onToggle}
+          className={`flex-1 min-w-0 flex items-center gap-2.5 pl-3.5 pr-2 py-2.5 text-left ${max ? 'cursor-default' : ''} ${inativo ? 'opacity-50' : ''}`}
         >
           {icon}
-          <span className={`flex-1 min-w-0 truncate font-bold uppercase text-sm ${inativo ? 'text-fg-muted' : 'text-primary'}`}>{title}</span>
+          <span id={titleId} className={`flex-1 min-w-0 truncate font-bold uppercase text-sm ${inativo ? 'text-fg-muted' : 'text-primary'}`}>{title}</span>
           {badge}
         </button>
         {doc && (doc.up || doc.down) && (
@@ -144,12 +151,20 @@ const Accordion: React.FC<{
             <button type="button" role="radio" aria-checked={!doc.on} onClick={() => doc.on && doc.set(false)} className={`text-[10px] font-bold uppercase px-2.5 py-1 border-l border-border ${!doc.on ? 'bg-surface-3 text-fg-secondary' : 'bg-surface text-fg-muted hover:text-fg-secondary'}`}>Não</button>
           </div>
         )}
-        <button type="button" onClick={onToggle} aria-label={open ? 'Recolher' : 'Expandir'} className="px-3 py-3.5 shrink-0">
-          <ChevronDown className={`w-4 h-4 text-fg-muted transition-transform ${open ? '' : '-rotate-90'}`} />
-        </button>
+        {!max && (
+          <button type="button" onClick={onToggle} aria-label={open ? 'Recolher' : 'Expandir'} aria-expanded={open} className="px-2 py-2.5 shrink-0">
+            <ChevronDown className={`w-4 h-4 text-fg-muted transition-transform ${open ? '' : '-rotate-90'}`} />
+          </button>
+        )}
+        <span className={max ? 'px-2' : 'pr-1.5'}>{button}</span>
       </div>
-      {open && <div className={`px-4 pb-4 pt-1 border-t border-border ${inativo ? 'opacity-60 focus-within:opacity-100' : ''}`}>{children}</div>}
+      {(visivel || everMax) && (
+        <div className={`${max ? 'flex-1 min-h-0 overflow-y-auto p-4' : 'px-3.5 pb-3.5 pt-2.5 border-t border-border'} ${visivel ? '' : 'hidden'} ${inativo ? 'opacity-60 focus-within:opacity-100' : ''}`}>{children}</div>
+      )}
     </div>
+        );
+      }}
+    </MaximizableCard>
   );
 };
 
@@ -1156,10 +1171,13 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
 
   // Card de valores (renderizado logo após os itens).
   const valorCard = (
-    <div className="bg-navy-3 text-white p-5 rounded-xl shadow-sm space-y-3">
+    <MaximizableCard title={somenteMaterial ? 'Resumo Financeiro' : 'Valores da Proposta'} tone="dark">
+    {({ max, button, titleId }) => (
+    <div className={`bg-navy-3 text-white p-4 rounded-xl shadow-sm space-y-3 ${max ? `${maxCardCls} overflow-y-auto` : ''}`}>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] font-bold text-[#F2A900] uppercase tracking-widest">{somenteMaterial ? 'Resumo Financeiro' : 'Valores da Proposta'}</span>
-        <span className="text-[10px] text-fg-muted text-right">{somenteMaterial ? 'Subtotal + frete + impostos − desconto = total geral.' : 'Serviço puro: use só os itens. Fornecimento + instalação: clique em Sugerir 70/30.'}</span>
+        <span id={titleId} className="text-[10px] font-bold text-[#F2A900] uppercase tracking-widest">{somenteMaterial ? 'Resumo Financeiro' : 'Valores da Proposta'}</span>
+        <span className="flex-1 text-[10px] text-fg-muted text-right">{somenteMaterial ? 'Subtotal + frete + impostos − desconto = total geral.' : 'Serviço puro: use só os itens. Fornecimento + instalação: clique em Sugerir 70/30.'}</span>
+        {button}
       </div>
       <div className="flex items-center justify-between text-sm">
         <span className="text-fg-muted">{somenteMaterial ? 'Subtotal dos produtos' : 'Subtotal dos itens'}</span>
@@ -1296,6 +1314,8 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
       </div>
       )}
     </div>
+    )}
+    </MaximizableCard>
   );
 
   // Faixa "Salvar como novo padrão / Restaurar padrão" (antes dos cards e na Estrutura).
@@ -1631,54 +1651,99 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   };
 
 
+  // Mesmas ações (e handlers) do rodapé, na versão do cabeçalho para telas largas.
+  const acoesSalvar = (
+    <>
+      <button
+        type="button"
+        onClick={handleSaveDraft}
+        className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 font-bold rounded-lg text-xs transition-colors uppercase tracking-wide flex items-center gap-1.5"
+      >
+        <Save className="w-4 h-4" /> Salvar Rascunho
+      </button>
+      {status === 'rascunho' && (
+        <button
+          type="button"
+          onClick={() => handleSaveWithValidation('em_revisao')}
+          className="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg text-xs transition-colors uppercase tracking-wide"
+        >
+          Enviar p/ Revisão
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={handleSaveAndEmit}
+        className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition-colors uppercase tracking-wide shadow-md flex items-center gap-1.5"
+      >
+        <CheckCircle className="w-4 h-4" /> {emitLabel}
+      </button>
+    </>
+  );
+
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-      <div className="bg-surface-2 max-w-4xl w-full rounded-2xl border border-border shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
+    // Editor panorâmico: ocupa praticamente toda a viewport. Sem backdrop-blur/transform
+    // aqui — o popup de card ampliado (position: fixed) depende disso para centralizar na tela.
+    <div className="fixed inset-0 z-50 bg-slate-900/70 flex p-0 sm:p-2 lg:p-3">
+      <div className="bg-surface-2 w-full h-full sm:rounded-2xl border border-border shadow-2xl flex flex-col overflow-hidden">
         {/* Cabeçalho */}
-        <div className="bg-navy-3 text-white p-5 px-6 flex justify-between items-center shrink-0 border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-danger text-white rounded-xl flex items-center justify-center">
+        <div className="bg-navy-3 text-white px-3 py-2.5 sm:px-4 flex justify-between items-center gap-3 shrink-0 border-b border-slate-800">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 bg-danger text-white rounded-xl hidden sm:flex items-center justify-center shrink-0">
               <FileText className="w-5 h-5" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] bg-[#F2A900] text-slate-950 font-black px-2 py-0.5 rounded uppercase">
+                <span className="text-[10px] bg-[#F2A900] text-slate-950 font-black px-2 py-0.5 rounded uppercase whitespace-nowrap">
                   Módulo CRM • Novo Pedido
                 </span>
-                <span className="text-xs font-data-mono text-fg-muted font-bold">{numeroPedido}</span>
+                <span className="text-xs font-data-mono text-fg-muted font-bold truncate">{numeroPedido}</span>
               </div>
-              <h2 className="text-xl font-bold font-display text-white tracking-wide mt-0.5">
+              <h2 className="text-lg font-bold font-display text-white tracking-wide leading-tight mt-0.5 truncate">
                 Estruturação do Pedido
               </h2>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Ações de salvamento no cabeçalho em telas largas (no rodapé nas demais). */}
+            <div className="hidden xl:flex items-center gap-2 pr-2 mr-1 border-r border-slate-700">{acoesSalvar}</div>
             <button
               onClick={handlePreview}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 uppercase"
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 uppercase"
             >
-              <Eye className="w-4 h-4" /> Pré-Visualizar PDF
+              <Eye className="w-4 h-4" /> <span className="hidden sm:inline">Pré-Visualizar PDF</span>
             </button>
-            <button onClick={onClose} className="p-2 text-fg-muted hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
+            <button onClick={onClose} aria-label="Fechar editor" className="p-2 text-fg-muted hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* Corpo: rolagem vertical contínua com sanfonas */}
-        <div ref={scrollRef} className="p-4 md:p-6 overflow-y-auto flex-1 space-y-4">
+        {/* Corpo: uma rolagem principal; duas colunas de cards no desktop */}
+        <div ref={scrollRef} data-editor-scroll className="p-3 md:p-4 overflow-y-auto flex-1 [scrollbar-gutter:stable]">
           {initialPedido?.proposal?.surveyOrigin && (
-            <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 flex items-start gap-2 text-xs text-indigo-950">
+            <div className="mb-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 flex items-start gap-2 text-xs text-indigo-950">
               <span className="material-symbols-outlined text-indigo-700">fact_check</span>
               <div><strong>Pedido originado de levantamento técnico.</strong> {initialPedido.proposal.surveyOrigin.reportNumber || 'Relatório sem número'} · os itens abaixo preservam a origem para conferência comercial.</div>
             </div>
           )}
+          {/* Panorâmico: no desktop, coluna esquerda = dados comerciais, direita = conteúdo
+              do documento (na ordem do PDF). Abaixo de lg as colunas viram `contents` e a
+              ordem original de uma coluna é mantida pelas classes order-*. */}
+          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:items-start">
+          <div className="contents lg:flex lg:flex-col lg:gap-3 lg:min-w-0">
           {/* ---- Informações do Pedido (sempre visível) ---- */}
-          <div className="bg-surface p-5 rounded-xl border border-border shadow-sm">
-            <h3 className="font-bold text-primary uppercase text-sm flex items-center gap-2 mb-4">
-              <Building2 className="w-4 h-4 text-danger" /> Informações do Pedido
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="order-1">
+          <MaximizableCard title="Informações do Pedido">
+          {({ max, button, titleId }) => (
+          <div className={`bg-surface rounded-xl border border-border shadow-sm ${max ? `${maxCardCls} overflow-hidden` : 'p-4'}`}>
+            <div className={`flex items-center justify-between gap-2 shrink-0 ${max ? 'px-4 py-2.5 border-b border-border' : 'mb-3'}`}>
+              <h3 id={titleId} className="font-bold text-primary uppercase text-sm flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-danger" /> Informações do Pedido
+              </h3>
+              {button}
+            </div>
+            <div className={max ? 'flex-1 min-h-0 overflow-y-auto p-4' : undefined}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-x-4 gap-y-3">
               <div>
                 <label className={labelCls}>Número do Pedido</label>
                 <input
@@ -1688,13 +1753,13 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                   placeholder="Ex.: PED-2026-249"
                   className={`${inputCls} font-data-mono font-bold`}
                 />
-                <p className="text-[11px] text-fg-muted mt-1">Sequencial automático — edite se quiser um número específico.</p>
+                <p className="text-[11px] text-fg-muted mt-0.5">Sequencial automático — edite se quiser um número específico.</p>
               </div>
-              <div>
+              <div className="xl:col-span-2">
                 <label className={labelCls}>Referência / Nome do Projeto</label>
                 <input type="text" value={referencia} onChange={(e) => setReferenciaManual(e.target.value)} placeholder="Ex.: Retrofit SDAI Bloco A" className={inputCls} />
               </div>
-              <div className="sm:col-span-2">
+              <div className="sm:col-span-2 xl:col-span-1">
                 <label className={labelCls}>Tipo de Pedido</label>
                 <select
                   value={pedidoTipo}
@@ -1714,7 +1779,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               </div>
 
               {/* Modalidade comercial (natureza) — decide seções técnicas × fornecimento */}
-              <div className="sm:col-span-2">
+              <div className="sm:col-span-2 xl:col-span-4">
                 <label className={labelCls}>Modalidade comercial</label>
                 <div className="grid grid-cols-3 gap-2">
                   {MODALIDADE_ORDER.map((m) => {
@@ -1742,7 +1807,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
 
               {/* P1 — Área de atuação (multi) + Tipo de serviço → título dinâmico */}
               <>
-              <div className="sm:col-span-2">
+              <div className="sm:col-span-2 xl:col-span-4">
                 <label className={labelCls}>Área(s) de atuação</label>
                 <div className="flex flex-wrap gap-1.5">
                   {AREAS_PROPOSTA.map((a) => {
@@ -1761,7 +1826,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                 </div>
                 <p className="text-[11px] text-fg-muted mt-1">Selecione uma ou mais áreas. Compõe o título e a apresentação.</p>
               </div>
-              <div className="sm:col-span-2">
+              <div className="sm:col-span-2 xl:col-span-4">
                 <div className="flex items-center justify-between">
                   <label className={labelCls}>{somenteMaterial ? 'Fornecimento de materiais' : 'Tipo de serviço'}</label>
                   {(somenteMaterial || tipoServico) && (
@@ -1890,7 +1955,7 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               </div>
               </>)}
 
-              <div className="sm:col-span-2">
+              <div className="sm:col-span-2 xl:col-span-4">
                 <label className={labelCls}>
                   Cliente / Contratante <span className="text-danger">*</span>
                 </label>
@@ -1957,9 +2022,14 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                 />
               </div>
             )}
+            </div>
+          </div>
+          )}
+          </MaximizableCard>
           </div>
 
           {/* ---- Lista de Materiais (puxa do Estoque) ---- */}
+          <div className="order-2">
           <Accordion
             title="Lista de Materiais"
             doc={docSecao('itens')}
@@ -1992,9 +2062,11 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               onMove={handleMoveEquipment}
             />
           </Accordion>
+          </div>
 
           {/* ---- Lista de Serviços (digitado ou do catálogo de Serviços) ---- */}
           {!somenteMaterial && (
+          <div className="order-3">
           <Accordion
             title="Lista de Serviços"
             doc={docSecao('itensServicos')}
@@ -2022,32 +2094,13 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               onMove={handleMoveEquipment}
             />
           </Accordion>
+          </div>
           )}
 
-          {valorCard}
-
-          {/* ---- Seções do documento: Sim/Não e ▲▼ no título de cada card, na ordem do documento ---- */}
-          {faixaPadrao}
-          {outrasSecoes}
-          {ordemCards.map((k) => <React.Fragment key={k}>{cardsSecao[k]}</React.Fragment>)}
-
-          {/* ---- Cláusulas Jurídicas (atalho: mesma seleção dos cards) ---- */}
-          {!somenteMaterial && (<>
-          <Accordion title="Cláusulas Jurídicas" icon={<Scale className="w-4 h-4 text-danger" />} open={!!open.clausulas} onToggle={() => toggle('clausulas')}>
-            <p className="text-[11px] text-fg-secondary mb-2">Marque os blocos que devem sair no PDF. Desmarcado = título e texto totalmente omitidos.</p>
-            <div className="space-y-2">
-              <ClauseRow label="Multas por atraso de pagamento" hint="Juros de mora e multa por inadimplência" checked={secaoOn('multas')} onChange={(on) => setSecao('multas', on)} />
-              <ClauseRow label="Limitação de responsabilidade" checked={secaoOn('limitacao')} onChange={(on) => setSecao('limitacao', on)} />
-              <ClauseRow label="Confidencialidade e sigilo" checked={secaoOn('confidencialidade')} onChange={(on) => setSecao('confidencialidade', on)} />
-              <ClauseRow label="Condições Gerais" checked={secaoOn('condicoesGerais')} onChange={(on) => setSecao('condicoesGerais', on)} />
-              <ClauseRow label="Segurança do Trabalho" checked={secaoOn('seguranca')} onChange={(on) => setSecao('seguranca', on)} />
-              <ClauseRow label="Termo de Aceite da Proposta" checked={secaoOn('termoAceite')} onChange={(on) => setSecao('termoAceite', on)} />
-            </div>
-          </Accordion>
-
-          </>)}
+          <div className="order-4">{valorCard}</div>
 
           {/* ---- Informações Básicas (colapsável com +/lixeira) ---- */}
+          <div className="order-9">
           <Accordion title={somenteMaterial ? 'Condições Comerciais' : 'Informações Básicas'} icon={<DollarSign className="w-4 h-4 text-emerald-600" />} open={!!open.basicas} onToggle={() => toggle('basicas')}>
             <div className="space-y-2.5">
               <BasicInfoRow label={somenteMaterial ? 'Prazo de entrega' : 'Prazo de Execução'} value={prazoExecucao} onChange={setPrazoExecucao} placeholder={somenteMaterial ? 'Ex.: Até 10 dias úteis após a confirmação do pedido' : 'Ex.: 10 dias úteis após liberação'} />
@@ -2067,9 +2120,11 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
               </div>
             </div>
           </Accordion>
+          </div>
 
           {/* ---- Observações comerciais (SOMENTE MATERIAL) ---- */}
           {somenteMaterial && (
+            <div className="order-10">
             <Accordion title="Observações" icon={<FileText className="w-4 h-4 text-primary" />} open={!!open.observacoes} onToggle={() => toggle('observacoes')}>
               <textarea
                 rows={3}
@@ -2082,10 +2137,12 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                 Observações livres do orçamento. O aviso de que o fornecimento não inclui instalação/serviços já entra automaticamente no documento.
               </p>
             </Accordion>
+            </div>
           )}
 
           {/* ---- Modelos reutilizáveis ---- */}
           {(templates.length > 0 || onSaveTemplate) && (
+            <div className="order-11">
             <Accordion title="Modelos Reutilizáveis" icon={<Sparkles className="w-4 h-4 text-[#F2A900]" />} open={!!open.modelos} onToggle={() => toggle('modelos')}>
               {onSaveTemplate && (
                 <button type="button" onClick={handleSaveCurrentTemplate} className="mb-3 w-full sm:w-auto px-3 py-2 border border-primary/25 text-primary hover:bg-navy/5 rounded-lg text-xs font-bold uppercase flex items-center justify-center gap-1.5">
@@ -2113,11 +2170,38 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
                 ))}
               </div>
             </Accordion>
+            </div>
           )}
+          </div>
+
+          <div className="contents lg:flex lg:flex-col lg:gap-3 lg:min-w-0">
+          {/* ---- Seções do documento: Sim/Não e ▲▼ no título de cada card, na ordem do documento ---- */}
+          {faixaPadrao && <div className="order-5 -mb-2">{faixaPadrao}</div>}
+          {outrasSecoes && <div className="order-6">{outrasSecoes}</div>}
+          <div className="order-7 flex flex-col gap-3">
+            {ordemCards.map((k) => <React.Fragment key={k}>{cardsSecao[k]}</React.Fragment>)}
+          </div>
+
+          {/* ---- Cláusulas Jurídicas (atalho: mesma seleção dos cards) ---- */}
+          {!somenteMaterial && (<div className="order-8">
+          <Accordion title="Cláusulas Jurídicas" icon={<Scale className="w-4 h-4 text-danger" />} open={!!open.clausulas} onToggle={() => toggle('clausulas')}>
+            <p className="text-[11px] text-fg-secondary mb-2">Marque os blocos que devem sair no PDF. Desmarcado = título e texto totalmente omitidos.</p>
+            <div className="space-y-2">
+              <ClauseRow label="Multas por atraso de pagamento" hint="Juros de mora e multa por inadimplência" checked={secaoOn('multas')} onChange={(on) => setSecao('multas', on)} />
+              <ClauseRow label="Limitação de responsabilidade" checked={secaoOn('limitacao')} onChange={(on) => setSecao('limitacao', on)} />
+              <ClauseRow label="Confidencialidade e sigilo" checked={secaoOn('confidencialidade')} onChange={(on) => setSecao('confidencialidade', on)} />
+              <ClauseRow label="Condições Gerais" checked={secaoOn('condicoesGerais')} onChange={(on) => setSecao('condicoesGerais', on)} />
+              <ClauseRow label="Segurança do Trabalho" checked={secaoOn('seguranca')} onChange={(on) => setSecao('seguranca', on)} />
+              <ClauseRow label="Termo de Aceite da Proposta" checked={secaoOn('termoAceite')} onChange={(on) => setSecao('termoAceite', on)} />
+            </div>
+          </Accordion>
+          </div>)}
+          </div>
+          </div>
         </div>
 
         {/* Rodapé */}
-        <div className="bg-surface border-t border-border p-4 px-6 flex flex-wrap justify-between items-center gap-3 shrink-0">
+        <div className="xl:hidden bg-surface border-t border-border p-3 px-4 flex flex-wrap justify-between items-center gap-3 shrink-0">
           <button
             type="button"
             onClick={handleSaveDraft}
