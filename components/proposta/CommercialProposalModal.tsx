@@ -29,10 +29,10 @@ import {
   ImpostosAdicionaisInfo,
 } from '@/lib/types';
 import { PEDIDO_TIPO_LABELS, PEDIDO_TIPO_ORDER, DEFAULT_DOC_BY_PEDIDO_TIPO } from '@/lib/documentos';
-import { numeracaoSecoesProposta } from '@/lib/numeracaoSecoesEditor';
+import { numeracaoSecoesProposta, numeracaoSecoesOrcamento } from '@/lib/numeracaoSecoesEditor';
 import { MODALIDADE_LABELS, MODALIDADE_ORDER, FRETE_MODO_LABELS, IMPOSTO_MODO_LABELS, OBS_DISPONIBILIDADE } from '@/lib/fornecimentoComercial';
 import { AREAS_PROPOSTA, TIPOS_SERVICO, conclusaoPorTipo, presetPorTipo } from '@/lib/propostaTitulo';
-import { SecaoDocKey, SECAO_KEYS, SECAO_TITULO, alternarSecao, atualizarPadraoEmpresa, flagDaSecao, igualAoPadrao, mesmasSecoes, moverSecao, normalizarSecoes, ordenarSecoes, padraoEmpresaDoTipo, padraoReferenciaDoTipo, secoesPadraoDoTipo } from '@/lib/documentoSecoes';
+import { SecaoDocKey, SECAO_KEYS, SECAO_TITULO, alternarSecao, atualizarPadraoEmpresa, flagDaSecao, igualAoPadrao, mesmasSecoes, moverSecao, normalizarSecoes, ordenarSecoes, padraoEmpresaDoTipo, padraoReferenciaDoTipo, secoesPadraoDoTipo, secoesSelecionadas } from '@/lib/documentoSecoes';
 import { CARTA_APRESENTACAO } from '@/lib/propostaTextos';
 import { SECOES_TEXTO, servicosOfertadosPadrao, restaurarSecaoLista, fonteDaSecaoLista, fonteServicos } from '@/lib/propostaMaterializacao';
 import { normalizeUnitCode } from '@/lib/commercialUnits';
@@ -689,6 +689,11 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     return null;
   });
 
+  // Card "Valores" retirado da tela (não usado). Continua em Somente Material (frete e
+  // impostos adicionais só existem nele) e em pedido antigo que já usa mão de obra,
+  // contrato recorrente ou valor total manual — para esses valores não ficarem invisíveis.
+  const [valorCardLegado] = useState(() => maoDeObraLegado || !!initialPedido?.proposal?.recorrente || manualValorTotal !== null);
+
   // §15 — Contrato recorrente (valor mensal / anual / vigência).
   const [recorrente, setRecorrente] = useState<boolean>(initialPedido?.proposal?.recorrente ?? false);
   const [valorMensal, setValorMensal] = useState<number>(initialPedido?.proposal?.valorMensal ?? 0);
@@ -1201,33 +1206,43 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const infoCompleta = !!clienteId && !!pedidoTipo && (somenteMaterial || (areaPrincipal.length > 0 && !!tipoServico));
   const mostrarResumoInfo = infoCompleta && (infoResumo ?? !!initialPedido);
 
-  // Numeração das seções como sai no PDF da Proposta Comercial (tipos que geram esse
-  // documento). Outros documentos (Orçamento, Laudo…) numeram de outro jeito: sem número.
-  const geraProposta = !somenteMaterial && !!pedidoTipo && DEFAULT_DOC_BY_PEDIDO_TIPO[pedidoTipo] === 'proposta_comercial';
-  const numeroPdf: Record<string, string> = geraProposta
-    ? numeracaoSecoesProposta(
-        { ...flagsSecoes, tipoServico, nivelProposta, ordemSecoes: ordemSecoes.length ? ordemSecoes : undefined },
-        {
-          selecao: secoesSaoPersonalizadas || pedidoTipo === 'personalizado' ? new Set(secoesAtivas) : null,
-          temMateriais: materiaisRows.length > 0,
-          garantiaVisivel: renderWarranty(warranty).hasAny,
-          showCarta: opcoesPdf?.showCarta,
-          showHistorico: opcoesPdf?.showHistorico,
-        },
-      )
-    : {};
+  // Numeração das seções exatamente como sai no PDF do documento que este Tipo de Pedido
+  // gera (Proposta Comercial ou Orçamento), calculada sobre o pedido como será gravado.
+  // Somente Material, Laudo e Personalizado usam outros documentos: sem número.
+  const docGerado = !somenteMaterial && pedidoTipo ? DEFAULT_DOC_BY_PEDIDO_TIPO[pedidoTipo] : null;
+  const numeroPdf: Record<string, string> = (() => {
+    if (docGerado !== 'proposta_comercial' && docGerado !== 'orcamento') return {};
+    const pAtual = buildCurrentPedido().proposal;
+    if (docGerado === 'orcamento') return numeracaoSecoesOrcamento(pAtual);
+    return numeracaoSecoesProposta(pAtual, {
+      selecao: secoesSelecionadas(pAtual),
+      temMateriais: (pAtual.equipmentItems || []).some((e) => e.tipo !== 'servico'),
+      garantiaVisivel: renderWarranty(pAtual.warranty).hasAny,
+      showCarta: opcoesPdf?.showCarta,
+      showHistorico: opcoesPdf?.showHistorico,
+    });
+  })();
 
-  // Cards de seção exibidos na sequência numerada do PDF. Seção desligada (sem número)
-  // fica logo após a vizinha anterior, como no editor. Só muda a exibição.
-  const cardsNaOrdemDoPdf: SecaoDocKey[] = (() => {
+  const mostrarValorCard = somenteMaterial || valorCardLegado;
+
+  // Cards de seção exibidos na sequência numerada do PDF, com Materiais/Serviços ("itens")
+  // na posição em que saem no documento. Seção sem número (desligada/sem conteúdo) fica
+  // logo após a vizinha anterior, como no editor. Só muda a exibição.
+  type CardGrade = SecaoDocKey | 'itens';
+  const cardsNaOrdemDoPdf: CardGrade[] = (() => {
+    const base: CardGrade[] = [...ordemCards];
+    if (!somenteMaterial) {
+      const iEscopo = base.indexOf('escopo');
+      base.splice(iEscopo >= 0 ? iEscopo + 1 : 0, 0, 'itens');
+    }
     let ultimo = 0;
-    return ordemCards
+    return base
       .map((k, i) => {
         const n = Number(numeroPdf[k]) || 0;
         if (n) ultimo = n;
         return { k, rank: n || ultimo + 0.5, i };
       })
-      .sort((a, b) => a.rank - b.rank || a.i - b.i)
+      .sort((x, y) => x.rank - y.rank || x.i - y.i)
       .map((x) => x.k);
   })();
 
@@ -1736,6 +1751,71 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
     ...((status === 'recusado' || status === 'expirado') && motivoRecusa ? [[status === 'recusado' ? 'Motivo da recusa' : 'Observação', motivoRecusa, true]] : []),
   ] as [string, string, boolean?][]).filter(([, valor]) => !!(valor || '').trim());
 
+  // Listas de Materiais e de Serviços (posicionadas na grade conforme o PDF).
+  const materiaisCard = (
+      <Accordion
+        title="Lista de Materiais"
+        doc={docSecao('itens')}
+        icon={<Wrench className="w-4 h-4 text-danger" />}
+        open={open.materiais}
+        onToggle={(atual) => toggle('materiais', atual)}
+        badge={<span className="text-[10px] font-bold bg-surface-3 text-fg-secondary rounded-full px-2 py-0.5">{materiaisRows.length}</span>}
+      >
+        <p className="text-[11px] text-fg-secondary mb-3">Vincule do Estoque (código, nome e preço vêm do produto) ou digite manualmente em “Cadastrar novo dispositivo”.</p>
+        <ItensCardEditor
+          tipo="material"
+          accent="red"
+          itens={materiaisRows}
+          smartCatalog={{ items: inventory, areaCodes: materialAreaCodes }}
+          resolveCatalogo={(id) => {
+            const inv = inventory.find((i) => i.id === id);
+            if (!inv) return undefined;
+            return {
+              descricao: inv.name,
+              descricaoDetalhada: inv.commercialDescription || inv.shortDescription || inv.description,
+              marcaModelo: [inv.brand, inv.model].filter(Boolean).join(' · ') || inv.supplier || inv.category,
+              precoUnitario: inv.salePrice ?? inv.unitPrice,
+              unidade: normalizeUnitCode(inv.unit),
+              stockSnapshot: inv.quantity,
+            };
+          }}
+          onAdd={handleAddEquipmentItem}
+          onUpdate={handleUpdateEquipmentPatch}
+          onRemove={handleRemoveEquipment}
+          onMove={handleMoveEquipment}
+        />
+      </Accordion>
+  );
+  const servicosCard = (
+      <Accordion
+        title="Lista de Serviços"
+        doc={docSecao('itensServicos')}
+        icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />}
+        open={open.servicos}
+        onToggle={(atual) => toggle('servicos', atual)}
+        badge={<span className="text-[10px] font-bold bg-surface-3 text-fg-secondary rounded-full px-2 py-0.5">{servicosRows.length}</span>}
+      >
+        <p className="text-[11px] text-fg-secondary mb-3">
+          Digite o serviço (ex.: &ldquo;Integração SDAI do lojista&rdquo;) ou vincule ao catálogo da aba Serviços, em “Cadastrar novo serviço”.
+        </p>
+        <ItensCardEditor
+          tipo="servico"
+          accent="emerald"
+          itens={servicosRows}
+          catalogo={services.map((svc) => ({ id: svc.id, label: `${svc.code} - ${svc.title}` }))}
+          resolveCatalogo={(id) => {
+            const svc = services.find((s) => s.id === id);
+            if (!svc) return undefined;
+            return { descricao: svc.title, precoUnitario: svc.standardValue, unidade: normalizeUnitCode(svc.unit || 'vb') };
+          }}
+          onAdd={handleAddEquipmentItem}
+          onUpdate={handleUpdateEquipmentPatch}
+          onRemove={handleRemoveEquipment}
+          onMove={handleMoveEquipment}
+        />
+      </Accordion>
+  );
+
   // Mesmas ações (e handlers) do rodapé, na versão do cabeçalho para telas largas.
   const acoesSalvar = (
     <>
@@ -2139,82 +2219,27 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
           </MaximizableCard>
           </div>
 
-          {/* ---- Lista de Materiais (puxa do Estoque) ---- */}
-          <div className={`min-w-0 ${somenteMaterial ? 'lg:col-span-2' : ''}`}>
-          <Accordion
-            title="Lista de Materiais"
-            doc={docSecao('itens')}
-            icon={<Wrench className="w-4 h-4 text-danger" />}
-            open={open.materiais}
-            onToggle={(atual) => toggle('materiais', atual)}
-            badge={<span className="text-[10px] font-bold bg-surface-3 text-fg-secondary rounded-full px-2 py-0.5">{materiaisRows.length}</span>}
-          >
-            <p className="text-[11px] text-fg-secondary mb-3">Vincule do Estoque (código, nome e preço vêm do produto) ou digite manualmente em “Cadastrar novo dispositivo”.</p>
-            <ItensCardEditor
-              tipo="material"
-              accent="red"
-              itens={materiaisRows}
-              smartCatalog={{ items: inventory, areaCodes: materialAreaCodes }}
-              resolveCatalogo={(id) => {
-                const inv = inventory.find((i) => i.id === id);
-                if (!inv) return undefined;
-                return {
-                  descricao: inv.name,
-                  descricaoDetalhada: inv.commercialDescription || inv.shortDescription || inv.description,
-                  marcaModelo: [inv.brand, inv.model].filter(Boolean).join(' · ') || inv.supplier || inv.category,
-                  precoUnitario: inv.salePrice ?? inv.unitPrice,
-                  unidade: normalizeUnitCode(inv.unit),
-                  stockSnapshot: inv.quantity,
-                };
-              }}
-              onAdd={handleAddEquipmentItem}
-              onUpdate={handleUpdateEquipmentPatch}
-              onRemove={handleRemoveEquipment}
-              onMove={handleMoveEquipment}
-            />
-          </Accordion>
-          </div>
-
-          {/* ---- Lista de Serviços (digitado ou do catálogo de Serviços) ---- */}
-          {!somenteMaterial && (
-          <div className="min-w-0">
-          <Accordion
-            title="Lista de Serviços"
-            doc={docSecao('itensServicos')}
-            icon={<ShieldCheck className="w-4 h-4 text-emerald-600" />}
-            open={open.servicos}
-            onToggle={(atual) => toggle('servicos', atual)}
-            badge={<span className="text-[10px] font-bold bg-surface-3 text-fg-secondary rounded-full px-2 py-0.5">{servicosRows.length}</span>}
-          >
-            <p className="text-[11px] text-fg-secondary mb-3">
-              Digite o serviço (ex.: &ldquo;Integração SDAI do lojista&rdquo;) ou vincule ao catálogo da aba Serviços, em “Cadastrar novo serviço”.
-            </p>
-            <ItensCardEditor
-              tipo="servico"
-              accent="emerald"
-              itens={servicosRows}
-              catalogo={services.map((svc) => ({ id: svc.id, label: `${svc.code} - ${svc.title}` }))}
-              resolveCatalogo={(id) => {
-                const svc = services.find((s) => s.id === id);
-                if (!svc) return undefined;
-                return { descricao: svc.title, precoUnitario: svc.standardValue, unidade: normalizeUnitCode(svc.unit || 'vb') };
-              }}
-              onAdd={handleAddEquipmentItem}
-              onUpdate={handleUpdateEquipmentPatch}
-              onRemove={handleRemoveEquipment}
-              onMove={handleMoveEquipment}
-            />
-          </Accordion>
-          </div>
-          )}
+          {/* ---- Lista de Materiais: em Somente Material fica no topo; nos demais, na
+              posição em que sai no PDF (junto da Lista de Serviços, na grade de seções) ---- */}
+          {somenteMaterial && <div className="lg:col-span-2">{materiaisCard}</div>}
 
 
-          <div className="lg:col-span-2">{valorCard}</div>
+          {mostrarValorCard && <div className="lg:col-span-2">{valorCard}</div>}
           {/* ---- Seções do documento: Sim/Não e ▲▼ no título de cada card, na ordem do documento ---- */}
           {faixaPadrao && <div className="lg:col-span-2 -mb-2">{faixaPadrao}</div>}
           {outrasSecoes && <div className="lg:col-span-2">{outrasSecoes}</div>}
           {/* Seções do documento lado a lado, na sequência do PDF: 1ª à esquerda, 2ª à direita… */}
-          {cardsNaOrdemDoPdf.map((k) => <div key={k} className="min-w-0 flex flex-col gap-3">{cardsSecao[k]}</div>)}
+          {cardsNaOrdemDoPdf.map((k) =>
+            k === 'itens' ? (
+              // Materiais | Serviços lado a lado, na posição da seção no PDF.
+              <div key={k} className="lg:col-span-2 grid gap-3 lg:grid-cols-2 lg:items-start">
+                <div className="min-w-0">{materiaisCard}</div>
+                <div className="min-w-0">{servicosCard}</div>
+              </div>
+            ) : (
+              <div key={k} className="min-w-0 flex flex-col gap-3">{cardsSecao[k]}</div>
+            ),
+          )}
 
           {/* ---- Cláusulas Jurídicas (atalho: mesma seleção dos cards) ---- */}
           {!somenteMaterial && (<div className="min-w-0">

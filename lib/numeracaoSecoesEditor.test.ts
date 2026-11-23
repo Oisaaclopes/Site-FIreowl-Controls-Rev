@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { numeracaoSecoesProposta } from './numeracaoSecoesEditor';
+import { numeracaoSecoesProposta, numeracaoSecoesOrcamento } from './numeracaoSecoesEditor';
 
 describe('numeracaoSecoesProposta', () => {
   it('com seleção: numera só as seções ligadas, na ordem do documento', () => {
@@ -24,5 +24,24 @@ describe('numeracaoSecoesProposta', () => {
     expect(n.historico).toBe('01');
     expect(n.visao).toBe('02');
     expect(n.embalagem).toBeUndefined();
+  });
+});
+
+describe('numeracaoSecoesOrcamento', () => {
+  it('sem seleção própria: números fixos do layout histórico', () => {
+    const n = numeracaoSecoesOrcamento({ objetivo: 'Manutenção', equipmentItems: [] } as never);
+    expect(n.visao).toBe('01');
+    expect(n.itens).toBe('02');
+    expect(n.validade).toBe('08');
+  });
+
+  it('com seleção: só seções ligadas e com conteúdo, em sequência', () => {
+    const n = numeracaoSecoesOrcamento({
+      secoesDocumento: ['visao', 'itens', 'itensServicos', 'premissas', 'precos', 'validade'],
+      objetivo: 'Manutenção corretiva',
+      premissas: [],
+      equipmentItems: [{ tipo: 'servico', descricao: 'x', quantidade: 1, precoUnitario: 1 }],
+    } as never);
+    expect(n).toEqual({ visao: '01', itens: '02', precos: '03', validade: '04' });
   });
 });

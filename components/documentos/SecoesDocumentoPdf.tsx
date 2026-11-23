@@ -8,6 +8,7 @@ import { resolverNormasReferencia } from '@/lib/normasReferencia';
 import { normalizeUnitCode } from '@/lib/commercialUnits';
 import { websiteDisplay } from '@/lib/companyProfile';
 import { conclusaoPorTipo } from '@/lib/propostaTitulo';
+import { secaoTemConteudo } from '@/lib/secaoConteudo';
 import {
   CARTA_APRESENTACAO,
   SERVICOS_OFERTADOS,
@@ -102,42 +103,8 @@ function servicosSec(p: CommercialProposalData) {
   return p.servicosOfertados !== undefined ? p.servicosOfertados : p.textosMaterializados ? [] : SERVICOS_OFERTADOS;
 }
 
-/** A seção tem algo para mostrar? (seção sem conteúdo não gera título vazio). */
-export function secaoTemConteudo(key: SecaoDocKey, ctx: SecoesCtx): boolean {
-  const { p } = ctx;
-  switch (key) {
-    case 'carta': return nv(p.cartaApresentacao) || p.cartaApresentacao === undefined;
-    case 'historico': return true;
-    case 'visao': return nv(p.objetivo);
-    case 'normas': return lnv(resolverNormasReferencia(p));
-    case 'escopo': return nv(p.escopoServico) || (p.slaTabela || []).length > 0 || nv(p.slaCritico);
-    case 'itens': return itensVisiveis(ctx).length > 0;
-    case 'itensServicos': return false; // sai dentro de "itens"
-    case 'premissas': return lnv(p.premissas);
-    case 'incluso': return lnv(p.incluso) || lnv(p.naoIncluso);
-    case 'servicos': return servicosSec(p).some((g) => nv(g.titulo) || lnv(g.itens));
-    case 'responsabilidades': return lnv(p.responsabilidadesContratada);
-    case 'entregaveis': return lnv(p.entregaveis);
-    case 'embalagem': return lnv(txtSec(p, p.embalagemTransporteTexto, EMBALAGEM_TRANSPORTE));
-    case 'seguranca': return lnv(txtSec(p, p.segurancaTrabalhoTexto, SEGURANCA_TRABALHO));
-    case 'obrigacoes': return lnv(p.responsabilidadesContratante);
-    case 'precos': return true;
-    case 'infoCompra': return true;
-    case 'impostos': return nv(p.impostos) || lnv(txtSec(p, p.impostosObsTexto, IMPOSTOS_OBS));
-    case 'pagamento': return true;
-    case 'multas': return lnv(txtSec(p, p.multasAtrasoTexto, MULTAS_ATRASO));
-    case 'limitacao': return lnv(txtSec(p, p.limitacaoRespTexto, LIMITACAO_RESPONSABILIDADE));
-    case 'prazo': return nv(p.prazoExecucao);
-    case 'garantia': return renderWarranty(p.warranty).hasAny;
-    case 'confidencialidade': return lnv(txtSec(p, p.confidencialidadeTexto, CONFIDENCIALIDADE));
-    case 'termoAceite': return lnv(txtSec(p, p.termoAceiteTexto, TERMO_ACEITE));
-    case 'condicoesGerais': return lnv(txtSec(p, p.condicoesGeraisTexto, CONDICOES_GERAIS));
-    case 'validade': return true;
-    case 'conclusao': return nv(p.conclusao);
-    case 'aceite': return true;
-    default: return false;
-  }
-}
+/** A seção tem algo para mostrar? Regra pura movida para lib/secaoConteudo (mesmo código). */
+export { secaoTemConteudo };
 
 /** Filtra as chaves que de fato serão desenhadas (para numerar antes de renderizar). */
 export function secoesRenderizaveis(keys: SecaoDocKey[], ctx: SecoesCtx): SecaoDocKey[] {

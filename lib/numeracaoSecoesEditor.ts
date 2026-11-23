@@ -1,3 +1,7 @@
+import { CommercialProposalData } from './types';
+import { SecaoDocKey, ordenarSecoes, secoesSelecionadas } from './documentoSecoes';
+import { renderWarranty } from './commercialWarranty';
+import { secaoTemConteudo } from './secaoConteudo';
 import { EstruturaProposalLike, montarEstruturaProposta, ordenarEstrutura } from './propostaEstrutura';
 
 /**
@@ -43,3 +47,40 @@ export function numeracaoSecoesProposta(
     });
   return out;
 }
+
+/**
+ * Numeração das seções como sai no PDF do ORÇAMENTO (OrcamentoDocument), com a
+ * mesma regra do gerador:
+ * - sem seleção própria (pedido no padrão do tipo): layout histórico, números fixos
+ *   01 Objetivo · 02 Materiais e Serviços · 03 Preços · 04 Impostos · 05 Pagamento ·
+ *   06 Prazo · 07 Garantia · 08 Validade (Objetivo e Garantia só quando têm conteúdo);
+ * - com seleção: cada seção ligada e com conteúdo, na ordem escolhida no editor.
+ */
+export function numeracaoSecoesOrcamento(p: CommercialProposalData): Record<string, string> {
+  const sel = secoesSelecionadas(p);
+  if (!sel) {
+    const out: Record<string, string> = { itens: '02', precos: '03', impostos: '04', pagamento: '05', prazo: '06', validade: '08' };
+    if (nv(p.objetivo) || nv(p.escopoServico)) out.visao = '01';
+    if (renderWarranty(p.warranty).hasAny) out.garantia = '07';
+    return out;
+  }
+  const ctx = { p, verMateriais: sel.has('itens'), verServicos: sel.has('itensServicos') };
+  const temConteudoOrc = (k: SecaoDocKey): boolean => {
+    switch (k) {
+      case 'itens': case 'precos': case 'impostos': case 'pagamento': case 'prazo': case 'validade': return true;
+      case 'garantia': return renderWarranty(p.warranty).hasAny;
+      case 'premissas': return lnv(p.premissas);
+      case 'incluso': return lnv(p.incluso) || lnv(p.naoIncluso);
+      default: return secaoTemConteudo(k, ctx);
+    }
+  };
+  const ordem = ordenarSecoes([...sel], p.ordemSecoes).filter(temConteudoOrc);
+  const out: Record<string, string> = {};
+  ordem.forEach((k, i) => {
+    out[k] = String(i + 1).padStart(2, '0');
+  });
+  return out;
+}
+
+const nv = (s?: string) => !!s && s.trim().length > 0;
+const lnv = (a?: string[]) => Array.isArray(a) && a.filter((x) => nv(x)).length > 0;
