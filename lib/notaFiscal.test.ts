@@ -155,11 +155,15 @@ describe('notaFiscal — NFs emitidas (card + selo)', () => {
 });
 
 describe('notaFiscal — registro antecipado (a partir de ACEITO)', () => {
-  it('pode informar em aceito/concluído, com valor e não recorrente', () => {
+  it('pode informar em aceito/concluído com valor, inclusive recorrente', () => {
     expect(podeInformarNotaFiscal(ped({ status: 'aceito' }))).toBe(true);
     expect(podeInformarNotaFiscal(ped({ status: 'concluido' }))).toBe(true);
     expect(podeInformarNotaFiscal(ped({ status: 'em_negociacao' }))).toBe(false);
-    expect(podeInformarNotaFiscal(ped({ status: 'aceito' }, { recorrente: true }))).toBe(false);
+    // Recorrente: registro manual liberado (bug: botão sumia em pedidos aceitos recorrentes).
+    expect(podeInformarNotaFiscal(ped({ status: 'aceito' }, { recorrente: true }))).toBe(true);
+    // ...mas o lembrete automático segue excluindo recorrente.
+    expect(isNotaFiscalPendente(registrarNotaFiscalEmitida(ped({ status: 'concluido' }, { recorrente: true }), {}))).toBe(false);
+    expect(isNotaFiscalElegivel(ped({ status: 'concluido' }, { recorrente: true }))).toBe(false);
     expect(podeInformarNotaFiscal(ped({ status: 'aceito' }, { valorTotal: 0 }))).toBe(false);
   });
 

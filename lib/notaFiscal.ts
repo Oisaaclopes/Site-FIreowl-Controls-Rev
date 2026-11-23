@@ -83,12 +83,15 @@ export const aplicarNotaFiscal = (
 /**
  * Pode registrar a NF manualmente na linha do pedido? A NF pode sair ANTES da
  * conclusão (faturamento antecipado), então vale a partir de ACEITO.
- * Recorrente fica de fora (fatura por competência, §11).
+ *
+ * Registro MANUAL vale também para pedido RECORRENTE (a NF de um contrato
+ * mensal pode e deve ser informada). Só o lembrete AUTOMÁTICO
+ * (isNotaFiscalElegivel / semear ao concluir) continua excluindo recorrente,
+ * porque contrato fatura por competência e não por conclusão (§11).
  */
 export const podeInformarNotaFiscal = (p: Pedido): boolean =>
   (p.status === 'aceito' || p.status === 'concluido') &&
-  pedidoValorNota(p) > 0 &&
-  p.proposal?.recorrente !== true;
+  pedidoValorNota(p) > 0;
 
 /** Registra (ou corrige) a NF como emitida — nº/data/observação opcionais. */
 export const registrarNotaFiscalEmitida = (
