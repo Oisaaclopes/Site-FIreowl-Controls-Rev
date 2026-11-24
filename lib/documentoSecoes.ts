@@ -100,6 +100,9 @@ export const SECAO_TITULO: Record<SecaoDocKey, string> = Object.fromEntries(
  */
 export const SECOES_NATIVAS_ORCAMENTO: SecaoDocKey[] = [
   'visao', 'normas', 'escopo', 'itens', 'itensServicos', 'incluso', 'precos', 'impostos', 'pagamento', 'prazo', 'garantia', 'validade', 'premissas',
+  // O orçamento sempre fechou com o bloco de assinaturas ("De acordo & Aceite"):
+  // é nativo, então aparece como "Sim" no editor e obedece ao "Não".
+  'aceite',
 ];
 
 /** Seções que o gerador de LAUDO imprime historicamente (objetivo, normas, itens, parecer). */

@@ -745,7 +745,12 @@ export const CommercialProposalModal: React.FC<CommercialProposalModalProps> = (
   const setSecao = (key: SecaoDocKey, ligar: boolean) => {
     const flag = flagDaSecao(key);
     if (flag) FLAG_SETTERS[flag](ligar);
-    setSecoesDocumento(alternarSecao(secoesAtivas, key, ligar));
+    let prox = alternarSecao(secoesAtivas, key, ligar);
+    // "Termo de Aceite" e o bloco final "Aceite da Proposta" (assinaturas) são,
+    // para quem edita, a mesma coisa: o Sim/Não do Termo vale para os dois. O
+    // Aceite continua com Sim/Não próprio em "Também no documento".
+    if (key === 'termoAceite') prox = alternarSecao(prox, 'aceite', ligar);
+    setSecoesDocumento(prox);
   };
   // Aplica uma seleção inteira (padrão do tipo), mantendo as flags coerentes.
   const aplicarSelecao = (lista: string[] | null) => {

@@ -214,6 +214,7 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
     switch (k) {
       case 'itens': case 'precos': case 'impostos': case 'pagamento': case 'prazo': case 'validade': return true;
       case 'garantia': return warrantyView.hasAny;
+      case 'aceite': return false; // assinaturas: bloco próprio no fim (abaixo)
       case 'premissas': return lnv(p.premissas);
       case 'incluso': return lnv(p.incluso) || lnv(p.naoIncluso);
       default: return secaoTemConteudo(k, secCtx);
@@ -514,7 +515,9 @@ export function OrcamentoDocument({ pedido, companyProfile, options }: { pedido:
           </View>
         </View>
 
-        {showAssinatura && (
+        {/* Assinaturas: sempre no layout histórico; com seleção, só se "Aceite" = Sim
+            no editor (mesmo visual, sem duplicar no corpo). */}
+        {showAssinatura && (!sel || sel.has('aceite')) && (
           <View style={styles.signRow} wrap={false}>
             <View style={styles.signCol}>
               <View style={styles.signLine} />
