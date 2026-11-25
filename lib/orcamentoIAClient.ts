@@ -16,6 +16,7 @@ const MENSAGENS: Record<string, string> = {
   cadastro_indisponivel: 'Não foi possível ler clientes e produtos agora. Tente novamente.',
   ia_ocupada: 'A IA está ocupada no momento. Aguarde um minuto e tente de novo.',
   ia_falhou: 'A IA não respondeu. Tente novamente em instantes.',
+  ia_config: 'Erro de configuração na chamada da IA. Avise o suporte técnico (detalhes no log da função gerar-orcamento).',
   ia_recusou: 'A IA não conseguiu montar este orçamento. Revise o texto e tente de novo.',
   plano_grande_demais: 'O orçamento ficou grande demais para uma geração. Divida em partes menores.',
   plano_invalido: 'A IA devolveu um plano em formato inválido. Tente novamente.',
