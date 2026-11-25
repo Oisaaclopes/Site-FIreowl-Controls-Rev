@@ -20,6 +20,28 @@ import { normalizeUnitCode } from './commercialUnits';
 
 export type AcaoProduto = 'usar' | 'atualizar' | 'criar';
 
+/** Tipos de documento que a IA sabe montar (subconjunto de PedidoTipo). */
+export const TIPOS_DOCUMENTO_IA = ['orcamento', 'proposta', 'servico', 'fornecimento'] as const;
+export type TipoDocumentoIA = (typeof TIPOS_DOCUMENTO_IA)[number];
+
+/** Só dígitos; CNPJ válido = 14 dígitos com dígitos verificadores corretos. */
+export function cnpjValido(cnpj: string | null | undefined): boolean {
+  const d = (cnpj || '').replace(/\D/g, '');
+  if (d.length !== 14 || /^(\d)\1+$/.test(d)) return false;
+  const dv = (base: string) => {
+    const pesos = base.length === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+    const soma = base.split('').reduce((s, n, i) => s + Number(n) * pesos[i], 0);
+    const r = soma % 11;
+    return r < 2 ? 0 : 11 - r;
+  };
+  const d1 = dv(d.slice(0, 12));
+  const d2 = dv(d.slice(0, 12) + d1);
+  return d.endsWith(`${d1}${d2}`);
+}
+
+export const formatarCnpj = (cnpj: string) =>
+  cnpj.replace(/\D/g, '').replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+
 export interface PlanoProduto {
   /** Chave interna do plano (normalmente o modelo) — liga itens a produtos. */
   chave: string;
@@ -49,7 +71,14 @@ export interface PlanoItem {
 }
 
 export interface PlanoOrcamentoIA {
-  cliente: { clienteId: string | null; nomeInformado: string; candidatosIds: string[] };
+  cliente: {
+    clienteId: string | null;
+    nomeInformado: string;
+    candidatosIds: string[];
+    /** Cliente NOVO informado no texto (nome + CNPJ) — cadastrado na aprovação. */
+    novoNome: string | null;
+    novoCnpj: string | null;
+  };
   dados: {
     titulo: string;
     local: string | null;
@@ -61,6 +90,8 @@ export interface PlanoOrcamentoIA {
     formaPagamento: string | null;
     areas: string[];
     tipoServico: string;
+    /** Tipo de documento do pedido (escolhe o PDF ao emitir). */
+    tipoDocumento: TipoDocumentoIA;
   };
   produtos: PlanoProduto[];
   itens: PlanoItem[];
@@ -162,7 +193,13 @@ export function validarPlano(raw: unknown): ResultadoValidacao {
     .filter((g) => g.titulo && g.itens.length);
 
   const plano: PlanoOrcamentoIA = {
-    cliente: { clienteId: strOrNull(c.clienteId), nomeInformado: str(c.nomeInformado), candidatosIds: strList(c.candidatosIds) },
+    cliente: {
+      clienteId: strOrNull(c.clienteId),
+      nomeInformado: str(c.nomeInformado),
+      candidatosIds: strList(c.candidatosIds),
+      novoNome: strOrNull(c.novoNome),
+      novoCnpj: strOrNull(c.novoCnpj),
+    },
     dados: {
       titulo: str(d.titulo),
       local: strOrNull(d.local),
@@ -174,6 +211,7 @@ export function validarPlano(raw: unknown): ResultadoValidacao {
       formaPagamento: strOrNull(d.formaPagamento),
       areas,
       tipoServico,
+      tipoDocumento: (TIPOS_DOCUMENTO_IA as readonly string[]).includes(str(d.tipoDocumento)) ? (str(d.tipoDocumento) as TipoDocumentoIA) : 'orcamento',
     },
     produtos,
     itens,
@@ -233,6 +271,61 @@ export function motivoParaEscalar(plano: PlanoOrcamentoIA | null, erros: string[
   return null;
 }
 
+/** Cliente novo válido do plano (nome + CNPJ com dígitos corretos) ou null. */
+export function clienteNovoDoPlano(plano: PlanoOrcamentoIA): { nome: string; cnpj: string } | null {
+  const { novoNome, novoCnpj } = plano.cliente;
+  if (!novoNome || !novoCnpj || !cnpjValido(novoCnpj)) return null;
+  return { nome: novoNome, cnpj: novoCnpj.replace(/\D/g, '') };
+}
+
+/**
+ * Cliente contra o cadastro REAL: se o CNPJ do "cliente novo" já existe, usa o
+ * cadastro existente (nunca duplica cliente). Id inexistente vira "sem cliente".
+ */
+export function resolverCliente(plano: PlanoOrcamentoIA, clients: Pick<Client, 'id' | 'cnpj'>[]): PlanoOrcamentoIA {
+  const c = { ...plano.cliente };
+  if (c.clienteId && !clients.some((x) => x.id === c.clienteId)) c.clienteId = null;
+  const cnpj = (c.novoCnpj || '').replace(/\D/g, '');
+  if (cnpj.length === 14) {
+    const existente = clients.find((x) => (x.cnpj || '').replace(/\D/g, '') === cnpj);
+    if (existente) {
+      c.clienteId = existente.id;
+      c.novoNome = null;
+      c.novoCnpj = null;
+    }
+  }
+  if (c.clienteId) { c.novoNome = null; c.novoCnpj = null; }
+  return { ...plano, cliente: c };
+}
+
+/** Monta o Client novo como o cadastro manual (CrmView): Receita quando houver. */
+export function montarClienteNovo(
+  novo: { nome: string; cnpj: string },
+  receita: { razaoSocial?: string; nomeFantasia?: string; logradouro?: string; cidadeUf?: string; email?: string; telefone?: string } | null,
+  segmento: string,
+  agora: Date,
+): Client {
+  const razao = receita?.razaoSocial || novo.nome;
+  const fantasia = receita?.nomeFantasia || (receita?.razaoSocial && novo.nome !== receita.razaoSocial ? novo.nome : '');
+  const endereco = [receita?.logradouro, receita?.cidadeUf].filter(Boolean).join(' — ');
+  const contato = receita?.email || receita?.telefone
+    ? [{ name: 'Contato Principal', role: 'Responsável', phone: receita?.telefone || '', email: receita?.email || '' }]
+    : [{ name: 'Responsável', role: 'Gerente', phone: '', email: '' }];
+  return {
+    id: `c_${agora.getTime()}`,
+    code: `#F0-${agora.getTime().toString().slice(-4)}`,
+    name: fantasia ? `${razao} (${fantasia})` : razao,
+    cnpj: formatarCnpj(novo.cnpj),
+    segment: segmento,
+    contractStatus: 'EM DIA',
+    lastOSDate: agora.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase(),
+    lastOSType: 'CADASTRO RECENTE',
+    address: endereco || 'Londrina / PR',
+    contacts: contato,
+    totalContractsValue: 0,
+  };
+}
+
 // ----------------------------------------------------------------------------
 // Conferência (determinística — não depende da IA).
 // ----------------------------------------------------------------------------
@@ -259,7 +352,7 @@ function itensParaTotais(plano: PlanoOrcamentoIA): PedidoEquipmentItem[] {
 
 export function conferirPlano(plano: PlanoOrcamentoIA, inventory: InventoryItem[], clients: Pick<Client, 'id'>[]): ConferenciaPlano {
   const alertas: string[] = [];
-  const totals = calculateCommercialProposalTotals({ equipmentItems: itensParaTotais(plano) });
+  const totals = calculateCommercialProposalTotals({ equipmentItems: itensParaTotais(plano), onlyMaterials: plano.dados.tipoDocumento === 'fornecimento' });
   const opcionais = roundMoney(plano.itens.filter((i) => i.opcional).reduce((s, i) => s + lineTotal(i), 0));
   const porChave = new Map(plano.produtos.map((p) => [p.chave, p]));
   const porId = new Map(inventory.map((i) => [i.id, i]));
@@ -290,8 +383,17 @@ export function conferirPlano(plano: PlanoOrcamentoIA, inventory: InventoryItem[
   cmp('Subtotal de serviços', plano.totaisInformados.servicos, totals.servicesSubtotal);
   cmp('Total', plano.totaisInformados.total, totals.finalTotal);
 
-  if (!plano.cliente.clienteId) {
-    alertas.push(plano.cliente.candidatosIds.length > 1 ? 'Mais de um cliente corresponde ao nome informado — escolha qual usar.' : 'Cliente não encontrado no cadastro — escolha um cliente existente.');
+  if (plano.dados.tipoDocumento === 'fornecimento' && plano.itens.some((i) => i.tipo === 'servico' && !i.opcional)) {
+    alertas.push('Fornecimento de materiais soma só os materiais: os serviços do plano ficam fora do total. Use Orçamento se houver mão de obra.');
+  }
+
+  const novo = clienteNovoDoPlano(plano);
+  if (!plano.cliente.clienteId && novo) {
+    alertas.push(`Cliente novo: "${novo.nome}" (CNPJ ${formatarCnpj(novo.cnpj)}) será cadastrado ao aprovar, com os dados da Receita.`);
+  } else if (!plano.cliente.clienteId && plano.cliente.novoCnpj && !cnpjValido(plano.cliente.novoCnpj)) {
+    alertas.push(`CNPJ informado para o cliente novo é inválido (${plano.cliente.novoCnpj}) — corrija no texto ou escolha um cliente existente.`);
+  } else if (!plano.cliente.clienteId) {
+    alertas.push(plano.cliente.candidatosIds.length > 1 ? 'Mais de um cliente corresponde ao nome informado — escolha qual usar.' : 'Cliente não encontrado no cadastro — escolha um existente ou informe nome e CNPJ no texto para cadastrar.');
   } else if (!clients.some((c) => c.id === plano.cliente.clienteId)) {
     alertas.push('O cliente indicado pela IA não está no cadastro — escolha um cliente existente.');
   }
@@ -409,7 +511,7 @@ function montarEscopo(plano: PlanoOrcamentoIA): string {
       const qtd = i.quantidade !== 1 ? `${i.quantidade} × ` : '';
       return `${qtd}${i.descricao} — ${brl(lineTotal(i))}`;
     });
-    const base = calculateCommercialProposalTotals({ equipmentItems: itensParaTotais(plano) }).finalTotal;
+    const base = calculateCommercialProposalTotals({ equipmentItems: itensParaTotais(plano), onlyMaterials: plano.dados.tipoDocumento === 'fornecimento' }).finalTotal;
     const extra = roundMoney(opcionais.reduce((s, i) => s + lineTotal(i), 0));
     partes.push(`Itens opcionais (não inclusos no valor total)\n\n${linhas.join('\n')}\n\nValor total com os opcionais: ${brl(roundMoney(base + extra))}.`);
   }
@@ -452,7 +554,7 @@ export function montarPedidoDoPlano(plano: PlanoOrcamentoIA, ctx: ContextoMontag
 
   const temMaterial = equipmentItems.some((i) => i.tipo !== 'servico');
   const temServico = equipmentItems.some((i) => i.tipo === 'servico');
-  const modalidade = temMaterial && !temServico ? 'somente_material' : temServico && !temMaterial ? 'servico' : 'material_servico';
+  const modalidade = plano.dados.tipoDocumento === 'fornecimento' || (temMaterial && !temServico) ? 'somente_material' : temServico && !temMaterial ? 'servico' : 'material_servico';
   const areaPrincipal = plano.dados.areas.length ? plano.dados.areas : ['outro'];
   const tipoServico = plano.dados.tipoServico;
   const totals = calculateCommercialProposalTotals({ equipmentItems, onlyMaterials: modalidade === 'somente_material' });
@@ -469,7 +571,7 @@ export function montarPedidoDoPlano(plano: PlanoOrcamentoIA, ctx: ContextoMontag
   const formaPagamento = plano.dados.formaPagamento || '';
   const proposal: CommercialProposalData = {
     schemaVersion: COMMERCIAL_SCHEMA_VERSION,
-    pedidoTipo: 'orcamento',
+    pedidoTipo: plano.dados.tipoDocumento,
     modalidade,
     nivelProposta: 'tecnica',
     areaPrincipal,

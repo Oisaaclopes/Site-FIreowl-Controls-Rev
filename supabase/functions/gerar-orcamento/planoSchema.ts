@@ -20,7 +20,7 @@ const objeto = (properties: Record<string, unknown>) => ({ type: 'object', prope
 // A API aceita no máximo 16 campos com união de tipos (nullable): textos
 // opcionais usam string VAZIA ("" = não informado); só números ficam nullable.
 export const PLANO_SCHEMA = objeto({
-  cliente: objeto({ clienteId: SN, nomeInformado: S, candidatosIds: LIST }),
+  cliente: objeto({ clienteId: SN, nomeInformado: S, candidatosIds: LIST, novoNome: S, novoCnpj: S }),
   dados: objeto({
     titulo: S,
     local: S,
@@ -32,6 +32,7 @@ export const PLANO_SCHEMA = objeto({
     formaPagamento: S,
     areas: { type: 'array', items: { type: 'string', enum: AREAS } },
     tipoServico: { type: 'string', enum: TIPOS },
+    tipoDocumento: { type: 'string', enum: ['orcamento', 'proposta', 'servico', 'fornecimento'] },
   }),
   produtos: {
     type: 'array',

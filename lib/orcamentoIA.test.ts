@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { InventoryItem } from './types';
 import {
+  clienteNovoDoPlano,
+  cnpjValido,
+  montarClienteNovo,
+  resolverCliente,
   conferirPlano,
   montarPedidoDoPlano,
   motivoParaEscalar,
@@ -177,6 +181,51 @@ describe('motivoParaEscalar', () => {
     (semVinculo.itens as any[])[0].produtoChave = null;
     const s = validarPlano(semVinculo);
     expect(motivoParaEscalar(s.plano, s.erros)).toMatch(/sem produto/);
+  });
+});
+
+describe('cliente novo e tipo de documento', () => {
+  it('valida CNPJ pelos dígitos verificadores', () => {
+    expect(cnpjValido('11.222.333/0001-81')).toBe(true);
+    expect(cnpjValido('11222333000181')).toBe(true);
+    expect(cnpjValido('11.222.333/0001-82')).toBe(false);
+    expect(cnpjValido('11.111.111/1111-11')).toBe(false);
+    expect(cnpjValido('123')).toBe(false);
+  });
+
+  it('cliente novo com CNPJ válido é aceito e avisado; CNPJ já cadastrado reaproveita o cliente', () => {
+    const base = planoAtlas({ cliente: { clienteId: null, nomeInformado: 'Padaria X', candidatosIds: [], novoNome: 'Padaria X', novoCnpj: '11.222.333/0001-81' } });
+    const { plano } = validarPlano(base);
+    expect(clienteNovoDoPlano(plano!)).toEqual({ nome: 'Padaria X', cnpj: '11222333000181' });
+    expect(conferirPlano(plano!, [], []).alertas.some((a) => a.includes('Cliente novo'))).toBe(true);
+
+    const jaExiste = resolverCliente(plano!, [{ id: 'c_9', cnpj: '11.222.333/0001-81' }]);
+    expect(jaExiste.cliente).toMatchObject({ clienteId: 'c_9', novoNome: null, novoCnpj: null });
+
+    const invalido = validarPlano(planoAtlas({ cliente: { clienteId: null, nomeInformado: 'X', candidatosIds: [], novoNome: 'X', novoCnpj: '11.222.333/0001-00' } })).plano!;
+    expect(clienteNovoDoPlano(invalido)).toBeNull();
+    expect(conferirPlano(invalido, [], []).alertas.some((a) => a.includes('inválido'))).toBe(true);
+  });
+
+  it('monta o cliente novo como o cadastro manual (Receita quando houver)', () => {
+    const agora = new Date('2026-11-25T12:00:00Z');
+    const c = montarClienteNovo({ nome: 'Padaria X', cnpj: '11222333000181' }, { razaoSocial: 'PADARIA X LTDA', nomeFantasia: 'PADARIA X', logradouro: 'Rua A, nº 1', cidadeUf: 'LONDRINA/PR' }, 'Indústria', agora);
+    expect(c).toMatchObject({ name: 'PADARIA X LTDA (PADARIA X)', cnpj: '11.222.333/0001-81', address: 'Rua A, nº 1 — LONDRINA/PR', segment: 'Indústria', contractStatus: 'EM DIA' });
+    expect(c.id).toBe(`c_${agora.getTime()}`);
+    const semReceita = montarClienteNovo({ nome: 'Padaria X', cnpj: '11222333000181' }, null, 'Indústria', agora);
+    expect(semReceita.name).toBe('Padaria X');
+  });
+
+  it('tipo de documento vai para o pedido; fornecimento soma só materiais e avisa serviços', () => {
+    const forn = validarPlano(planoAtlas({ dados: { ...planoAtlas().dados, tipoDocumento: 'fornecimento' } })).plano!;
+    const c = conferirPlano(forn, [], [{ id: 'c_atlas' }]);
+    expect(c.total).toBe(9523.06);
+    expect(c.alertas.some((a) => a.includes('Fornecimento de materiais'))).toBe(true);
+    const ped = montarPedidoDoPlano(forn, { cliente: { id: 'c_atlas', name: 'ATLAS' }, idsPorChave: {}, numeroPedido: 'PED-2026-1', responsavelNome: '', agora: '2026-11-25T12:00:00.000Z', hoje: '2026-11-25' });
+    expect(ped.proposal).toMatchObject({ pedidoTipo: 'fornecimento', modalidade: 'somente_material', valorTotal: 9523.06 });
+    const prop = validarPlano(planoAtlas({ dados: { ...planoAtlas().dados, tipoDocumento: 'proposta' } })).plano!;
+    expect(prop.dados.tipoDocumento).toBe('proposta');
+    expect(validarPlano(planoAtlas()).plano!.dados.tipoDocumento).toBe('orcamento');
   });
 });
 

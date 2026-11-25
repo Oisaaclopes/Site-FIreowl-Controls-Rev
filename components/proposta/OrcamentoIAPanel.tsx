@@ -6,15 +6,23 @@
  * pedido em RASCUNHO pelos mesmos handlers do restante do sistema.
  */
 import React, { useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Loader2, Sparkles, ArrowLeft } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Loader2, Sparkles, ArrowLeft, Download, Upload, FileText, UserPlus } from 'lucide-react';
+import { GUIA_IA, MODELOS_IA, baixarTxt, limparTextoParaIA } from '@/lib/orcamentoIAModelos';
+import { PEDIDO_TIPO_LABELS } from '@/lib/documentos';
+import { fetchCnpjData } from '@/lib/cnpj';
+import { DEFAULT_CLIENT_SEGMENT } from '@/lib/clients';
 import type { Client, InventoryItem, Pedido } from '@/lib/types';
 import { clientDisplayName } from '@/lib/clientSelection';
 import { showToast, requestConfirm } from '@/components/ui/Feedback';
 import { CODIGOS_ESCALAVEIS, ErroOrcamentoIA, ModoIA, gerarPlanoOrcamento } from '@/lib/orcamentoIAClient';
 import {
   PlanoOrcamentoIA,
+  clienteNovoDoPlano,
   conferirPlano,
+  formatarCnpj,
+  montarClienteNovo,
   montarPedidoDoPlano,
+  resolverCliente,
   motivoParaEscalar,
   produtoAtualizadoParaEstoque,
   produtoNovoParaEstoque,
@@ -33,6 +41,8 @@ interface Props {
   onCreateInventoryItem?: (item: InventoryItem) => Promise<InventoryItem>;
   onEditInventoryCatalog?: (item: InventoryItem) => Promise<void>;
   onSavePedido: (pedido: Pedido) => void | Promise<void>;
+  /** Cadastro de cliente (mesmo handler da tela Clientes) — cliente novo do plano. */
+  onAddClient?: (client: Client) => void | Promise<void>;
   /** Abre o pedido recém-criado no editor de Pedidos. */
   onOpenPedido: (pedido: Pedido) => void;
 }
@@ -74,6 +84,7 @@ export const OrcamentoIAPanel: React.FC<Props> = ({
   onCreateInventoryItem,
   onEditInventoryCatalog,
   onSavePedido,
+  onAddClient,
   onOpenPedido,
 }) => {
   const [texto, setTexto] = useState('');
@@ -95,17 +106,29 @@ export const OrcamentoIAPanel: React.FC<Props> = ({
   const invPorId = useMemo(() => new Map(inventory.map((i) => [i.id, i])), [inventory]);
   const candidatos = plano?.cliente.candidatosIds.map((id) => clients.find((c) => c.id === id)).filter(Boolean) as Client[] | undefined;
 
+  // Só o que tem conteúdo vai para a IA (sem comentários "#" e campos vazios).
+  const textoLimpo = useMemo(() => limparTextoParaIA(texto), [texto]);
+  const clienteNovo = plano && !cliente ? clienteNovoDoPlano(plano) : null;
+
   const exibir = (p: PlanoOrcamentoIA, erros: string[], modo: ModoIA, motivo?: string) => {
-    setPlano(resolverAcoesProdutos(p, inventory));
+    setPlano(resolverCliente(resolverAcoesProdutos(p, inventory), clients));
     setErrosPlano(erros);
     setClienteEscolhido('');
     setOrigem({ modo, motivo });
   };
 
+  const carregarArquivo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const arq = e.target.files?.[0];
+    e.target.value = '';
+    if (!arq) return;
+    if (arq.size > 200_000) { showToast('Arquivo grande demais (máx. 200 KB).'); return; }
+    setTexto(await arq.text());
+  };
+
   /** Gera com a IA avançada (Opus) — automática após falha da rápida ou pelo botão. */
   const gerarAvancado = async (motivo: string) => {
     setGerando('Refazendo com a IA avançada… (até 2 min)');
-    const r = await gerarPlanoOrcamento(texto, 'avancado');
+    const r = await gerarPlanoOrcamento(textoLimpo, 'avancado');
     const { plano: p, erros } = validarPlano(r.plano);
     if (!p) throw new Error(erros[0] || 'Plano inválido.');
     exibir(p, erros, 'avancado', motivo);
@@ -118,7 +141,7 @@ export const OrcamentoIAPanel: React.FC<Props> = ({
     try {
       let r;
       try {
-        r = await gerarPlanoOrcamento(texto, 'rapido');
+        r = await gerarPlanoOrcamento(textoLimpo, 'rapido');
       } catch (err) {
         if (err instanceof ErroOrcamentoIA && CODIGOS_ESCALAVEIS.has(err.codigo)) {
           await gerarAvancado('a IA rápida não conseguiu montar o plano');
@@ -158,17 +181,29 @@ export const OrcamentoIAPanel: React.FC<Props> = ({
   };
 
   const aprovar = async () => {
-    if (!plano || !cliente) return;
+    if (!plano || (!cliente && !clienteNovo)) return;
+    if (clienteNovo && !onAddClient) { showToast('Cadastro de cliente indisponível nesta tela.'); return; }
     const novos = plano.produtos.filter((p) => p.acao === 'criar').length;
     const atualizados = plano.produtos.filter((p) => p.acao === 'atualizar').length;
+    const tipoDoc = PEDIDO_TIPO_LABELS[plano.dados.tipoDocumento];
     const ok = await requestConfirm(
-      `Criar o rascunho ${numeroPedido} para ${clientDisplayName(cliente)}?\n\n` +
+      `Criar o rascunho ${numeroPedido} (${tipoDoc}) para ${cliente ? clientDisplayName(cliente) : `${clienteNovo!.nome} — cliente NOVO`}?\n\n` +
+        (clienteNovo ? `• cadastrar o cliente ${clienteNovo.nome} (CNPJ ${formatarCnpj(clienteNovo.cnpj)})\n` : '') +
         `• ${novos} produto(s) novo(s) no estoque (saldo 0)\n• ${atualizados} produto(s) com preço atualizado\n\n` +
-        'O orçamento NÃO será enviado ao cliente.'
+        'O documento NÃO será enviado ao cliente.'
     );
     if (!ok) return;
     const idsPorChave: Record<string, string> = {};
     try {
+      let clienteFinal: Client | null = cliente;
+      if (!clienteFinal && clienteNovo) {
+        setAplicando('Consultando o CNPJ na Receita…');
+        const receita = await fetchCnpjData(clienteNovo.cnpj).catch(() => null);
+        setAplicando(`Cadastrando o cliente ${clienteNovo.nome}…`);
+        clienteFinal = montarClienteNovo(clienteNovo, receita, DEFAULT_CLIENT_SEGMENT, new Date());
+        await onAddClient!(clienteFinal);
+      }
+      if (!clienteFinal) throw new Error('cliente não definido');
       for (const p of plano.produtos) {
         const atual = p.inventoryItemId ? invPorId.get(p.inventoryItemId) : undefined;
         if (p.acao === 'criar' || !atual) {
@@ -188,7 +223,7 @@ export const OrcamentoIAPanel: React.FC<Props> = ({
       setAplicando('Criando o rascunho…');
       const agora = new Date();
       const pedido = montarPedidoDoPlano(plano, {
-        cliente: { id: cliente.id, name: cliente.name },
+        cliente: { id: clienteFinal.id, name: clienteFinal.name },
         idsPorChave,
         numeroPedido,
         responsavelNome: currentUserName,
@@ -202,7 +237,7 @@ export const OrcamentoIAPanel: React.FC<Props> = ({
       onOpenPedido(pedido);
     } catch (err) {
       console.error('Falha ao aplicar o plano de orçamento:', err);
-      showToast(`Parou no meio: ${err instanceof Error ? err.message : 'erro ao gravar'}. Os produtos já gravados ficam no estoque; o rascunho não foi criado.`);
+      showToast(`Parou no meio: ${err instanceof Error ? err.message : 'erro ao gravar'}. O que já foi gravado (cliente/produtos) fica no cadastro; o rascunho não foi criado.`);
     } finally {
       setAplicando('');
     }
@@ -223,6 +258,40 @@ export const OrcamentoIAPanel: React.FC<Props> = ({
             </p>
           </div>
         </div>
+        <div className="rounded-lg border border-border bg-surface-3/50 p-3 space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-fg-muted flex items-center gap-1.5">
+              <FileText className="w-3.5 h-3.5" /> Modelos prontos (.txt) — preencha e envie; comentários “#” e campos vazios não gastam tokens
+            </p>
+            <button type="button" onClick={() => baixarTxt(GUIA_IA.arquivo, GUIA_IA.conteudo)} className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1">
+              <Download className="w-3.5 h-3.5" /> Guia: o que a IA faz
+            </button>
+          </div>
+          <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-2">
+            {MODELOS_IA.map((m) => (
+              <div key={m.id} className="rounded-lg border border-border bg-surface p-2.5 flex flex-col gap-1.5">
+                <p className="text-xs font-bold text-fg">{m.titulo}</p>
+                <p className="text-[11px] text-fg-muted flex-1">{m.descricao}</p>
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => baixarTxt(m.arquivo, m.conteudo)} className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1">
+                    <Download className="w-3.5 h-3.5" /> Baixar .txt
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!!gerando}
+                    onClick={async () => {
+                      if (texto.trim() && !(await requestConfirm('Substituir o texto atual pelo modelo?'))) return;
+                      setTexto(m.conteudo);
+                    }}
+                    className="text-[11px] font-bold text-fg-secondary hover:text-fg"
+                  >
+                    Usar aqui
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
         <textarea
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
@@ -232,11 +301,19 @@ export const OrcamentoIAPanel: React.FC<Props> = ({
           className="w-full rounded-lg border border-border bg-surface p-3 text-sm text-fg font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
         />
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-[11px] text-fg-muted">{texto.length.toLocaleString('pt-BR')} / 30.000 caracteres</p>
+          <div className="flex flex-wrap items-center gap-4">
+            <label className={`text-xs font-bold text-fg-secondary hover:text-fg flex items-center gap-1.5 cursor-pointer ${gerando ? 'pointer-events-none opacity-50' : ''}`}>
+              <Upload className="w-4 h-4" /> Carregar .txt
+              <input type="file" accept=".txt,text/plain" className="hidden" onChange={carregarArquivo} />
+            </label>
+            <p className="text-[11px] text-fg-muted">
+              Vai para a IA: <b className="text-fg">{textoLimpo.length.toLocaleString('pt-BR')}</b> de {texto.length.toLocaleString('pt-BR')} caracteres (máx. 30.000)
+            </p>
+          </div>
           <button
             type="button"
             onClick={gerar}
-            disabled={!!gerando || texto.trim().length < 20}
+            disabled={!!gerando || textoLimpo.length < 20 || textoLimpo.length > 30000}
             className="bg-primary hover:opacity-90 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 uppercase tracking-wide disabled:opacity-50"
           >
             {gerando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
@@ -249,7 +326,7 @@ export const OrcamentoIAPanel: React.FC<Props> = ({
 
   // ------------------------------- REVISÃO -------------------------------
   const alertas = [...(conferencia?.alertas || []), ...plano.alertas];
-  const bloqueado = !cliente || errosPlano.length > 0 || !!aplicando || !!gerando;
+  const bloqueado = (!cliente && !clienteNovo) || errosPlano.length > 0 || !!aplicando || !!gerando;
   const itensBase = plano.itens.filter((i) => !i.opcional);
   const opcionais = plano.itens.filter((i) => i.opcional);
   const margem = conferencia ? roundMoney(conferencia.equipamentos - conferencia.custoEquipamentos) : 0;
@@ -258,7 +335,7 @@ export const OrcamentoIAPanel: React.FC<Props> = ({
     <div className="space-y-4">
       <div className="bg-surface rounded-xl border border-border shadow-sm p-5 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-wide text-fg-muted">Plano de revisão · {numeroPedido} · Rascunho</p>
+          <p className="text-[11px] font-bold uppercase tracking-wide text-fg-muted">Plano de revisão · {numeroPedido} · {PEDIDO_TIPO_LABELS[plano.dados.tipoDocumento]} · Rascunho</p>
           <h2 className="text-lg font-bold text-fg mt-0.5">{plano.dados.titulo || 'Sem título'}</h2>
           <p className="text-xs text-fg-secondary mt-1">
             {[plano.dados.local && `Local: ${plano.dados.local}`, plano.dados.dataEmissao && `Data: ${plano.dados.dataEmissao.split('-').reverse().join('/')}`, plano.dados.validadeDias && `Validade: ${plano.dados.validadeDias} dias`]
@@ -316,6 +393,15 @@ export const OrcamentoIAPanel: React.FC<Props> = ({
           )}
           <optgroup label="Todos os clientes">{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</optgroup>
         </select>
+        {clienteNovo && (
+          <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-xs text-fg flex gap-2 max-w-xl">
+            <UserPlus className="w-4 h-4 shrink-0 text-emerald-600" />
+            <p>
+              <b>Cliente novo:</b> {clienteNovo.nome} · CNPJ {formatarCnpj(clienteNovo.cnpj)}. Será cadastrado ao aprovar, com razão social e endereço
+              da Receita. Para usar um cliente existente, escolha na lista acima.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="bg-surface rounded-xl border border-border shadow-sm p-5 overflow-x-auto">
@@ -406,7 +492,7 @@ export const OrcamentoIAPanel: React.FC<Props> = ({
       </div>
 
       <div className="flex flex-wrap items-center justify-end gap-3">
-        {!cliente && <p className="text-xs text-danger font-bold">Escolha o cliente para continuar.</p>}
+        {!cliente && !clienteNovo && <p className="text-xs text-danger font-bold">Escolha o cliente para continuar.</p>}
         {aplicando && <p className="text-xs text-fg-secondary flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />{aplicando}</p>}
         <button
           type="button"

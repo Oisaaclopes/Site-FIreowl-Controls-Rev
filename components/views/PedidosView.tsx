@@ -1165,6 +1165,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
           onCreateInventoryItem={onCreateInventoryItem}
           onEditInventoryCatalog={onEditInventoryCatalog}
           onSavePedido={onSavePedido}
+          onAddClient={onAddClient}
           onOpenPedido={(ped) => {
             setViewTab('propostas');
             setEditingPedido(ped);
