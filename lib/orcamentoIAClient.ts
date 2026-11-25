@@ -1,7 +1,10 @@
-// Chamada da Edge Function `gerar-orcamento` (Orçamento com IA — Fase 1).
+// Chamada da Edge Function `gerar-orcamento` (Orçamento com IA).
 // O JWT do usuário vai automaticamente no functions.invoke; a função valida o
 // perfil (ADMINISTRATIVO/GESTOR) e lê os cadastros respeitando o RLS.
+// Fase 1.1: modo "rapido" (Haiku, padrão, barato) e "avancado" (Opus).
 import { getSupabaseClient } from './supabaseClient';
+
+export type ModoIA = 'rapido' | 'avancado';
 
 const MENSAGENS: Record<string, string> = {
   unauthorized: 'Sessão expirada. Entre novamente no sistema.',
@@ -18,14 +21,29 @@ const MENSAGENS: Record<string, string> = {
   plano_invalido: 'A IA devolveu um plano em formato inválido. Tente novamente.',
 };
 
-export async function gerarPlanoOrcamento(texto: string): Promise<unknown> {
+/** Falhas do modo rápido que valem uma nova tentativa no modo avançado. */
+export const CODIGOS_ESCALAVEIS = new Set(['ia_recusou', 'plano_grande_demais', 'plano_invalido', 'ia_falhou']);
+
+export class ErroOrcamentoIA extends Error {
+  constructor(public codigo: string) {
+    super(MENSAGENS[codigo] || 'Não foi possível gerar o plano agora (tempo esgotado ou falha de rede). Tente novamente.');
+  }
+}
+
+export interface RespostaPlano {
+  plano: unknown;
+  modelo: string;
+  modo: ModoIA;
+}
+
+export async function gerarPlanoOrcamento(texto: string, modo: ModoIA = 'rapido'): Promise<RespostaPlano> {
   const supabase = getSupabaseClient() as any;
-  const { data, error } = await supabase.functions.invoke('gerar-orcamento', { body: { texto } });
+  const { data, error } = await supabase.functions.invoke('gerar-orcamento', { body: { texto, modo } });
   if (error) {
     let codigo = '';
     try { codigo = (await error.context?.json?.())?.error || ''; } catch { /* resposta sem JSON */ }
-    throw new Error(MENSAGENS[codigo] || 'Não foi possível gerar o plano agora (tempo esgotado ou falha de rede). Tente novamente.');
+    throw new ErroOrcamentoIA(codigo || 'rede');
   }
-  if (!data?.plano) throw new Error(MENSAGENS.plano_invalido);
-  return data.plano;
+  if (!data?.plano) throw new ErroOrcamentoIA('plano_invalido');
+  return { plano: data.plano, modelo: String(data.modelo || ''), modo: data.modo === 'avancado' ? 'avancado' : modo };
 }

@@ -10,11 +10,12 @@ import { AlertTriangle, CheckCircle2, Loader2, Sparkles, ArrowLeft } from 'lucid
 import type { Client, InventoryItem, Pedido } from '@/lib/types';
 import { clientDisplayName } from '@/lib/clientSelection';
 import { showToast, requestConfirm } from '@/components/ui/Feedback';
-import { gerarPlanoOrcamento } from '@/lib/orcamentoIAClient';
+import { CODIGOS_ESCALAVEIS, ErroOrcamentoIA, ModoIA, gerarPlanoOrcamento } from '@/lib/orcamentoIAClient';
 import {
   PlanoOrcamentoIA,
   conferirPlano,
   montarPedidoDoPlano,
+  motivoParaEscalar,
   produtoAtualizadoParaEstoque,
   produtoNovoParaEstoque,
   proximoNumeroPedido,
@@ -76,7 +77,9 @@ export const OrcamentoIAPanel: React.FC<Props> = ({
   onOpenPedido,
 }) => {
   const [texto, setTexto] = useState('');
-  const [gerando, setGerando] = useState(false);
+  const [gerando, setGerando] = useState('');
+  /** Qual IA gerou o plano em tela e, se houve, por que subiu para a avançada. */
+  const [origem, setOrigem] = useState<{ modo: ModoIA; motivo?: string } | null>(null);
   const [aplicando, setAplicando] = useState('');
   const [plano, setPlano] = useState<PlanoOrcamentoIA | null>(null);
   const [errosPlano, setErrosPlano] = useState<string[]>([]);
@@ -92,19 +95,65 @@ export const OrcamentoIAPanel: React.FC<Props> = ({
   const invPorId = useMemo(() => new Map(inventory.map((i) => [i.id, i])), [inventory]);
   const candidatos = plano?.cliente.candidatosIds.map((id) => clients.find((c) => c.id === id)).filter(Boolean) as Client[] | undefined;
 
+  const exibir = (p: PlanoOrcamentoIA, erros: string[], modo: ModoIA, motivo?: string) => {
+    setPlano(resolverAcoesProdutos(p, inventory));
+    setErrosPlano(erros);
+    setClienteEscolhido('');
+    setOrigem({ modo, motivo });
+  };
+
+  /** Gera com a IA avançada (Opus) — automática após falha da rápida ou pelo botão. */
+  const gerarAvancado = async (motivo: string) => {
+    setGerando('Refazendo com a IA avançada… (até 2 min)');
+    const r = await gerarPlanoOrcamento(texto, 'avancado');
+    const { plano: p, erros } = validarPlano(r.plano);
+    if (!p) throw new Error(erros[0] || 'Plano inválido.');
+    exibir(p, erros, 'avancado', motivo);
+  };
+
+  // Fase 1.1: começa SEMPRE na IA rápida (Haiku, custo baixo). Só sobe para a
+  // avançada quando o plano vem com defeito de estrutura (ver motivoParaEscalar).
   const gerar = async () => {
-    setGerando(true);
+    setGerando('Montando o plano…');
     try {
-      const bruto = await gerarPlanoOrcamento(texto);
-      const { plano: p, erros } = validarPlano(bruto);
+      let r;
+      try {
+        r = await gerarPlanoOrcamento(texto, 'rapido');
+      } catch (err) {
+        if (err instanceof ErroOrcamentoIA && CODIGOS_ESCALAVEIS.has(err.codigo)) {
+          await gerarAvancado('a IA rápida não conseguiu montar o plano');
+          return;
+        }
+        throw err;
+      }
+      const { plano: p, erros } = validarPlano(r.plano);
+      const motivo = motivoParaEscalar(p, erros);
+      if (motivo) {
+        try {
+          await gerarAvancado(motivo);
+          return;
+        } catch (err) {
+          // Avançada falhou: mostra o plano da rápida (se existir) para revisão.
+          if (!p) throw err;
+          showToast(`A IA avançada não respondeu; mostrando o plano da IA rápida. ${err instanceof Error ? err.message : ''}`);
+        }
+      }
       if (!p) throw new Error(erros[0] || 'Plano inválido.');
-      setPlano(resolverAcoesProdutos(p, inventory));
-      setErrosPlano(erros);
-      setClienteEscolhido('');
+      exibir(p, erros, 'rapido');
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Falha ao gerar o plano.');
     } finally {
-      setGerando(false);
+      setGerando('');
+    }
+  };
+
+  const refazerAvancado = async () => {
+    try {
+      await gerarAvancado('pedido manual');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Falha ao gerar o plano.');
+    } finally {
+      setGerando('');
     }
   };
 
@@ -169,7 +218,8 @@ export const OrcamentoIAPanel: React.FC<Props> = ({
             <h2 className="text-base font-bold text-fg">Orçamento com IA</h2>
             <p className="text-xs text-fg-secondary mt-0.5">
               Descreva o orçamento (cliente, equipamentos com custo, serviços, condições e textos). A IA monta um plano; você revisa e só então o
-              sistema cria os produtos e o rascunho. Nada é enviado ao cliente.
+              sistema cria os produtos e o rascunho. Nada é enviado ao cliente. Usa a IA rápida (baixo custo); se o plano vier com
+              problema, refaz sozinha na IA avançada.
             </p>
           </div>
         </div>
@@ -178,7 +228,7 @@ export const OrcamentoIAPanel: React.FC<Props> = ({
           onChange={(e) => setTexto(e.target.value)}
           placeholder={EXEMPLO}
           rows={18}
-          disabled={gerando}
+          disabled={!!gerando}
           className="w-full rounded-lg border border-border bg-surface p-3 text-sm text-fg font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
         />
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -186,11 +236,11 @@ export const OrcamentoIAPanel: React.FC<Props> = ({
           <button
             type="button"
             onClick={gerar}
-            disabled={gerando || texto.trim().length < 20}
+            disabled={!!gerando || texto.trim().length < 20}
             className="bg-primary hover:opacity-90 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 uppercase tracking-wide disabled:opacity-50"
           >
             {gerando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            {gerando ? 'Montando o plano… (até 2 min)' : 'Gerar plano com IA'}
+            {gerando || 'Gerar plano com IA'}
           </button>
         </div>
       </div>
@@ -199,7 +249,7 @@ export const OrcamentoIAPanel: React.FC<Props> = ({
 
   // ------------------------------- REVISÃO -------------------------------
   const alertas = [...(conferencia?.alertas || []), ...plano.alertas];
-  const bloqueado = !cliente || errosPlano.length > 0 || !!aplicando;
+  const bloqueado = !cliente || errosPlano.length > 0 || !!aplicando || !!gerando;
   const itensBase = plano.itens.filter((i) => !i.opcional);
   const opcionais = plano.itens.filter((i) => i.opcional);
   const margem = conferencia ? roundMoney(conferencia.equipamentos - conferencia.custoEquipamentos) : 0;
@@ -216,9 +266,29 @@ export const OrcamentoIAPanel: React.FC<Props> = ({
               .join(' · ')}
           </p>
         </div>
-        <button type="button" onClick={() => setPlano(null)} disabled={!!aplicando} className="text-xs font-bold text-fg-secondary hover:text-fg flex items-center gap-1.5">
-          <ArrowLeft className="w-4 h-4" /> Voltar e ajustar o texto
-        </button>
+        <div className="flex flex-col items-end gap-2">
+          <button type="button" onClick={() => setPlano(null)} disabled={!!aplicando || !!gerando} className="text-xs font-bold text-fg-secondary hover:text-fg flex items-center gap-1.5">
+            <ArrowLeft className="w-4 h-4" /> Voltar e ajustar o texto
+          </button>
+          {origem && (
+            <p className="text-[11px] text-fg-muted text-right">
+              Gerado pela <b className="text-fg">{origem.modo === 'avancado' ? 'IA avançada' : 'IA rápida'}</b>
+              {origem.motivo && origem.motivo !== 'pedido manual' && <> (subiu automaticamente: {origem.motivo})</>}
+            </p>
+          )}
+          {origem?.modo === 'rapido' && (
+            <button
+              type="button"
+              onClick={refazerAvancado}
+              disabled={!!gerando || !!aplicando}
+              title="Usa o modelo mais capaz (custa mais). Útil quando o plano veio fraco."
+              className="text-xs font-bold text-primary hover:underline flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {gerando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              {gerando || 'Refazer com IA avançada'}
+            </button>
+          )}
+        </div>
       </div>
 
       {(errosPlano.length > 0 || alertas.length > 0) && (

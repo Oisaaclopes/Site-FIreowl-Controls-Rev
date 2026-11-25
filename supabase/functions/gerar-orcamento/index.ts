@@ -7,8 +7,15 @@
 // Secrets necessários: ANTHROPIC_API_KEY (Supabase › Edge Functions › Secrets).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import Anthropic from 'npm:@anthropic-ai/sdk';
+import { catalogoRelevante } from './catalogoRelevante.ts';
 
-const MODEL = 'claude-opus-5-5';
+// Fase 1.1 — custo: "rapido" (padrão) usa o Haiku; "avancado" usa o Opus e só
+// entra quando a tela pede (plano do Haiku reprovado na conferência ou botão).
+const MODELOS = {
+  rapido: { model: 'claude-haiku-5-5', effort: 'medium' },
+  avancado: { model: 'claude-opus-5-5', effort: 'medium' },
+} as const;
+type Modo = keyof typeof MODELOS;
 const ROLES = ['ADMINISTRATIVO', 'GESTOR'];
 const MAX_TEXTO = 30000;
 const LIMITE_DIARIO = 40;
@@ -141,6 +148,7 @@ Deno.serve(async (req: Request) => {
   const texto = String(body.texto || '').trim();
   if (texto.length < 20) return json(422, { error: 'texto_curto' }, cors);
   if (texto.length > MAX_TEXTO) return json(422, { error: 'texto_longo' }, cors);
+  const modo: Modo = body.modo === 'avancado' ? 'avancado' : 'rapido';
 
   // Limite diário por usuário (contado no próprio audit_logs).
   const inicioDia = new Date(); inicioDia.setUTCHours(0, 0, 0, 0);
@@ -156,12 +164,16 @@ Deno.serve(async (req: Request) => {
   if (cErr || pErr) return json(500, { error: 'cadastro_indisponivel' }, cors);
 
   const hoje = new Date().toISOString().slice(0, 10);
+  // Só os produtos citados no texto (+ variantes da família): menos tokens, mais rápido.
+  const recorte = catalogoRelevante(produtos || [], texto);
   const conteudo = [
     '<clientes>\nid | código | nome | cnpj',
     ...(clientes || []).map((c) => [c.id, c.code || '', c.name, c.cnpj || ''].join(' | ')),
     '</clientes>',
-    '<produtos>\nid | modelo | nome | marca | categoria | unidade | custo | venda | notas',
-    ...(produtos || []).map(linhaProduto),
+    recorte.completo
+      ? '<produtos>\nid | modelo | nome | marca | categoria | unidade | custo | venda | notas'
+      : '<produtos> (recorte do cadastro: só os produtos citados no texto e as variantes da mesma família; modelo ausente aqui = produto não cadastrado)\nid | modelo | nome | marca | categoria | unidade | custo | venda | notas',
+    ...recorte.produtos.map(linhaProduto),
     '</produtos>',
     `<pedido_do_usuario>\n${texto}\n</pedido_do_usuario>`,
   ].join('\n');
@@ -169,17 +181,23 @@ Deno.serve(async (req: Request) => {
   const anthropic = new Anthropic({ apiKey });
   let message;
   try {
+    const cfg = MODELOS[modo];
     // deno-lint-ignore no-explicit-any
     const params: any = {
-      model: MODEL,
+      model: cfg.model,
       max_tokens: 32000,
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
-      output_config: { effort: 'medium', format: { type: 'json_schema', schema: PLANO_SCHEMA } },
+      output_config: { effort: cfg.effort, format: { type: 'json_schema', schema: PLANO_SCHEMA } },
       system: SYSTEM.replace('{HOJE}', hoje),
       messages: [{ role: 'user', content: conteudo }],
     };
-    message = await anthropic.beta.messages.stream(params).finalMessage();
+    if (modo === 'avancado') {
+      // Opus: se recusar, o servidor da Anthropic refaz em outro modelo.
+      params.betas = ['server-side-fallback-2026-07-01'];
+      params.fallbacks = 'default';
+      message = await anthropic.beta.messages.stream(params).finalMessage();
+    } else {
+      message = await anthropic.messages.stream(params).finalMessage();
+    }
   } catch (err) {
     console.error('anthropic_error', err instanceof Anthropic.APIError ? `${err.status} ${err.message}` : String(err));
     const status = err instanceof Anthropic.RateLimitError ? 429 : 502;
@@ -200,8 +218,8 @@ Deno.serve(async (req: Request) => {
     user_role: actor.role,
     action: 'ORCAMENTO_IA',
     module: 'pedidos',
-    details: `model=${message.model} in=${usage.input_tokens ?? 0} out=${usage.output_tokens ?? 0} chars=${texto.length}`,
+    details: `modo=${modo} model=${message.model} in=${usage.input_tokens ?? 0} out=${usage.output_tokens ?? 0} chars=${texto.length} produtos=${recorte.produtos.length}${recorte.completo ? '(todos)' : ''}`,
   });
 
-  return json(200, { plano, modelo: message.model }, cors);
+  return json(200, { plano, modelo: message.model, modo }, cors);
 });

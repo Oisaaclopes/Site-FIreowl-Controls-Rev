@@ -219,6 +219,20 @@ export function resolverAcoesProdutos(plano: PlanoOrcamentoIA, inventory: Invent
   return { ...plano, produtos };
 }
 
+/**
+ * Fase 1.1 — decide se o plano do modo RÁPIDO (Haiku) deve ser refeito no
+ * AVANÇADO (Opus). Só falhas que indicam erro da IA (formato/estrutura), nunca
+ * inconsistências do próprio texto do usuário (ex.: total digitado errado).
+ * Devolve o motivo (para mostrar na tela) ou null.
+ */
+export function motivoParaEscalar(plano: PlanoOrcamentoIA | null, erros: string[]): string | null {
+  if (!plano) return 'a IA rápida não devolveu um plano válido';
+  if (erros.length) return 'o plano da IA rápida veio incompleto';
+  if (plano.itens.some((i) => i.tipo === 'material' && !i.opcional && !i.produtoChave)) return 'a IA rápida deixou equipamento sem produto vinculado';
+  if (!plano.produtos.length && plano.itens.some((i) => i.tipo === 'material')) return 'a IA rápida não identificou os produtos';
+  return null;
+}
+
 // ----------------------------------------------------------------------------
 // Conferência (determinística — não depende da IA).
 // ----------------------------------------------------------------------------

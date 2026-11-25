@@ -3,6 +3,7 @@ import type { InventoryItem } from './types';
 import {
   conferirPlano,
   montarPedidoDoPlano,
+  motivoParaEscalar,
   produtoAtualizadoParaEstoque,
   produtoNovoParaEstoque,
   proximoNumeroPedido,
@@ -157,6 +158,25 @@ describe('montarPedidoDoPlano', () => {
     expect(ped.proposal.textosMaterializados).toBe(true);
     expect(ped.proposal.condicoesGeraisTexto?.length).toBeGreaterThan(0);
     expect(ped.proposal.diretrizesNormativas.join(' ')).toContain('NBR 5410');
+  });
+});
+
+describe('motivoParaEscalar', () => {
+  it('não escala plano bom, mesmo com total digitado errado pelo usuário', () => {
+    const { plano, erros } = validarPlano(planoAtlas({ totaisInformados: { equipamentos: 1, servicos: null, total: null } }));
+    expect(motivoParaEscalar(plano, erros)).toBeNull();
+  });
+
+  it('escala plano inválido, incompleto ou com equipamento sem produto', () => {
+    expect(motivoParaEscalar(null, ['x'])).toMatch(/não devolveu/);
+    const ruim = planoAtlas();
+    (ruim.itens as any[])[0].produtoChave = 'NAO-EXISTE';
+    const v = validarPlano(ruim);
+    expect(motivoParaEscalar(v.plano, v.erros)).toMatch(/incompleto/);
+    const semVinculo = planoAtlas();
+    (semVinculo.itens as any[])[0].produtoChave = null;
+    const s = validarPlano(semVinculo);
+    expect(motivoParaEscalar(s.plano, s.erros)).toMatch(/sem produto/);
   });
 });
 
