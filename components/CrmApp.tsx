@@ -1463,6 +1463,7 @@ function CrmAppContent({
               onGenerateSupplyOrderFromPedido={handleGenerateSupplyOrderFromPedido}
               onUpdateSupplyOrder={handleUpdateSupplyOrder}
               onCreateInventoryItem={handleCreateInventoryItemReturning}
+              onEditInventoryCatalog={handleEditInventoryCatalog}
               onReceiveSupplyOrderIntoStock={handleReceiveSupplyOrderIntoStock}
               onSupplyChanged={handleSupplyChanged}
               onSelectClientForReport={handleSelectClientForReport}

@@ -28,6 +28,7 @@ type ExperienciaOpt = {
 };
 import { uploadPropostaCapa, removePropostaCapa, propostaCapaDataUrl, blobToDataUrl, readImageSize } from '@/lib/propostaCapa';
 import { CommercialProposalModal } from '@/components/proposta/CommercialProposalModal';
+import { OrcamentoIAPanel } from '@/components/proposta/OrcamentoIAPanel';
 import { SupplyReceivingModal } from '@/components/fornecimento/SupplyReceivingModal';
 import { SupplyPurchaseModal } from '@/components/fornecimento/SupplyPurchaseModal';
 import { SupplyOrderDetailModal } from '@/components/fornecimento/SupplyOrderDetailModal';
@@ -67,6 +68,7 @@ import {
   Trash2,
   History,
   Files,
+  Sparkles,
 } from 'lucide-react';
 
 interface PedidosViewProps {
@@ -109,6 +111,8 @@ interface PedidosViewProps {
   onUpdateSupplyOrder?: (order: SupplyOrder) => void;
   /** Cria um item de estoque e retorna o item persistido (para vínculo imediato). */
   onCreateInventoryItem?: (item: InventoryItem) => Promise<InventoryItem>;
+  /** Edição de cadastro do produto (preço) — usada pelo Orçamento com IA. */
+  onEditInventoryCatalog?: (item: InventoryItem) => Promise<void>;
   onReceiveSupplyOrderIntoStock?: (order: SupplyOrder) => void;
   /** Recarrega estoque/pedidos após a entrada segura do recebimento (novo fluxo). */
   onSupplyChanged?: () => void;
@@ -182,6 +186,7 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   onGenerateSupplyOrderFromPedido,
   onUpdateSupplyOrder,
   onCreateInventoryItem,
+  onEditInventoryCatalog,
   onReceiveSupplyOrderIntoStock,
   onSupplyChanged,
   onSelectClientForReport,
@@ -210,7 +215,9 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
   const isTecnico = userRole === 'TECNICO';
 
   // Aba inicial: atalho "Nova OS" força OS; técnico começa em OS; demais em propostas
-  const [viewTab, setViewTab] = useNavigationValue<'propostas' | 'ordens_servico' | 'fornecimento'>('pedidosAba', initialView ?? (isTecnico ? 'ordens_servico' : 'propostas'), ['propostas', 'ordens_servico', 'fornecimento']);
+  const [viewTab, setViewTab] = useNavigationValue<'propostas' | 'ordens_servico' | 'fornecimento' | 'ia'>('pedidosAba', initialView ?? (isTecnico ? 'ordens_servico' : 'propostas'), ['propostas', 'ordens_servico', 'fornecimento', 'ia']);
+  // Orçamento com IA: só perfis que montam orçamentos (a Edge Function confere de novo).
+  const podeUsarIA = userRole === 'ADMINISTRATIVO' || userRole === 'GESTOR';
   // Abre o detalhe do fornecimento quando solicitado por outra tela (ex.: Estoque → Origem).
   useEffect(() => {
     if (!initialDetailOrderId) return;
@@ -1140,7 +1147,30 @@ export const PedidosView: React.FC<PedidosViewProps> = ({
         <button onClick={() => { setViewTab('fornecimento'); setFilterStatus('TODOS'); }} className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all ${viewTab === 'fornecimento' ? 'bg-navy-3 text-white shadow-md' : 'text-fg-secondary hover:text-fg'}`}>
           <span className="material-symbols-outlined text-base text-sky-600">shopping_cart</span> Fornecimento ({supplyOrders.length})
         </button>
+        {podeUsarIA && (
+          <button onClick={() => { setViewTab('ia'); setFilterStatus('TODOS'); }} className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all ${viewTab === 'ia' ? 'bg-navy-3 text-white shadow-md' : 'text-fg-secondary hover:text-fg'}`}>
+            <Sparkles className="w-4 h-4 text-violet-500" /> Orçamento com IA
+          </button>
+        )}
       </div>
+
+      {/* ===================== ORÇAMENTO COM IA ===================== */}
+      {viewTab === 'ia' && podeUsarIA && (
+        <OrcamentoIAPanel
+          clients={clients}
+          inventory={inventory}
+          pedidos={pedidos}
+          nextProposalNumber={nextProposalNumber}
+          currentUserName={currentUserName}
+          onCreateInventoryItem={onCreateInventoryItem}
+          onEditInventoryCatalog={onEditInventoryCatalog}
+          onSavePedido={onSavePedido}
+          onOpenPedido={(ped) => {
+            setViewTab('propostas');
+            setEditingPedido(ped);
+          }}
+        />
+      )}
 
       {/* ===================== PROPOSTAS ===================== */}
       {viewTab === 'propostas' && !isTecnico && (

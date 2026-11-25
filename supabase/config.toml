@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.reverse-geocode]
 verify_jwt = false
+
+[functions.gerar-orcamento]
+verify_jwt = false
